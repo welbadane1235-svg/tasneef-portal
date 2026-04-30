@@ -1891,3 +1891,206 @@ function monthlyReportRowsV58(){return monthlyRowsV60()}
   // تطبيق أولي بعد التحميل
   setTimeout(()=>{ try{ injectPermissionsBox(); applyCurrentPermissions(); }catch(e){} }, 1200);
 })();
+
+/* =========================
+   V74 - Project Geofence Check
+   منع التسجيل خارج نطاق المشروع
+   ========================= */
+(function(){
+  function v74NormNum(v){ const n=Number(v); return Number.isFinite(n)?n:null; }
+  function v74Get(id){ return document.getElementById(id); }
+  function v74Msg(text,type){ if(typeof msg==='function') msg(text,type||'ok'); else alert(text); }
+  function v74ProjectById(id){ return (window.data?.projects||data?.projects||[]).find(p=>String(p.id)===String(id)); }
+  function v74Bool(v){ return v===true || v==='true' || v===1 || v==='1' || v==='on' || v==='yes'; }
+  function v74Rad(x){ return x * Math.PI / 180; }
+  function v74DistanceMeters(lat1,lng1,lat2,lng2){
+    const R=6371000;
+    const dLat=v74Rad(lat2-lat1), dLng=v74Rad(lng2-lng1);
+    const a=Math.sin(dLat/2)**2 + Math.cos(v74Rad(lat1))*Math.cos(v74Rad(lat2))*Math.sin(dLng/2)**2;
+    return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+  }
+  function v74ExtractCoordsFromUrl(url){
+    const s=String(url||'');
+    const patterns=[
+      /@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+      /[?&]q=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+      /[?&]ll=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+      /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/
+    ];
+    for(const r of patterns){ const m=s.match(r); if(m) return {lat:Number(m[1]), lng:Number(m[2])}; }
+    return null;
+  }
+  function v74ProjectLat(p){ return v74NormNum(p?.geofence_lat ?? p?.latitude ?? p?.lat); }
+  function v74ProjectLng(p){ return v74NormNum(p?.geofence_lng ?? p?.longitude ?? p?.lng); }
+  function v74ProjectRadius(p){ return Math.max(1, Number(p?.geofence_radius_meters ?? p?.allowed_distance_meters ?? 150) || 150); }
+  function v74OutAllowed(p){ return v74Bool(p?.allow_out_of_range); }
+  function v74ProjectMapUrl(p){ return p?.map_url || p?.location_url || p?.google_maps_url || p?.location || ''; }
+  function v74GetPosition(){
+    return new Promise((resolve,reject)=>{
+      if(!navigator.geolocation) return reject(new Error('الموقع GPS غير مدعوم في هذا المتصفح'));
+      navigator.geolocation.getCurrentPosition(resolve, reject, {enableHighAccuracy:true, timeout:15000, maximumAge:0});
+    });
+  }
+  async function v74CheckProjectGeofence(projectId, actionLabel){
+    const p=v74ProjectById(projectId);
+    if(!p) return {ok:false, reason:'لم يتم العثور على المشروع'};
+    const enabled = v74Bool(p.geofence_enabled);
+    if(!enabled) return {ok:true, skipped:true};
+
+    let lat=v74ProjectLat(p), lng=v74ProjectLng(p);
+    const fromUrl=v74ExtractCoordsFromUrl(v74ProjectMapUrl(p));
+    if((lat===null || lng===null) && fromUrl){ lat=fromUrl.lat; lng=fromUrl.lng; }
+    if(lat===null || lng===null){
+      if(v74OutAllowed(p)) return {ok:true, warning:'لم يتم تحديد إحداثيات المشروع، وتم السماح بالتسجيل حسب إعداد المشروع'};
+      return {ok:false, reason:'موقع المشروع غير مضبوط. أضف رابط خرائط يحتوي إحداثيات أو خط العرض والطول من قسم المشاريع.'};
+    }
+    let pos;
+    try{ pos=await v74GetPosition(); }
+    catch(e){
+      if(v74OutAllowed(p)) return {ok:true, warning:'تعذر قراءة موقع الجوال، وتم السماح بالتسجيل حسب إعداد المشروع'};
+      return {ok:false, reason:'تعذر قراءة موقع الجوال. فعّل صلاحية الموقع GPS ثم جرّب مرة أخرى. التفاصيل: '+(e.message||e)};
+    }
+    const curLat=pos.coords.latitude, curLng=pos.coords.longitude;
+    const dist=v74DistanceMeters(curLat,curLng,lat,lng);
+    const radius=v74ProjectRadius(p);
+    const payload={lat:curLat,lng:curLng,distance:dist,radius,projectLat:lat,projectLng:lng,projectName:p.name};
+    if(dist<=radius) return {ok:true, location:payload};
+    if(v74OutAllowed(p)){
+      return {ok:true, location:payload, warning:`أنت خارج نطاق المشروع بمسافة ${dist} متر، والمسموح ${radius} متر. تم السماح بالتسجيل حسب إعداد المشروع.`};
+    }
+    return {ok:false, location:payload, reason:`لا يمكن ${actionLabel||'التسجيل'}: أنت خارج نطاق المشروع. المسافة الحالية ${dist} متر، والمسموح ${radius} متر.`};
+  }
+
+  function v74AppendLocationNote(projectId, check){
+    if(!check || !check.location) return;
+    const el=v74Get('logNotes'); if(!el) return;
+    const l=check.location;
+    const line=`GPS: ${Number(l.lat).toFixed(6)}, ${Number(l.lng).toFixed(6)} | المسافة عن المشروع: ${l.distance}م | النطاق: ${l.radius}م`;
+    if(String(el.value||'').includes('GPS:')) return;
+    el.value = (el.value ? el.value + '\n' : '') + line;
+  }
+
+  const oldSupervisorCheckIn = window.supervisorCheckIn;
+  const oldSupervisorCheckOut = window.supervisorCheckOut;
+  window.supervisorCheckIn = async function(){
+    const pid=v74Get('logProject')?.value;
+    if(!pid) return v74Msg('اختر المشروع','err');
+    v74Msg('جاري التحقق من موقعك بالنسبة للمشروع...');
+    const check=await v74CheckProjectGeofence(pid,'تسجيل الدخول');
+    if(!check.ok) return v74Msg(check.reason,'err');
+    if(check.warning) v74Msg(check.warning,'err');
+    v74AppendLocationNote(pid, check);
+    if(typeof oldSupervisorCheckIn==='function') return oldSupervisorCheckIn.apply(this, arguments);
+  };
+  window.supervisorCheckOut = async function(){
+    const pid=v74Get('logProject')?.value;
+    if(!pid) return v74Msg('اختر المشروع','err');
+    v74Msg('جاري التحقق من موقعك بالنسبة للمشروع...');
+    const check=await v74CheckProjectGeofence(pid,'تسجيل الخروج');
+    if(!check.ok) return v74Msg(check.reason,'err');
+    if(check.warning) v74Msg(check.warning,'err');
+    v74AppendLocationNote(pid, check);
+    if(typeof oldSupervisorCheckOut==='function') return oldSupervisorCheckOut.apply(this, arguments);
+  };
+
+  function v74InjectProjectFields(){
+    if(document.getElementById('projectGeofenceBoxV74')) return;
+    const loc=v74Get('projectLocation');
+    if(!loc) return;
+    const box=document.createElement('div');
+    box.id='projectGeofenceBoxV74';
+    box.className='perm-box-v72';
+    box.innerHTML=`
+      <h3 style="margin:0 0 10px;color:#0A4033">إعدادات نطاق التسجيل GPS</h3>
+      <label>رابط موقع المشروع على الخريطة</label>
+      <input id="projectMapUrl" placeholder="ضع رابط Google Maps للمشروع">
+      <div class="split">
+        <div><label>خط العرض Latitude</label><input id="projectGeoLat" type="number" step="0.000001" placeholder="24.713600"></div>
+        <div><label>خط الطول Longitude</label><input id="projectGeoLng" type="number" step="0.000001" placeholder="46.675300"></div>
+      </div>
+      <button type="button" class="light" id="extractCoordsBtnV74">استخراج الإحداثيات من الرابط</button>
+      <div class="split">
+        <div><label>المسافة المسموحة بالمتر</label><input id="projectGeoRadius" type="number" min="1" value="150"></div>
+        <div><label>تفعيل منع التسجيل خارج النطاق</label><select id="projectGeoEnabled"><option value="true">مفعل</option><option value="false">غير مفعل</option></select></div>
+      </div>
+      <label>السماح بالتسجيل خارج النطاق؟</label>
+      <select id="projectAllowOutRange"><option value="false">لا، امنع التسجيل خارج النطاق</option><option value="true">نعم، اسمح مع تنبيه</option></select>
+      <div class="footer-note">ملاحظة: الروابط المختصرة مثل goo.gl قد لا نستطيع استخراج الإحداثيات منها. الأفضل استخدام رابط Google Maps كامل يظهر فيه @latitude,longitude أو إدخال الإحداثيات يدويًا.</div>
+    `;
+    loc.insertAdjacentElement('afterend', box);
+    const btn=box.querySelector('#extractCoordsBtnV74');
+    btn.onclick=()=>{
+      const c=v74ExtractCoordsFromUrl(v74Get('projectMapUrl')?.value||v74Get('projectLocation')?.value||'');
+      if(!c) return v74Msg('لم أستطع استخراج الإحداثيات من الرابط. ضع رابط خرائط كامل أو اكتب خط العرض والطول يدويًا.','err');
+      v74Get('projectGeoLat').value=c.lat;
+      v74Get('projectGeoLng').value=c.lng;
+      v74Msg('تم استخراج الإحداثيات من الرابط');
+    };
+  }
+
+  const oldClearProjectForm=window.clearProjectForm;
+  window.clearProjectForm=function(){
+    if(typeof oldClearProjectForm==='function') oldClearProjectForm.apply(this, arguments);
+    v74InjectProjectFields();
+    if(v74Get('projectMapUrl')) v74Get('projectMapUrl').value='';
+    if(v74Get('projectGeoLat')) v74Get('projectGeoLat').value='';
+    if(v74Get('projectGeoLng')) v74Get('projectGeoLng').value='';
+    if(v74Get('projectGeoRadius')) v74Get('projectGeoRadius').value=150;
+    if(v74Get('projectGeoEnabled')) v74Get('projectGeoEnabled').value='true';
+    if(v74Get('projectAllowOutRange')) v74Get('projectAllowOutRange').value='false';
+  };
+
+  window.saveProject = async function(){
+    v74InjectProjectFields();
+    const id=v74Get('projectId')?.value;
+    const name=(v74Get('projectName')?.value||'').trim();
+    if(!name) return v74Msg('اسم المشروع مطلوب','err');
+    const row={
+      name,
+      location:(v74Get('projectLocation')?.value||'').trim(),
+      supervisor_id:Number(v74Get('projectSupervisor')?.value)||null,
+      required_daily_minutes:Number(v74Get('projectRequiredDaily')?.value||180),
+      friday_minutes:Number(v74Get('projectFridayMinutes')?.value||90),
+      operation_type:v74Get('projectOperationType')?.value||'daily_visit',
+      visit_type_default:v74Get('projectVisitDefault')?.value||'surface',
+      status:v74Get('projectStatus')?.value||'active',
+      notes:v74Get('projectNotes')?.value||'',
+      map_url:(v74Get('projectMapUrl')?.value||'').trim(),
+      geofence_lat:v74NormNum(v74Get('projectGeoLat')?.value),
+      geofence_lng:v74NormNum(v74Get('projectGeoLng')?.value),
+      geofence_radius_meters:Number(v74Get('projectGeoRadius')?.value||150),
+      geofence_enabled:v74Get('projectGeoEnabled')?.value==='true',
+      allow_out_of_range:v74Get('projectAllowOutRange')?.value==='true'
+    };
+    let res=id?await sb.from('projects').update(row).eq('id',id):await sb.from('projects').insert(row);
+    if(res.error && String(res.error.message||'').match(/map_url|geofence|allow_out_of_range/i)){
+      return v74Msg('أعمدة GPS غير موجودة في قاعدة البيانات. شغّل ملف schema_update_v74_geofence.sql ثم أعد الحفظ.','err');
+    }
+    if(res.error) return v74Msg(res.error.message,'err');
+    v74Msg(id?'تم تحديث المشروع مع إعدادات النطاق':'تم حفظ المشروع مع إعدادات النطاق');
+    if(typeof window.clearProjectForm==='function') window.clearProjectForm();
+    if(typeof refreshAll==='function') await refreshAll();
+  };
+
+  window.editProject = function(id){
+    v74InjectProjectFields();
+    const p=(data.projects||[]).find(x=>String(x.id)===String(id)); if(!p)return;
+    v74Get('projectId').value=p.id; v74Get('projectName').value=p.name||''; v74Get('projectLocation').value=p.location||'';
+    v74Get('projectSupervisor').value=p.supervisor_id||''; v74Get('projectStatus').value=p.status||'active'; v74Get('projectNotes').value=p.notes||'';
+    if(v74Get('projectRequiredDaily')) v74Get('projectRequiredDaily').value=p.required_daily_minutes??180;
+    if(v74Get('projectFridayMinutes')) v74Get('projectFridayMinutes').value=p.friday_minutes??90;
+    if(v74Get('projectOperationType')) v74Get('projectOperationType').value=p.operation_type||'daily_visit';
+    if(v74Get('projectVisitDefault')) v74Get('projectVisitDefault').value=p.visit_type_default||'surface';
+    if(v74Get('projectMapUrl')) v74Get('projectMapUrl').value=p.map_url||p.location_url||p.google_maps_url||'';
+    if(v74Get('projectGeoLat')) v74Get('projectGeoLat').value=p.geofence_lat??p.latitude??p.lat??'';
+    if(v74Get('projectGeoLng')) v74Get('projectGeoLng').value=p.geofence_lng??p.longitude??p.lng??'';
+    if(v74Get('projectGeoRadius')) v74Get('projectGeoRadius').value=p.geofence_radius_meters??p.allowed_distance_meters??150;
+    if(v74Get('projectGeoEnabled')) v74Get('projectGeoEnabled').value=String(p.geofence_enabled!==false);
+    if(v74Get('projectAllowOutRange')) v74Get('projectAllowOutRange').value=String(v74OutAllowed(p));
+    if(v74Get('projectFormTitle')) v74Get('projectFormTitle').textContent='تعديل مشروع';
+    if(v74Get('projectSaveBtn')) v74Get('projectSaveBtn').textContent='تحديث المشروع';
+    window.scrollTo({top:0,behavior:'smooth'});
+  };
+
+  window.addEventListener('load', ()=>setTimeout(v74InjectProjectFields, 800));
+})();
