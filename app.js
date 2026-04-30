@@ -1539,3 +1539,320 @@ function renderMonthly(){const body=$('monthlyBody');if(!body)return;const table
 function exportMonthlyCSV(){const rows=[...document.querySelectorAll('#monthlyBody tr')].map(tr=>[...tr.children].map(td=>td.textContent.trim()));const csv=['المشرف,المشروع,أسماء العمال,الساعات المطلوبة,الساعات الفعلية,وقت الانتقال,نسبة العمل,نسبة الالتزام,حالة الأداء',...rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(','))].join('\n');download('monthly.csv',csv)}
 function monthlyBaseRowsV59(){return monthlyRowsV60()}
 function monthlyReportRowsV58(){return monthlyRowsV60()}
+
+/* ===== V72: User permissions + camera photo for supervisor check-in/out + WhatsApp ===== */
+(function(){
+  'use strict';
+
+  const PERMISSIONS_V72 = [
+    ['can_time_logs','تسجيل دخول / خروج'],
+    ['can_journey','رحلة التشغيل اليومية'],
+    ['can_attendance','تسجيل الحضور'],
+    ['can_tickets','التكتات'],
+    ['can_reports','الملخص والتقارير'],
+    ['can_monthly','الأوقات الشهرية'],
+    ['can_edit_time_logs','تعديل السجلات اليومية'],
+    ['can_manage_users','إدارة المستخدمين'],
+    ['can_manage_workers','إدارة العمال']
+  ];
+
+  function roleDefaults(role){
+    if(role === 'admin') return Object.fromEntries(PERMISSIONS_V72.map(p=>[p[0], true]));
+    if(role === 'technician') return {can_tickets:true};
+    return {
+      can_time_logs:true,
+      can_journey:true,
+      can_attendance:true,
+      can_tickets:true,
+      can_reports:true,
+      can_monthly:false,
+      can_edit_time_logs:false,
+      can_manage_users:false,
+      can_manage_workers:false
+    };
+  }
+  function getPerms(user){
+    user = user || (typeof session === 'function' ? session() : null) || {};
+    let base = roleDefaults(user.role);
+    let extra = user.permissions || {};
+    if(typeof extra === 'string'){
+      try{ extra = JSON.parse(extra || '{}'); }catch(e){ extra = {}; }
+    }
+    return Object.assign({}, base, extra || {});
+  }
+  window.getUserPermissionsV72 = getPerms;
+
+  function injectPermissionsBox(){
+    const formTitle = document.getElementById('userFormTitle');
+    if(!formTitle || document.getElementById('userPermissionsBoxV72')) return;
+    const active = document.getElementById('userActive');
+    if(!active) return;
+    const box = document.createElement('div');
+    box.id = 'userPermissionsBoxV72';
+    box.className = 'perm-box-v72';
+    box.innerHTML = '<label>الصلاحيات</label><div class="perm-grid-v72">' + PERMISSIONS_V72.map(([key,label]) =>
+      `<label class="perm-item-v72"><input type="checkbox" id="perm_${key}" data-perm="${key}"> <span>${label}</span></label>`
+    ).join('') + '</div><div class="footer-note">تحدد هذه الصلاحيات ما يظهر للمستخدم داخل التطبيق. المدير يحصل على كل الصلاحيات افتراضيًا.</div>';
+    active.parentElement.insertBefore(box, active.nextSibling);
+    const role = document.getElementById('userRole');
+    if(role) role.addEventListener('change', ()=>setPermInputs(roleDefaults(role.value)));
+    setPermInputs(roleDefaults(role?.value || 'supervisor'));
+  }
+  function readPermInputs(){
+    const out = {};
+    PERMISSIONS_V72.forEach(([key])=>{
+      const el = document.getElementById('perm_'+key);
+      if(el) out[key] = !!el.checked;
+    });
+    return out;
+  }
+  function setPermInputs(perms){
+    perms = perms || {};
+    PERMISSIONS_V72.forEach(([key])=>{
+      const el = document.getElementById('perm_'+key);
+      if(el) el.checked = !!perms[key];
+    });
+  }
+  function permissionsText(perms){
+    perms = perms || {};
+    const labels = PERMISSIONS_V72.filter(([k])=>perms[k]).map(x=>x[1]);
+    return labels.length ? labels.join('، ') : '-';
+  }
+
+  const oldHydrate = window.hydrateForms;
+  window.hydrateForms = function(){
+    if(typeof oldHydrate === 'function') oldHydrate.apply(this, arguments);
+    injectPermissionsBox();
+  };
+
+  window.saveUser = async function(){
+    const id=$('userId')?.value;
+    const row={
+      full_name:$('userFullName')?.value.trim(),
+      username:$('userUsername')?.value.trim(),
+      password:$('userPassword')?.value.trim()||'123456',
+      role:$('userRole')?.value,
+      is_active:$('userActive')?.value==='true',
+      permissions: readPermInputs()
+    };
+    if(!row.full_name||!row.username) return msg('الاسم واسم المستخدم مطلوبان','err');
+    let res = id ? await sb.from('app_users').update(row).eq('id',id) : await sb.from('app_users').insert(row);
+    if(res.error && String(res.error.message||'').includes('permissions')){
+      const safeRow = Object.assign({}, row); delete safeRow.permissions;
+      res = id ? await sb.from('app_users').update(safeRow).eq('id',id) : await sb.from('app_users').insert(safeRow);
+      if(!res.error) msg('تم حفظ المستخدم، لكن عمود الصلاحيات غير موجود. شغّل ملف schema_update_v72_permissions_camera.sql','err');
+    }
+    if(res.error) return msg(res.error.message,'err');
+    msg('تم حفظ المستخدم والصلاحيات');
+    if(typeof clearUserForm === 'function') clearUserForm();
+    await refreshAll();
+    injectPermissionsBox();
+  };
+
+  window.renderUsers = function(){
+    const b=$('usersBody'); if(!b) return;
+    const table=b.closest('table');
+    if(table && table.tHead){
+      table.tHead.innerHTML='<tr><th>الاسم</th><th>المستخدم</th><th>الدور</th><th>الحالة</th><th>الصلاحيات</th><th>إجراء</th></tr>';
+    }
+    b.innerHTML=(data.users||[]).map(u=>{
+      const perms = getPerms(u);
+      return `<tr><td>${esc(u.full_name)}</td><td>${esc(u.username)}</td><td><span class="badge">${u.role==='admin'?'مدير':(u.role==='technician'?'فني':'مشرف')}</span></td><td><span class="badge ${u.is_active?'green':'red'}">${u.is_active?'نشط':'موقوف'}</span></td><td style="white-space:normal;min-width:220px">${esc(permissionsText(perms))}</td><td class="row-actions"><button onclick="editUser(${u.id})">تعديل</button><button class="danger" onclick="deleteRow('app_users',${u.id})">حذف</button></td></tr>`;
+    }).join('') || '<tr><td colspan="6">لا يوجد مستخدمون</td></tr>';
+  };
+
+  window.editUser = function(id){
+    const u=(data.users||[]).find(x=>String(x.id)===String(id)); if(!u)return;
+    injectPermissionsBox();
+    $('userId').value=u.id; $('userFullName').value=u.full_name||''; $('userUsername').value=u.username||''; $('userPassword').value=u.password||''; $('userRole').value=u.role; $('userActive').value=String(u.is_active!==false); $('userFormTitle').textContent='تعديل مستخدم';
+    setPermInputs(getPerms(u));
+  };
+
+  const oldClearUser = window.clearUserForm;
+  window.clearUserForm = function(){
+    if(typeof oldClearUser === 'function') oldClearUser.apply(this, arguments);
+    injectPermissionsBox();
+    setPermInputs(roleDefaults(document.getElementById('userRole')?.value || 'supervisor'));
+  };
+
+  function applyCurrentPermissions(){
+    const u = (typeof session === 'function') ? session() : null;
+    if(!u) return;
+    const p = getPerms(u);
+    if(u.role === 'admin'){
+      const navMap = [
+        ['users','can_manage_users'], ['workers','can_manage_workers'], ['daily','can_time_logs'], ['attendance','can_attendance'], ['monthly','can_monthly'], ['tickets','can_tickets']
+      ];
+      navMap.forEach(([page,perm])=>{
+        const btn=[...document.querySelectorAll('.nav')].find(b=>String(b.getAttribute('onclick')||'').includes(`'${page}'`));
+        if(btn && p[perm]===false) btn.classList.add('hidden');
+      });
+    }
+    if(u.role === 'supervisor'){
+      const tabRules = [
+        ['supLogs','can_time_logs'], ['supAttendance','can_attendance'], ['supTickets','can_tickets'], ['supSummary','can_reports']
+      ];
+      tabRules.forEach(([page,perm])=>{
+        const btn=[...document.querySelectorAll('.sup-tab')].find(b=>String(b.getAttribute('onclick')||'').includes(`'${page}'`));
+        if(btn && p[perm]===false) btn.classList.add('hidden');
+      });
+    }
+  }
+  window.addEventListener('load', ()=>setTimeout(applyCurrentPermissions, 700));
+
+  function ensureCameraStyles(){
+    if(document.getElementById('cameraStylesV72')) return;
+    const st=document.createElement('style'); st.id='cameraStylesV72';
+    st.textContent = `
+      .cam-overlay-v72{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:999999;display:grid;place-items:center;padding:16px;direction:rtl}
+      .cam-box-v72{width:min(560px,96vw);background:#fff;border-radius:22px;padding:14px;border:1px solid #dce6e2;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+      .cam-box-v72 h3{margin:0 0 10px;color:#0A4033}.cam-video-v72{width:100%;max-height:58vh;background:#111;border-radius:16px;object-fit:cover}
+      .cam-actions-v72{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.cam-actions-v72 button{flex:1}.cam-cancel-v72{background:#b83232!important}.perm-box-v72{margin-top:12px;border:1px solid var(--line,#dce6e2);background:#fbfdfc;border-radius:14px;padding:12px}.perm-grid-v72{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.perm-item-v72{display:flex!important;align-items:center;gap:8px;margin:0!important;color:#10231d!important;font-weight:600!important}.perm-item-v72 input{width:auto!important}.footer-note{font-size:12px;color:#60706a;line-height:1.7;margin-top:8px}
+      @media(max-width:640px){.perm-grid-v72{grid-template-columns:1fr}.cam-actions-v72{flex-direction:column}}
+    `;
+    document.head.appendChild(st);
+  }
+  function nowArabicLabel(){ return new Date().toLocaleString('ar-SA', {dateStyle:'medium', timeStyle:'short'}); }
+  function dataUrlToFile(dataUrl, filename){
+    const arr = dataUrl.split(','), mime = (arr[0].match(/:(.*?);/)||[])[1] || 'image/jpeg';
+    const bstr = atob(arr[1]); let n=bstr.length; const u8=new Uint8Array(n);
+    while(n--) u8[n]=bstr.charCodeAt(n);
+    return new File([u8], filename, {type:mime});
+  }
+  async function capturePhotoV72(info){
+    ensureCameraStyles();
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      msg('الكاميرا غير مدعومة في هذا المتصفح','err');
+      return null;
+    }
+    return new Promise(async(resolve)=>{
+      let stream=null;
+      const overlay=document.createElement('div'); overlay.className='cam-overlay-v72';
+      overlay.innerHTML=`<div class="cam-box-v72"><h3>${info.title}</h3><video class="cam-video-v72" autoplay playsinline></video><div class="cam-actions-v72"><button type="button" id="camShotV72">التقاط الصورة</button><button type="button" class="cam-cancel-v72" id="camCancelV72">إلغاء</button></div><div class="footer-note">سيتم وضع التاريخ والوقت واسم المشرف على الصورة تلقائيًا.</div></div>`;
+      document.body.appendChild(overlay);
+      const video=overlay.querySelector('video');
+      function close(val){ try{ stream && stream.getTracks().forEach(t=>t.stop()); }catch(e){} overlay.remove(); resolve(val); }
+      overlay.querySelector('#camCancelV72').onclick=()=>close(null);
+      overlay.querySelector('#camShotV72').onclick=()=>{
+        const w=640, h=480;
+        const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+        const ctx=canvas.getContext('2d');
+        ctx.fillStyle='#111'; ctx.fillRect(0,0,w,h);
+        try{
+          const vw=video.videoWidth||w, vh=video.videoHeight||h;
+          const scale=Math.max(w/vw,h/vh), dw=vw*scale, dh=vh*scale, dx=(w-dw)/2, dy=(h-dh)/2;
+          ctx.drawImage(video,dx,dy,dw,dh);
+        }catch(e){}
+        const lines=[info.title, 'المشرف: '+info.supervisorName, 'المشروع: '+info.projectName, 'الوقت: '+nowArabicLabel()];
+        ctx.font='bold 24px Tahoma, Arial';
+        const pad=16, lineH=34, boxH=pad*2+lines.length*lineH;
+        ctx.fillStyle='rgba(10,64,51,.86)'; ctx.fillRect(0,h-boxH,w,boxH);
+        ctx.fillStyle='#fff'; ctx.textAlign='right'; ctx.direction='rtl';
+        lines.forEach((line,i)=>ctx.fillText(line,w-pad,h-boxH+pad+26+i*lineH));
+        close(canvas.toDataURL('image/jpeg',0.72));
+      };
+      try{
+        stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}, audio:false});
+        video.srcObject=stream;
+      }catch(err){
+        msg('تعذر فتح الكاميرا: '+(err.message||err),'err');
+        close(null);
+      }
+    });
+  }
+  function workersForSupervisorText(supervisorId){
+    const map=new Map();
+    const projects=(data.projects||[]).filter(p=>String(p.supervisor_id||'')===String(supervisorId||''));
+    const pids=new Set(projects.map(p=>String(p.id)));
+    (data.workers||[]).forEach(w=>{
+      const pid = (typeof workerProjectId === 'function') ? workerProjectId(w) : (w.project_id || w.assigned_project_id || '');
+      if(!pids.has(String(pid))) return;
+      const name=String(w.name||'').trim(); if(!name) return;
+      const key=(typeof tasneefNormNameV60==='function'?tasneefNormNameV60(name):name.replace(/\s+/g,' '));
+      if(!map.has(key)) map.set(key,name);
+    });
+    return [...map.values()].join('، ') || '-';
+  }
+  function attendanceWhatsappTextV72(type, row){
+    const title = type==='out' ? 'انصراف المشرف وعماله' : 'حضور المشرف وعماله';
+    const lines=[title,'','المشرف: '+supervisorName(row.supervisor_id),'المشروع: '+projectName(row.project_id),'نوع الزيارة: '+(typeof visitTypeText==='function'?visitTypeText(row.visit_type):row.visit_type||'-'),'العمال: '+workersForSupervisorText(row.supervisor_id),'التاريخ: '+(row.log_date||today()),(type==='out'?'وقت الخروج: ':'وقت الدخول: ')+timeOnly(type==='out'?row.check_out:row.check_in),'','شركة تصنيف لإدارة المرافق'];
+    return lines.join('\n');
+  }
+  async function sharePhotoAndWhatsappV72(dataUrl, text, filename){
+    try{
+      if(dataUrl && navigator.canShare && navigator.share){
+        const file=dataUrlToFile(dataUrl, filename||'tasneef-attendance.jpg');
+        if(navigator.canShare({files:[file]})){
+          await navigator.share({title:'تصنيف', text, files:[file]});
+          return;
+        }
+      }
+    }catch(e){}
+    try{ await navigator.clipboard?.writeText(text); }catch(e){}
+    const url='https://wa.me/?text='+encodeURIComponent(text + (dataUrl?'\n\nملاحظة: تم التقاط الصورة داخل التطبيق. إذا لم تُرفق تلقائيًا، احفظها من شاشة التصوير وأرفقها يدويًا.':''));
+    window.open(url,'_blank');
+  }
+  async function saveTimeLogWithPhotoV72(type, photoDataUrl){
+    const u=session();
+    const id=$('logId')?.value;
+    const date=$('logDate')?.value || today();
+    let sup=$('logSupervisor')?.value || (u.role==='supervisor'?u.id:'');
+    const project=$('logProject')?.value;
+    if(!sup && project) sup=getProjectSupervisorId(project);
+    const check_in=dateTime(date,$('logIn')?.value), check_out=dateTime(date,$('logOut')?.value);
+    if(!project||!check_in) return {error:'المشروع ووقت الدخول مطلوبان'};
+    const actual=minutesBetween(check_in,check_out);
+    const required=requiredMinutesForLog(project,date);
+    const ts=calcTimeStatus(actual,required);
+    const autoTravel=calculateTravelMinutes(sup,date,check_in,id);
+    const row={user_id:u.id, supervisor_id:Number(sup)||null, project_id:Number(project), check_in, check_out, log_date:date, duration_minutes:actual, travel_minutes:autoTravel, visit_type:$('logVisitType')?.value||findProject(project)?.visit_type_default||'surface', required_minutes:required, time_difference_minutes:ts.diff, time_status:ts.status, notes:$('logNotes')?.value||''};
+    if(photoDataUrl){
+      if(type==='out'){ row.check_out_photo=photoDataUrl; row.check_out_photo_at=new Date().toISOString(); }
+      else { row.check_in_photo=photoDataUrl; row.check_in_photo_at=new Date().toISOString(); }
+    }
+    let res = id ? await sb.from('time_logs').update(row).eq('id',id).select('*').maybeSingle() : await sb.from('time_logs').insert(row).select('*').single();
+    if(res.error && String(res.error.message||'').includes('photo')){
+      delete row.check_in_photo; delete row.check_out_photo; delete row.check_in_photo_at; delete row.check_out_photo_at;
+      res = id ? await sb.from('time_logs').update(row).eq('id',id).select('*').maybeSingle() : await sb.from('time_logs').insert(row).select('*').single();
+      if(!res.error) msg('تم الحفظ، لكن أعمدة الصور غير موجودة. شغّل ملف schema_update_v72_permissions_camera.sql','err');
+    }
+    if(res.error) return {error:res.error.message};
+    const savedRow = res.data ? res.data : Object.assign({id:Number(id)||0}, row);
+    return {row:savedRow};
+  }
+
+  window.supervisorCheckIn = async function(){
+    const u=session();
+    if(!$('logProject')?.value) return msg('اختر المشروع','err');
+    const pName=projectName($('logProject').value);
+    const photo=await capturePhotoV72({title:'صورة حضور / دخول', supervisorName:u?.full_name||u?.username||'مشرف', projectName:pName});
+    if(!photo) return msg('تم إلغاء التصوير، لم يتم تسجيل الدخول','err');
+    $('logDate').value=today(); $('logIn').value=nowTime(); $('logOut').value='';
+    const saved=await saveTimeLogWithPhotoV72('in', photo);
+    if(saved.error) return msg(saved.error,'err');
+    playAppSound('checkin'); msg('تم تسجيل الدخول بالصورة');
+    const text=attendanceWhatsappTextV72('in', saved.row);
+    await sharePhotoAndWhatsappV72(photo, text, 'tasneef-checkin-'+Date.now()+'.jpg');
+    clearLogForm(); await initSupervisor();
+  };
+  window.supervisorCheckOut = async function(){
+    const u=session(); const pid=$('logProject')?.value;
+    if(!pid) return msg('اختر المشروع','err');
+    const todayStr=today();
+    const open=(data.logs||[]).filter(l=>String(l.project_id)===String(pid)&&String(l.supervisor_id)===String(u.id)&&(!l.check_out)&&(l.log_date||String(l.check_in||'').slice(0,10))===todayStr).sort((a,b)=>new Date(b.check_in)-new Date(a.check_in))[0];
+    if(open) editTimeLog(open.id); else { $('logDate').value=todayStr; $('logIn').value=$('logIn').value||nowTime(); }
+    const pName=projectName(pid);
+    const photo=await capturePhotoV72({title:'صورة انصراف / خروج', supervisorName:u?.full_name||u?.username||'مشرف', projectName:pName});
+    if(!photo) return msg('تم إلغاء التصوير، لم يتم تسجيل الخروج','err');
+    $('logOut').value=nowTime();
+    const saved=await saveTimeLogWithPhotoV72('out', photo);
+    if(saved.error) return msg(saved.error,'err');
+    playAppSound('checkout'); msg('تم تسجيل الخروج بالصورة');
+    const text=attendanceWhatsappTextV72('out', saved.row);
+    await sharePhotoAndWhatsappV72(photo, text, 'tasneef-checkout-'+Date.now()+'.jpg');
+    clearLogForm(); await initSupervisor();
+  };
+
+  // تطبيق أولي بعد التحميل
+  setTimeout(()=>{ try{ injectPermissionsBox(); applyCurrentPermissions(); }catch(e){} }, 1200);
+})();
