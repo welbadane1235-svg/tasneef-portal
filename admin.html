@@ -135,52 +135,7 @@
         <div class="filters"><input id="contractSearch" oninput="renderContracts()" placeholder="بحث باسم المشروع"><select id="contractFilterStatus" onchange="renderContracts()"><option value="">كل الحالات</option><option value="active">نشط</option><option value="soon">قريب الانتهاء</option><option value="expired">منتهي</option><option value="missing">بيانات ناقصة</option></select></div>
         <div class="table-wrap"><table><thead><tr><th>المشروع</th><th>العمائر</th><th>الشقق</th><th>بداية العقد</th><th>نهاية العقد</th><th>الأيام المتبقية</th><th>حالة العقد</th><th>إجراء</th></tr></thead><tbody id="contractsBody"></tbody></table></div>
       </div>
-      
-      <div class="card">
-        <div class="table-head">
-          <div>
-            <h2>الخدمات التعاقدية حسب جدول الإكسل</h2>
-            <p>تظهر البيانات بنفس القيم الموجودة في جدول الخدمات، مع إمكانية الجدولة الذكية وتسجيل التنفيذ.</p>
-          </div>
-          <div class="actions">
-            <button class="light" onclick="refreshContractServices()">تحديث الخدمات</button>
-            <button onclick="smartScheduleServices()">جدولة ذكية للخدمات غير المنفذة</button>
-            <button class="light" onclick="exportContractServicesCSV()">تصدير CSV</button>
-          </div>
-        </div>
-        <div class="kpis small">
-          <div class="kpi"><small>إجمالي الخدمات</small><b id="servicesTotalCount">0</b></div>
-          <div class="kpi"><small>منجزة</small><b id="servicesDoneCount">0</b></div>
-          <div class="kpi"><small>مستحقة / مراجعة</small><b id="servicesPendingCount">0</b></div>
-        </div>
-        <div class="filters">
-          <input id="serviceSearch" oninput="renderContractServices()" placeholder="بحث باسم المشروع أو الخدمة أو القيمة">
-          <select id="serviceSupervisorFilter" onchange="renderContractServices()"><option value="">كل المشرفين</option></select>
-          <select id="serviceStatusFilter" onchange="renderContractServices()"><option value="">كل الحالات</option><option value="مجدولة">مجدولة</option><option value="منجزة">منجزة</option><option value="مستحقة/مراجعة">مستحقة/مراجعة</option><option value="تكرار/حسب العقد">تكرار/حسب العقد</option><option value="خارج العقد">خارج العقد</option></select>
-          <select id="serviceProjectFilter" onchange="renderContractServices()"><option value="">كل المشاريع</option></select>
-        </div>
-        <div id="smartScheduleResult" class="alerts" style="margin-bottom:12px"></div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>المشروع</th>
-                <th>المسؤول</th>
-                <th>الخدمة</th>
-                <th>القيمة كما في الجدول</th>
-                <th>تاريخ الخدمة</th>
-                <th>الحالة</th>
-                <th>جدولة ذكية</th>
-                <th>تنفيذ</th>
-                <th>ملاحظات</th>
-                <th>إجراء</th>
-              </tr>
-            </thead>
-            <tbody id="contractServicesBody"></tbody>
-          </table>
-        </div>
-      </div>
-
+      <div class="card"><h2>الخدمات السنوية</h2><p>هذه الواجهة جاهزة للمرحلة التالية: إضافة خدمات مثل غسيل الخزانات، مكافحة الحشرات، المصاعد، والدفاع المدني وربطها بكل عقد.</p></div>
     </section>
 
     <section id="workers" class="page hidden">
@@ -303,6 +258,6 @@
     <section id="export" class="page hidden"><div class="card"><h2>التصدير</h2><p>صدّر بيانات النظام الحالية بصيغة CSV.</p><div class="actions"><button onclick="exportTable('app_users')">المستخدمين</button><button onclick="exportTable('projects')">المشاريع</button><button onclick="exportTable('workers')">العمال</button><button onclick="exportTable('attendance')">الحضور</button><button onclick="exportTable('time_logs')">التسجيلات اليومية</button><button onclick="exportTable('tickets')">التكتات</button></div></div></section>
   </main>
 </div>
-<script src="app.js?v=79?v=73"></script>
+<script src="app.js?v=73"></script>
 </body>
 </html>
