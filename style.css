@@ -18,5 +18,11 @@
 .closure-box{margin-top:12px;padding:12px;border:1px dashed #d8e5df;border-radius:14px;background:#fbfdfc}.closure-box.hidden{display:none!important}.footer-note{margin-top:8px;color:#60706a;font-size:12px;line-height:1.7}
 
 
-/* V83 Tasneef Assistant */
-.tasneef-assistant-card{max-width:1120px;margin:auto}.assistant-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}.assistant-head p{margin:6px 0 0;color:var(--muted);line-height:1.7}.assistant-badge{background:linear-gradient(135deg,#0A4033,#0f5a47);color:#fff;border:1px solid #c7a24d;border-radius:999px;padding:8px 14px;font-weight:900}.assistant-quick{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.assistant-chat{height:430px;overflow:auto;background:linear-gradient(180deg,#f7fbfa,#fff);border:1px solid var(--line);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px}.assistant-msg{max-width:88%;padding:12px 14px;border-radius:16px;line-height:1.8;white-space:pre-wrap;border:1px solid var(--line)}.assistant-msg.user{align-self:flex-start;background:#0A4033;color:#fff;border-color:#0A4033}.assistant-msg.bot{align-self:flex-end;background:#fff;color:var(--text);box-shadow:0 8px 20px rgba(10,64,51,.05)}.assistant-msg.bot b{color:#0A4033}.assistant-input-row{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:12px}.assistant-input-row textarea{min-height:70px}.assistant-suggestions{display:grid;gap:8px;margin-top:8px}.assistant-suggestions .chip{display:inline-block;background:#eef6f3;color:#0A4033;border:1px solid var(--line);border-radius:999px;padding:6px 10px;margin:2px;font-weight:700;cursor:pointer}@media(max-width:720px){.assistant-input-row{grid-template-columns:1fr}.assistant-msg{max-width:100%}.assistant-chat{height:360px}}
+/* V84 Assistant */
+.assistant-chat{height:360px;overflow:auto;background:#fbfdfc;border:1px solid var(--line);border-radius:18px;padding:14px;display:grid;gap:10px;align-content:start}
+.assistant-empty{color:var(--muted);text-align:center;padding:50px 10px;line-height:1.8}
+.assistant-msg{max-width:88%;border:1px solid var(--line);border-radius:18px;padding:12px;background:#fff;box-shadow:0 6px 18px rgba(10,64,51,.04)}
+.assistant-msg.user{margin-right:auto;background:#eef6f3;border-color:#cfe0da}
+.assistant-msg.bot{margin-left:auto;background:#fff}
+.assistant-msg b{display:block;color:var(--brand);margin-bottom:6px}
+.assistant-msg pre{margin:0;white-space:pre-wrap;font-family:Tahoma,Arial,sans-serif;line-height:1.9;color:#122b24}

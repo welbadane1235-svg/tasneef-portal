@@ -311,7 +311,7 @@ async function saveSupervisorAttendance(){ const u=session(); const date=$('atte
     catch(e){ console.error('Error in '+name, e); }
   }
 
-  const renderNames = ['renderDashboard','renderTimeLogs','renderUsers','renderProjects','renderWorkers','renderAttendance','renderMonthly','renderTickets','renderAlerts'];
+  const renderNames = ['renderDashboard','renderTimeLogs','renderUsers','renderProjects','renderWorkers','renderAttendance','renderMonthly','renderTickets','renderAlerts','renderTasneefAssistant'];
   window.renderAll = function(){ renderNames.forEach(runSafe); };
 
   window.showPage = function(id, btn){
@@ -347,6 +347,7 @@ async function saveSupervisorAttendance(){ const u=session(); const date=$('atte
         'الأوقات الشهرية':'monthly',
         'التكتات':'tickets',
         'التنبيهات':'alerts',
+        'مساعد تصنيف':'assistant',
         'التصدير':'export'
       };
       const old = btn.getAttribute('onclick') || '';
@@ -2036,183 +2037,95 @@ function monthlyReportRowsV58(){return monthlyRowsV60()}
   setTimeout(()=>{ try{ if($('monthlyBody')) renderMonthly(); }catch(e){} }, 800);
 })();
 
-// ===== V83 Tasneef Internal Assistant - Free templates/rules, no API =====
-(function(){
-  window.tasneefAssistantHistory = window.tasneefAssistantHistory || [];
-  window.tasneefAssistantLastReply = window.tasneefAssistantLastReply || '';
 
-  function assistantEsc(s){ return String(s ?? '').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-  function normAr(s){ return String(s||'').trim().replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/\s+/g,' ').toLowerCase(); }
-  function assistantDate(){ try{ return new Date().toLocaleDateString('ar-SA'); }catch(e){ return today(); } }
-  function assistantTime(){ try{ return new Date().toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return nowTime(); } }
-  function findProjectInText(text){
-    const n = normAr(text);
-    return (data.projects||[]).find(p => n.includes(normAr(p.name))) || null;
+/* ===== V84: Internal Tasneef Assistant - no API ===== */
+(function(){
+  let assistantMessages = [];
+  let assistantLastReply = '';
+  function normAr(s){return String(s||'').toLowerCase().replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/\s+/g,' ').trim();}
+  function safe(s){return (typeof esc==='function'?esc(s):String(s??''));}
+  function getProjectByText(text){
+    const n=normAr(text);
+    return (data.projects||[]).find(p=>n.includes(normAr(p.name))) || null;
   }
-  function currentMonth(){ return ($('monthlyMonth')?.value || today().slice(0,7)); }
-  function getMonthLogs(month){
-    return (data.logs||[]).filter(l => String(l.log_date || l.check_in || '').slice(0,7) === month && l.check_in && l.check_out);
+  function getSupervisorByText(text){
+    const n=normAr(text);
+    return (data.supervisors||data.users||[]).find(u=>u.role==='supervisor' && n.includes(normAr(u.full_name||u.username))) || null;
   }
-  function getTodayLogs(){
-    const d = $('dailyDate')?.value || today();
-    return (data.logs||[]).filter(l => (l.log_date || String(l.check_in||'').slice(0,10)) === d);
-  }
-  function openLogsText(){
-    const d = $('dailyDate')?.value || today();
-    const rows = (data.logs||[]).filter(l => (l.log_date || String(l.check_in||'').slice(0,10)) === d && l.check_in && !l.check_out);
-    if(!rows.length) return `لا توجد سجلات مفتوحة بدون خروج بتاريخ ${d}.`;
-    return `السجلات المفتوحة بدون خروج بتاريخ ${d}:\n` + rows.map((l,i)=>`${i+1}. المشرف: ${supervisorName(l.supervisor_id)} | المشروع: ${projectName(l.project_id)} | دخول: ${timeOnly(l.check_in)}`).join('\n');
-  }
-  function todayAnalysisText(){
-    const d = $('dailyDate')?.value || today();
-    const logs = getTodayLogs();
-    const completed = logs.filter(l=>l.check_in && l.check_out);
-    const open = logs.filter(l=>l.check_in && !l.check_out);
-    const totalMins = completed.reduce((a,l)=>a + (Number(l.duration_minutes)||minutesBetween(l.check_in,l.check_out)),0);
-    const bySup = new Map();
-    completed.forEach(l=>{
-      const sid=String(l.supervisor_id||'');
-      if(!bySup.has(sid)) bySup.set(sid,{count:0,mins:0});
-      const x=bySup.get(sid); x.count++; x.mins += (Number(l.duration_minutes)||minutesBetween(l.check_in,l.check_out));
-    });
-    const supLines = [...bySup.entries()].map(([sid,x])=>`- ${supervisorName(sid)}: ${x.count} سجلات مكتملة، إجمالي ${minsToText(x.mins)}`).join('\n') || '- لا توجد سجلات مكتملة.';
-    return `ملخص تشغيل اليوم ${d}:\n\nإجمالي السجلات: ${logs.length}\nالسجلات المكتملة: ${completed.length}\nالسجلات المفتوحة: ${open.length}\nإجمالي ساعات العمل داخل المشاريع: ${minsToText(totalMins)}\n\nحسب المشرفين:\n${supLines}\n\n${open.length ? 'تنبيه: يوجد سجلات مفتوحة تحتاج تسجيل خروج أو مراجعة.' : 'الوضع جيد: لا توجد سجلات مفتوحة.'}`;
-  }
-  function monthlyUnderTimeText(){
-    const month = currentMonth();
-    let rows = [];
-    try{
-      if(typeof monthlyRowsV60 === 'function') rows = monthlyRowsV60();
-      else if(typeof monthlyBaseRowsV59 === 'function') rows = monthlyBaseRowsV59();
-    }catch(e){ rows=[]; }
-    if(!rows.length){
-      const logs = getMonthLogs(month);
-      const grouped = new Map();
-      logs.forEach(l=>{
-        const key=(l.supervisor_id||'')+'|'+(l.project_id||'');
-        if(!grouped.has(key)) grouped.set(key,{s:l.supervisor_id,p:l.project_id,a:0,r:0});
-        const g=grouped.get(key); const actual=Number(l.duration_minutes)||minutesBetween(l.check_in,l.check_out); const req=logRequiredMinutes(l);
-        g.a += actual; g.r += req;
-      });
-      rows=[...grouped.values()].map(r=>({...r,diff:r.a-r.r,st:(r.a-r.r)<-5?'ناقص وقت':((r.a-r.r)>5?'زيادة وقت':'ضمن الوقت')}));
-    }
-    const under = rows.filter(r => (r.st||'').includes('ناقص') || Number(r.diff||0) < -5);
-    if(!under.length) return `لا توجد مشاريع ناقصة وقت في شهر ${month} حسب البيانات الحالية.`;
-    return `المشاريع الناقصة وقت في شهر ${month}:\n` + under.map((r,i)=>`${i+1}. ${projectName(r.p)} | المشرف: ${supervisorName(r.s)} | الفعلي: ${minsToText(r.a)} | المطلوب: ${minsToText(r.r)} | النقص: ${minsToText(Math.abs(r.diff||0))}`).join('\n');
-  }
-  function ticketsLateText(){
-    const now = Date.now();
-    const rows = (data.tickets||[]).filter(t => (t.status||'open') !== 'closed').map(t=>{
-      const created = new Date(t.created_at || t.date || now).getTime();
-      const hours = Math.max(0, Math.round((now-created)/36e5));
-      return {...t,hours};
-    }).filter(t=>t.hours>=24).sort((a,b)=>b.hours-a.hours);
-    if(!rows.length) return 'لا توجد تكتات مفتوحة أكثر من 24 ساعة حسب البيانات الحالية.';
-    return 'التكتات المتأخرة أكثر من 24 ساعة:\n' + rows.map((t,i)=>`${i+1}. ${projectName(t.project_id)} | ${t.title||'تكت'} | الحالة: ${t.status||'مفتوح'} | مفتوح منذ ${t.hours} ساعة`).join('\n');
-  }
+  function arDate(d=new Date()){try{return d.toLocaleDateString('ar-SA',{year:'numeric',month:'2-digit',day:'2-digit'})}catch(e){return today();}}
   function projectWorkersText(projectId){
-    const names = [...new Set((data.workers||[]).filter(w=>String(workerProjectId(w))===String(projectId) && (w.status||'active')!=='inactive').map(w=>w.name).filter(Boolean))];
-    return names.join('، ') || '-';
+    const rows=(data.workers||[]).filter(w=>String(workerProjectId?.(w)||w.project_id||'')===String(projectId));
+    const names=[...new Set(rows.map(w=>w.name).filter(Boolean))];
+    return names.length?names.join('، '):'حسب فريق المشروع';
   }
-  function reportTemplate(type, p, extra){
-    const project = p?.name || extractProjectNameFallback(extra) || '[اسم المشروع]';
-    const date = assistantDate();
-    if(type==='pest') return `تقرير مكافحة الحشرات\n\nالمشروع: ${project}\nالتاريخ: ${date}\n\nتم تنفيذ أعمال مكافحة الحشرات في المشروع وفق الإجراءات المعتمدة، وشملت معالجة المناطق المستهدفة داخل المرافق المشتركة ومتابعة المواقع التي قد تكون سببًا في ظهور الحشرات.\n\nتم توجيه الفريق بالمتابعة الدورية والتأكد من جودة التنفيذ، مع الالتزام بإجراءات السلامة أثناء العمل.\n\nملاحظات:\n${extra || 'لا توجد ملاحظات إضافية.'}\n\nشركة تصنيف لإدارة المرافق`;
-    if(type==='tank') return `تقرير تنظيف الخزانات\n\nالمشروع: ${project}\nالتاريخ: ${date}\n\nتم تنفيذ أعمال تنظيف وغسيل الخزانات حسب الخطة التشغيلية، مع العناية بإزالة الرواسب وتنظيف الجدران والأرضيات الداخلية للخزان، والتأكد من جاهزية الموقع بعد الانتهاء.\n\nتم تنفيذ العمل من قبل الفريق المختص، وسيتم متابعة أي ملاحظات تظهر لاحقًا.\n\nملاحظات:\n${extra || 'تم الانتهاء من العمل بصورة جيدة.'}\n\nشركة تصنيف لإدارة المرافق`;
-    if(type==='maintenance') return `تقرير صيانة\n\nالمشروع: ${project}\nالتاريخ: ${date}\n\nتمت مباشرة بلاغ الصيانة في المشروع، وفحص الموقع من قبل الفريق المختص، واتخاذ الإجراء اللازم حسب طبيعة الملاحظة.\n\nالإجراء المنفذ:\n${extra || 'تمت المعالجة والمتابعة.'}\n\nشركة تصنيف لإدارة المرافق`;
-    return `تقرير أعمال نظافة\n\nالمشروع: ${project}\nالتاريخ: ${date}\n\nتم تنفيذ أعمال النظافة بالمشروع وفق الخطة التشغيلية المعتمدة، وشملت تنظيف المواقع المستهدفة ورفع الملاحظات الظاهرة والتأكد من جاهزية المرافق المشتركة.\n\nملاحظات:\n${extra || 'تم التنفيذ بصورة جيدة.'}\n\nشركة تصنيف لإدارة المرافق`;
+  function makeReport(q){
+    const p=getProjectByText(q); const project=p?.name || 'اسم المشروع';
+    const n=normAr(q);
+    let title='تقرير تنفيذ أعمال'; let body='تم تنفيذ الأعمال المطلوبة بالمشروع وفق الخطة التشغيلية المعتمدة، مع متابعة جودة التنفيذ والتأكد من نظافة الموقع بعد الانتهاء.';
+    if(n.includes('مكافحه')||n.includes('حشرات')||n.includes('مبيد')){title='تقرير مكافحة الحشرات';body='تم تنفيذ أعمال مكافحة الحشرات في مرافق المشروع، مع التركيز على الممرات والمداخل ومناطق الخدمات، وتمت المتابعة للتأكد من سلامة التنفيذ.';}
+    else if(n.includes('خزان')||n.includes('خزانات')){title='تقرير تنظيف الخزانات';body='تم تنفيذ أعمال تنظيف وغسيل الخزانات حسب الإجراءات التشغيلية، مع العناية بمراحل التنظيف والشطف والتأكد من جاهزية الخزانات بعد الانتهاء.';}
+    else if(n.includes('بيسمنت')||n.includes('قبو')){title='تقرير تنظيف البيسمنت';body='تم تنفيذ أعمال تنظيف البيسمنت وإزالة الأتربة والمخلفات، مع ترتيب الموقع وتحسين مستوى النظافة العام.';}
+    else if(n.includes('سطح')||n.includes('اسطح')){title='تقرير تنظيف الأسطح';body='تم تنفيذ أعمال تنظيف الأسطح وإزالة الأتربة والمخلفات، مع التأكد من نظافة مجاري التصريف والمناطق المحيطة.';}
+    else if(n.includes('صيان')){title='تقرير صيانة';body='تمت مباشرة أعمال الصيانة المطلوبة ومعالجة الملاحظة حسب المتاح في الموقع، وسيتم متابعة الحالة لضمان عدم تكرار المشكلة.';}
+    return `السلام عليكم ورحمة الله وبركاته\n\n${title}\n\nالمشروع: ${project}\nالتاريخ: ${arDate()}\n\n${body}\n\nوتفضلوا بقبول فائق التحية والتقدير\nشركة تصنيف لإدارة المرافق`;
   }
-  function whatsappTemplate(type, p, extra){
-    const project = p?.name || extractProjectNameFallback(extra) || '[اسم المشروع]';
-    if(type==='tank') return `السلام عليكم ورحمة الله وبركاته\n\nنفيدكم بأنه تم تحديد موعد غسيل الخزانات لمشروع ${project}.\n\nالموعد: ${extra || 'حسب الجدول المعتمد'}\n\nنأمل من الجميع أخذ العلم، شاكرين لكم تعاونكم.\n\nشركة تصنيف لإدارة المرافق`;
-    if(type==='pest') return `السلام عليكم ورحمة الله وبركاته\n\nنفيدكم بأنه سيتم تنفيذ أعمال مكافحة الحشرات في مشروع ${project}.\n\nالموعد: ${extra || 'حسب الجدول المعتمد'}\n\nيرجى إغلاق النوافذ واتباع تعليمات الفريق أثناء التنفيذ.\n\nشركة تصنيف لإدارة المرافق`;
-    if(type==='ticket') return `تم إغلاق التكت\n\nاسم المشروع: ${project}\nوصف المشكلة: ${extra || '[وصف المشكلة]'}\nحالة المشكلة: مغلق\nالتاريخ: ${assistantDate()}\nالوقت: ${assistantTime()}\n\nشركة تصنيف لإدارة المرافق`;
-    return `السلام عليكم ورحمة الله وبركاته\n\nبخصوص مشروع ${project}:\n${extra || 'نفيدكم بأنه تم تنفيذ المطلوب وسيتم المتابعة من قبل الفريق المختص.'}\n\nشركة تصنيف لإدارة المرافق`;
+  function makeMessage(q){
+    const p=getProjectByText(q); const project=p?.name || 'اسم المشروع'; const n=normAr(q);
+    if(n.includes('خزان')||n.includes('خزانات')) return `السلام عليكم ورحمة الله وبركاته\n\nالسادة سكان / ملاك مشروع ${project} المحترمين\n\nنفيدكم بأنه سيتم تنفيذ أعمال غسيل الخزانات حسب الموعد المحدد، ونأمل من الجميع أخذ العلم باحتمالية تأثر المياه خلال فترة العمل.\n\nشاكرين لكم تعاونكم.\nشركة تصنيف لإدارة المرافق`;
+    if(n.includes('حشرات')||n.includes('مبيد')) return `السلام عليكم ورحمة الله وبركاته\n\nالسادة سكان / ملاك مشروع ${project} المحترمين\n\nنفيدكم بأنه سيتم تنفيذ أعمال مكافحة الحشرات في المشروع، ونأمل إغلاق النوافذ وإبعاد الأغراض الشخصية عن مناطق الرش قدر الإمكان.\n\nشاكرين لكم تعاونكم.\nشركة تصنيف لإدارة المرافق`;
+    if(n.includes('اعتماد')) return `السلام عليكم ورحمة الله وبركاته\n\nمرفق لسيادتكم طلب اعتماد بخصوص مشروع ${project}.\nنأمل الاطلاع والتوجيه بما ترونه مناسبًا حتى نتمكن من استكمال الإجراء.\n\nوتفضلوا بقبول فائق التحية والتقدير\nشركة تصنيف لإدارة المرافق`;
+    return `السلام عليكم ورحمة الله وبركاته\n\nبخصوص مشروع ${project}:\nنفيدكم بأنه تم متابعة الملاحظة، وسيتم اتخاذ اللازم حسب الخطة التشغيلية.\n\nشركة تصنيف لإدارة المرافق`;
   }
-  function designTemplate(text){
-    const p = findProjectInText(text); const project = p?.name || extractProjectNameFallback(text) || '[اسم المشروع]';
-    let title='إشعار هام'; let body='يرجى من السكان الكرام أخذ العلم والالتزام بما ورد في هذا الإشعار.';
-    if(normAr(text).includes('قمامه')||normAr(text).includes('نفايات')){ title='موعد جمع النفايات'; body='نود إشعاركم بأن موعد جمع النفايات سيكون حسب الوقت المحدد أدناه، ونأمل إخراج النفايات في الوقت المناسب حفاظًا على نظافة المشروع.'; }
-    if(normAr(text).includes('خزانات')){ title='إشعار غسيل الخزانات'; body='نود إشعاركم بأنه سيتم تنفيذ أعمال غسيل الخزانات، وقد يترتب على ذلك ضعف أو انقطاع مؤقت للمياه أثناء فترة العمل.'; }
-    if(normAr(text).includes('سيارات')||normAr(text).includes('ابعاد')){ title='تنبيه إبعاد السيارات'; body='يرجى من السكان الكرام إبعاد السيارات عن الموقع المحدد خلال فترة العمل، وذلك لتمكين الفريق من تنفيذ الأعمال بأمان.'; }
-    return `تصميم إعلان جاهز للطباعة\n\nالعنوان: ${title}\nالمشروع: ${project}\n\nالنص المقترح:\n${body}\n\nالوقت / الموعد:\n${extractTimePhrase(text) || '[اكتب الموعد هنا]'}\n\nشركة تصنيف لإدارة المرافق`;
+  function openLogsReply(){
+    const d=today(); const rows=(data.logs||[]).filter(l=>(l.log_date||String(l.check_in||'').slice(0,10))===d && l.check_in && !l.check_out);
+    if(!rows.length) return 'لا توجد سجلات مفتوحة اليوم. جميع السجلات الحالية مكتملة أو لا توجد بيانات مفتوحة.';
+    return 'السجلات المفتوحة اليوم:\n\n'+rows.map((l,i)=>`${i+1}. المشرف: ${supervisorName(l.supervisor_id)}\nالمشروع: ${projectName(l.project_id)}\nوقت الدخول: ${timeOnly(l.check_in)}`).join('\n\n');
   }
-  function extractProjectNameFallback(text){
-    const m = String(text||'').match(/مشروع\s+([^\n،,.]+)/); return m ? m[1].trim() : '';
+  function weakMonthlyReply(){
+    const month=($('monthlyMonth')?.value)||today().slice(0,7); const start=month+'-01'; const end=month+'-31';
+    const groups={};
+    (data.logs||[]).filter(l=>{const d=l.log_date||String(l.check_in||'').slice(0,10);return d>=start&&d<=end&&l.check_in&&l.check_out;}).forEach(l=>{
+      const key=[l.supervisor_id,l.project_id].join('|'); if(!groups[key]) groups[key]={sid:l.supervisor_id,pid:l.project_id,actual:0,requiredDays:new Set(),dailyReq:0};
+      const d=l.log_date||String(l.check_in||'').slice(0,10); groups[key].actual += logActualMinutes(l); groups[key].requiredDays.add(d); groups[key].dailyReq = logRequiredMinutes(l)||groups[key].dailyReq;
+    });
+    const weak=Object.values(groups).map(g=>{const req=(g.dailyReq||0)*g.requiredDays.size; const pct=req?g.actual/req*100:0; return {...g,req,pct};}).filter(g=>g.req && g.pct<90).sort((a,b)=>a.pct-b.pct).slice(0,12);
+    if(!weak.length) return `لا توجد مشاريع ناقصة وقت في شهر ${month} حسب البيانات الحالية.`;
+    return `المشاريع الناقصة وقت في شهر ${month}:\n\n`+weak.map((g,i)=>`${i+1}. ${projectName(g.pid)} — ${supervisorName(g.sid)}\nالفعلي: ${minsToText(g.actual)} / المطلوب: ${minsToText(g.req)} — الالتزام: ${g.pct.toFixed(1)}%`).join('\n\n');
   }
-  function extractTimePhrase(text){
-    const m = String(text||'').match(/(?:الساعة|من الساعة|غدا|غدًا|اليوم|يوم)\s*([^\n]+)/); return m ? m[0].trim() : '';
+  function dailySummaryReply(){
+    const d=today(); const rows=(data.logs||[]).filter(l=>(l.log_date||String(l.check_in||'').slice(0,10))===d);
+    const done=rows.filter(l=>l.check_in&&l.check_out); const open=rows.filter(l=>l.check_in&&!l.check_out); const mins=done.reduce((a,l)=>a+logActualMinutes(l),0);
+    return `ملخص تشغيل اليوم ${d}:\n\nعدد التسجيلات: ${rows.length}\nالسجلات المكتملة: ${done.length}\nالسجلات المفتوحة: ${open.length}\nإجمالي ساعات العمل: ${minsToText(mins)}\n\n${open.length?'يوجد سجلات مفتوحة تحتاج متابعة.':'لا توجد سجلات مفتوحة حاليًا.'}`;
   }
-  function assistantAnswer(text){
-    const n = normAr(text); const p = findProjectInText(text); const extra = String(text||'').trim();
-    if(!extra) return assistantHelp();
-    if(n.includes('سجلات مفتوح') || n.includes('بدون خروج') || n.includes('لم يسجل خروج')) return openLogsText();
-    if(n.includes('حلل تشغيل اليوم') || n.includes('ملخص تشغيل اليوم') || n.includes('تحليل اليوم')) return todayAnalysisText();
-    if(n.includes('ناقص') && (n.includes('شهر') || n.includes('الوقت'))) return monthlyUnderTimeText();
-    if(n.includes('تكت') && (n.includes('متاخر') || n.includes('متأخر') || n.includes('مفتوح'))) return ticketsLateText();
-    if(n.includes('عمال') && p) return `عمال مشروع ${p.name}:\n${projectWorkersText(p.id)}`;
-    if(n.includes('تقرير')){
-      if(n.includes('حشرات') || n.includes('مكافحه')) return reportTemplate('pest',p,extra);
-      if(n.includes('خزان') || n.includes('خزانات')) return reportTemplate('tank',p,extra);
-      if(n.includes('صيانه') || n.includes('صيانة')) return reportTemplate('maintenance',p,extra);
-      return reportTemplate('cleaning',p,extra);
-    }
-    if(n.includes('رساله') || n.includes('رسالة') || n.includes('واتس') || n.includes('واتساب')){
-      if(n.includes('خزان') || n.includes('خزانات')) return whatsappTemplate('tank',p,extra);
-      if(n.includes('حشرات') || n.includes('مكافحه')) return whatsappTemplate('pest',p,extra);
-      if(n.includes('تكت')) return whatsappTemplate('ticket',p,extra);
-      return whatsappTemplate('general',p,extra);
-    }
-    if(n.includes('صمم') || n.includes('تصميم') || n.includes('اعلان') || n.includes('إعلان') || n.includes('اشعار') || n.includes('إشعار')) return designTemplate(text);
-    if(n.includes('ماذا تستطيع') || n.includes('مساعدة') || n.includes('ساعدني')) return assistantHelp();
-    return assistantFallback(text);
+  function designNotice(q){
+    const p=getProjectByText(q); const project=p?.name||'اسم المشروع'; const n=normAr(q); let title='إشعار هام'; let line='نرجو من الجميع الالتزام بما ورد في هذا الإشعار.';
+    if(n.includes('قمامه')||n.includes('نفايات')){title='موعد جمع النفايات'; line='موعد جمع النفايات اليومي: 4:00 عصرًا. نأمل إخراج النفايات في الوقت المحدد.';}
+    else if(n.includes('سيارات')||n.includes('ابعاد')){title='تنبيه إبعاد السيارات'; line='نأمل إبعاد السيارات عن منطقة العمل خلال الفترة المحددة لتسهيل تنفيذ الأعمال.';}
+    else if(n.includes('خزان')){title='إشعار غسيل الخزانات'; line='سيتم تنفيذ أعمال غسيل الخزانات حسب الموعد المحدد، ونأمل أخذ الاحتياطات اللازمة.';}
+    return `${title}\n\nالمشروع: ${project}\n\n${line}\n\nشركة تصنيف لإدارة المرافق`;
   }
-  function assistantHelp(){
-    return `يمكنني مساعدتك في:\n\n1. كتابة تقارير تشغيلية\nمثال: اكتب تقرير مكافحة حشرات لمشروع صفاء 50\n\n2. كتابة رسائل واتساب\nمثال: اكتب رسالة غسيل خزانات لمشروع صفاء 65 غدًا الساعة 8 صباحًا\n\n3. تحليل بيانات التشغيل\nمثال: ما السجلات المفتوحة اليوم؟\nمثال: ما المشاريع الناقصة وقت هذا الشهر؟\n\n4. تصميم نص إعلان جاهز للطباعة\nمثال: صمم إعلان جمع قمامة لمشروع صفا 28 الساعة 4 عصرًا\n\nملاحظة: هذا مساعد داخلي مجاني يعمل بالقوالب وبيانات التطبيق، وليس API مدفوع.`;
+  function fallbackReply(){return 'أقدر أساعدك في:\n1. كتابة تقرير تشغيل أو تنظيف أو صيانة\n2. كتابة رسالة واتساب أو خطاب\n3. عرض السجلات المفتوحة اليوم\n4. تحليل المشاريع الناقصة وقت هذا الشهر\n5. إنشاء نص إعلان جاهز للطباعة\n\nاكتب طلبك مثل: اكتب تقرير مكافحة حشرات لمشروع صفاء 50';}
+  function answer(q){
+    const n=normAr(q);
+    if(n.includes('سجلات مفتوحه')||n.includes('بدون خروج')||n.includes('لم يسجل خروج')) return openLogsReply();
+    if(n.includes('ناقص') && (n.includes('وقت')||n.includes('شهر'))) return weakMonthlyReply();
+    if(n.includes('ملخص')||n.includes('تحليل اليوم')||n.includes('تشغيل اليوم')) return dailySummaryReply();
+    if(n.includes('تقرير')) return makeReport(q);
+    if(n.includes('رساله')||n.includes('واتساب')||n.includes('خطاب')) return makeMessage(q);
+    if(n.includes('تصميم')||n.includes('اعلان')||n.includes('اشعار')||n.includes('تنبيه')) return designNotice(q);
+    return fallbackReply();
   }
-  function assistantFallback(text){
-    return `لم أفهم الطلب بشكل كامل، لكن أقدر أساعدك بهذه الطرق:\n\n${assistantHelp()}\n\nطلبك كان:\n${text}`;
-  }
-  function addAssistantMessage(role, text){
-    window.tasneefAssistantHistory.push({role,text,at:new Date().toISOString()});
-    if(role==='bot') window.tasneefAssistantLastReply = text;
-    renderTasneefAssistant();
-  }
-  window.renderTasneefAssistant = function(){
-    const box = $('assistantChat'); if(!box) return;
-    if(!window.tasneefAssistantHistory.length){
-      box.innerHTML = `<div class="assistant-msg bot">${assistantEsc(assistantHelp())}<div class="assistant-suggestions"><span class="chip" onclick="assistantQuick('ما السجلات المفتوحة اليوم؟')">السجلات المفتوحة</span><span class="chip" onclick="assistantQuick('اكتب تقرير تنظيف خزانات لمشروع صفاء 65')">تقرير خزانات</span><span class="chip" onclick="assistantQuick('صمم إعلان جمع قمامة لمشروع وجود الياسمين الساعة 4 عصرًا')">تصميم إعلان</span></div></div>`;
-      return;
-    }
-    box.innerHTML = window.tasneefAssistantHistory.map(m=>`<div class="assistant-msg ${m.role==='user'?'user':'bot'}">${assistantEsc(m.text)}</div>`).join('');
-    box.scrollTop = box.scrollHeight;
+  function addMsg(role,text){assistantMessages.push({role,text}); assistantLastReply=role==='bot'?text:assistantLastReply; renderTasneefAssistant();}
+  window.renderTasneefAssistant=function(){
+    const box=$('assistantChat'); if(!box) return;
+    if(!assistantMessages.length){box.innerHTML=`<div class="assistant-empty">اكتب طلبك أو اختر أحد الأزرار السريعة. هذا المساعد يعمل بدون API وبدون تكلفة.</div>`; return;}
+    box.innerHTML=assistantMessages.map(m=>`<div class="assistant-msg ${m.role==='user'?'user':'bot'}"><b>${m.role==='user'?'أنت':'مساعد تصنيف'}</b><pre>${safe(m.text)}</pre></div>`).join('');
+    box.scrollTop=box.scrollHeight;
   };
-  window.tasneefAssistantSend = function(){
-    const input = $('assistantInput'); if(!input) return;
-    const text = input.value.trim(); if(!text) return;
-    input.value='';
-    addAssistantMessage('user', text);
-    const reply = assistantAnswer(text);
-    addAssistantMessage('bot', reply);
-  };
-  window.assistantQuick = function(text){ const input=$('assistantInput'); if(input) input.value=text; tasneefAssistantSend(); };
-  window.copyAssistantLastReply = function(){
-    const txt = window.tasneefAssistantLastReply || '';
-    if(!txt) return msg('لا يوجد رد لنسخه','err');
-    if(typeof copyText==='function') copyText(txt); else navigator.clipboard?.writeText(txt);
-    msg('تم نسخ الرد');
-  };
-  window.sendAssistantLastWhatsapp = function(){
-    const txt = window.tasneefAssistantLastReply || '';
-    if(!txt) return msg('لا يوجد رد لإرساله','err');
-    window.open('https://wa.me/?text='+encodeURIComponent(txt),'_blank');
-  };
-  window.printAssistantLastReply = function(){
-    const txt = window.tasneefAssistantLastReply || '';
-    if(!txt) return msg('لا يوجد رد للطباعة','err');
-    const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>مساعد تصنيف</title><style>body{font-family:Tahoma,Arial,sans-serif;padding:30px;line-height:1.9;color:#10231d}.page{border:2px solid #0A4033;border-radius:18px;padding:24px}.head{border-bottom:3px solid #0A4033;margin-bottom:18px;padding-bottom:12px}h1{color:#0A4033;margin:0}.content{white-space:pre-wrap;font-size:15px}</style></head><body><div class="page"><div class="head"><h1>شركة تصنيف</h1><p>مساعد تصنيف التشغيلي — المسؤول: وائل شاكر</p></div><div class="content">${assistantEsc(txt)}</div></div><script>window.onload=function(){window.print()}</script></body></html>`;
-    const w=window.open('','_blank'); if(!w) return msg('المتصفح منع فتح نافذة الطباعة','err'); w.document.open(); w.document.write(html); w.document.close();
-  };
-  window.clearAssistantChat = function(){ window.tasneefAssistantHistory=[]; window.tasneefAssistantLastReply=''; renderTasneefAssistant(); };
-  setTimeout(()=>{ try{ renderTasneefAssistant(); }catch(e){} }, 1000);
+  window.assistantSend=function(){const input=$('assistantInput'); const q=(input?.value||'').trim(); if(!q) return msg('اكتب طلبك أولًا','err'); addMsg('user',q); input.value=''; addMsg('bot',answer(q));};
+  window.assistantQuick=function(q){const input=$('assistantInput'); if(input) input.value=q; window.assistantSend();};
+  window.assistantCopyLast=function(){if(!assistantLastReply)return msg('لا يوجد رد لنسخه','err'); (navigator.clipboard?.writeText(assistantLastReply)||Promise.resolve()).then(()=>msg('تم نسخ الرد'));};
+  window.assistantWhatsappLast=function(){if(!assistantLastReply)return msg('لا يوجد رد لإرساله','err'); try{navigator.clipboard?.writeText(assistantLastReply)}catch(e){} window.open('https://wa.me/?text='+encodeURIComponent(assistantLastReply),'_blank');};
+  window.assistantPrintLast=function(){if(!assistantLastReply)return msg('لا يوجد رد للطباعة','err'); const w=window.open('','_blank'); w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>مساعد تصنيف</title><style>body{font-family:Tahoma,Arial;padding:30px;line-height:1.9;white-space:pre-wrap;color:#0A4033}</style></head><body>${safe(assistantLastReply)}<script>window.onload=()=>setTimeout(()=>print(),300)<\/script></body></html>`); w.document.close();};
+  window.assistantClear=function(){assistantMessages=[]; assistantLastReply=''; renderTasneefAssistant();};
 })();

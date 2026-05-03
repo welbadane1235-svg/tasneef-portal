@@ -9,11 +9,6 @@
 
 
 .attendance-matrix-wrap{max-height:72vh}.attendance-matrix th,.attendance-matrix td{text-align:center;min-width:42px}.attendance-matrix th:first-child,.attendance-matrix td:first-child{position:sticky;right:0;background:#fff;z-index:2;text-align:right;min-width:160px}.att-cell{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:10px;font-weight:900;font-size:12px}.att-present{background:#e8f4ee;color:#137a4b;border:1px solid #b9dfcb}.att-absent{background:#fde8e8;color:#9d2222;border:1px solid #efb4b4}.att-empty{background:#f3f6f5;color:#87938f;border:1px solid #dce6e2}.att-summary{font-size:12px;color:#60706a;line-height:1.7}
-
-
-/* V83 Tasneef Assistant */
-.tasneef-assistant-card{max-width:1120px;margin:auto}.assistant-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}.assistant-head p{margin:6px 0 0;color:var(--muted);line-height:1.7}.assistant-badge{background:linear-gradient(135deg,#0A4033,#0f5a47);color:#fff;border:1px solid #c7a24d;border-radius:999px;padding:8px 14px;font-weight:900}.assistant-quick{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.assistant-chat{height:430px;overflow:auto;background:linear-gradient(180deg,#f7fbfa,#fff);border:1px solid var(--line);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px}.assistant-msg{max-width:88%;padding:12px 14px;border-radius:16px;line-height:1.8;white-space:pre-wrap;border:1px solid var(--line)}.assistant-msg.user{align-self:flex-start;background:#0A4033;color:#fff;border-color:#0A4033}.assistant-msg.bot{align-self:flex-end;background:#fff;color:var(--text);box-shadow:0 8px 20px rgba(10,64,51,.05)}.assistant-msg.bot b{color:#0A4033}.assistant-input-row{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:12px}.assistant-input-row textarea{min-height:70px}.assistant-suggestions{display:grid;gap:8px;margin-top:8px}.assistant-suggestions .chip{display:inline-block;background:#eef6f3;color:#0A4033;border:1px solid var(--line);border-radius:999px;padding:6px 10px;margin:2px;font-weight:700;cursor:pointer}@media(max-width:720px){.assistant-input-row{grid-template-columns:1fr}.assistant-msg{max-width:100%}.assistant-chat{height:360px}}
-
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -31,6 +26,7 @@
     <button class="nav" onclick="showPage('monthly',this)">الأوقات الشهرية</button>
     <button class="nav" onclick="showPage('tickets',this)">التكتات</button>
     <button class="nav" onclick="showPage('alerts',this)">التنبيهات</button>
+    <button class="nav" onclick="showPage('assistant',this)">مساعد تصنيف</button>
     <button class="nav" onclick="showPage('export',this)">التصدير</button>
     <button class="nav danger" onclick="logout()">تسجيل خروج</button>
   </aside>
@@ -259,43 +255,40 @@
       </div>
     </section>
 
+    <section id="alerts" class="page hidden"><div class="card"><h2>التنبيهات وأخطاء التوزيع</h2><div id="alertsList" class="alerts"></div></div></section>
 
 
     <section id="assistant" class="page hidden">
       <div class="card tasneef-assistant-card">
-        <div class="assistant-head">
-          <div>
-            <h2>مساعد تصنيف</h2>
-            <p>مساعد داخلي مجاني بدون API: يكتب تقارير ورسائل واتساب، ويحلل بيانات التشغيل من داخل التطبيق.</p>
-          </div>
-          <div class="assistant-badge">بدون تكلفة</div>
-        </div>
-        <div class="assistant-quick">
+        <h2>مساعد تصنيف</h2>
+        <p style="color:var(--muted);line-height:1.8;margin-top:-6px">مساعد داخلي مجاني للتقارير والرسائل والتحليل السريع. يعمل بالقوالب وبيانات التطبيق بدون API.</p>
+        <div class="actions">
           <button class="light" onclick="assistantQuick('اكتب تقرير مكافحة حشرات لمشروع صفاء 50')">تقرير مكافحة حشرات</button>
           <button class="light" onclick="assistantQuick('اكتب تقرير تنظيف خزانات لمشروع صفاء 65')">تقرير خزانات</button>
-          <button class="light" onclick="assistantQuick('اكتب رسالة غسيل خزانات غدا الساعة 8 صباحا')">رسالة غسيل خزانات</button>
+          <button class="light" onclick="assistantQuick('اكتب رسالة واتساب لرئيس الجمعية عن غسيل الخزانات غداً الساعة 8 صباحاً')">رسالة واتساب</button>
           <button class="light" onclick="assistantQuick('ما السجلات المفتوحة اليوم؟')">السجلات المفتوحة</button>
-          <button class="light" onclick="assistantQuick('ما المشاريع الناقصة وقت هذا الشهر؟')">ناقص وقت هذا الشهر</button>
-          <button class="light" onclick="assistantQuick('حلل تشغيل اليوم')">تحليل اليوم</button>
+          <button class="light" onclick="assistantQuick('ما المشاريع الناقصة وقت هذا الشهر؟')">ناقص وقت</button>
         </div>
         <div id="assistantChat" class="assistant-chat"></div>
-        <div class="assistant-input-row">
-          <textarea id="assistantInput" placeholder="اكتب طلبك هنا... مثال: اكتب تقرير تنظيف بيسمنت لمشروع صفاء 50 أو ما السجلات المفتوحة اليوم؟" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault(); tasneefAssistantSend();}"></textarea>
-          <button onclick="tasneefAssistantSend()">إرسال</button>
-        </div>
-        <div class="actions">
-          <button class="light" onclick="copyAssistantLastReply()">نسخ آخر رد</button>
-          <button class="light" onclick="sendAssistantLastWhatsapp()">إرسال واتساب</button>
-          <button class="light" onclick="printAssistantLastReply()">طباعة</button>
-          <button class="danger" onclick="clearAssistantChat()">مسح المحادثة</button>
+        <div class="split" style="align-items:end;margin-top:12px">
+          <div>
+            <label>اكتب طلبك</label>
+            <textarea id="assistantInput" placeholder="مثال: اكتب تقرير تنظيف بيسمنت لمشروع اتحاد العاصمة"></textarea>
+          </div>
+          <div class="actions" style="margin:0">
+            <button onclick="assistantSend()">إرسال</button>
+            <button class="light" onclick="assistantCopyLast()">نسخ آخر رد</button>
+            <button class="light" onclick="assistantWhatsappLast()">واتساب</button>
+            <button class="light" onclick="assistantPrintLast()">طباعة</button>
+            <button class="danger" onclick="assistantClear()">مسح</button>
+          </div>
         </div>
       </div>
     </section>
 
-    <section id="alerts" class="page hidden"><div class="card"><h2>التنبيهات وأخطاء التوزيع</h2><div id="alertsList" class="alerts"></div></div></section>
     <section id="export" class="page hidden"><div class="card"><h2>التصدير</h2><p>صدّر بيانات النظام الحالية بصيغة CSV.</p><div class="actions"><button onclick="exportTable('app_users')">المستخدمين</button><button onclick="exportTable('projects')">المشاريع</button><button onclick="exportTable('workers')">العمال</button><button onclick="exportTable('attendance')">الحضور</button><button onclick="exportTable('time_logs')">التسجيلات اليومية</button><button onclick="exportTable('tickets')">التكتات</button></div></div></section>
   </main>
 </div>
-<script src="app.js?v=83"></script>
+<script src="app.js?v=84"></script>
 </body>
 </html>
