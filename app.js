@@ -1,4 +1,4 @@
-// Tasneef HTML App V3 - Supabase
+// Tasneef HTML App V86 - Contract Services Cloud View Fix
 const SUPABASE_URL = "https://zmjdqiswytxlbfgnfjfv.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -29,18 +29,32 @@ async function login(){
 }
 function logout(){ clearSession(); location.href='index.html'; }
 async function loadAll(){
-  const [users, projects, workers, attendance, logs, tickets, contractServices] = await Promise.all([
+  const [users, projects, workers, attendance, logs, tickets] = await Promise.all([
     sb.from('app_users').select('*').order('id'),
     sb.from('projects').select('*').order('id'),
     sb.from('workers').select('*').order('id'),
     sb.from('attendance').select('*').order('attendance_date',{ascending:false}),
     sb.from('time_logs').select('*').order('check_in',{ascending:false}),
-    sb.from('tickets').select('*').order('created_at',{ascending:false}),
-    sb.from('contract_services').select('*').order('id')
+    sb.from('tickets').select('*').order('created_at',{ascending:false})
   ]);
+
+  let contractServices = await sb.from('contract_services_app_view').select('*').order('id');
+  if(contractServices.error){
+    console.warn('contract_services_app_view:', contractServices.error.message);
+    contractServices = await sb.from('contract_services').select('*').order('id');
+  }
+
   for(const r of [users,projects,workers,attendance,logs,tickets,contractServices]) if(r.error) console.warn(r.error.message);
-  data.users = users.data || []; data.supervisors = data.users.filter(u=>u.role==='supervisor' && u.is_active!==false); data.technicians = data.users.filter(u=>u.role==='technician' && u.is_active!==false); data.technicians = data.users.filter(u=>u.role==='technician' && u.is_active!==false);
-  data.projects = projects.data || []; data.workers = workers.data || []; data.attendance = attendance.data || []; data.logs = logs.data || []; data.tickets = tickets.data || []; data.contractServices = contractServices.data || [];
+  data.users = users.data || [];
+  data.supervisors = data.users.filter(u=>u.role==='supervisor' && u.is_active!==false);
+  data.technicians = data.users.filter(u=>u.role==='technician' && u.is_active!==false);
+  data.projects = projects.data || [];
+  data.workers = workers.data || [];
+  data.attendance = attendance.data || [];
+  data.logs = logs.data || [];
+  data.tickets = tickets.data || [];
+  data.contractServices = contractServices.data || [];
+  data.contractServicesError = contractServices.error ? contractServices.error.message : '';
 }
 function fillSelect(id, rows, label='name', allLabel=null, value='id'){ const el=$(id); if(!el) return; el.innerHTML = (allLabel!==null?`<option value="">${allLabel}</option>`:'') + rows.map(r=>`<option value="${r[value]}">${esc(r[label]||r.full_name||r.username)}</option>`).join(''); }
 function supervisorName(id){ return data.users.find(u=>String(u.id)===String(id))?.full_name || data.supervisors.find(u=>String(u.id)===String(id))?.full_name || '-'; }
@@ -2221,13 +2235,16 @@ function renderContractServices(){
   if($('servicesSoonCount')) $('servicesSoonCount').textContent=counts.soon;
   if($('servicesLateCount')) $('servicesLateCount').textContent=counts.late;
   if($('servicesReviewCount')) $('servicesReviewCount').textContent=counts.review;
+  const emptyMsg = data.contractServicesError
+    ? ('تعذر تحميل الخدمات من قاعدة البيانات: ' + esc(data.contractServicesError))
+    : 'لا توجد خدمات مطابقة للفلاتر الحالية. جرّب إعادة تعيين الفلاتر أو اضغط تحديث الخدمات.';
   $('contractServicesBody').innerHTML = rows.slice(0,200).map(s=>{
     const k=csStatusKey(s);
     return `<tr>
       <td><b>${esc(csProjectName(s))}</b></td><td>${esc(csSupervisorName(s))}</td><td>${esc(csServiceName(s))}</td><td>${esc(csSheetValue(s))}</td><td>${csVisits(s)||'-'}</td><td>${esc(csExecutor(s))}</td><td>${csRemaining(s)}</td><td>${esc(csLastDate(s)||'-')}</td><td>${esc(csDueDate(s)||'-')}</td><td><span class="badge ${csBadgeClass(k)}">${csStatusText(k)}</span></td>
       <td class="row-actions"><button onclick="executeContractService(${Number(s.id)||0})">تسجيل تنفيذ</button><button class="light" onclick="editContractService(${Number(s.id)||0})">تعديل</button><button class="light" onclick="whatsappContractService(${Number(s.id)||0})">واتساب</button></td>
     </tr>`;
-  }).join('') || '<tr><td colspan="11">لا توجد خدمات. شغّل ملف SQL الخاص بالخدمات أو أضف خدمة جديدة.</td></tr>';
+  }).join('') || `<tr><td colspan="11">${emptyMsg}</td></tr>`;
   renderSmartServicesList(); showSupervisorServicesPreview(false);
 }
 function resetServiceFilters(){['serviceSearch','serviceFilterProject','serviceFilterSupervisor','serviceFilterStatus','serviceFilterType','serviceFilterDate'].forEach(id=>{if($(id))$(id).value=''}); renderContractServices();}
@@ -2238,7 +2255,7 @@ async function executeContractService(id){
   const executor=prompt('المنفذ / الشركة المنفذة', csExecutor(s)==='-'?'':csExecutor(s)) || '';
   const notes=prompt('ملاحظات التنفيذ', csNotes(s)||'') || '';
   const done=(csDone(s)||0)+1; const visits=csVisits(s)||done; const remaining=Math.max(visits-done,0);
-  const row={last_execution_date:d, execution_date:d, executed_visits:done, remaining_visits:remaining, executor, notes, status:remaining>0?'مستحقة':'منجزة'};
+  const row={last_execution_date:d, execution_date:d, executed_count:done, remaining_count:remaining, executor_name:executor, notes, status:remaining>0?'مستحقة':'منجزة'};
   const {error}=await sb.from('contract_services').update(row).eq('id',id);
   if(error) return msg(error.message,'err'); msg('تم تسجيل تنفيذ الخدمة'); await refreshAll();
 }
@@ -2249,7 +2266,7 @@ async function editContractService(id){
   const due=prompt('تاريخ الاستحقاق القادم YYYY-MM-DD', csDueDate(s)||'') || null;
   const status=prompt('الحالة: منجزة / مستحقة / قريبة / متأخرة / مراجعة / خارج العقد', csStatusText(csStatusKey(s))) || csStatusText(csStatusKey(s));
   const notes=prompt('ملاحظات', csNotes(s)||'') || '';
-  const {error}=await sb.from('contract_services').update({service_name:service, sheet_value:value, next_due_date:due, status, notes}).eq('id',id);
+  const {error}=await sb.from('contract_services').update({service_name:service, service_value:value, raw_value:value, next_due_date:due, status, notes}).eq('id',id);
   if(error) return msg(error.message,'err'); msg('تم تعديل الخدمة'); await refreshAll();
 }
 async function openNewContractService(){
@@ -2258,7 +2275,7 @@ async function openNewContractService(){
   const p=data.projects.find(x=>normalizeArV85(x.name)===normalizeArV85(project)) || data.projects.find(x=>normalizeArV85(x.name).includes(normalizeArV85(project)));
   const due=prompt('تاريخ الاستحقاق YYYY-MM-DD', today()) || null;
   const visits=Number(prompt('عدد الزيارات المطلوبة', '1')||1);
-  const row={project_id:p?.id||null, project_name:p?.name||project, supervisor_id:p?.supervisor_id||null, supervisor_name:p?supervisorName(p.supervisor_id):'', service_name:service, sheet_value:'إضافة يدوية', required_visits:visits, executed_visits:0, remaining_visits:visits, next_due_date:due, status:'مستحقة', notes:'أضيفت من التطبيق'};
+  const row={project_id:p?.id||null, project_name:p?.name||project, supervisor_id:p?.supervisor_id||null, supervisor_name:p?supervisorName(p.supervisor_id):'', service_name:service, sheet_value:'إضافة يدوية', visit_count:visits, executed_count:0, remaining_count:visits, next_due_date:due, status:'مستحقة', notes:'أضيفت من التطبيق'};
   const {error}=await sb.from('contract_services').insert(row);
   if(error) return msg(error.message,'err'); msg('تمت إضافة الخدمة'); await refreshAll();
 }
@@ -2285,7 +2302,7 @@ async function smartScheduleContractServices(){
   const rows=(data.contractServices||[]).filter(s=>!['done','out'].includes(csStatusKey(s))).slice(0,20);
   if(!rows.length) return msg('لا توجد خدمات غير منفذة للجدولة');
   let base=new Date(); let updates=[];
-  rows.forEach((s,i)=>{ const d=new Date(base.getTime()+(i+1)*86400000); const ds=d.toISOString().slice(0,10); updates.push(sb.from('contract_services').update({next_due_date:ds, scheduled_date:ds, status:csStatusKey(s)==='late'?'متأخرة':'مستحقة'}).eq('id',s.id)); });
+  rows.forEach((s,i)=>{ const d=new Date(base.getTime()+(i+1)*86400000); const ds=d.toISOString().slice(0,10); updates.push(sb.from('contract_services').update({next_due_date:ds, smart_schedule_date:ds, status:csStatusKey(s)==='late'?'متأخرة':'مستحقة'}).eq('id',s.id)); });
   const results=await Promise.all(updates); const err=results.find(r=>r.error)?.error; if(err) return msg(err.message,'err'); msg('تمت الجدولة الذكية للخدمات غير المنفذة'); await refreshAll();
 }
 function exportContractServicesCSV(){
