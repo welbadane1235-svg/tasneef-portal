@@ -1534,9 +1534,67 @@ function uniqueWorkersForProjectTextV60(projectId){const m=new Map();(data.worke
 function renderDashboard(){if(!$('kpiUsers'))return;$('kpiUsers').textContent=data.users.length;$('kpiProjects').textContent=data.projects.length;$('kpiWorkers').textContent=uniqueWorkersCountV60();$('kpiTodayLogs').textContent=data.logs.filter(l=>(l.log_date||String(l.check_in||'').slice(0,10))===today()).length;const div=$('todaySummary');if(div)div.innerHTML=data.supervisors.map(s=>{const logs=data.logs.filter(l=>String(l.supervisor_id)===String(s.id)&&(l.log_date||String(l.check_in||'').slice(0,10))===today());const mins=logs.reduce((a,l)=>a+(Number(l.duration_minutes)||minutesBetween(l.check_in,l.check_out)),0);return `<div class="summary-item"><b>${esc(s.full_name)}</b><br>عدد التسجيلات: ${logs.length}<br>إجمالي الوقت: ${minsToText(mins)}</div>`}).join('')||'<div class="summary-item">لا توجد تسجيلات اليوم</div>'}
 function monthlyStatusFromDiffV60(diff,required){if(!Number(required||0))return{text:'غير محدد',cls:'neutral'};diff=Number(diff||0);if(diff<-5)return{text:'ناقص وقت',cls:'bad'};if(diff>5)return{text:'زيادة وقت',cls:'warn'};return{text:'ضمن الوقت',cls:'ok'}}
 function monthlyCommitmentClassV60(percent,required){if(!Number(required||0))return'neutral';percent=Number(percent||0);if(percent>=95&&percent<=105)return'ok';if(percent>105)return'warn';return'bad'}
-function monthlyRowsV60(){const month=$('monthlyMonth')?.value||today().slice(0,7);const sid=$('monthlySupervisor')?.value;let logs=(data.logs||[]).filter(l=>{const d=l.log_date||String(l.check_in||'').slice(0,10);return d&&d.slice(0,7)===month});if(sid)logs=logs.filter(l=>String(l.supervisor_id)===String(sid));const map=new Map();logs.forEach(l=>{const k=String(l.supervisor_id||'')+'_'+String(l.project_id||'');if(!map.has(k))map.set(k,{s:l.supervisor_id,p:l.project_id,a:0,r:0,t:0});const x=map.get(k);x.a+=Number((typeof logActualMinutes==='function'?logActualMinutes(l):(l.duration_minutes||minutesBetween(l.check_in,l.check_out)))||0);x.r+=Number((typeof logRequiredMinutes==='function'?logRequiredMinutes(l):l.required_minutes)||0);x.t+=Number(l.travel_minutes||0)});const vals=[...map.values()];const supTotals={};vals.forEach(r=>{const s=String(r.s||'');supTotals[s]=(supTotals[s]||0)+Number(r.a||0)});return vals.map(r=>{const supTotal=supTotals[String(r.s||'')]||0;const workPercent=supTotal?(r.a/supTotal*100):0;const commitmentPercent=r.r?(r.a/r.r*100):0;const diff=r.a-r.r;const st=monthlyStatusFromDiffV60(diff,r.r);return{...r,supTotal,workers:uniqueWorkersForProjectTextV60(r.p),workPercent,commitmentPercent,ccls:monthlyCommitmentClassV60(commitmentPercent,r.r),diff,st:st.text,cls:st.cls}}).sort((a,b)=>{const s=supervisorName(a.s).localeCompare(supervisorName(b.s),'ar');return s||projectName(a.p).localeCompare(projectName(b.p),'ar')})}
-function renderMonthly(){const body=$('monthlyBody');if(!body)return;const table=body.closest('table');if(table&&table.tHead)table.tHead.innerHTML='<tr><th>المشرف</th><th>المشروع</th><th>أسماء العمال</th><th>الساعات المطلوبة</th><th>الساعات الفعلية</th><th>وقت الانتقال</th><th>نسبة العمل</th><th>نسبة الالتزام</th><th>حالة الأداء</th></tr>';const vals=monthlyRowsV60();body.innerHTML=vals.map(r=>`<tr><td>${esc(supervisorName(r.s))}</td><td>${esc(projectName(r.p))}</td><td>${esc(r.workers)}</td><td>${minsToText(r.r)}</td><td>${minsToText(r.a)}</td><td>${r.t} دقيقة</td><td><span class="badge green">${percentText(r.workPercent)}</span></td><td><span class="badge ${r.ccls}">${percentText(r.commitmentPercent)}</span></td><td><span class="badge ${r.cls}">${r.st}</span></td></tr>`).join('')||'<tr><td colspan="9">لا توجد بيانات</td></tr>';const total=vals.reduce((a,r)=>a+r.a,0),required=vals.reduce((a,r)=>a+r.r,0),travel=vals.reduce((a,r)=>a+r.t,0),commitment=required?total/required*100:0;const diff=total-required,st=monthlyStatusFromDiffV60(diff,required);if($('monthlySummary'))$('monthlySummary').innerHTML=`<div class="kpi"><small>الساعات المطلوبة</small><b>${minsToText(required)}</b></div><div class="kpi"><small>الساعات الفعلية</small><b>${minsToText(total)}</b></div><div class="kpi"><small>فرق الوقت</small><b>${monthlyDiffTextV57(diff)}</b></div><div class="kpi"><small>وقت الانتقال</small><b>${travel} دقيقة</b></div><div class="kpi"><small>نسبة الالتزام</small><b>${percentText(commitment)}</b></div><div class="kpi"><small>حالة الأداء</small><b><span class="badge ${st.cls}">${st.text}</span></b></div>`}
-function exportMonthlyCSV(){const rows=[...document.querySelectorAll('#monthlyBody tr')].map(tr=>[...tr.children].map(td=>td.textContent.trim()));const csv=['المشرف,المشروع,أسماء العمال,الساعات المطلوبة,الساعات الفعلية,وقت الانتقال,نسبة العمل,نسبة الالتزام,حالة الأداء',...rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(','))].join('\n');download('monthly.csv',csv)}
+function monthlyRowsV60(){
+  const month=$('monthlyMonth')?.value||today().slice(0,7);
+  const sid=$('monthlySupervisor')?.value;
+  let logs=(data.logs||[]).filter(l=>{
+    const d=l.log_date||String(l.check_in||'').slice(0,10);
+    return d&&d.slice(0,7)===month;
+  });
+  if(sid)logs=logs.filter(l=>String(l.supervisor_id)===String(sid));
+
+  const map=new Map();
+  logs.forEach(l=>{
+    const k=String(l.supervisor_id||'')+'_'+String(l.project_id||'');
+    if(!map.has(k))map.set(k,{s:l.supervisor_id,p:l.project_id,a:0,r:0,t:0,logCount:0,dayReq:{}});
+    const x=map.get(k);
+    const d=l.log_date||String(l.check_in||'').slice(0,10);
+    const actual=Number((typeof logActualMinutes==='function'?logActualMinutes(l):(l.duration_minutes||minutesBetween(l.check_in,l.check_out)))||0);
+    const required=Number((typeof logRequiredMinutes==='function'?logRequiredMinutes(l):l.required_minutes)||0);
+
+    // الوقت الفعلي يبقى حسب كل سجل دخول/خروج.
+    x.a+=actual;
+    // الوقت المطلوب لا يُحسب أكثر من مرة لنفس المشروع في نفس اليوم، حتى لو تكرر التسجيل أو كان هناك أكثر من عامل.
+    if(d){
+      x.dayReq[d]=Math.max(Number(x.dayReq[d]||0), required);
+    }else{
+      x.dayReq['no_date_'+x.logCount]=required;
+    }
+    x.t+=Number(l.travel_minutes||0);
+    x.logCount+=1;
+  });
+
+  const vals=[...map.values()].map(x=>{
+    const reqValues=Object.values(x.dayReq).map(v=>Number(v||0));
+    x.daysCount=reqValues.length;
+    x.oneRequired=reqValues.length ? Math.max(...reqValues) : 0;
+    x.r=reqValues.reduce((a,v)=>a+v,0);
+    return x;
+  });
+
+  const supTotals={};
+  vals.forEach(r=>{const s=String(r.s||'');supTotals[s]=(supTotals[s]||0)+Number(r.a||0)});
+  return vals.map(r=>{
+    const supTotal=supTotals[String(r.s||'')]||0;
+    const workPercent=supTotal?(r.a/supTotal*100):0;
+    const commitmentPercent=r.r?(r.a/r.r*100):0;
+    const diff=r.a-r.r;
+    const st=monthlyStatusFromDiffV60(diff,r.r);
+    return{...r,supTotal,workers:uniqueWorkersForProjectTextV60(r.p),workPercent,commitmentPercent,ccls:monthlyCommitmentClassV60(commitmentPercent,r.r),diff,st:st.text,cls:st.cls};
+  }).sort((a,b)=>{const s=supervisorName(a.s).localeCompare(supervisorName(b.s),'ar');return s||projectName(a.p).localeCompare(projectName(b.p),'ar')});
+}
+function renderMonthly(){
+  const body=$('monthlyBody');if(!body)return;
+  const table=body.closest('table');
+  if(table&&table.tHead)table.tHead.innerHTML='<tr><th>المشرف</th><th>المشروع</th><th>أسماء العمال</th><th>أيام التشغيل</th><th>وقت اليوم</th><th>الساعات المطلوبة</th><th>الساعات الفعلية</th><th>وقت الانتقال</th><th>نسبة العمل</th><th>نسبة الالتزام</th><th>حالة الأداء</th></tr>';
+  const vals=monthlyRowsV60();
+  body.innerHTML=vals.map(r=>`<tr><td>${esc(supervisorName(r.s))}</td><td>${esc(projectName(r.p))}</td><td>${esc(r.workers)}</td><td>${r.daysCount||0}</td><td>${minsToText(r.oneRequired||0)}</td><td>${minsToText(r.r)}</td><td>${minsToText(r.a)}</td><td>${r.t} دقيقة</td><td><span class="badge green">${percentText(r.workPercent)}</span></td><td><span class="badge ${r.ccls}">${percentText(r.commitmentPercent)}</span></td><td><span class="badge ${r.cls}">${r.st}</span></td></tr>`).join('')||'<tr><td colspan="11">لا توجد بيانات</td></tr>';
+  const total=vals.reduce((a,r)=>a+r.a,0),required=vals.reduce((a,r)=>a+r.r,0),travel=vals.reduce((a,r)=>a+r.t,0),commitment=required?total/required*100:0;
+  const daysTotal=vals.reduce((a,r)=>a+Number(r.daysCount||0),0);
+  const diff=total-required,st=monthlyStatusFromDiffV60(diff,required);
+  if($('monthlySummary'))$('monthlySummary').innerHTML=`<div class="kpi"><small>أيام التشغيل المحتسبة</small><b>${daysTotal}</b></div><div class="kpi"><small>الساعات المطلوبة</small><b>${minsToText(required)}</b></div><div class="kpi"><small>الساعات الفعلية</small><b>${minsToText(total)}</b></div><div class="kpi"><small>فرق الوقت</small><b>${monthlyDiffTextV57(diff)}</b></div><div class="kpi"><small>وقت الانتقال</small><b>${travel} دقيقة</b></div><div class="kpi"><small>نسبة الالتزام</small><b>${percentText(commitment)}</b></div><div class="kpi"><small>حالة الأداء</small><b><span class="badge ${st.cls}">${st.text}</span></b></div>`;
+}
+function exportMonthlyCSV(){const rows=[...document.querySelectorAll('#monthlyBody tr')].map(tr=>[...tr.children].map(td=>td.textContent.trim()));const csv=['المشرف,المشروع,أسماء العمال,أيام التشغيل,وقت اليوم,الساعات المطلوبة,الساعات الفعلية,وقت الانتقال,نسبة العمل,نسبة الالتزام,حالة الأداء',...rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(','))].join('\n');download('monthly.csv',csv)}
 function monthlyBaseRowsV59(){return monthlyRowsV60()}
 function monthlyReportRowsV58(){return monthlyRowsV60()}
 
