@@ -2337,3 +2337,137 @@ function exportContractServicesCSV(){
   const csv='\uFEFF'+lines.map(r=>r.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(',')).join('\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='contract_services_manual.csv'; a.click(); URL.revokeObjectURL(a.href);
 }
+
+/* ===== V91: جذر منع التهنيج - تحميل كسول ومحدود للسجلات ===== */
+(function(){
+  const LOG_COLS = 'id,user_id,supervisor_id,project_id,check_in,check_out,duration_minutes,travel_minutes,visit_type,required_minutes,time_difference_minutes,time_status,notes,created_at,updated_at,log_date';
+  const loadedLogRanges = new Set();
+  const inflightRanges = new Set();
+  const oldRenderMonthly = window.renderMonthly || (typeof renderMonthly==='function'?renderMonthly:null);
+
+  function iso(d){ return d.toISOString().slice(0,10); }
+  function addDays(dateStr, days){ const d=new Date(dateStr+'T00:00:00'); d.setDate(d.getDate()+days); return iso(d); }
+  function monthStart(month){ return (month || today().slice(0,7)) + '-01'; }
+  function monthEnd(month){ const [y,m]=(month || today().slice(0,7)).split('-').map(Number); return iso(new Date(y, m, 0)); }
+  function currentMonth(){ return today().slice(0,7); }
+  function mergeLogs(rows){
+    const map = new Map((data.logs||[]).map(l=>[String(l.id), l]));
+    (rows||[]).forEach(l=>{ if(l && l.id!=null) map.set(String(l.id), l); });
+    data.logs = [...map.values()].sort((a,b)=>String(b.check_in||b.created_at||'').localeCompare(String(a.check_in||a.created_at||'')));
+  }
+  async function safeQuery(name, builder, fallback=[]){
+    try{
+      const res = await builder;
+      if(res.error){ console.warn('تعذر تحميل '+name+':', res.error.message); return {data:fallback,error:res.error}; }
+      return {data:res.data||fallback,error:null};
+    }catch(e){ console.warn('تعذر تحميل '+name+':', e?.message||e); return {data:fallback,error:e}; }
+  }
+
+  window.fetchTimeLogsRangeV91 = async function(start, end, options={}){
+    if(!start || !end) return [];
+    const key = `${start}_${end}_${options.supervisorId||'all'}`;
+    if(loadedLogRanges.has(key)) return data.logs || [];
+    if(inflightRanges.has(key)) return data.logs || [];
+    inflightRanges.add(key);
+    try{
+      let q = sb.from('time_logs')
+        .select(LOG_COLS)
+        .gte('log_date', start)
+        .lte('log_date', end)
+        .order('id', {ascending:false})
+        .limit(options.limit || 2000);
+      if(options.supervisorId) q = q.eq('supervisor_id', options.supervisorId);
+      const res = await q;
+      if(res.error){
+        console.warn('تعذر تحميل سجلات الفترة:', res.error.message);
+        data.logsLoadError = res.error.message;
+        return data.logs || [];
+      }
+      mergeLogs(res.data || []);
+      loadedLogRanges.add(key);
+      data.logsLoadError = '';
+      return data.logs || [];
+    }catch(e){
+      console.warn('تعذر تحميل سجلات الفترة:', e?.message||e);
+      data.logsLoadError = e?.message || String(e);
+      return data.logs || [];
+    }finally{
+      inflightRanges.delete(key);
+    }
+  };
+
+  window.loadAll = async function(){
+    const d=today();
+    const cm=currentMonth();
+    const start=monthStart(cm);
+    const end=monthEnd(cm);
+
+    const usersP = safeQuery('المستخدمين', sb.from('app_users').select('*').order('id'));
+    const projectsP = safeQuery('المشاريع', sb.from('projects').select('*').order('id'));
+    const workersP = safeQuery('العمال', sb.from('workers').select('*').order('id'));
+    const attendanceP = safeQuery('الحضور', sb.from('attendance').select('*').gte('attendance_date', addDays(d,-45)).order('attendance_date',{ascending:false}).limit(2000));
+    const ticketsP = safeQuery('التكتات', sb.from('tickets').select('*').order('id',{ascending:false}).limit(1000));
+    const servicesP = safeQuery('الخدمات', sb.from('contract_services').select('*').order('id',{ascending:false}).limit(1000));
+
+    const [users, projects, workers, attendance, tickets, contractServices] = await Promise.all([usersP,projectsP,workersP,attendanceP,ticketsP,servicesP]);
+
+    data.users = users.data || [];
+    data.supervisors = data.users.filter(u=>u.role==='supervisor' && u.is_active!==false);
+    data.technicians = data.users.filter(u=>u.role==='technician' && u.is_active!==false);
+    data.projects = projects.data || [];
+    data.workers = workers.data || [];
+    data.attendance = attendance.data || [];
+    data.tickets = tickets.data || [];
+    data.contractServices = contractServices.data || [];
+    data.contractServicesError = contractServices.error ? contractServices.error.message : '';
+
+    // تحميل السجلات منفصلًا حتى لا يوقف التطبيق لو فشل time_logs
+    await window.fetchTimeLogsRangeV91(start, end, {limit: 2000});
+  };
+
+  window.refreshAll = async function(){
+    try{ await window.loadAll(); }
+    catch(e){ console.error('loadAll V91 failed', e); msg && msg('تعذر تحميل بعض البيانات، لكن التطبيق سيستمر بالعمل','err'); }
+    try{ hydrateForms(); }catch(e){ console.warn('hydrateForms failed', e); }
+    try{ renderAll(); }catch(e){ console.warn('renderAll failed', e); }
+  };
+
+  window.renderMonthly = function(){
+    const body=$('monthlyBody');
+    const month=$('monthlyMonth')?.value || today().slice(0,7);
+    const start=monthStart(month), end=monthEnd(month);
+    const key=`${start}_${end}_all`;
+    if(body && !loadedLogRanges.has(key) && !inflightRanges.has(key)){
+      body.innerHTML='<tr><td colspan="12">جاري تحميل سجلات الشهر من السحابة...</td></tr>';
+      window.fetchTimeLogsRangeV91(start,end,{limit:3000}).then(()=>{
+        try{ if(oldRenderMonthly) oldRenderMonthly(); }catch(e){ console.warn(e); }
+      });
+      return;
+    }
+    if(oldRenderMonthly) return oldRenderMonthly();
+  };
+
+  window.exportTable = async function(table){
+    let rows=[]; let error=null;
+    if(table==='time_logs'){
+      const month=$('monthlyMonth')?.value || today().slice(0,7);
+      const start=monthStart(month), end=monthEnd(month);
+      const res=await sb.from('time_logs').select(LOG_COLS).gte('log_date',start).lte('log_date',end).order('id',{ascending:false}).limit(5000);
+      rows=res.data||[]; error=res.error;
+    }else{
+      const res=await sb.from(table).select('*').limit(5000);
+      rows=res.data||[]; error=res.error;
+    }
+    if(error) return msg(error.message,'err');
+    download(`${table}.csv`, toCSV(rows||[]));
+  };
+
+  window.reloadTodayLogsV91 = async function(){
+    const d=today();
+    loadedLogRanges.delete(`${d}_${d}_all`);
+    await window.fetchTimeLogsRangeV91(d,d,{limit:1000});
+    renderAll();
+  };
+
+  console.log('V91 performance guard loaded: time_logs lazy loading enabled');
+})();
