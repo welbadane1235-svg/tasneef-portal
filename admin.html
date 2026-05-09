@@ -9,6 +9,9 @@
 
 
 .attendance-matrix-wrap{max-height:72vh}.attendance-matrix th,.attendance-matrix td{text-align:center;min-width:42px}.attendance-matrix th:first-child,.attendance-matrix td:first-child{position:sticky;right:0;background:#fff;z-index:2;text-align:right;min-width:160px}.att-cell{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:10px;font-weight:900;font-size:12px}.att-present{background:#e8f4ee;color:#137a4b;border:1px solid #b9dfcb}.att-absent{background:#fde8e8;color:#9d2222;border:1px solid #efb4b4}.att-empty{background:#f3f6f5;color:#87938f;border:1px solid #dce6e2}.att-summary{font-size:12px;color:#60706a;line-height:1.7}
+
+.report-services-box{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:6px}.report-services-box label{display:flex;align-items:center;gap:8px;background:#fbfdfc;border:1px solid var(--line);border-radius:12px;padding:9px;margin:0;color:var(--text);font-weight:700}.report-services-box input{width:auto}.report-photo-preview{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0;max-height:170px;overflow:auto}.report-photo-preview .thumb{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;position:relative}.report-photo-preview img{width:100%;height:90px;object-fit:cover;display:block}.report-photo-preview small{display:block;padding:5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.report-preview{background:#f8fbfa;border:1px solid var(--line);border-radius:16px;padding:10px;overflow:auto;max-height:70vh}.report-page{width:100%;max-width:1080px;margin:0 auto 18px;background:white;border:1px solid #d8e3df;border-radius:18px;padding:22px;box-shadow:0 12px 28px rgba(0,0,0,.06);min-height:520px;color:#0A4033}.report-page h1,.report-page h2{color:#0A4033;text-align:center;margin:8px 0 18px}.report-page .date{font-weight:700;text-align:left;color:#32433c}.report-page p{line-height:2;color:#172b24;font-size:16px}.report-page .service-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:22px}.report-page .service-tile{background:#eef6f3;border:1px solid #d7e6e0;border-radius:14px;padding:16px;text-align:center;font-weight:900}.report-page table{width:100%;border-collapse:collapse}.report-page th{background:#0A4033;color:white}.report-page th,.report-page td{border:1px solid #dce6e2;padding:10px;text-align:center}.report-page .photos{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0}.report-page .photos img{width:100%;height:180px;object-fit:cover;border-radius:14px;border:1px solid #dce6e2}.report-page .footer-sign{margin-top:30px;text-align:left;font-weight:700}@media(max-width:800px){.report-services-box{grid-template-columns:1fr}.report-photo-preview{grid-template-columns:repeat(2,1fr)}.report-page .photos,.report-page .service-grid{grid-template-columns:1fr}}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -27,6 +30,7 @@
     <button class="nav" onclick="showPage('tickets',this)">التكتات</button>
     <button class="nav" onclick="showPage('alerts',this)">التنبيهات</button>
     <button class="nav" onclick="showPage('assistant',this)">مساعد تصنيف</button>
+    <button class="nav" onclick="showPage('reportMaker',this)">صانع التقارير</button>
     <button class="nav" onclick="showPage('export',this)">التصدير</button>
     <button class="nav danger" onclick="logout()">تسجيل خروج</button>
   </aside>
@@ -351,9 +355,51 @@
       </div>
     </section>
 
+
+
+    <section id="reportMaker" class="page hidden">
+      <div class="card">
+        <h2>صانع التقارير</h2>
+        <p style="color:var(--muted);line-height:1.8;margin-top:-6px">أنشئ تقرير أعمال مقدم بنفس فكرة قالب الباوربوينت: مقدمة، مقارنة الأعمال بالعقد، صفحات خدمات، صور، وتصدير PDF.</p>
+        <div class="grid two">
+          <div>
+            <label>نوع القالب</label>
+            <select id="rmTemplate">
+              <option value="quarter">تقرير الأعمال المقدمة / الربع السنوي</option>
+              <option value="service">تقرير خدمة منفذة</option>
+            </select>
+            <label>المشروع</label><select id="rmProject"></select>
+            <div class="split"><div><label>تاريخ التقرير</label><input type="date" id="rmDate"></div><div><label>الفترة</label><input id="rmPeriod" placeholder="مثال: الربع السنوي"></div></div>
+            <label>السادة / الجهة المستلمة</label><input id="rmRecipient" placeholder="السادة جمعية اتحاد ملاك ... المحترمين">
+            <label>مدير مجلس الإدارة / العميل</label><input id="rmManager" placeholder="مثال: مالك القحطاني المحترم">
+            <label>عنوان التقرير</label><input id="rmTitle" value="تقرير بالأعمال المقدمة">
+            <label>ملاحظات عامة</label><textarea id="rmNotes" placeholder="أي ملاحظات إضافية تظهر في نهاية التقرير"></textarea>
+          </div>
+          <div>
+            <label>الخدمات التي تظهر في التقرير</label>
+            <div id="rmServicesBox" class="report-services-box"></div>
+            <div class="split">
+              <div><label>إضافة صور إلى خدمة</label><select id="rmPhotoService"></select></div>
+              <div><label>رفع الصور</label><input type="file" id="rmPhotos" multiple accept="image/*" onchange="rmAddPhotos()"></div>
+            </div>
+            <div id="rmPhotoPreview" class="report-photo-preview"></div>
+            <div class="actions">
+              <button onclick="rmGeneratePreview()">إنشاء معاينة</button>
+              <button class="light" onclick="rmPrintReport()">طباعة / PDF</button>
+              <button class="light" onclick="rmReset()">مسح</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>معاينة التقرير</h2>
+        <div id="rmPreview" class="report-preview"><div class="assistant-empty">اختر المشروع والخدمات وارفع الصور ثم اضغط إنشاء معاينة.</div></div>
+      </div>
+    </section>
+
     <section id="export" class="page hidden"><div class="card"><h2>التصدير</h2><p>صدّر بيانات النظام الحالية بصيغة CSV.</p><div class="actions"><button onclick="exportTable('app_users')">المستخدمين</button><button onclick="exportTable('projects')">المشاريع</button><button onclick="exportTable('workers')">العمال</button><button onclick="exportTable('attendance')">الحضور</button><button onclick="exportTable('time_logs')">التسجيلات اليومية</button><button onclick="exportTable('tickets')">التكتات</button></div></div></section>
   </main>
 </div>
-<script src="app.js?v=91"></script>
+<script src="app.js?v=92"></script>
 </body>
 </html>

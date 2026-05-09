@@ -2471,3 +2471,129 @@ function exportContractServicesCSV(){
 
   console.log('V91 performance guard loaded: time_logs lazy loading enabled');
 })();
+
+/* =========================================================
+   V92 - صانع التقارير / قالب الأعمال المقدمة
+   ========================================================= */
+const rmServiceTemplates = [
+  {key:'daily', title:'خــدمـات النظافة اليومية', short:'النظافة اليومية', text:'تم تنفيذ أعمال النظافة اليومية بالمشروع وفق الخطة التشغيلية المعتمدة، وذلك من خلال الالتزام بالزيارات المحددة وأعمال التنظيف الدورية للمرافق المشتركة. وقد تم توثيق الأعمال المنفذة وإرفاق الصور الميدانية الداعمة لإثبات التنفيذ.'},
+  {key:'deep', title:'خــدمات النظافة العميقة', short:'النظافة العميقة', text:'تم تنفيذ أعمال التنظيف العميق بالمشروع باستخدام الأدوات والمعدات المناسبة، وذلك لتحسين مستوى النظافة العامة ورفع جودة المرافق المشتركة بما يتوافق مع بنود العقد.'},
+  {key:'pest', title:'مـكـافـحـة الـحـشـرات', short:'مكافحة الحشرات', text:'تم تنفيذ أعمال مكافحة الحشرات وفق الاشتراطات الصحية وباستخدام مبيدات معتمدة وآمنة، وشملت الأعمال رش الممرات والمداخل والمخارج والمناطق المحيطة وفتحات التصريف والمناطق الرطبة.'},
+  {key:'tanks', title:'تــنــظــيــف الــخــزانــات الــعــلــويــة', short:'تنظيف الخزانات', text:'تم تنفيذ أعمال تنظيف الخزانات بالمشروع، حيث شملت الأعمال تفريغ الخزانات من المياه، وإزالة الرواسب والشوائب من الداخل، ثم تنظيف الجدران والأرضيات باستخدام مواد مخصصة وآمنة لضمان أعلى مستوى من النظافة.'},
+  {key:'manholes', title:'تــنــظــيــف الــمــنــاور', short:'تنظيف المناور', text:'تم تنفيذ أعمال تنظيف المناور بالمشروع وفق الخطة التشغيلية المعتمدة، وشملت إزالة الأتربة والمخلفات، وتنظيف النوافذ الداخلية المطلة على المناور، ورفع المخلفات إلى نقاط التجميع المعتمدة.'},
+  {key:'surfaces', title:'تــنــظــيــف الــا ســطــح', short:'تنظيف الأسطح', text:'تم تنفيذ أعمال تنظيف الأسطح بالمشروع، حيث شملت الأعمال إزالة الأتربة والمخلفات وتنظيف الأرضيات والزوايا، مع الاهتمام بمناطق تصريف المياه لضمان عدم وجود أي عوائق.'},
+  {key:'basement', title:'تــنــظــيــف البــيــســمــنــت و مــنــظــومــة الــدفــاع الــمــدني', short:'تنظيف البيسمنت', text:'تم تنفيذ أعمال تنظيف البيسمنت باستخدام مكائن متخصصة، وذلك لإزالة الأتربة والترسبات وتحسين مستوى النظافة العامة للمواقف وفق الخطة التشغيلية وباستخدام المعدات المناسبة.'},
+  {key:'garden', title:'الـــبــســتـنـة', short:'البستنة', text:'تهدف خدمة البستنة إلى تحسين المظهر العام للموقع والحفاظ على المساحات الخضراء، وتشمل تنظيف الأحواض النباتية، إزالة المخلفات الزراعية، وري الأشجار والعناية بها.'},
+  {key:'perfume', title:'الـتـعـطـيـر', short:'التعطير', text:'تمت متابعة أعمال التعطير بالمرافق المشتركة لضمان المحافظة على بيئة مريحة للسكان والزوار، وذلك وفق الجدول التشغيلي المعتمد.'},
+  {key:'maintenance', title:'الصيانة وحل مشاكلها', short:'الصيانة', text:'تمت متابعة أعمال الصيانة ومعالجة الملاحظات الفنية المسجلة حسب البلاغات الواردة، مع توثيق الأعمال المنفذة بما يحافظ على سلامة المرافق وجودة التشغيل.'}
+];
+let rmPhotosByService = {};
+function rmEnsureInit(){
+  const box=$('rmServicesBox'), sel=$('rmPhotoService');
+  if(box && !box.dataset.ready){
+    box.innerHTML = rmServiceTemplates.map((s,i)=>`<label><input type="checkbox" class="rm-service" value="${s.key}" ${i<6?'checked':''}> ${safe(s.short)}</label>`).join('');
+    box.dataset.ready='1';
+  }
+  if(sel && !sel.dataset.ready){
+    sel.innerHTML = rmServiceTemplates.map(s=>`<option value="${s.key}">${safe(s.short)}</option>`).join('');
+    sel.dataset.ready='1';
+  }
+  const psel=$('rmProject');
+  if(psel){ psel.innerHTML=(data.projects||[]).map(p=>`<option value="${p.id}">${safe(p.name)}</option>`).join('') || '<option value="">لا توجد مشاريع</option>'; }
+  if($('rmDate') && !$('rmDate').value) $('rmDate').value=today();
+  if($('rmPeriod') && !$('rmPeriod').value) $('rmPeriod').value='الربع السنوي';
+}
+(function(){
+  const oldHydrate=window.hydrateForms;
+  if(typeof oldHydrate==='function'){
+    window.hydrateForms=function(){ oldHydrate(); try{rmEnsureInit()}catch(e){console.warn(e)} };
+  }
+  const oldRenderAll=window.renderAll;
+  if(typeof oldRenderAll==='function'){
+    window.renderAll=function(){ oldRenderAll(); try{rmEnsureInit()}catch(e){console.warn(e)} };
+  }
+})();
+function rmSelectedServices(){
+  return [...document.querySelectorAll('.rm-service:checked')].map(i=>i.value).map(k=>rmServiceTemplates.find(s=>s.key===k)).filter(Boolean);
+}
+function rmProjectName(){ const id=$('rmProject')?.value; return (data.projects||[]).find(p=>String(p.id)===String(id))?.name || 'المشروع'; }
+function rmDateLabel(){ const d=$('rmDate')?.value || today(); try{return new Date(d+'T12:00:00').toLocaleDateString('ar-SA')}catch(e){return d} }
+function rmAddPhotos(){
+  const input=$('rmPhotos'); const key=$('rmPhotoService')?.value || 'daily'; if(!input || !input.files?.length) return;
+  rmPhotosByService[key]=rmPhotosByService[key]||[];
+  [...input.files].forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=()=>{ rmPhotosByService[key].push({name:file.name,url:reader.result}); rmRenderPhotoPreview(); };
+    reader.readAsDataURL(file);
+  });
+  input.value='';
+}
+function rmRenderPhotoPreview(){
+  const box=$('rmPhotoPreview'); if(!box) return;
+  const items=[];
+  Object.entries(rmPhotosByService).forEach(([key,arr])=>{
+    const s=rmServiceTemplates.find(x=>x.key===key); (arr||[]).forEach((p,i)=>items.push(`<div class="thumb"><img src="${p.url}"><small>${safe(s?.short||key)} - ${safe(p.name||('صورة '+(i+1)))}</small></div>`));
+  });
+  box.innerHTML=items.join('') || '<div class="footer-note">لم يتم رفع صور بعد</div>';
+}
+function rmContractRowsHtml(){
+  const services=rmSelectedServices();
+  const rows=services.map(s=>`<tr><td>${safe(s.short)}</td><td>حسب العقد</td><td>${(rmPhotosByService[s.key]||[]).length?'تم':'-'}</td></tr>`).join('');
+  return `<table><thead><tr><th>الخدمة</th><th>عدد الزيارات في العقد</th><th>عدد الزيارات المنفذة</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+function rmReportHtml(){
+  rmEnsureInit();
+  const project=rmProjectName(), date=rmDateLabel(), period=$('rmPeriod')?.value||'الربع السنوي';
+  const recipient=$('rmRecipient')?.value || `السادة جمعية اتحاد ملاك ${project} المحترمين`;
+  const manager=$('rmManager')?.value || 'مدير مجلس الإدارة المحترم';
+  const title=$('rmTitle')?.value || 'تقرير بالأعمال المقدمة';
+  const notes=$('rmNotes')?.value || '';
+  const services=rmSelectedServices();
+  const serviceTiles=services.map(s=>`<div class="service-tile">${safe(s.short)}</div>`).join('');
+  const pages=[];
+  pages.push(`<div class="report-page"><div class="date">التاريخ: ${safe(date)}</div><h1>${safe(title)}</h1><p><b>${safe(recipient)}</b></p><p><b>${safe(manager)}</b></p><p>مرفق تقرير بالأعمال المنفذة في ${safe(period)} ضمن العقد المبرم بين شركة تصنيف لإدارة المرافق وجمعية ${safe(project)}، ويتضمن التقرير مقارنة تفصيلية بين الأعمال المقدمة فعليًا في المشروع وبنود العقد الموقّع بين الطرفين.</p><p>يهدف هذا التقرير إلى توثيق الأعمال المنفذة ضمن نطاق العقد المبرم، وإثبات التزام الشركة بتنفيذ خدمات التشغيل والنظافة والصيانة حسب الخطة المعتمدة.</p><div class="service-grid">${serviceTiles}</div></div>`);
+  pages.push(`<div class="report-page"><div class="date">التاريخ: ${safe(date)}</div><h2>مقارنة الأعمال بالعقد</h2>${rmContractRowsHtml()}<p style="margin-top:20px">تمت مقارنة الأعمال المنفذة فعليًا مع بنود العقد، وتوثيق ما تم تنفيذه بالصور والملاحظات حسب كل خدمة.</p></div>`);
+  services.forEach(s=>{
+    const imgs=(rmPhotosByService[s.key]||[]).map(p=>`<img src="${p.url}" alt="${safe(s.short)}">`).join('');
+    pages.push(`<div class="report-page"><div class="date">التاريخ: ${safe(date)}</div><h2>${safe(s.title)}</h2><p>${safe(s.text)}</p>${imgs?`<div class="photos">${imgs}</div>`:'<div class="footer-note">يمكن إضافة الصور الخاصة بهذه الخدمة من قسم رفع الصور.</div>'}</div>`);
+  });
+  pages.push(`<div class="report-page"><div class="date">التاريخ: ${safe(date)}</div><h2>الخاتمة</h2><p>في ختام هذا التقرير المقدم ضمن أعمال مشروع ${safe(project)}، تؤكد شركة تصنيف لإدارة المرافق حرصها على استمرارية الخدمات وجودتها، بما ينعكس إيجابًا على راحة السكان والمحافظة على مستوى التشغيل بالمشروع.</p>${notes?`<p><b>ملاحظات:</b> ${safe(notes)}</p>`:''}<div class="footer-sign">إدارة شركة تصنيف لإدارة المرافق</div></div>`);
+  return pages.join('');
+}
+function rmGeneratePreview(){ const box=$('rmPreview'); if(!box) return; box.innerHTML=rmReportHtml(); msg('تم إنشاء معاينة التقرير'); }
+function rmPrintReport(){
+  const html=rmReportHtml();
+  const w=window.open('','_blank');
+  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير الأعمال المقدمة</title><style>@page{size:A4 landscape;margin:10mm}body{font-family:Tahoma,Arial,sans-serif;background:#f3f6f5;color:#0A4033}.report-page{page-break-after:always;background:white;border:2px solid #0A4033;border-radius:18px;padding:24px;min-height:180mm;box-sizing:border-box}.report-page h1,.report-page h2{text-align:center;color:#0A4033}.date{text-align:left;font-weight:700}.report-page p{line-height:2;font-size:16px;color:#172b24}.service-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:22px}.service-tile{background:#eef6f3;border:1px solid #d7e6e0;border-radius:14px;padding:16px;text-align:center;font-weight:900}table{width:100%;border-collapse:collapse}th{background:#0A4033;color:white}th,td{border:1px solid #dce6e2;padding:10px;text-align:center}.photos{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0}.photos img{width:100%;height:180px;object-fit:cover;border-radius:14px;border:1px solid #dce6e2}.footer-note{background:#eef6f3;border:1px solid #dce6e2;border-radius:12px;padding:12px;margin-top:20px}.footer-sign{margin-top:40px;text-align:left;font-weight:700}@media print{body{background:white}.report-page{border-radius:0}}</style></head><body>${html}<script>window.onload=()=>setTimeout(()=>print(),500)<\/script></body></html>`);
+  w.document.close();
+}
+function rmReset(){ rmPhotosByService={}; if($('rmPreview')) $('rmPreview').innerHTML='<div class="assistant-empty">تم المسح. ابدأ تقريرًا جديدًا.</div>'; rmRenderPhotoPreview(); }
+
+/* V92 safer time_logs loading to reduce dashboard hang */
+(function(){
+  if(typeof window.loadAll==='function'){
+    window.loadAll = async function(){
+      const m=today().slice(0,7); const start=m+'-01'; const end=m+'-31';
+      const [users, projects, workers, attendance, logs, tickets] = await Promise.all([
+        sb.from('app_users').select('*').order('id'),
+        sb.from('projects').select('*').order('id'),
+        sb.from('workers').select('*').order('id'),
+        sb.from('attendance').select('*').order('attendance_date',{ascending:false}).limit(1000),
+        sb.from('time_logs').select('id,user_id,supervisor_id,project_id,log_date,check_in,check_out,duration_minutes,required_minutes,time_difference_minutes,time_status,travel_minutes,visit_type,cleaning_type,notes,created_at').gte('log_date', start).lte('log_date', end).order('check_in',{ascending:false}).limit(2000),
+        sb.from('tickets').select('*').order('created_at',{ascending:false}).limit(500)
+      ]);
+      let contractServices = await sb.from('contract_services').select('*').order('id', { ascending: false }).limit(500);
+      for(const r of [users,projects,workers,attendance,logs,tickets,contractServices]) if(r.error) console.warn(r.error.message);
+      data.users = users.data || [];
+      data.supervisors = data.users.filter(u=>u.role==='supervisor' && u.is_active!==false);
+      data.technicians = data.users.filter(u=>u.role==='technician' && u.is_active!==false);
+      data.projects = projects.data || [];
+      data.workers = workers.data || [];
+      data.attendance = attendance.data || [];
+      data.logs = logs.data || [];
+      data.tickets = tickets.data || [];
+      data.contractServices = contractServices.data || [];
+      data.contractServicesError = contractServices.error ? contractServices.error.message : '';
+    };
+  }
+})();
