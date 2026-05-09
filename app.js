@@ -2597,3 +2597,132 @@ function rmReset(){ rmPhotosByService={}; if($('rmPreview')) $('rmPreview').inne
     };
   }
 })();
+
+/* =========================================================
+   V93 - إصلاح صانع التقارير: تحميل المشاريع ورفع الصور + منع توقف التطبيق
+   ========================================================= */
+(function(){
+  const esc = (typeof safe==='function') ? safe : (v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
+
+  async function rmLoadProjectsV93(){
+    const sel = document.getElementById('rmProject');
+    if(!sel) return;
+    try{
+      if((!window.data || !Array.isArray(data.projects) || !data.projects.length) && window.sb){
+        sel.innerHTML = '<option value="">جاري تحميل المشاريع...</option>';
+        const res = await sb.from('projects').select('id,name,supervisor_id').order('name',{ascending:true}).limit(1000);
+        if(res.error) throw res.error;
+        window.data = window.data || {};
+        data.projects = res.data || [];
+      }
+      const projects = (window.data && Array.isArray(data.projects)) ? data.projects : [];
+      sel.innerHTML = projects.length
+        ? '<option value="">اختر المشروع</option>' + projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')
+        : '<option value="">لا توجد مشاريع - اضغط تحديث البيانات</option>';
+    }catch(e){
+      console.warn('rmLoadProjectsV93', e);
+      sel.innerHTML = `<option value="">تعذر تحميل المشاريع: ${esc(e.message||e)}</option>`;
+      if(typeof msg==='function') msg('تعذر تحميل المشاريع في صانع التقارير: '+(e.message||e),'err');
+    }
+  }
+
+  function rmEnsureInitV93(){
+    try{ if(typeof rmEnsureInit === 'function') rmEnsureInit(); }catch(e){ console.warn(e); }
+    const box=document.getElementById('rmServicesBox'), serviceSel=document.getElementById('rmPhotoService');
+    if(box && !box.innerHTML.trim() && typeof rmServiceTemplates!=='undefined'){
+      box.innerHTML = rmServiceTemplates.map((s,i)=>`<label><input type="checkbox" class="rm-service" value="${s.key}" ${i<6?'checked':''}> ${esc(s.short)}</label>`).join('');
+    }
+    if(serviceSel && !serviceSel.innerHTML.trim() && typeof rmServiceTemplates!=='undefined'){
+      serviceSel.innerHTML = rmServiceTemplates.map(s=>`<option value="${s.key}">${esc(s.short)}</option>`).join('');
+    }
+    if(document.getElementById('rmDate') && !document.getElementById('rmDate').value && typeof today==='function') document.getElementById('rmDate').value=today();
+    if(document.getElementById('rmPeriod') && !document.getElementById('rmPeriod').value) document.getElementById('rmPeriod').value='الربع السنوي';
+    rmLoadProjectsV93();
+  }
+
+  window.rmRefreshProjects = rmLoadProjectsV93;
+  window.rmEnsureInitV93 = rmEnsureInitV93;
+
+  // اجعل دوال صانع التقارير متاحة دائمًا للـ onclick داخل HTML
+  try{
+    if(typeof rmAddPhotos==='function') window.rmAddPhotos = rmAddPhotos;
+    if(typeof rmGeneratePreview==='function') window.rmGeneratePreview = rmGeneratePreview;
+    if(typeof rmPrintReport==='function') window.rmPrintReport = rmPrintReport;
+    if(typeof rmReset==='function') window.rmReset = rmReset;
+  }catch(e){ console.warn(e); }
+
+  // ربط رفع الصور بالحدث مباشرة، حتى لو inline onchange لم يعمل
+  function bindReportMakerEventsV93(){
+    const input=document.getElementById('rmPhotos');
+    if(input && !input.dataset.v93Bound){
+      input.addEventListener('change', function(){
+        try{
+          if(typeof rmAddPhotos==='function') rmAddPhotos();
+          else if(typeof window.rmAddPhotos==='function') window.rmAddPhotos();
+        }catch(e){ console.error(e); if(typeof msg==='function') msg('تعذر رفع الصور: '+(e.message||e),'err'); }
+      });
+      input.dataset.v93Bound='1';
+    }
+    const psel=document.getElementById('rmProject');
+    if(psel && !psel.dataset.v93Bound){
+      psel.addEventListener('focus', rmLoadProjectsV93);
+      psel.dataset.v93Bound='1';
+    }
+  }
+
+  const oldShowPage = window.showPage;
+  if(typeof oldShowPage==='function'){
+    window.showPage = function(id, btn){
+      const r = oldShowPage(id, btn);
+      if(id==='reportMaker') setTimeout(()=>{ rmEnsureInitV93(); bindReportMakerEventsV93(); }, 50);
+      return r;
+    };
+  }
+
+  const oldRenderAll = window.renderAll;
+  if(typeof oldRenderAll==='function'){
+    window.renderAll = function(){
+      const r = oldRenderAll();
+      if(!document.getElementById('reportMaker')?.classList.contains('hidden')) setTimeout(()=>{ rmEnsureInitV93(); bindReportMakerEventsV93(); }, 50);
+      return r;
+    };
+  }
+
+  // تحميل البيانات بشكل مستقل؛ إذا فشل جدول لا يوقف باقي التطبيق
+  if(window.sb){
+    window.loadAll = async function(){
+      const month = (typeof today==='function'?today().slice(0,7):new Date().toISOString().slice(0,7));
+      const start = month + '-01';
+      const end = month + '-31';
+      const reqs = {
+        users: sb.from('app_users').select('*').order('id'),
+        projects: sb.from('projects').select('*').order('id'),
+        workers: sb.from('workers').select('*').order('id').limit(2000),
+        attendance: sb.from('attendance').select('*').order('attendance_date',{ascending:false}).limit(1000),
+        logs: sb.from('time_logs').select('id,user_id,supervisor_id,project_id,log_date,check_in,check_out,duration_minutes,required_minutes,time_difference_minutes,time_status,travel_minutes,visit_type,cleaning_type,notes,created_at').gte('log_date', start).lte('log_date', end).order('check_in',{ascending:false}).limit(2000),
+        tickets: sb.from('tickets').select('*').order('created_at',{ascending:false}).limit(500),
+        services: sb.from('contract_services').select('*').order('id',{ascending:false}).limit(500)
+      };
+      const entries = await Promise.allSettled(Object.entries(reqs).map(async ([k,p])=>[k, await p]));
+      window.data = window.data || {};
+      const errors=[];
+      for(const item of entries){
+        if(item.status!=='fulfilled'){ errors.push(item.reason?.message||String(item.reason)); continue; }
+        const [key,res]=item.value;
+        if(res?.error){ errors.push(`${key}: ${res.error.message}`); data[key==='services'?'contractServices':key]=[]; continue; }
+        if(key==='users'){
+          data.users=res.data||[];
+          data.supervisors=data.users.filter(u=>u.role==='supervisor' && u.is_active!==false);
+          data.technicians=data.users.filter(u=>u.role==='technician' && u.is_active!==false);
+        }else if(key==='services') data.contractServices=res.data||[];
+        else data[key]=res.data||[];
+      }
+      data.loadErrors = errors;
+      if(errors.length) console.warn('loadAll partial errors', errors);
+      try{ rmEnsureInitV93(); }catch(e){ console.warn(e); }
+    };
+  }
+
+  document.addEventListener('DOMContentLoaded', ()=>setTimeout(()=>{ rmEnsureInitV93(); bindReportMakerEventsV93(); }, 300));
+  setTimeout(()=>{ rmEnsureInitV93(); bindReportMakerEventsV93(); }, 1000);
+})();
