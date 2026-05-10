@@ -44,3 +44,7 @@ V96:
 
 ## V103 Finance Core
 تمت إضافة النظام المالي: العقود المالية، الفواتير، سندات القبض، المصروفات، وربحية المشاريع. شغّل ملف schema_update_v103_finance_core.sql في Supabase قبل الاستخدام.
+
+
+V104 Finance RLS Fix:
+- إذا ظهر خطأ row-level security policy على المصروفات أو الفواتير، شغّل الملف schema_update_v103_finance_core.sql الموجود في هذه النسخة لأنه يحتوي إصلاح الصلاحيات.
