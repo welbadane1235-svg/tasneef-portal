@@ -25,6 +25,7 @@
     <button class="nav" onclick="showPage('attendance',this)">الحضور والغياب</button>
     <button class="nav" onclick="showPage('monthly',this)">الأوقات الشهرية</button>
     <button class="nav" onclick="showPage('tickets',this)">التكتات</button>
+    <button class="nav" onclick="showPage('reports',this)">تقارير العملاء</button>
     <button class="nav" onclick="showPage('alerts',this)">التنبيهات</button>
     <button class="nav" onclick="showPage('assistant',this)">مساعد تصنيف</button>
     <button class="nav" onclick="showPage('export',this)">التصدير</button>
@@ -316,6 +317,52 @@
             <input id="ticketSearch" oninput="renderTickets()" placeholder="بحث برقم التكت، المشروع، العنوان أو الوصف">
           </div>
           <div class="table-wrap"><table><thead><tr><th>رقم التكت</th><th>المشروع</th><th>المشرف</th><th>العنوان</th><th>الوصف</th><th>الأولوية</th><th>الحالة</th><th>التاريخ</th><th>مدة الفتح</th><th>استلم بواسطة</th><th>أغلق بواسطة</th><th>كيف تم الإغلاق</th><th>واتساب</th><th>إجراء</th></tr></thead><tbody id="ticketsBody"></tbody></table></div>
+        </div>
+      </div>
+    </section>
+
+
+
+    <section id="reports" class="page hidden">
+      <div class="grid two reports-grid">
+        <div class="card">
+          <h2 id="reportFormTitle">إنشاء تقرير عميل</h2>
+          <input type="hidden" id="reportId">
+          <div class="split">
+            <div><label>المشروع</label><select id="reportProject" onchange="setReportDefaults()"></select></div>
+            <div><label>نوع التقرير</label><select id="reportType" onchange="setReportTypeDefaults()"><option value="مكافحة الحشرات">مكافحة الحشرات</option><option value="تنظيف الخزانات">تنظيف الخزانات</option><option value="نظافة الأسطح">نظافة الأسطح</option><option value="تنظيف البيسمنت">تنظيف البيسمنت</option><option value="تنظيف فلاتر المكيفات">تنظيف فلاتر المكيفات</option><option value="صيانة">صيانة</option><option value="نظافة عامة">نظافة عامة</option></select></div>
+          </div>
+          <div class="split">
+            <div><label>تاريخ التنفيذ</label><input type="date" id="reportExecutionDate"></div>
+            <div><label>رقم واتساب رئيس الجمعية</label><input id="reportClientPhone" placeholder="مثال: 9665xxxxxxxx"></div>
+          </div>
+          <label>عنوان التقرير</label><input id="reportTitle" placeholder="مثال: تقرير مكافحة الحشرات">
+          <div class="split">
+            <div><label>الموقع داخل المشروع</label><input id="reportLocation" placeholder="مثال: المرافق المشتركة بالكامل"></div>
+            <div><label>المشرف</label><select id="reportSupervisor"></select></div>
+          </div>
+          <label>الملخص التنفيذي</label><textarea id="reportSummary" placeholder="اكتب ملخصًا احترافيًا مختصرًا للتقرير"></textarea>
+          <label>الأعمال المنفذة <small>كل سطر يظهر كبند مستقل</small></label><textarea id="reportWorks" placeholder="مثال:\nتنظيف وتجهيز المواقع قبل التنفيذ\nمعالجة أماكن تجمع الحشرات\nمتابعة الملاحظات بعد التنفيذ"></textarea>
+          <label>ملاحظات الفريق</label><textarea id="reportNotes" placeholder="مثال: لا توجد ملاحظات مؤثرة، وتم تنفيذ الخدمة بنجاح."></textarea>
+          <label>صور التقرير</label><input type="file" id="reportImages" accept="image/*" multiple onchange="previewReportImages()">
+          <div id="reportImagePreview" class="report-image-preview"></div>
+          <div class="actions">
+            <button onclick="saveClientReport('draft')">حفظ مسودة</button>
+            <button onclick="saveClientReport('published')">اعتماد ونشر</button>
+            <button class="light" onclick="previewCurrentReport()">معاينة</button>
+            <button class="light" onclick="clearReportForm()">جديد</button>
+          </div>
+          <div class="footer-note">لن يظهر التقرير لرئيس الجمعية إلا بعد الضغط على <b>اعتماد ونشر</b>.</div>
+        </div>
+        <div class="card">
+          <h2>تقارير العملاء</h2>
+          <div class="filters">
+            <select id="reportFilterProject" onchange="renderClientReports()"></select>
+            <select id="reportFilterStatus" onchange="renderClientReports()"><option value="">كل الحالات</option><option value="draft">مسودة</option><option value="published">معتمد ومنشور</option><option value="unpublished">غير منشور</option></select>
+            <input id="reportSearch" oninput="renderClientReports()" placeholder="بحث بالعنوان أو رقم التقرير">
+          </div>
+          <div id="reportsSchemaWarning" class="msg err hidden"></div>
+          <div class="table-wrap"><table><thead><tr><th>رقم التقرير</th><th>المشروع</th><th>النوع</th><th>التاريخ</th><th>الحالة</th><th>واتساب</th><th>إجراء</th></tr></thead><tbody id="reportsBody"></tbody></table></div>
         </div>
       </div>
     </section>

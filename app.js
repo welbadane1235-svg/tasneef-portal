@@ -2471,3 +2471,164 @@ function exportContractServicesCSV(){
 
   console.log('V91 performance guard loaded: time_logs lazy loading enabled');
 })();
+
+/* V92 Client Reports Portal - independent approved reports */
+(function(){
+  const REPORT_BASE_URL = (()=>{
+    try{ return (localStorage.getItem('tasneef_report_base_url') || (location.origin + location.pathname.replace(/admin\.html.*$/,'client-report.html'))).trim(); }catch(e){ return 'client-report.html'; }
+  })();
+  const WHATSAPP_WEBHOOK_URL = (()=>{ try{ return (localStorage.getItem('tasneef_whatsapp_webhook_url') || window.TASNEEF_WHATSAPP_WEBHOOK_URL || '').trim(); }catch(e){ return ''; } })();
+  const oldLoadAllReports = window.loadAll;
+  const oldHydrateReports = window.hydrateForms || hydrateForms;
+  const oldRenderReports = window.renderAll || renderAll;
+
+  function ensureReportStyles(){
+    if(document.getElementById('clientReportsStyleV92')) return;
+    const st=document.createElement('style'); st.id='clientReportsStyleV92'; st.textContent=`
+      .reports-grid{grid-template-columns:470px 1fr!important}.report-image-preview{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}.report-thumb{position:relative;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fbfdfc;min-height:86px}.report-thumb img{width:100%;height:100px;object-fit:cover;display:block}.report-thumb small{display:block;padding:6px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.report-status{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:900}.report-status.draft{background:#fff5da;color:#8a6700}.report-status.published{background:#e8f5ee;color:#12643f}.report-status.unpublished{background:#edf1f4;color:#52616b}.report-link-box{direction:ltr;text-align:left;background:#f8fbfa;border:1px solid var(--line);border-radius:10px;padding:8px;font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis}.report-mini-actions{display:flex;gap:6px;flex-wrap:wrap}.report-mini-actions button{font-size:12px;padding:7px 8px;border-radius:9px}@media(max-width:1100px){.reports-grid{grid-template-columns:1fr!important}.report-image-preview{grid-template-columns:repeat(2,1fr)}}`;
+    document.head.appendChild(st);
+  }
+  function reportNumber(id){ const d=new Date(); const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); return `TR-${y}${m}${day}-${String(id||Math.floor(Math.random()*9999)).padStart(4,'0')}`; }
+  function token(){ return Math.random().toString(36).slice(2,10)+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+  function reportUrl(r){ const base=(localStorage.getItem('tasneef_report_base_url')||REPORT_BASE_URL||'client-report.html').split('#')[0]; return `${base}?token=${encodeURIComponent(r.public_token||'')}`; }
+  function cleanPhone(p){ p=String(p||'').replace(/[^0-9]/g,''); if(p.startsWith('05')) p='966'+p.slice(1); if(p.startsWith('5')) p='966'+p; return p; }
+  function reportStatusBadge(s){ const map={draft:'مسودة',published:'معتمد ومنشور',unpublished:'غير منشور'}; return `<span class="report-status ${esc(s||'draft')}">${map[s]||'مسودة'}</span>`; }
+  function defaultWorks(type){
+    const m={
+      'مكافحة الحشرات':['تفتيش وتجهيز المواقع قبل التنفيذ','رش المناطق المستهدفة بالمبيدات المناسبة','معالجة أماكن تجمع الحشرات','متابعة الملاحظات بعد التنفيذ'],
+      'تنظيف الخزانات':['تفريغ وتجهيز الخزانات للتنظيف','غسيل وتعقيم الخزانات العلوية','إزالة الرواسب والأتربة من الداخل','التأكد من جاهزية الخزانات بعد الانتهاء'],
+      'نظافة الأسطح':['إزالة الأتربة والمخلفات من الأسطح','غسيل المناطق المستهدفة بالمياه','تنظيف مصارف ومجاري تصريف المياه','متابعة نظافة الموقع بعد التنفيذ'],
+      'تنظيف البيسمنت':['كنس وتنظيف أرضيات البيسمنت','غسيل المناطق المستهدفة','تنظيف مواصير ومرافق الدفاع المدني الظاهرة','إزالة المخلفات ومتابعة الملاحظات'],
+      'تنظيف فلاتر المكيفات':['فك الفلاتر بطريقة آمنة','تنظيف وغسيل الفلاتر','إعادة تركيب الفلاتر بعد التجفيف','التأكد من جاهزية المكيفات للتشغيل'],
+      'صيانة':['معاينة موقع البلاغ وتحديد سبب المشكلة','تنفيذ أعمال الإصلاح المطلوبة','اختبار الموقع بعد الصيانة','تسليم الموقع بحالة جيدة'],
+      'نظافة عامة':['تنظيف الممرات والمداخل','إزالة النفايات وتجديد الأكياس','تنظيف المصاعد والسلالم','متابعة الملاحظات العامة بالمشروع']
+    };
+    return (m[type]||m['نظافة عامة']).join('\n');
+  }
+  window.setReportTypeDefaults=function(){
+    const type=$('reportType')?.value||'تقرير';
+    if($('reportTitle') && !$('reportTitle').value.trim()) $('reportTitle').value='تقرير '+type;
+    if($('reportWorks') && !$('reportWorks').value.trim()) $('reportWorks').value=defaultWorks(type);
+    if($('reportSummary') && !$('reportSummary').value.trim()) $('reportSummary').value=`تم تنفيذ خدمة ${type} في الموقع المستهدف حسب الخطة التشغيلية المعتمدة، مع التركيز على رفع مستوى النظافة والسلامة داخل المشروع.`;
+    if($('reportNotes') && !$('reportNotes').value.trim()) $('reportNotes').value='لا توجد ملاحظات مؤثرة، وتم تنفيذ الخدمة بنجاح.';
+  };
+  window.setReportDefaults=function(){
+    const pid=$('reportProject')?.value; const p=(data.projects||[]).find(x=>String(x.id)===String(pid));
+    if(p){ if($('reportSupervisor')) $('reportSupervisor').value=p.supervisor_id||''; }
+    window.setReportTypeDefaults();
+  };
+  async function imageFileToDataUrl(file){
+    return new Promise((resolve,reject)=>{
+      const img=new Image(); const fr=new FileReader();
+      fr.onload=()=>{ img.onload=()=>{ try{ const max=1280; let w=img.width,h=img.height; if(w>max||h>max){ const r=Math.min(max/w,max/h); w=Math.round(w*r); h=Math.round(h*r); } const c=document.createElement('canvas'); c.width=w; c.height=h; const ctx=c.getContext('2d'); ctx.drawImage(img,0,0,w,h); resolve({name:file.name,type:'image/jpeg',dataUrl:c.toDataURL('image/jpeg',0.74)}); }catch(e){reject(e);} }; img.onerror=reject; img.src=fr.result; };
+      fr.onerror=reject; fr.readAsDataURL(file);
+    });
+  }
+  async function selectedReportImages(){
+    const files=[...($('reportImages')?.files||[])].slice(0,12);
+    const old=window.currentReportImagesV92||[];
+    if(!files.length) return old;
+    const arr=[]; for(const f of files) arr.push(await imageFileToDataUrl(f));
+    window.currentReportImagesV92=arr; return arr;
+  }
+  window.previewReportImages=async function(){
+    const box=$('reportImagePreview'); if(!box) return;
+    box.innerHTML='<div class="footer-note">جاري تجهيز الصور...</div>';
+    try{ const imgs=await selectedReportImages(); box.innerHTML=imgs.map((im,i)=>`<div class="report-thumb"><img src="${im.dataUrl}"><small>صورة ${i+1}</small></div>`).join('')||'<div class="footer-note">لم يتم اختيار صور</div>'; }
+    catch(e){ box.innerHTML='<div class="msg err">تعذر قراءة الصور</div>'; }
+  };
+  function reportPayload(status){
+    const pid=$('reportProject')?.value; const p=(data.projects||[]).find(x=>String(x.id)===String(pid)); const type=$('reportType')?.value||'';
+    return { project_id: pid?Number(pid):null, project_name:p?.name||'', report_type:type, title:($('reportTitle')?.value||('تقرير '+type)).trim(), execution_date:$('reportExecutionDate')?.value||today(), location_text:($('reportLocation')?.value||'المرافق المشتركة بالمشروع').trim(), supervisor_id:$('reportSupervisor')?.value?Number($('reportSupervisor').value):null, supervisor_name:supervisorName($('reportSupervisor')?.value), summary:($('reportSummary')?.value||'').trim(), works:($('reportWorks')?.value||'').split('\n').map(x=>x.trim()).filter(Boolean), notes:($('reportNotes')?.value||'').trim(), client_phone:cleanPhone($('reportClientPhone')?.value||''), status, updated_at:new Date().toISOString() };
+  }
+  async function upsertReport(row, images){
+    const id=$('reportId')?.value;
+    if(id){ return await sb.from('service_reports').update({...row, images}).eq('id',id).select('*').maybeSingle(); }
+    const insert={...row, images, public_token:token(), created_at:new Date().toISOString()};
+    const first=await sb.from('service_reports').insert(insert).select('*').single();
+    if(first.error) return first;
+    const num=reportNumber(first.data.id);
+    await sb.from('service_reports').update({report_number:num}).eq('id',first.data.id);
+    return {data:{...first.data,report_number:num},error:null};
+  }
+  window.saveClientReport=async function(status='draft'){
+    const pid=$('reportProject')?.value; if(!pid) return msg('اختر المشروع أولًا','err');
+    const type=$('reportType')?.value; if(!type) return msg('اختر نوع التقرير','err');
+    try{
+      const images=await selectedReportImages();
+      if(status==='published' && images.length===0 && !(window.currentReportImagesV92||[]).length) return msg('أضف صورة واحدة على الأقل قبل الاعتماد والنشر','err');
+      const row=reportPayload(status); if(status==='published'){ row.published_at=new Date().toISOString(); }
+      const res=await upsertReport(row, images);
+      if(res.error){ reportSchemaWarning(res.error.message); return msg('تعذر حفظ التقرير: '+res.error.message,'err'); }
+      $('reportId') && ($('reportId').value=res.data.id);
+      msg(status==='published'?'تم اعتماد التقرير ونشره':'تم حفظ التقرير كمسودة');
+      await loadReportsOnly(); renderClientReports();
+      if(status==='published') await sendReportWhatsapp(res.data,true);
+    }catch(e){ console.error(e); msg('حدث خطأ أثناء حفظ التقرير','err'); }
+  };
+  function whatsappText(r){ return `السيد / رئيس جمعية ${r.project_name||projectName(r.project_id)} المحترم\n\nنفيدكم بأنه تم اعتماد ونشر ${r.title||('تقرير '+r.report_type)} الخاص بالمشروع.\n\nيمكنكم الاطلاع على التقرير من خلال الرابط التالي:\n${reportUrl(r)}\n\nوتفضلوا بقبول فائق التحية والتقدير\nشركة تصنيف لإدارة المرافق\n920015589`; }
+  async function sendReportWhatsapp(r, automatic=false){
+    const phone=cleanPhone(r.client_phone||''); const text=whatsappText(r);
+    if(!phone){ if(!automatic) msg('لا يوجد رقم واتساب مسجل لهذا التقرير','err'); return false; }
+    if(WHATSAPP_WEBHOOK_URL){
+      try{ const res=await fetch(WHATSAPP_WEBHOOK_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,message:text,report_id:r.id,report_number:r.report_number})}); if(!res.ok) throw new Error('Webhook failed'); await sb.from('service_reports').update({whatsapp_sent_at:new Date().toISOString(), whatsapp_status:'sent'}).eq('id',r.id); msg('تم إرسال رسالة الواتساب تلقائيًا'); return true; }catch(e){ await sb.from('service_reports').update({whatsapp_status:'failed'}).eq('id',r.id); msg('تم النشر، لكن فشل إرسال الواتساب التلقائي','err'); return false; }
+    }
+    const url=`https://wa.me/${phone}?text=${encodeURIComponent(text)}`; window.open(url,'_blank');
+    await sb.from('service_reports').update({whatsapp_sent_at:new Date().toISOString(), whatsapp_status:'opened'}).eq('id',r.id);
+    if(!automatic) msg('تم فتح رسالة الواتساب الجاهزة للإرسال');
+    return true;
+  }
+  window.sendReportWhatsappById=async function(id){ const r=(data.serviceReports||[]).find(x=>String(x.id)===String(id)); if(r) await sendReportWhatsapp(r,false); };
+  window.previewReportById=function(id){ const r=(data.serviceReports||[]).find(x=>String(x.id)===String(id)); if(!r) return; window.open(reportUrl(r),'_blank'); };
+  window.previewCurrentReport=async function(){
+    const id=$('reportId')?.value; if(id) return previewReportById(id);
+    msg('احفظ التقرير أولًا ثم افتح المعاينة','err');
+  };
+  window.editClientReport=function(id){
+    const r=(data.serviceReports||[]).find(x=>String(x.id)===String(id)); if(!r) return;
+    $('reportId').value=r.id; $('reportProject').value=r.project_id||''; $('reportType').value=r.report_type||'مكافحة الحشرات'; $('reportExecutionDate').value=r.execution_date||today(); $('reportClientPhone').value=r.client_phone||''; $('reportTitle').value=r.title||''; $('reportLocation').value=r.location_text||''; $('reportSupervisor').value=r.supervisor_id||''; $('reportSummary').value=r.summary||''; $('reportWorks').value=(r.works||[]).join('\n'); $('reportNotes').value=r.notes||''; window.currentReportImagesV92=r.images||[]; $('reportFormTitle').textContent='تعديل تقرير عميل'; previewReportImages(); window.scrollTo({top:0,behavior:'smooth'});
+  };
+  window.clearReportForm=function(){ ['reportId','reportClientPhone','reportTitle','reportLocation','reportSummary','reportWorks','reportNotes'].forEach(id=>$(id)&&($(id).value='')); if($('reportExecutionDate')) $('reportExecutionDate').value=today(); if($('reportImages')) $('reportImages').value=''; window.currentReportImagesV92=[]; if($('reportImagePreview')) $('reportImagePreview').innerHTML=''; if($('reportFormTitle')) $('reportFormTitle').textContent='إنشاء تقرير عميل'; setReportTypeDefaults(); };
+  window.unpublishReport=async function(id){ if(!confirm('هل تريد إلغاء نشر التقرير؟ لن يظهر للعميل بعد ذلك.')) return; const res=await sb.from('service_reports').update({status:'unpublished',updated_at:new Date().toISOString()}).eq('id',id); if(res.error) return msg(res.error.message,'err'); msg('تم إلغاء نشر التقرير'); await loadReportsOnly(); renderClientReports(); };
+  window.deleteClientReport=async function(id){ if(!confirm('حذف التقرير نهائيًا؟')) return; const res=await sb.from('service_reports').delete().eq('id',id); if(res.error) return msg(res.error.message,'err'); msg('تم حذف التقرير'); await loadReportsOnly(); renderClientReports(); };
+  function reportSchemaWarning(t){ const el=$('reportsSchemaWarning'); if(!el) return; el.textContent='يجب تشغيل ملف قاعدة البيانات schema_update_v92_client_reports.sql أولًا. التفاصيل: '+t; el.classList.remove('hidden'); }
+  async function loadReportsOnly(){
+    try{ const res=await sb.from('service_reports').select('*').order('id',{ascending:false}).limit(1000); if(res.error){ data.serviceReports=[]; data.serviceReportsError=res.error.message; return; } data.serviceReports=res.data||[]; data.serviceReportsError=''; }catch(e){ data.serviceReports=[]; data.serviceReportsError=e?.message||String(e); }
+  }
+  window.renderClientReports=function(){
+    ensureReportStyles(); const b=$('reportsBody'); if(!b) return;
+    const warn=$('reportsSchemaWarning'); if(warn){ if(data.serviceReportsError){ warn.textContent='تنبيه: لم يتم العثور على جدول تقارير العملاء. شغّل ملف schema_update_v92_client_reports.sql في Supabase.'; warn.classList.remove('hidden'); } else warn.classList.add('hidden'); }
+    const pid=$('reportFilterProject')?.value||'', st=$('reportFilterStatus')?.value||'', q=($('reportSearch')?.value||'').trim().toLowerCase();
+    let rows=[...(data.serviceReports||[])]; if(pid) rows=rows.filter(r=>String(r.project_id)===String(pid)); if(st) rows=rows.filter(r=>(r.status||'draft')===st); if(q) rows=rows.filter(r=>[r.report_number,r.title,r.report_type,r.project_name].join(' ').toLowerCase().includes(q));
+    b.innerHTML=rows.map(r=>`<tr><td><b>${esc(r.report_number||('-'+r.id))}</b><div class="report-link-box">${esc(reportUrl(r))}</div></td><td>${esc(r.project_name||projectName(r.project_id))}</td><td>${esc(r.report_type||'-')}</td><td>${esc(r.execution_date||'-')}</td><td>${reportStatusBadge(r.status)}</td><td>${r.whatsapp_sent_at?'<span class="badge green">تم التجهيز</span>':'<span class="badge amber">لم يرسل</span>'}</td><td class="report-mini-actions"><button onclick="editClientReport(${r.id})">تعديل</button><button class="light" onclick="previewReportById(${r.id})">عرض</button><button class="light" onclick="sendReportWhatsappById(${r.id})">واتساب</button><button class="light" onclick="navigator.clipboard.writeText('${reportUrl(r).replace(/'/g,'%27')}');msg('تم نسخ الرابط')">نسخ الرابط</button><button class="danger" onclick="unpublishReport(${r.id})">إلغاء النشر</button></td></tr>`).join('')||'<tr><td colspan="7">لا توجد تقارير حتى الآن</td></tr>';
+  };
+  window.hydrateForms=function(){ oldHydrateReports && oldHydrateReports(); fillSelect('reportProject', data.projects||[], 'name', 'اختر المشروع'); fillSelect('reportFilterProject', data.projects||[], 'name', 'كل المشاريع'); fillSelect('reportSupervisor', data.supervisors||[], 'full_name', 'بدون مشرف'); if($('reportExecutionDate')&&!$('reportExecutionDate').value) $('reportExecutionDate').value=today(); if($('reportWorks')&&!$('reportWorks').value) setReportTypeDefaults(); };
+  window.renderAll=function(){ oldRenderReports && oldRenderReports(); renderClientReports(); };
+  window.loadAll=async function(){ if(oldLoadAllReports) await oldLoadAllReports(); await loadReportsOnly(); };
+  document.addEventListener('DOMContentLoaded', ensureReportStyles);
+})();
+
+/* V92 refresh binding fix */
+(function(){
+  const previousRefresh = window.refreshAll;
+  window.refreshAll = async function(){
+    try{ if(window.loadAll) await window.loadAll(); }
+    catch(e){ console.error('refreshAll V92 failed', e); msg && msg('تعذر تحميل بعض البيانات، لكن التطبيق سيستمر بالعمل','err'); }
+    try{ if(window.hydrateForms) window.hydrateForms(); }
+    catch(e){ console.warn('hydrateForms V92 failed', e); }
+    try{ if(window.renderAll) window.renderAll(); }
+    catch(e){ console.warn('renderAll V92 failed', e); }
+  };
+})();
+
+/* V92 showPage binding fix */
+(function(){
+  window.showPage = function(id, btn){
+    document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden'));
+    $(id)?.classList.remove('hidden');
+    document.querySelectorAll('.nav').forEach(n=>n.classList.remove('active'));
+    btn?.classList.add('active');
+    try{ window.renderAll && window.renderAll(); }catch(e){ console.warn('renderAll after showPage failed', e); }
+    if(id==='contracts' && typeof showContractsSubTab==='function') showContractsSubTab('services');
+  };
+})();
