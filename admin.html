@@ -343,8 +343,19 @@
           </div>
           <label>الملخص التنفيذي</label><textarea id="reportSummary" placeholder="اكتب ملخصًا احترافيًا مختصرًا للتقرير"></textarea>
           <label>الأعمال المنفذة <small>كل سطر يظهر كبند مستقل</small></label><textarea id="reportWorks" placeholder="مثال:\nتنظيف وتجهيز المواقع قبل التنفيذ\nمعالجة أماكن تجمع الحشرات\nمتابعة الملاحظات بعد التنفيذ"></textarea>
-          <label>بوابات الخدمات وصور كل خدمة <small>فعّل الخدمة، ثم أضف صور قبل التنفيذ وصور بعد التنفيذ الخاصة بها</small></label>
-          <div id="reportServiceManager" class="service-manager"></div>
+          <label>بوابات الخدمات التي تظهر لرئيس الجمعية <small>اختر الخدمات التي تريد إظهارها داخل صفحة التقرير</small></label>
+          <div id="reportServicePortals" class="service-portal-picker">
+            <label><input type="checkbox" name="reportServicePortal" value="مكافحة الحشرات"> مكافحة الحشرات</label>
+            <label><input type="checkbox" name="reportServicePortal" value="تنظيف الخزانات"> تنظيف الخزانات</label>
+            <label><input type="checkbox" name="reportServicePortal" value="نظافة البيسمنت"> نظافة البيسمنت</label>
+            <label><input type="checkbox" name="reportServicePortal" value="نظافة الأسطح"> نظافة الأسطح</label>
+            <label><input type="checkbox" name="reportServicePortal" value="تنظيف فلاتر المكيفات"> تنظيف فلاتر المكيفات</label>
+            <label><input type="checkbox" name="reportServicePortal" value="صيانة"> صيانة</label>
+            <label><input type="checkbox" name="reportServicePortal" value="النظافة اليومية"> النظافة اليومية</label>
+            <label><input type="checkbox" name="reportServicePortal" value="التعطير"> التعطير</label>
+            <label><input type="checkbox" name="reportServicePortal" value="المصاعد"> المصاعد</label>
+            <label><input type="checkbox" name="reportServicePortal" value="الكاميرات"> الكاميرات</label>
+          </div>
           <label>ملاحظات الفريق</label><textarea id="reportNotes" placeholder="مثال: لا توجد ملاحظات مؤثرة، وتم تنفيذ الخدمة بنجاح."></textarea>
           <label>صور التقرير</label><input type="file" id="reportImages" accept="image/*" multiple onchange="previewReportImages()">
           <div id="reportImagePreview" class="report-image-preview"></div>
