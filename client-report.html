@@ -1,82 +1,79 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>تقرير عميل - تصنيف لإدارة المرافق</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تقرير العميل - تصنيف</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-:root{--brand:#075f37;--brand2:#0b8d4b;--soft:#eef8f2;--line:#dce9e1;--text:#10231d;--muted:#68766f;--bg:#f7faf8}*{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial,sans-serif;background:radial-gradient(circle at 10% 0%,#eaf8ef,transparent 30%),var(--bg);color:var(--text)}.topbar{height:78px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:5}.brand{display:flex;align-items:center;gap:12px;color:var(--brand);font-weight:900}.logo{width:54px;height:54px;border-radius:16px;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;display:grid;place-items:center;font-size:24px;font-weight:900}.brand small{display:block;color:var(--muted);font-weight:700}.access{display:flex;align-items:center;gap:8px;color:var(--brand);font-weight:800}.page{max-width:1240px;margin:24px auto;padding:0 18px;display:grid;grid-template-columns:1fr 280px;gap:18px}.card{background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:0 10px 28px rgba(7,95,55,.06);padding:20px;margin-bottom:16px}.hero{padding:28px}.crumb{color:var(--muted);font-size:13px;margin-bottom:12px}.title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.title-row h1{margin:0;color:var(--brand);font-size:34px}.approved{display:inline-flex;align-items:center;gap:8px;background:#e5f6ec;color:var(--brand);border-radius:999px;padding:8px 14px;font-weight:900}.meta{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:18px;overflow:hidden;margin-top:22px}.meta-item{padding:16px;text-align:center;border-left:1px solid var(--line);background:#fbfdfc}.meta-item:last-child{border-left:0}.icon{width:52px;height:52px;margin:0 auto 8px;border-radius:50%;display:grid;place-items:center;background:#eaf6ef;color:var(--brand);font-size:22px}.meta-item small{display:block;color:var(--muted);margin-bottom:4px}.meta-item b{color:var(--brand)}.section-title{display:flex;align-items:center;gap:10px;color:var(--brand);font-size:20px;margin:0 0 12px}.section-icon{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;font-size:22px}.summary{line-height:2;text-align:right}.works{display:grid;gap:10px}.work{display:flex;align-items:center;gap:10px;line-height:1.8}.check{width:22px;height:22px;border-radius:50%;background:var(--brand2);color:#fff;display:grid;place-items:center;font-size:14px;font-weight:900;flex:0 0 auto}.photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.photo{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#fff}.photo b{display:block;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;text-align:center;padding:8px}.photo img{width:100%;height:auto;max-height:520px;object-fit:contain;background:#f6fbf8;display:block;cursor:pointer}.thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px}.thumbs img{height:72px;border-radius:8px;object-fit:contain;background:#f6fbf8;width:100%;cursor:pointer}.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.btn{border:0;border-radius:13px;padding:13px 16px;font-family:inherit;font-weight:900;cursor:pointer;background:var(--brand);color:#fff;text-align:center;text-decoration:none}.btn.light{background:#fff;color:var(--brand);border:1px solid var(--brand)}.side-card h3{margin:0 0 16px;color:var(--brand)}.info-list{display:grid;gap:16px;text-align:center}.info-list small{display:block;color:var(--muted);margin-bottom:6px}.info-list b{font-size:17px}.support{font-size:26px;color:var(--brand);font-weight:900;text-align:center}.footer{text-align:center;color:var(--muted);padding:12px 0 28px}.notice{background:#eaf8ef;color:var(--brand);border:1px solid #cfe7d8;border-radius:14px;padding:13px;text-align:center;font-weight:800}.service-portals{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.service-card{border:1px solid var(--line);border-radius:18px;background:#fff;padding:18px;text-align:center;box-shadow:0 8px 18px rgba(7,95,55,.04)}.service-card .svc-icon{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;margin:0 auto 10px;background:#eaf6ef;color:var(--brand);font-size:30px}.service-card h3{margin:8px 0;color:var(--brand)}.service-card p{margin:0;line-height:1.8;color:var(--text)}.service-card button{margin-top:14px;border:0;border-radius:10px;background:var(--brand);color:#fff;padding:10px 18px;font-family:inherit;font-weight:900}.empty{max-width:560px;margin:80px auto;background:#fff;border:1px solid var(--line);border-radius:22px;padding:32px;text-align:center;box-shadow:0 10px 28px rgba(7,95,55,.06)}.empty h1{color:var(--brand)}.building{height:120px;border-radius:18px;background:linear-gradient(180deg,#f4fbf6,#e9f8ee);display:grid;place-items:center;color:var(--brand);font-size:54px}@media(max-width:900px){.topbar{padding:0 14px}.page{display:block;margin-top:14px}.title-row h1{font-size:25px}.meta{grid-template-columns:repeat(2,1fr)}.photo-grid{grid-template-columns:1fr}.service-portals{grid-template-columns:1fr 1fr}.actions{grid-template-columns:1fr}.photo img{height:auto;max-height:none}}@media print{.topbar,.actions,.side{display:none}.page{display:block;max-width:none}.card{box-shadow:none;break-inside:avoid}.photo img{height:170px}body{background:#fff}}
+:root{--brand:#0A4033;--brand2:#0f5a47;--bg:#f3f6f5;--card:#fff;--line:#dce6e2;--text:#10231d;--muted:#60706a;--red:#b83232;--green:#137a4b;--amber:#9a6b00}*{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial,sans-serif;background:linear-gradient(180deg,#eaf4f0,#f7fbfa);color:var(--text)}button{font-family:inherit;border:0;background:var(--brand);color:#fff;border-radius:12px;padding:11px 15px;font-weight:700;cursor:pointer}button.light{background:#eef6f3;color:var(--brand);border:1px solid var(--line)}input,textarea,select{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px;background:#fff;font-family:inherit}.container{width:min(1180px,94vw);margin:auto}.cover{margin:22px auto;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border-radius:28px;padding:28px;box-shadow:0 20px 50px rgba(10,64,51,.18);position:relative;overflow:hidden}.cover:before{content:"";position:absolute;inset:auto -80px -120px auto;width:320px;height:320px;border-radius:50%;background:rgba(255,255,255,.08)}.topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;position:relative}.logo{display:flex;gap:12px;align-items:center}.logo-mark{width:58px;height:58px;border-radius:18px;background:#fff;color:var(--brand);display:grid;place-items:center;font-size:28px;font-weight:900}.logo small,.cover p{color:#e6f5ef}.cover h1{font-size:32px;margin:22px 0 8px}.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:22px;position:relative}.meta div{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);padding:12px;border-radius:16px}.meta small{display:block;color:#cfe9df;margin-bottom:5px}.actions{display:flex;gap:8px;flex-wrap:wrap}.card{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:20px;margin:16px 0;box-shadow:0 10px 28px rgba(10,64,51,.06)}.card h2{margin:0 0 14px;color:var(--brand)}.summary{font-size:17px;line-height:1.9}.service-gates{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.gate{background:#fbfdfc;border:1px solid var(--line);border-radius:20px;padding:16px;cursor:pointer;transition:.2s}.gate:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(10,64,51,.08)}.gate-icon{width:46px;height:46px;border-radius:16px;background:#e8f4ee;color:var(--brand);display:grid;place-items:center;font-size:22px;margin-bottom:10px}.badge{display:inline-block;padding:6px 10px;border-radius:999px;background:#e8f4ee;color:var(--brand);font-size:12px;font-weight:700}.service-section{scroll-margin-top:16px}.service-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.scope{background:#f7fbfa;border:1px solid var(--line);border-radius:16px;padding:12px;line-height:1.8;color:#31443d}.stages{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}.stage h3{color:var(--brand);margin:0 0 10px}.images{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.img-card{border:1px solid var(--line);border-radius:16px;background:#f8fbfa;overflow:hidden;cursor:pointer}.img-card img{width:100%;height:220px;object-fit:contain;background:#fff;display:block}.empty-img{border:1px dashed #c7d8d2;border-radius:16px;padding:24px;text-align:center;color:var(--muted);background:#fbfdfc}.compare{display:grid;grid-template-columns:1fr 1fr;gap:12px}.compare .img-card img{height:260px}.timeline{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.step{background:#fbfdfc;border:1px solid var(--line);border-radius:16px;padding:12px;text-align:center}.step b{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--brand);color:#fff;margin:0 auto 8px}.rating-box{background:#f7fbfa;border:1px solid var(--line);border-radius:18px;padding:14px;margin-top:16px}.rating-buttons{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.rating-buttons button{background:#fff;color:var(--brand);border:1px solid var(--line)}.rating-buttons button.active{background:var(--brand);color:#fff}.footer{text-align:center;color:var(--muted);padding:26px}.modal{position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;padding:20px;z-index:999}.modal.open{display:flex}.modal img{max-width:96vw;max-height:88vh;object-fit:contain;background:#fff;border-radius:12px}.close{position:absolute;top:18px;left:18px;background:#fff;color:#111}.loading{min-height:80vh;display:grid;place-items:center;text-align:center}.err{background:#fde8e8;color:#9d2222;border:1px solid #efc3c3;border-radius:18px;padding:18px}.print-only{display:none}@media(max-width:900px){.topbar,.service-head{display:block}.meta,.service-gates,.stages,.timeline,.compare{grid-template-columns:1fr}.images{grid-template-columns:1fr}.cover h1{font-size:25px}.actions{margin-top:14px}.img-card img,.compare .img-card img{height:auto;max-height:520px}}@media print{body{background:#fff}.actions,.rating-box{display:none}.cover,.card{box-shadow:none}.container{width:100%;}.print-only{display:block}.img-card img{height:auto;max-height:400px}.stage,.service-section{break-inside:avoid}}
 </style>
 </head>
-<body>
-<div class="topbar"><div class="access">🔒 رؤساء الجمعية فقط</div><div class="brand"><div><b>تصنيف</b><small>لإدارة المرافق</small></div><div class="logo">ت</div></div></div>
-<div id="app"><div class="empty"><h1>جاري تحميل التقرير...</h1><p>يرجى الانتظار لحظات</p></div></div>
+<body onload="loadClientReport()">
+<div id="app" class="container loading"><div><h2>جاري تحميل التقرير...</h2><p>شركة تصنيف لإدارة المرافق</p></div></div>
+<div id="imgModal" class="modal" onclick="this.classList.remove('open')"><button class="close">إغلاق</button><img id="modalImg"></div>
 <script>
 const SUPABASE_URL = "https://zmjdqiswytxlbfgnfjfv.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const esc=s=>String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
-const qs=new URLSearchParams(location.search);
-function fmtDate(d){ if(!d) return '-'; try{return new Date(d+'T00:00:00').toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'});}catch(e){return d;} }
-function reportUrl(){ return location.href; }
-function cleanPhone(p){ p=String(p||'').replace(/[^0-9]/g,''); if(p.startsWith('05')) p='966'+p.slice(1); if(p.startsWith('5')) p='966'+p; return p; }
-function serviceInfo(name){ const m={
-  'مكافحة الحشرات':['🪲','خدمات مكافحة الحشرات والقوارض بأحدث الطرق'],
-  'تنظيف الخزانات':['🧴','تنظيف وتعقيم الخزانات الأرضية والعلوية'],
-  'نظافة البيسمنت':['🧹','تنظيف البيسمنت والمواقف وإزالة الأتربة'],
-  'نظافة الأسطح':['🧽','تنظيف الأسطح والزجاج وواجهات المباني'],
-  'تنظيف فلاتر المكيفات':['❄️','تنظيف فلاتر المكيفات وتحسين جودة الهواء'],
-  'صيانة':['🛠️','متابعة أعمال الصيانة والبلاغات التشغيلية'],
-  'النظافة اليومية':['🧼','متابعة النظافة اليومية للمرافق المشتركة'],
-  'التعطير':['🌿','تعطير دوري للمداخل والمرافق المشتركة'],
-  'المصاعد':['🛗','متابعة زيارات وصيانة المصاعد الدورية'],
-  'الكاميرات':['📷','متابعة الكاميرات وتمسيح العدسات عند الحاجة']
-}; return m[name]||['✅','خدمة ضمن نطاق التشغيل المعتمد للمشروع']; }
-function renderServicePortals(arr){ arr=Array.isArray(arr)?arr:[]; if(!arr.length) return ''; return `<section class="card"><h2 class="section-title"><span class="section-icon">▦</span>بوابات الخدمات</h2><div class="service-portals">${arr.map(n=>{const i=serviceInfo(n);return `<div class="service-card"><div class="svc-icon">${i[0]}</div><h3>${esc(n)}</h3><p>${esc(i[1])}</p><button type="button">عرض الخدمة</button></div>`}).join('')}</div></section>`; }
-function unavailable(){ document.getElementById('app').innerHTML='<div class="empty"><h1>هذا التقرير غير متاح حاليًا</h1><p>قد يكون التقرير غير معتمد أو تم إلغاء نشره من الإدارة.</p></div>'; }
-function shareWhatsApp(r){ const text=`السيد / رئيس جمعية ${r.project_name||''} المحترم\n\nتم نشر ${r.title||'التقرير'} ويمكنكم الاطلاع عليه من خلال الرابط التالي:\n${reportUrl()}\n\nشركة تصنيف لإدارة المرافق\n920015589`; window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank'); }
-function render(r){
-  const imgs=Array.isArray(r.images)?r.images:[];
-  const main=imgs.slice(0,3);
-  const labels=['قبل التنفيذ','أثناء التنفيذ','بعد التنفيذ'];
-  const works=Array.isArray(r.works)?r.works:[];
-  document.title=(r.title||'تقرير عميل')+' - تصنيف';
-  document.getElementById('app').innerHTML=`
-  <div class="page">
-    <main>
-      <section class="card hero">
-        <div class="crumb">التقارير / ${esc(r.report_type)} / ${esc(r.project_name)}</div>
-        <div class="title-row"><h1>${esc(r.title||('تقرير '+r.report_type))}</h1><span class="approved">✓ معتمد</span></div>
-        <p style="color:var(--muted);margin:8px 0 0">${esc(r.project_name||'')}</p>
-        <div class="meta">
-          <div class="meta-item"><div class="icon">🪲</div><small>نوع الخدمة</small><b>${esc(r.report_type||'-')}</b></div>
-          <div class="meta-item"><div class="icon">📅</div><small>تاريخ التنفيذ</small><b>${esc(r.execution_date||'-')}</b></div>
-          <div class="meta-item"><div class="icon">📍</div><small>الموقع</small><b>${esc(r.location_text||'المرافق المشتركة')}</b></div>
-          <div class="meta-item"><div class="icon">👷</div><small>المشرف</small><b>${esc(r.supervisor_name||'-')}</b></div>
-        </div>
-      </section>
-      <section class="card"><h2 class="section-title"><span class="section-icon">📋</span>ملخص التنفيذ</h2><div class="summary">${esc(r.summary||'تم تنفيذ الخدمة حسب الخطة التشغيلية المعتمدة.').replace(/\n/g,'<br>')}</div></section>
-      <section class="card"><h2 class="section-title"><span class="section-icon">✓</span>الأعمال المنفذة</h2><div class="works">${works.map(w=>`<div class="work"><span class="check">✓</span><span>${esc(w)}</span></div>`).join('')||'<div class="work">لا توجد بنود مسجلة</div>'}</div></section>
-      <section class="card"><h2 class="section-title"><span class="section-icon">🖼️</span>صور التقرير</h2><div class="photo-grid">${main.map((im,i)=>`<div class="photo"><b>${labels[i]||('صورة '+(i+1))}</b><img src="${im.dataUrl}" onclick="window.open(this.src,'_blank')"></div>`).join('')||'<p>لا توجد صور مرفقة</p>'}</div>${imgs.length>3?`<div class="thumbs">${imgs.slice(3).map(im=>`<img src="${im.dataUrl}" onclick="window.open(this.src,'_blank')">`).join('')}</div>`:''}</section>
-      ${renderServicePortals(r.service_portals)}
-      <section class="card"><h2 class="section-title"><span class="section-icon">📝</span>ملاحظات الفريق</h2><div class="summary">${esc(r.notes||'لا توجد ملاحظات مؤثرة، وتم تنفيذ الخدمة بنجاح.')}</div></section>
-      <section class="card"><div class="actions"><button class="btn" onclick="window.print()">تحميل PDF</button><button class="btn" onclick='shareWhatsApp(${JSON.stringify({project_name:r.project_name,title:r.title}).replace(/'/g,"&#39;")})'>مشاركة التقرير</button><button class="btn light" onclick="window.print()">طباعة التقرير</button></div></section>
-      <div class="notice">تم اعتماد التقرير من الإدارة ونشره بتاريخ ${fmtDate((r.published_at||'').slice(0,10))}</div>
-    </main>
-    <aside class="side">
-      <div class="card side-card"><h3>معلومات التقرير</h3><div class="info-list"><div><small>رقم التقرير</small><b>${esc(r.report_number||'-')}</b></div><div><small>تاريخ النشر</small><b>${fmtDate((r.published_at||'').slice(0,10))}</b></div><div><small>حالة التقرير</small><b style="color:var(--brand)">معتمد ومنشور</b></div></div></div>
-      <div class="card side-card"><h3>للتواصل والدعم</h3><div class="support">920015589</div></div>
-      <div class="card"><div class="building">▥</div></div>
-    </aside>
-  </div><div class="footer">جميع الحقوق محفوظة © 2026 تصنيف لإدارة المرافق</div>`;
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let currentReport=null, currentServices=[];
+function imgCount(s){ return [...(s.before_images||[]),...(s.during_images||[]),...(s.after_images||[])].length; }
+function firstImg(arr){ return (arr&&arr[0]&&(arr[0].data||arr[0].url))||''; }
+function openImg(src){ $('modalImg').src=src; $('imgModal').classList.add('open'); }
+function iconFor(t){ if(String(t).includes('حشرات')) return '🛡️'; if(String(t).includes('خزانات')) return '💧'; if(String(t).includes('أسطح')) return '🏢'; if(String(t).includes('بيسمنت')) return '🅿️'; if(String(t).includes('كهرباء')) return '💡'; if(String(t).includes('سباكة')) return '🔧'; if(String(t).includes('زراعة')) return '🌿'; return '✅'; }
+async function loadClientReport(){
+  const token=new URLSearchParams(location.search).get('token');
+  if(!token) return showError('رابط التقرير غير صحيح.');
+  const {data:report,error}=await sb.from('client_reports').select('*').eq('public_token',token).eq('status','published').maybeSingle();
+  if(error || !report) return showError('هذا التقرير غير متاح حاليًا أو لم يتم اعتماده من الإدارة.');
+  const {data:services,error:se}=await sb.from('client_report_services').select('*').eq('report_id',report.id).order('sort_order',{ascending:true});
+  if(se) return showError('تعذر تحميل خدمات التقرير.');
+  currentReport=report; currentServices=services||[]; render();
 }
-async function load(){
-  const token=qs.get('token'); if(!token) return unavailable();
-  const {data,error}=await sb.from('service_reports').select('*').eq('public_token',token).eq('status','published').maybeSingle();
-  if(error||!data) return unavailable(); render(data);
+function showError(text){ $('app').className='container loading'; $('app').innerHTML=`<div class="err"><h2>${esc(text)}</h2><p>شركة تصنيف لإدارة المرافق - 920015589</p></div>`; }
+function render(){
+  const r=currentReport, s=currentServices;
+  $('app').className='container';
+  $('app').innerHTML=`
+  <section class="cover">
+    <div class="topbar">
+      <div class="logo"><div class="logo-mark">ت</div><div><b>شركة تصنيف لإدارة المرافق</b><small>بوابة تقارير العملاء</small></div></div>
+      <div class="actions"><button onclick="window.print()">تحميل / طباعة PDF</button><button class="light" onclick="navigator.share?navigator.share({title:document.title,url:location.href}):navigator.clipboard.writeText(location.href)">مشاركة التقرير</button></div>
+    </div>
+    <h1>${esc(r.title||'تقرير خدمات المشروع')}</h1>
+    <p>${esc(r.executive_summary||'تم تنفيذ الأعمال الموضحة في التقرير حسب الخطة التشغيلية المعتمدة.')}</p>
+    <div class="meta"><div><small>المشروع</small><b>${esc(r.project_name)}</b></div><div><small>تاريخ التنفيذ</small><b>${esc(r.report_date)}</b></div><div><small>رقم التقرير</small><b>${esc(r.report_no||r.id)}</b></div><div><small>الحالة</small><b>معتمد من الإدارة</b></div></div>
+  </section>
+  <section class="card"><h2>ملخص التقرير</h2><div class="summary">${esc(r.executive_summary||'').replace(/\n/g,'<br>')}</div></section>
+  <section class="card"><h2>بوابات الخدمات</h2><div class="service-gates">${s.map((x,i)=>`<div class="gate" onclick="document.getElementById('service-${x.id}').scrollIntoView({behavior:'smooth'})"><div class="gate-icon">${iconFor(x.service_type)}</div><h3>${esc(x.title||x.service_type)}</h3><p><span class="badge">${imgCount(x)} صورة</span> <span class="badge">مكتمل</span></p><small>عرض التفاصيل</small></div>`).join('')||'لا توجد خدمات'}</div></section>
+  <section class="card"><h2>مسار تنفيذ الخدمة</h2><div class="timeline"><div class="step"><b>1</b>إعداد التقرير</div><div class="step"><b>2</b>توثيق الصور</div><div class="step"><b>3</b>تنفيذ الخدمة</div><div class="step"><b>4</b>مراجعة الجودة</div><div class="step"><b>5</b>اعتماد الإدارة</div></div></section>
+  ${s.map(renderService).join('')}
+  <div class="footer">شركة تصنيف لإدارة المرافق<br>920015589</div>`;
 }
-load();
+function renderImages(arr){ arr=arr||[]; if(!arr.length) return '<div class="empty-img">لا توجد صور في هذا القسم</div>'; return `<div class="images">${arr.map(im=>{const src=im.data||im.url||''; return `<div class="img-card" onclick="openImg('${src}')"><img src="${src}" alt="صورة التقرير"></div>`}).join('')}</div>`; }
+function renderService(s,i){
+  const before=firstImg(s.before_images), after=firstImg(s.after_images);
+  return `<section class="card service-section" id="service-${s.id}">
+    <div class="service-head"><div><h2>${esc(s.title||s.service_type)}</h2><p class="badge">${esc(s.service_type||'خدمة')}</p></div><p class="badge">عدد الصور: ${imgCount(s)}</p></div>
+    ${s.service_description?`<p class="summary">${esc(s.service_description).replace(/\n/g,'<br>')}</p>`:''}
+    ${s.scope_work?`<div class="scope"><b>نطاق العمل:</b><br>${esc(s.scope_work).replace(/\n/g,'<br>')}</div>`:''}
+    ${(before||after)?`<h3 style="color:var(--brand)">مقارنة قبل وبعد</h3><div class="compare"><div><b>قبل التنفيذ</b>${before?`<div class="img-card" onclick="openImg('${before}')"><img src="${before}"></div>`:'<div class="empty-img">لا توجد صورة قبل</div>'}</div><div><b>بعد التنفيذ</b>${after?`<div class="img-card" onclick="openImg('${after}')"><img src="${after}"></div>`:'<div class="empty-img">لا توجد صورة بعد</div>'}</div></div>`:''}
+    <div class="stages"><div class="stage"><h3>قبل التنفيذ</h3>${renderImages(s.before_images)}</div><div class="stage"><h3>أثناء التنفيذ</h3>${renderImages(s.during_images)}</div><div class="stage"><h3>بعد التنفيذ</h3>${renderImages(s.after_images)}</div></div>
+    ${s.notes?`<div class="scope" style="margin-top:12px"><b>ملاحظات الإدارة:</b><br>${esc(s.notes).replace(/\n/g,'<br>')}</div>`:''}
+    <div class="rating-box" id="rating-${s.id}"><h3>ما مدى رضاكم عن هذه الخدمة؟</h3><div class="rating-buttons"><button onclick="setRating('${s.id}','ممتاز',this)">ممتاز</button><button onclick="setRating('${s.id}','جيد جدًا',this)">جيد جدًا</button><button onclick="setRating('${s.id}','جيد',this)">جيد</button><button onclick="setRating('${s.id}','يحتاج تحسين',this)">يحتاج تحسين</button></div><textarea id="comment-${s.id}" placeholder="ملاحظاتكم على الخدمة - اختياري"></textarea><label style="display:flex;gap:8px;align-items:center;margin:10px 0"><input id="follow-${s.id}" type="checkbox" style="width:auto"> أرغب بزيارة متابعة</label><button onclick="submitRating('${s.id}')">إرسال التقييم</button><div id="thanks-${s.id}" style="margin-top:8px;color:var(--brand);font-weight:bold"></div></div>
+  </section>`;
+}
+function setRating(serviceId, value, btn){ const box=$(`rating-${serviceId}`); box.dataset.rating=value; box.querySelectorAll('.rating-buttons button').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); }
+async function submitRating(serviceId){
+  const box=$(`rating-${serviceId}`); const rating=box.dataset.rating; if(!rating){ alert('اختر التقييم أولاً'); return; }
+  const s=currentServices.find(x=>String(x.id)===String(serviceId));
+  const row={report_id:currentReport.id,service_id:serviceId,project_id:currentReport.project_id,project_name:currentReport.project_name,report_title:currentReport.title,service_title:s?.title||s?.service_type||'',rating,comment:$(`comment-${serviceId}`).value||'',followup_requested:$(`follow-${serviceId}`).checked};
+  const {error}=await sb.from('client_service_ratings').insert(row); if(error){ alert(error.message); return; }
+  $(`thanks-${serviceId}`).textContent='شكرًا لكم، تم استلام تقييمكم بنجاح.';
+  box.querySelector('button[onclick^="submitRating"]').disabled=true;
+}
 </script>
 </body>
 </html>

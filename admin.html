@@ -9,6 +9,11 @@
 
 
 .attendance-matrix-wrap{max-height:72vh}.attendance-matrix th,.attendance-matrix td{text-align:center;min-width:42px}.attendance-matrix th:first-child,.attendance-matrix td:first-child{position:sticky;right:0;background:#fff;z-index:2;text-align:right;min-width:160px}.att-cell{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:10px;font-weight:900;font-size:12px}.att-present{background:#e8f4ee;color:#137a4b;border:1px solid #b9dfcb}.att-absent{background:#fde8e8;color:#9d2222;border:1px solid #efb4b4}.att-empty{background:#f3f6f5;color:#87938f;border:1px solid #dce6e2}.att-summary{font-size:12px;color:#60706a;line-height:1.7}
+
+
+/* V95 Premium Client Reports */
+.report-premium-wrap{display:grid;grid-template-columns:430px 1fr;gap:16px;align-items:start}.report-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.report-kpis .kpi b{font-size:24px}.report-form-card{position:sticky;top:14px}.service-builder{display:grid;gap:12px}.service-editor-card{border:1px solid var(--line);background:#fbfdfc;border-radius:18px;padding:14px}.service-editor-head{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:10px}.stage-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stage-box{border:1px dashed #b9d4cb;border-radius:16px;padding:10px;background:#fff}.stage-box h4{margin:0 0 8px;color:var(--brand)}.img-previews{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}.preview-img{position:relative;border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden}.preview-img img{width:100%;height:92px;object-fit:contain;background:#f6f9f8;display:block}.preview-img button{position:absolute;top:5px;left:5px;padding:4px 7px;border-radius:8px;background:#b83232}.report-filters-panel{display:grid;grid-template-columns:2fr repeat(5,1fr);gap:8px;align-items:end}.service-chip{display:inline-flex;align-items:center;gap:6px;background:#e8f4ee;color:#0A4033;border:1px solid #b9dfcb;border-radius:999px;padding:5px 9px;margin:2px;font-weight:700;font-size:12px}.rating-face{font-size:18px}.no-reports-box{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.no-report-item{background:#fff8e8;border:1px solid #f0d48d;border-radius:14px;padding:10px}.mini-link{color:var(--brand);font-weight:700;cursor:pointer;text-decoration:underline}.client-copy{direction:ltr;text-align:left;font-size:12px;color:#60706a;white-space:normal;max-width:260px}.low-rating{background:#fde8e8!important;border-color:#efc3c3!important}.full-width{grid-column:1/-1}@media(max-width:1100px){.report-premium-wrap,.report-filters-panel,.stage-grid,.report-kpis,.no-reports-box{grid-template-columns:1fr}.report-form-card{position:static}}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -25,7 +30,8 @@
     <button class="nav" onclick="showPage('attendance',this)">الحضور والغياب</button>
     <button class="nav" onclick="showPage('monthly',this)">الأوقات الشهرية</button>
     <button class="nav" onclick="showPage('tickets',this)">التكتات</button>
-    <button class="nav" onclick="showPage('reports',this)">تقارير العملاء</button>
+    <button class="nav" onclick="showPage('clientReports',this)">تقارير العملاء</button>
+    <button class="nav" onclick="showPage('clientRatings',this)">تقييمات العملاء</button>
     <button class="nav" onclick="showPage('alerts',this)">التنبيهات</button>
     <button class="nav" onclick="showPage('assistant',this)">مساعد تصنيف</button>
     <button class="nav" onclick="showPage('export',this)">التصدير</button>
@@ -323,60 +329,80 @@
 
 
 
-    <section id="reports" class="page hidden">
-      <div class="grid two reports-grid">
-        <div class="card">
-          <h2 id="reportFormTitle">إنشاء تقرير عميل</h2>
-          <input type="hidden" id="reportId">
-          <div class="split">
-            <div><label>المشروع</label><select id="reportProject" onchange="setReportDefaults()"></select></div>
-            <div><label>نوع التقرير</label><select id="reportType" onchange="setReportTypeDefaults()"><option value="مكافحة الحشرات">مكافحة الحشرات</option><option value="تنظيف الخزانات">تنظيف الخزانات</option><option value="نظافة الأسطح">نظافة الأسطح</option><option value="تنظيف البيسمنت">تنظيف البيسمنت</option><option value="تنظيف فلاتر المكيفات">تنظيف فلاتر المكيفات</option><option value="صيانة">صيانة</option><option value="نظافة عامة">نظافة عامة</option></select></div>
-          </div>
-          <div class="split">
-            <div><label>تاريخ التنفيذ</label><input type="date" id="reportExecutionDate"></div>
-            <div><label>رقم واتساب رئيس الجمعية</label><input id="reportClientPhone" placeholder="مثال: 9665xxxxxxxx"></div>
-          </div>
-          <label>عنوان التقرير</label><input id="reportTitle" placeholder="مثال: تقرير مكافحة الحشرات">
-          <div class="split">
-            <div><label>الموقع داخل المشروع</label><input id="reportLocation" placeholder="مثال: المرافق المشتركة بالكامل"></div>
-            <div><label>المشرف</label><select id="reportSupervisor"></select></div>
-          </div>
-          <label>الملخص التنفيذي</label><textarea id="reportSummary" placeholder="اكتب ملخصًا احترافيًا مختصرًا للتقرير"></textarea>
-          <label>الأعمال المنفذة <small>كل سطر يظهر كبند مستقل</small></label><textarea id="reportWorks" placeholder="مثال:\nتنظيف وتجهيز المواقع قبل التنفيذ\nمعالجة أماكن تجمع الحشرات\nمتابعة الملاحظات بعد التنفيذ"></textarea>
-          <label>بوابات الخدمات التي تظهر لرئيس الجمعية <small>اختر الخدمات التي تريد إظهارها داخل صفحة التقرير</small></label>
-          <div id="reportServicePortals" class="service-portal-picker">
-            <label><input type="checkbox" name="reportServicePortal" value="مكافحة الحشرات"> مكافحة الحشرات</label>
-            <label><input type="checkbox" name="reportServicePortal" value="تنظيف الخزانات"> تنظيف الخزانات</label>
-            <label><input type="checkbox" name="reportServicePortal" value="نظافة البيسمنت"> نظافة البيسمنت</label>
-            <label><input type="checkbox" name="reportServicePortal" value="نظافة الأسطح"> نظافة الأسطح</label>
-            <label><input type="checkbox" name="reportServicePortal" value="تنظيف فلاتر المكيفات"> تنظيف فلاتر المكيفات</label>
-            <label><input type="checkbox" name="reportServicePortal" value="صيانة"> صيانة</label>
-            <label><input type="checkbox" name="reportServicePortal" value="النظافة اليومية"> النظافة اليومية</label>
-            <label><input type="checkbox" name="reportServicePortal" value="التعطير"> التعطير</label>
-            <label><input type="checkbox" name="reportServicePortal" value="المصاعد"> المصاعد</label>
-            <label><input type="checkbox" name="reportServicePortal" value="الكاميرات"> الكاميرات</label>
-          </div>
-          <label>ملاحظات الفريق</label><textarea id="reportNotes" placeholder="مثال: لا توجد ملاحظات مؤثرة، وتم تنفيذ الخدمة بنجاح."></textarea>
-          <label>صور التقرير</label><input type="file" id="reportImages" accept="image/*" multiple onchange="previewReportImages()">
-          <div id="reportImagePreview" class="report-image-preview"></div>
+    <section id="clientReports" class="page hidden">
+      <div class="card section-head">
+        <div>
+          <h2>بوابة تقارير العملاء - V95 Premium</h2>
+          <p>إنشاء تقرير مستقل لرئيس الجمعية مع بوابات خدمات، صور قبل/أثناء/بعد، اعتماد ونشر، تقييمات، وفلاتر قوية.</p>
+        </div>
+        <button class="light" onclick="clearPremiumReportForm(); document.getElementById('premiumReportFormCard')?.scrollIntoView({behavior:'smooth'})">تقرير جديد</button>
+      </div>
+
+      <div class="report-kpis">
+        <div class="kpi"><small>إجمالي التقارير</small><b id="reportsTotalKpi">0</b></div>
+        <div class="kpi"><small>هذا الشهر</small><b id="reportsMonthKpi">0</b></div>
+        <div class="kpi"><small>مسودات</small><b id="reportsDraftKpi">0</b></div>
+        <div class="kpi"><small>منشورة</small><b id="reportsPublishedKpi">0</b></div>
+        <div class="kpi"><small>تحتاج متابعة</small><b id="reportsFollowKpi">0</b></div>
+      </div>
+
+      <div class="report-premium-wrap">
+        <div class="card report-form-card" id="premiumReportFormCard">
+          <h2 id="premiumReportFormTitle">إنشاء تقرير جديد</h2>
+          <input type="hidden" id="premiumReportId">
+          <div class="split"><div><label>المشروع</label><select id="premiumReportProject" onchange="syncPremiumProjectInfo()"></select></div><div><label>تاريخ التنفيذ</label><input type="date" id="premiumReportDate"></div></div>
+          <label>عنوان التقرير</label><input id="premiumReportTitle" placeholder="مثال: تقرير مكافحة الحشرات وتنظيف المرافق">
+          <div class="split"><div><label>نوع التقرير العام</label><select id="premiumReportType"><option>تقرير خدمات</option><option>مكافحة الحشرات</option><option>غسيل خزانات</option><option>نظافة عامة</option><option>صيانة</option><option>تقرير شهري</option></select></div><div><label>رئيس الجمعية / المستلم</label><input id="premiumChairmanName" placeholder="اختياري"></div></div>
+          <label>رقم واتساب رئيس الجمعية</label><input id="premiumChairmanPhone" placeholder="9665xxxxxxxx">
+          <label>الملخص التنفيذي</label><textarea id="premiumSummary" placeholder="اكتب ملخص مختصر يظهر في أول التقرير"></textarea>
           <div class="actions">
-            <button onclick="saveClientReport('draft')">حفظ مسودة</button>
-            <button onclick="saveClientReport('published')">اعتماد ونشر</button>
-            <button class="light" onclick="previewCurrentReport()">معاينة</button>
-            <button class="light" onclick="clearReportForm()">جديد</button>
+            <button onclick="addPremiumService()">+ إضافة خدمة</button>
+            <button class="light" onclick="addPremiumService('مكافحة الحشرات')">مكافحة</button>
+            <button class="light" onclick="addPremiumService('تنظيف الأسطح')">أسطح</button>
+            <button class="light" onclick="addPremiumService('تنظيف البيسمنت')">بيسمنت</button>
+            <button class="light" onclick="addPremiumService('غسيل الخزانات')">خزانات</button>
           </div>
-          <div class="footer-note">لن يظهر التقرير لرئيس الجمعية إلا بعد الضغط على <b>اعتماد ونشر</b>.</div>
-        </div>
-        <div class="card">
-          <h2>تقارير العملاء</h2>
-          <div class="filters">
-            <select id="reportFilterProject" onchange="renderClientReports()"></select>
-            <select id="reportFilterStatus" onchange="renderClientReports()"><option value="">كل الحالات</option><option value="draft">مسودة</option><option value="published">معتمد ومنشور</option><option value="unpublished">غير منشور</option></select>
-            <input id="reportSearch" oninput="renderClientReports()" placeholder="بحث بالعنوان أو رقم التقرير">
+          <div id="premiumServicesEditor" class="service-builder"></div>
+          <div class="actions">
+            <button class="light" onclick="savePremiumReport('draft')">حفظ كمسودة</button>
+            <button onclick="savePremiumReport('published')">اعتماد ونشر</button>
+            <button class="light" onclick="previewPremiumReport()">معاينة</button>
+            <button class="danger" onclick="clearPremiumReportForm()">تفريغ</button>
           </div>
-          <div id="reportsSchemaWarning" class="msg err hidden"></div>
-          <div class="table-wrap"><table><thead><tr><th>رقم التقرير</th><th>المشروع</th><th>النوع</th><th>التاريخ</th><th>الحالة</th><th>واتساب</th><th>إجراء</th></tr></thead><tbody id="reportsBody"></tbody></table></div>
+          <div class="footer-note">لن يظهر التقرير لرئيس الجمعية إلا بعد حالة: معتمد ومنشور.</div>
         </div>
+
+        <div>
+          <div class="card">
+            <h2>البحث والفلاتر</h2>
+            <div class="report-filters-panel">
+              <input id="premiumReportSearch" oninput="renderPremiumReports()" placeholder="بحث باسم المشروع، رقم التقرير، العنوان أو الخدمة">
+              <select id="premiumReportFilterProject" onchange="renderPremiumReports()"><option value="">كل المشاريع</option></select>
+              <select id="premiumReportFilterService" onchange="renderPremiumReports()"><option value="">كل الخدمات</option><option>مكافحة الحشرات</option><option>غسيل الخزانات</option><option>تنظيف الأسطح</option><option>تنظيف البيسمنت</option><option>تنظيف المناور</option><option>تنظيف المكيفات</option><option>صيانة كهرباء</option><option>صيانة سباكة</option><option>صيانة مصعد</option><option>أعمال زراعة</option><option>أخرى</option></select>
+              <select id="premiumReportFilterStatus" onchange="renderPremiumReports()"><option value="">كل الحالات</option><option value="draft">مسودة</option><option value="published">معتمد ومنشور</option><option value="unpublished">غير منشور</option></select>
+              <select id="premiumReportFilterRating" onchange="renderPremiumReports()"><option value="">كل التقييمات</option><option value="ممتاز">ممتاز</option><option value="جيد جدًا">جيد جدًا</option><option value="جيد">جيد</option><option value="يحتاج تحسين">يحتاج تحسين</option><option value="none">لم يتم التقييم</option></select>
+              <input type="month" id="premiumReportFilterMonth" onchange="renderPremiumReports()">
+            </div>
+            <div class="actions">
+              <button class="light" onclick="toggleProjectsWithoutReports()">المشاريع بدون تقارير هذا الشهر</button>
+              <button class="light" onclick="resetPremiumReportFilters()">إعادة تعيين</button>
+              <button class="light" onclick="exportPremiumReportsCSV()">تصدير CSV</button>
+            </div>
+            <div id="projectsWithoutReportsBox" class="hidden"></div>
+          </div>
+          <div class="card">
+            <div class="table-head"><h2>سجل التقارير</h2><button class="light" onclick="loadPremiumReportsOnly()">تحديث التقارير</button></div>
+            <div class="table-wrap"><table><thead><tr><th>رقم التقرير</th><th>التاريخ</th><th>المشروع</th><th>الخدمات</th><th>الحالة</th><th>التقييم</th><th>رابط العميل</th><th>إجراء</th></tr></thead><tbody id="premiumReportsBody"></tbody></table></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="clientRatings" class="page hidden">
+      <div class="card section-head"><div><h2>تقييمات العملاء</h2><p>متابعة رضا رؤساء الجمعيات عن كل خدمة وإظهار التقييمات التي تحتاج متابعة.</p></div><button class="light" onclick="loadPremiumReportsOnly()">تحديث</button></div>
+      <div class="card">
+        <div class="filters"><input id="ratingSearch" oninput="renderClientRatings()" placeholder="بحث بالمشروع أو الخدمة أو الملاحظة"><select id="ratingFilterValue" onchange="renderClientRatings()"><option value="">كل التقييمات</option><option>ممتاز</option><option>جيد جدًا</option><option>جيد</option><option>يحتاج تحسين</option></select><select id="ratingFilterFollow" onchange="renderClientRatings()"><option value="">كل الحالات</option><option value="yes">يريد زيارة متابعة</option><option value="low">تحتاج تحسين</option></select></div>
+        <div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المشروع</th><th>التقرير</th><th>الخدمة</th><th>التقييم</th><th>ملاحظة العميل</th><th>زيارة متابعة</th></tr></thead><tbody id="clientRatingsBody"></tbody></table></div>
       </div>
     </section>
 
@@ -414,6 +440,6 @@
     <section id="export" class="page hidden"><div class="card"><h2>التصدير</h2><p>صدّر بيانات النظام الحالية بصيغة CSV.</p><div class="actions"><button onclick="exportTable('app_users')">المستخدمين</button><button onclick="exportTable('projects')">المشاريع</button><button onclick="exportTable('workers')">العمال</button><button onclick="exportTable('attendance')">الحضور</button><button onclick="exportTable('time_logs')">التسجيلات اليومية</button><button onclick="exportTable('tickets')">التكتات</button></div></div></section>
   </main>
 </div>
-<script src="app.js?v=91"></script>
+<script src="app.js?v=95"></script>
 </body>
 </html>
