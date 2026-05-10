@@ -2610,31 +2610,79 @@ function collectPremiumReportBase(status){
 }
 async function savePremiumReport(status='draft'){
   try{
-    const id=$('premiumReportId')?.value; const base=collectPremiumReportBase(status);
-    let reportId=id; let publicToken='';
+    const btn = event?.target;
+    if(btn){ btn.disabled=true; btn.dataset.oldText=btn.innerHTML; btn.innerHTML='جاري الحفظ...'; }
+
+    const rawId=($('premiumReportId')?.value||'').trim();
+    const isUuid=v=>/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v||'');
+    const id=isUuid(rawId)?rawId:'';
+    const base=collectPremiumReportBase(status);
+    let reportId='';
+    let publicToken='';
+
     if(id){
-      const existing=(data.clientReports||[]).find(r=>String(r.id)===String(id));
-      publicToken = existing?.public_token || genReportToken();
-      const row={...base, public_token: status==='published'?publicToken:existing?.public_token, updated_at:new Date().toISOString()};
-      const {error}=await sb.from('client_reports').update(row).eq('id',id); if(error) throw error;
-      await sb.from('client_report_services').delete().eq('report_id',id);
-    }else{
+      // نقرأ التقرير من قاعدة البيانات نفسها حتى لا نعتمد على كاش المتصفح
+      const {data:current,error:readErr}=await sb.from('client_reports').select('id,public_token').eq('id',id).maybeSingle();
+      if(readErr) throw readErr;
+      if(current?.id){
+        publicToken = current.public_token || genReportToken();
+        const row={...base, public_token: status==='published'?publicToken:current.public_token, updated_at:new Date().toISOString()};
+        const {data:updated,error}=await sb.from('client_reports').update(row).eq('id',id).select('id,public_token').single();
+        if(error) throw error;
+        reportId=updated.id;
+        publicToken=updated.public_token||publicToken;
+      }
+    }
+
+    // إذا كان رقم التقرير الموجود في الشاشة قديمًا أو غير موجود، ننشئ تقريرًا جديدًا بدل إدخال خدمات على تقرير غير موجود
+    if(!reportId){
       publicToken=genReportToken();
       const row={...base, report_no:genReportNo(), public_token: status==='published'?publicToken:null};
-      const {data:ins,error}=await sb.from('client_reports').insert(row).select().single(); if(error) throw error; reportId=ins.id; publicToken=ins.public_token||publicToken;
-      $('premiumReportId').value=reportId;
+      const {data:ins,error}=await sb.from('client_reports').insert(row).select('id,public_token').single();
+      if(error) throw error;
+      reportId=ins.id;
+      publicToken=ins.public_token||publicToken;
+      if($('premiumReportId')) $('premiumReportId').value=reportId;
     }
-    const serviceRows=premiumServicesState.map((s,i)=>({report_id:reportId, sort_order:i+1, service_type:s.service_type||s.title||'خدمة', title:s.title||s.service_type||'خدمة', service_description:s.service_description||'', scope_work:s.scope_work||'', notes:s.notes||'', before_images:s.before_images||[], during_images:s.during_images||[], after_images:s.after_images||[]}));
-    const {error:se}=await sb.from('client_report_services').insert(serviceRows); if(se) throw se;
+
+    // مهم: لا نحفظ الخدمات إلا بعد التأكد أن التقرير الرئيسي محفوظ فعليًا في قاعدة البيانات
+    const {error:delErr}=await sb.from('client_report_services').delete().eq('report_id',reportId);
+    if(delErr) throw delErr;
+
+    const serviceRows=premiumServicesState.map((s,i)=>({
+      report_id:reportId,
+      sort_order:i+1,
+      service_type:s.service_type||s.title||'خدمة',
+      title:s.title||s.service_type||'خدمة',
+      service_description:s.service_description||'',
+      scope_work:s.scope_work||'',
+      notes:s.notes||'',
+      before_images:Array.isArray(s.before_images)?s.before_images:[],
+      during_images:Array.isArray(s.during_images)?s.during_images:[],
+      after_images:Array.isArray(s.after_images)?s.after_images:[]
+    }));
+
+    if(serviceRows.length){
+      const {error:se}=await sb.from('client_report_services').insert(serviceRows);
+      if(se) throw se;
+    }
+
     await loadPremiumReportsOnly(false);
     msg(status==='published'?'تم اعتماد ونشر التقرير':'تم حفظ التقرير كمسودة');
+
     if(status==='published'){
       const url=clientReportUrl(publicToken);
       const phone=normalizePhoneForWa(base.chairman_phone);
       const text=`السيد / رئيس جمعية ${base.project_name} المحترم\n\nتم نشر ${base.title}.\nللاطلاع على التقرير:\n${url}\n\nشركة تصنيف لإدارة المرافق\n920015589`;
       if(phone && confirm('تم النشر. هل تريد فتح رسالة واتساب الآن؟')) window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,'_blank');
     }
-  }catch(e){ msg(e.message||String(e),'err'); }
+  }catch(e){
+    console.error('savePremiumReport failed:', e);
+    msg(e.message||String(e),'err');
+  }finally{
+    const btn = event?.target;
+    if(btn){ btn.disabled=false; if(btn.dataset.oldText) btn.innerHTML=btn.dataset.oldText; }
+  }
 }
 function getReportServices(reportId){ return (data.clientReportServices||[]).filter(s=>String(s.report_id)===String(reportId)).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)); }
 function reportRatings(reportId){ return (data.clientServiceRatings||[]).filter(r=>String(r.report_id)===String(reportId)); }
@@ -2711,192 +2759,3 @@ function exportPremiumReportsCSV(){
 
 // Initialize report form when the admin page is ready
 setTimeout(()=>{ if($('premiumReportDate') && !premiumServicesState.length){ clearPremiumReportForm(); } }, 800);
-
-/* ===================== V101 Stability Patch: fast reports + auto refresh ===================== */
-(function(){
-  const SERVICE_LIGHT_SELECT_V101 = 'id,report_id,sort_order,service_type,title,created_at';
-  let premiumSavingV101 = false;
-
-  function setPremiumBusyV101(on, text){
-    premiumSavingV101 = !!on;
-    document.body.classList.toggle('premium-saving', !!on);
-    document.querySelectorAll('[onclick*="savePremiumReport"],[onclick*="deletePremiumReport"]').forEach(btn=>{
-      btn.disabled = !!on;
-      btn.style.opacity = on ? '.65' : '';
-      btn.style.pointerEvents = on ? 'none' : '';
-    });
-    if(text && typeof msg==='function') msg(text, 'ok');
-  }
-
-  // تحميل خفيف: لا نجلب صور كل التقارير داخل لوحة الإدارة حتى لا يثقل التطبيق.
-  window.loadPremiumReportsOnly = async function(showMessage=false){
-    try{
-      const [reports, services, ratings] = await Promise.all([
-        sb.from('client_reports').select('*').order('created_at',{ascending:false}),
-        sb.from('client_report_services').select(SERVICE_LIGHT_SELECT_V101).order('sort_order',{ascending:true}),
-        sb.from('client_service_ratings').select('*').order('created_at',{ascending:false})
-      ]);
-      data.clientReports = reports.data || [];
-      data.clientReportServices = services.data || [];
-      data.clientServiceRatings = ratings.data || [];
-      data.clientReportsError = reports.error?.message || services.error?.message || ratings.error?.message || '';
-      if(showMessage) msg(data.clientReportsError ? 'تأكد من تشغيل ملف SQL الخاص بالتقارير في Supabase' : 'تم تحديث التقارير', data.clientReportsError?'err':'ok');
-      requestAnimationFrame(()=>{
-        try{ renderPremiumReports(); }catch(e){ console.warn(e); }
-        try{ renderClientRatings(); }catch(e){ console.warn(e); }
-      });
-    }catch(e){
-      data.clientReportsError = e.message || String(e);
-      if(showMessage) msg(data.clientReportsError,'err');
-    }
-  };
-
-  async function fetchFullServicesV101(reportId){
-    const {data:rows,error} = await sb.from('client_report_services').select('*').eq('report_id', reportId).order('sort_order',{ascending:true});
-    if(error) throw error;
-    return rows || [];
-  }
-
-  // عند التعديل نجلب صور هذا التقرير فقط، وليس كل صور كل التقارير.
-  window.editPremiumReport = async function(id){
-    const r=(data.clientReports||[]).find(x=>String(x.id)===String(id)); if(!r) return;
-    try{
-      setPremiumBusyV101(true,'جاري فتح التقرير للتعديل...');
-      const fullServices = await fetchFullServicesV101(id);
-      $('premiumReportId').value=r.id;
-      $('premiumReportProject').value=r.project_id||'';
-      $('premiumReportDate').value=r.report_date||today();
-      $('premiumReportTitle').value=r.title||'';
-      $('premiumReportType').value=r.report_type||'تقرير خدمات';
-      $('premiumChairmanName').value=r.chairman_name||'';
-      $('premiumChairmanPhone').value=r.chairman_phone||'';
-      $('premiumSummary').value=r.executive_summary||defaultReportSummary();
-      premiumServicesState=fullServices.map(s=>({
-        service_type:s.service_type,
-        title:s.title,
-        service_description:s.service_description,
-        scope_work:s.scope_work,
-        notes:s.notes,
-        before_images:Array.isArray(s.before_images)?s.before_images:[],
-        during_images:Array.isArray(s.during_images)?s.during_images:[],
-        after_images:Array.isArray(s.after_images)?s.after_images:[]
-      }));
-      if(!premiumServicesState.length) premiumServicesState=[makeService()];
-      renderPremiumServicesEditor();
-      $('premiumReportFormTitle')&&($('premiumReportFormTitle').textContent='تعديل تقرير');
-      $('premiumReportFormCard')?.scrollIntoView({behavior:'smooth', block:'start'});
-    }catch(e){ msg(e.message||String(e),'err'); }
-    finally{ setPremiumBusyV101(false); }
-  };
-
-  // حفظ مع تحديث فوري للقائمة بدون Refresh للصفحة.
-  window.savePremiumReport = async function(status='draft'){
-    if(premiumSavingV101) return;
-    try{
-      setPremiumBusyV101(true, status==='published'?'جاري الاعتماد والنشر...':'جاري الحفظ...');
-      const id=$('premiumReportId')?.value;
-      const base=collectPremiumReportBase(status);
-      let reportId=id;
-      let publicToken='';
-      let savedReport=null;
-
-      if(id){
-        const existing=(data.clientReports||[]).find(r=>String(r.id)===String(id));
-        publicToken = existing?.public_token || genReportToken();
-        const row={...base, public_token: status==='published'?publicToken:existing?.public_token, updated_at:new Date().toISOString()};
-        const {data:updated,error}=await sb.from('client_reports').update(row).eq('id',id).select().single();
-        if(error) throw error;
-        savedReport = updated;
-        const {error:delErr}=await sb.from('client_report_services').delete().eq('report_id',id);
-        if(delErr) throw delErr;
-      }else{
-        publicToken=genReportToken();
-        const row={...base, report_no:genReportNo(), public_token: status==='published'?publicToken:null};
-        const {data:ins,error}=await sb.from('client_reports').insert(row).select().single();
-        if(error) throw error;
-        reportId=ins.id;
-        savedReport=ins;
-        publicToken=ins.public_token||publicToken;
-        $('premiumReportId').value=reportId;
-      }
-
-      const serviceRows=premiumServicesState.map((s,i)=>({
-        report_id:reportId,
-        sort_order:i+1,
-        service_type:s.service_type||s.title||'خدمة',
-        title:s.title||s.service_type||'خدمة',
-        service_description:s.service_description||'',
-        scope_work:s.scope_work||'',
-        notes:s.notes||'',
-        before_images:s.before_images||[],
-        during_images:s.during_images||[],
-        after_images:s.after_images||[]
-      }));
-      if(serviceRows.length){
-        const {error:se}=await sb.from('client_report_services').insert(serviceRows);
-        if(se) throw se;
-      }
-
-      // تحديث محلي فوري: التقارير + خدمات خفيفة فقط للقائمة.
-      data.clientReports = [savedReport, ...(data.clientReports||[]).filter(r=>String(r.id)!==String(reportId))]
-        .sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
-      data.clientReportServices = [
-        ...(data.clientReportServices||[]).filter(s=>String(s.report_id)!==String(reportId)),
-        ...serviceRows.map((s,idx)=>({id:`local_${reportId}_${idx}`, report_id:reportId, sort_order:s.sort_order, service_type:s.service_type, title:s.title}))
-      ];
-      renderPremiumReports();
-      renderClientRatings();
-      msg(status==='published'?'تم اعتماد ونشر التقرير':'تم حفظ التقرير كمسودة');
-
-      // مزامنة خفيفة بالخلفية لضمان تطابق البيانات من Supabase بدون تهنيج.
-      setTimeout(()=>loadPremiumReportsOnly(false), 250);
-
-      if(status==='published'){
-        const url=clientReportUrl(publicToken || savedReport.public_token);
-        const phone=normalizePhoneForWa(base.chairman_phone);
-        const text=`السيد / رئيس جمعية ${base.project_name} المحترم\n\nتم نشر ${base.title}.\nللاطلاع على التقرير:\n${url}\n\nشركة تصنيف لإدارة المرافق\n920015589`;
-        if(phone && confirm('تم النشر. هل تريد فتح رسالة واتساب الآن؟')) window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,'_blank');
-      }
-    }catch(e){ msg(e.message||String(e),'err'); }
-    finally{ setPremiumBusyV101(false); }
-  };
-
-  // حذف فوري من الواجهة بدون الحاجة لتحديث الصفحة.
-  window.deletePremiumReport = async function(id){
-    if(premiumSavingV101) return;
-    if(!confirm('حذف التقرير وكل خدماته وتقييماته؟')) return;
-    const oldReports=[...(data.clientReports||[])];
-    const oldServices=[...(data.clientReportServices||[])];
-    const oldRatings=[...(data.clientServiceRatings||[])];
-    try{
-      data.clientReports = oldReports.filter(r=>String(r.id)!==String(id));
-      data.clientReportServices = oldServices.filter(s=>String(s.report_id)!==String(id));
-      data.clientServiceRatings = oldRatings.filter(r=>String(r.report_id)!==String(id));
-      renderPremiumReports();
-      renderClientRatings();
-      setPremiumBusyV101(true,'جاري حذف التقرير...');
-      const {error}=await sb.from('client_reports').delete().eq('id',id);
-      if(error) throw error;
-      msg('تم حذف التقرير');
-      setTimeout(()=>loadPremiumReportsOnly(false), 250);
-    }catch(e){
-      data.clientReports=oldReports; data.clientReportServices=oldServices; data.clientServiceRatings=oldRatings;
-      renderPremiumReports(); renderClientRatings();
-      msg(e.message||String(e),'err');
-    }finally{ setPremiumBusyV101(false); }
-  };
-
-  // تحديث تلقائي هادئ عند رجوع المستخدم للصفحة أو عند فتح قسم التقارير.
-  document.addEventListener('visibilitychange', ()=>{
-    if(!document.hidden && document.getElementById('premiumReportsBody')) loadPremiumReportsOnly(false);
-  });
-
-  const oldRemovePremiumServiceV101 = window.removePremiumService || removePremiumService;
-  window.removePremiumService = function(i){
-    if(!confirm('حذف هذه الخدمة من التقرير؟')) return;
-    premiumServicesState.splice(i,1);
-    renderPremiumServicesEditor();
-  };
-
-  console.log('V101 reports stability patch loaded: light loading + instant UI refresh');
-})();
