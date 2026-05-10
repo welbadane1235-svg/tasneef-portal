@@ -45,3 +45,10 @@ localStorage.setItem('tasneef_whatsapp_webhook_url','https://YOUR-WHATSAPP-WEBHO
 ```js
 localStorage.setItem('tasneef_report_base_url','https://your-domain.com/client-report.html')
 ```
+
+
+## تحديث V93
+- تم تعديل عرض صور التقارير في صفحة العميل لتظهر كاملة وواضحة بدون قص.
+- تم إضافة اختيار بوابات الخدمات من لوحة الإدارة، ولا تظهر في صفحة التقرير إلا الخدمات التي تحددها أنت.
+- في حال كانت قاعدة البيانات موجودة مسبقًا، شغّل الملف: `schema_update_v93_client_reports_services.sql`.
+- في حال تثبيت جديد، شغّل ملف V92 المحدث ثم ملف V93 عند الحاجة.
