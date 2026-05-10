@@ -14,6 +14,8 @@
 /* V95 Premium Client Reports */
 .report-premium-wrap{display:grid;grid-template-columns:430px 1fr;gap:16px;align-items:start}.report-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.report-kpis .kpi b{font-size:24px}.report-form-card{position:sticky;top:14px}.add-service-panel{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;background:#f1faf6;border:1px solid #b9dfcb;border-radius:18px;padding:12px;margin:10px 0}.quick-service-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}.service-builder{display:grid;gap:14px}.service-editor-card{border:1px solid var(--line);background:linear-gradient(180deg,#ffffff,#fbfdfc);border-radius:20px;padding:14px;box-shadow:0 8px 22px rgba(10,64,51,.06)}.service-editor-head{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:10px;border-bottom:1px solid #e7efec;padding-bottom:10px}.service-title-line{display:flex;align-items:center;gap:10px}.service-number{display:grid;place-items:center;min-width:34px;height:34px;border-radius:50%;background:var(--brand);color:#fff;font-weight:800}.service-counts{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}.stage-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stage-box{border:1px dashed #b9d4cb;border-radius:18px;padding:12px;background:#fff}.stage-box h4{margin:0 0 4px;color:var(--brand)}.stage-box small{color:#667;display:block;margin-top:6px}.stage-upload{display:block;border:1px solid #dbe8e3;border-radius:14px;padding:10px;background:#f8fbfa;cursor:pointer;text-align:center;font-weight:700;color:var(--brand)}.stage-upload input{display:none}.img-previews{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}.preview-img{position:relative;border:1px solid var(--line);border-radius:14px;background:#fff;overflow:hidden}.preview-img img{width:100%;height:110px;object-fit:contain;background:#f6f9f8;display:block}.preview-img button{position:absolute;top:5px;left:5px;padding:4px 7px;border-radius:8px;background:#b83232}.report-filters-panel{display:grid;grid-template-columns:2fr repeat(5,1fr);gap:8px;align-items:end}.service-chip{display:inline-flex;align-items:center;gap:6px;background:#e8f4ee;color:#0A4033;border:1px solid #b9dfcb;border-radius:999px;padding:5px 9px;margin:2px;font-weight:700;font-size:12px}.rating-face{font-size:18px}.no-reports-box{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.no-report-item{background:#fff8e8;border:1px solid #f0d48d;border-radius:14px;padding:10px}.mini-link{color:var(--brand);font-weight:700;cursor:pointer;text-decoration:underline}.client-copy{direction:ltr;text-align:left;font-size:12px;color:#60706a;white-space:normal;max-width:260px}.low-rating{background:#fde8e8!important;border-color:#efc3c3!important}.full-width{grid-column:1/-1}@media(max-width:1100px){.report-premium-wrap,.report-filters-panel,.stage-grid,.report-kpis,.no-reports-box{grid-template-columns:1fr}.report-form-card{position:static}}
 
+
+.finance-tabs{display:flex;gap:8px;flex-wrap:wrap}.finance-tab.active{background:var(--brand);color:#fff}.finance-kpis .kpi b{font-size:22px}.money-pos{color:#137a4b;font-weight:900}.money-neg{color:#b83232;font-weight:900}.finance-status-paid{background:#dff7ea;color:#137a4b}.finance-status-due{background:#fff1cc;color:#8a5b00}.finance-status-bad{background:#fde8e8;color:#b83232}.finance-status-neutral{background:#edf2f7;color:#334155}@media(max-width:1100px){.finance-tabs{display:grid;grid-template-columns:1fr 1fr}.finance-tabs button{width:100%}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -32,6 +34,7 @@
     <button class="nav" onclick="showPage('tickets',this)">التكتات</button>
     <button class="nav" onclick="showPage('clientReports',this)">تقارير العملاء</button>
     <button class="nav" onclick="showPage('clientRatings',this)">تقييمات العملاء</button>
+    <button class="nav" onclick="showPage('financeDashboard',this)">النظام المالي</button>
     <button class="nav" onclick="showPage('alerts',this)">التنبيهات</button>
     <button class="nav" onclick="showPage('assistant',this)">مساعد تصنيف</button>
     <button class="nav" onclick="showPage('export',this)">التصدير</button>
@@ -412,6 +415,121 @@
       <div class="card">
         <div class="filters"><input id="ratingSearch" oninput="renderClientRatings()" placeholder="بحث بالمشروع أو الخدمة أو الملاحظة"><select id="ratingFilterValue" onchange="renderClientRatings()"><option value="">كل التقييمات</option><option>ممتاز</option><option>جيد جدًا</option><option>جيد</option><option>يحتاج تحسين</option></select><select id="ratingFilterFollow" onchange="renderClientRatings()"><option value="">كل الحالات</option><option value="yes">يريد زيارة متابعة</option><option value="low">تحتاج تحسين</option></select></div>
         <div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المشروع</th><th>التقرير</th><th>الخدمة</th><th>التقييم</th><th>ملاحظة العميل</th><th>زيارة متابعة</th></tr></thead><tbody id="clientRatingsBody"></tbody></table></div>
+      </div>
+    </section>
+
+
+    <section id="financeDashboard" class="page hidden">
+      <div class="card section-head">
+        <div>
+          <h2>النظام المالي - V103 Finance Core</h2>
+          <p>محاسبة إدارية مرتبطة بالمشاريع: عقود مالية، فواتير، سندات قبض، مصروفات، وربحية كل مشروع.</p>
+        </div>
+        <div class="actions"><button class="light" onclick="financeLoadAll(true)">تحديث مالي</button><button onclick="financeOpenNewProject()">+ مشروع مالي جديد</button></div>
+      </div>
+      <div class="report-kpis finance-kpis">
+        <div class="kpi"><small>إجمالي الفواتير</small><b id="finKpiRevenue">0</b></div>
+        <div class="kpi"><small>إجمالي المقبوض</small><b id="finKpiReceipts">0</b></div>
+        <div class="kpi"><small>إجمالي المصروفات</small><b id="finKpiExpenses">0</b></div>
+        <div class="kpi"><small>صافي الربح</small><b id="finKpiProfit">0</b></div>
+        <div class="kpi"><small>غير مدفوع</small><b id="finKpiDue">0</b></div>
+      </div>
+      <div class="card">
+        <div class="finance-tabs">
+          <button class="light finance-tab active" onclick="financeShowTab('overview',this)">الملخص</button>
+          <button class="light finance-tab" onclick="financeShowTab('contracts',this)">العقود المالية</button>
+          <button class="light finance-tab" onclick="financeShowTab('invoices',this)">الفواتير</button>
+          <button class="light finance-tab" onclick="financeShowTab('receipts',this)">سندات القبض</button>
+          <button class="light finance-tab" onclick="financeShowTab('expenses',this)">المصروفات</button>
+          <button class="light finance-tab" onclick="financeShowTab('profitability',this)">ربحية المشاريع</button>
+        </div>
+      </div>
+
+      <div id="financeTabOverview" class="finance-tab-page">
+        <div class="card">
+          <h2>بحث وفلاتر مالية</h2>
+          <div class="report-filters-panel">
+            <input id="financeSearch" oninput="financeRenderAll()" placeholder="بحث بالمشروع أو رقم الفاتورة أو المورد">
+            <select id="financeProjectFilter" onchange="financeRenderAll()"><option value="">كل المشاريع</option></select>
+            <select id="financeMonthFilter" onchange="financeRenderAll()"></select>
+            <select id="financeInvoiceStatusFilter" onchange="financeRenderAll()"><option value="">كل حالات الفواتير</option><option value="draft">مسودة</option><option value="sent">مرسلة</option><option value="partial">مدفوعة جزئيًا</option><option value="paid">مدفوعة بالكامل</option><option value="overdue">متأخرة</option><option value="cancelled">ملغاة</option></select>
+            <select id="financeExpenseTypeFilter" onchange="financeRenderAll()"><option value="">كل المصروفات</option><option>رواتب</option><option>قطع غيار</option><option>مشتريات نظافة</option><option>صيانة</option><option>صهاريج مياه</option><option>صهاريج صرف</option><option>مكافحة حشرات</option><option>معدات</option><option>وقود</option><option>مصروف عام</option><option>مصروف طارئ</option></select>
+            <button class="light" onclick="financeResetFilters()">إعادة تعيين</button>
+          </div>
+        </div>
+        <div class="split">
+          <div class="card"><h2>آخر الفواتير</h2><div class="table-wrap"><table><thead><tr><th>الفاتورة</th><th>المشروع</th><th>الإجمالي</th><th>المدفوع</th><th>الحالة</th></tr></thead><tbody id="finRecentInvoices"></tbody></table></div></div>
+          <div class="card"><h2>آخر المصروفات</h2><div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المشروع</th><th>النوع</th><th>الإجمالي</th></tr></thead><tbody id="finRecentExpenses"></tbody></table></div></div>
+        </div>
+      </div>
+
+      <div id="financeTabContracts" class="finance-tab-page hidden">
+        <div class="report-premium-wrap">
+          <div class="card report-form-card">
+            <h2 id="financeProjectFormTitle">إضافة / تعديل عقد مالي</h2>
+            <input type="hidden" id="financeContractId"><input type="hidden" id="financeProjectId">
+            <label>اختيار مشروع موجود</label><select id="financeProjectSelect" onchange="financeFillProjectFromSelect()"><option value="">مشروع جديد أو اختر مشروعًا</option></select>
+            <label>اسم المشروع</label><input id="financeProjectName" placeholder="مثال: مغنى 14">
+            <label>موقع المشروع / ملاحظات</label><input id="financeProjectLocation" placeholder="اختياري">
+            <div class="split"><div><label>بداية العقد</label><input type="date" id="financeContractStart"></div><div><label>نهاية العقد</label><input type="date" id="financeContractEnd"></div></div>
+            <div class="split"><div><label>قيمة العقد الشهرية قبل الضريبة</label><input type="number" id="financeMonthlyAmount" min="0" step="0.01"></div><div><label>الضريبة %</label><input type="number" id="financeVatRate" value="15" min="0" step="0.01"></div></div>
+            <div class="split"><div><label>طريقة الفوترة</label><select id="financeBillingCycle"><option value="monthly">شهري</option><option value="quarterly">ربع سنوي</option><option value="installments">دفعات</option></select></div><div><label>رقم جوال المسؤول المالي</label><input id="financeContactPhone" placeholder="9665xxxxxxxx"></div></div>
+            <label>ملاحظات مالية</label><textarea id="financeContractNotes"></textarea>
+            <div class="actions"><button onclick="financeSaveContract()">حفظ العقد المالي</button><button class="light" onclick="financeClearContractForm()">تفريغ</button></div>
+          </div>
+          <div class="card"><div class="table-head"><h2>العقود المالية</h2><button class="light" onclick="financeOpenNewProject()">+ إضافة مشروع مالي</button></div><div class="table-wrap"><table><thead><tr><th>المشروع</th><th>مدة العقد</th><th>القيمة الشهرية</th><th>الضريبة</th><th>الإجمالي</th><th>الفوترة</th><th>إجراء</th></tr></thead><tbody id="financeContractsBody"></tbody></table></div></div>
+        </div>
+      </div>
+
+      <div id="financeTabInvoices" class="finance-tab-page hidden">
+        <div class="report-premium-wrap">
+          <div class="card report-form-card">
+            <h2 id="financeInvoiceFormTitle">إنشاء فاتورة</h2><input type="hidden" id="financeInvoiceId">
+            <label>المشروع</label><select id="financeInvoiceProject" onchange="financeSuggestInvoiceAmount()"></select>
+            <div class="split"><div><label>نوع الفاتورة</label><select id="financeInvoiceType"><option>فاتورة عقد شهري</option><option>فاتورة خدمة إضافية</option><option>فاتورة صيانة</option><option>فاتورة توريد قطع</option><option>أخرى</option></select></div><div><label>حالة الفاتورة</label><select id="financeInvoiceStatus"><option value="draft">مسودة</option><option value="sent">مرسلة</option><option value="partial">مدفوعة جزئيًا</option><option value="paid">مدفوعة بالكامل</option><option value="overdue">متأخرة</option><option value="cancelled">ملغاة</option></select></div></div>
+            <div class="split"><div><label>تاريخ الفاتورة</label><input type="date" id="financeInvoiceDate"></div><div><label>تاريخ الاستحقاق</label><input type="date" id="financeInvoiceDue"></div></div>
+            <div class="split"><div><label>المبلغ قبل الضريبة</label><input type="number" id="financeInvoiceSubtotal" step="0.01" oninput="financeCalcInvoiceTotal()"></div><div><label>الضريبة</label><input type="number" id="financeInvoiceVat" step="0.01" oninput="financeCalcInvoiceTotal()"></div></div>
+            <label>الإجمالي</label><input type="number" id="financeInvoiceTotal" step="0.01">
+            <label>ملاحظات</label><textarea id="financeInvoiceNotes"></textarea>
+            <div class="actions"><button onclick="financeSaveInvoice()">حفظ الفاتورة</button><button class="light" onclick="financeClearInvoiceForm()">تفريغ</button></div>
+          </div>
+          <div class="card"><h2>الفواتير</h2><div class="table-wrap"><table><thead><tr><th>رقم الفاتورة</th><th>التاريخ</th><th>المشروع</th><th>النوع</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="financeInvoicesBody"></tbody></table></div></div>
+        </div>
+      </div>
+
+      <div id="financeTabReceipts" class="finance-tab-page hidden">
+        <div class="report-premium-wrap">
+          <div class="card report-form-card">
+            <h2>تسجيل سند قبض</h2><input type="hidden" id="financeReceiptId">
+            <label>الفاتورة</label><select id="financeReceiptInvoice" onchange="financeFillReceiptInvoice()"></select>
+            <label>المشروع</label><select id="financeReceiptProject"></select>
+            <div class="split"><div><label>المبلغ المدفوع</label><input type="number" id="financeReceiptAmount" step="0.01"></div><div><label>تاريخ الدفع</label><input type="date" id="financeReceiptDate"></div></div>
+            <div class="split"><div><label>طريقة الدفع</label><select id="financeReceiptMethod"><option>تحويل</option><option>نقد</option><option>شيك</option><option>شبكة</option></select></div><div><label>رقم العملية</label><input id="financeReceiptRef"></div></div>
+            <label>ملاحظات</label><textarea id="financeReceiptNotes"></textarea>
+            <div class="actions"><button onclick="financeSaveReceipt()">حفظ سند القبض</button><button class="light" onclick="financeClearReceiptForm()">تفريغ</button></div>
+          </div>
+          <div class="card"><h2>سندات القبض</h2><div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المشروع</th><th>الفاتورة</th><th>المبلغ</th><th>طريقة الدفع</th><th>العملية</th><th>إجراء</th></tr></thead><tbody id="financeReceiptsBody"></tbody></table></div></div>
+        </div>
+      </div>
+
+      <div id="financeTabExpenses" class="finance-tab-page hidden">
+        <div class="report-premium-wrap">
+          <div class="card report-form-card">
+            <h2>تسجيل مصروف</h2><input type="hidden" id="financeExpenseId">
+            <label>المشروع</label><select id="financeExpenseProject"></select>
+            <div class="split"><div><label>نوع المصروف</label><select id="financeExpenseCategory"><option>رواتب</option><option>قطع غيار</option><option>مشتريات نظافة</option><option>صيانة</option><option>صهاريج مياه</option><option>صهاريج صرف</option><option>مكافحة حشرات</option><option>معدات</option><option>وقود</option><option>مصروف عام</option><option>مصروف طارئ</option></select></div><div><label>التاريخ</label><input type="date" id="financeExpenseDate"></div></div>
+            <div class="split"><div><label>المبلغ قبل الضريبة</label><input type="number" id="financeExpenseSubtotal" step="0.01" oninput="financeCalcExpenseTotal()"></div><div><label>الضريبة</label><input type="number" id="financeExpenseVat" step="0.01" oninput="financeCalcExpenseTotal()"></div></div>
+            <label>الإجمالي</label><input type="number" id="financeExpenseTotal" step="0.01">
+            <div class="split"><div><label>المورد</label><input id="financeExpenseSupplier"></div><div><label>طريقة الدفع</label><select id="financeExpenseMethod"><option>تحويل</option><option>نقد</option><option>شبكة</option><option>آجل</option></select></div></div>
+            <label>ملاحظات</label><textarea id="financeExpenseNotes"></textarea>
+            <div class="actions"><button onclick="financeSaveExpense()">حفظ المصروف</button><button class="light" onclick="financeClearExpenseForm()">تفريغ</button></div>
+          </div>
+          <div class="card"><h2>المصروفات</h2><div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المشروع</th><th>النوع</th><th>المورد</th><th>الإجمالي</th><th>الدفع</th><th>إجراء</th></tr></thead><tbody id="financeExpensesBody"></tbody></table></div></div>
+        </div>
+      </div>
+
+      <div id="financeTabProfitability" class="finance-tab-page hidden">
+        <div class="card"><h2>ربحية المشاريع</h2><div class="table-wrap"><table><thead><tr><th>المشروع</th><th>إجمالي الفواتير</th><th>المقبوض</th><th>المتبقي</th><th>المصروفات</th><th>صافي الربح</th><th>نسبة الربح</th><th>الحالة المالية</th></tr></thead><tbody id="financeProfitabilityBody"></tbody></table></div></div>
       </div>
     </section>
 
