@@ -423,7 +423,7 @@
       <div class="page-head">
         <div>
           <h1>المصروفات والمخزون</h1>
-          <h2>V106 Expenses & Inventory Requests</h2>
+          <h2>V108 Inventory Approval Workflow</h2>
           <p>نظام مبسط لإدارة مصروفات المشاريع ومتابعة الأصناف وحركة الصرف والإدخال.</p>
         </div>
         <div class="actions"><button onclick="financeLoadAll(true)">تحديث</button><button class="light" onclick="financeOpenNewProject()">+ إضافة مشروع</button></div>
@@ -511,10 +511,22 @@
 
 
       <div id="financeTabRequests" class="finance-tab-page hidden">
+        <div class="card">
+          <h2>إعدادات مسار اعتماد صرف المخزون</h2>
+          <p class="muted">اختر الجهات المطلوبة للموافقة ورتبها بالأرقام. إذا تركت جهة بدون تحديد لن تدخل في المسار.</p>
+          <div class="approval-grid">
+            <label class="approval-step"><input type="checkbox" id="approvalWarehouse" checked> مدير المخازن <input type="number" id="approvalWarehouseOrder" value="1" min="1"></label>
+            <label class="approval-step"><input type="checkbox" id="approvalOps" checked> المدير التشغيلي <input type="number" id="approvalOpsOrder" value="2" min="1"></label>
+            <label class="approval-step"><input type="checkbox" id="approvalFinance" checked> المدير المالي <input type="number" id="approvalFinanceOrder" value="3" min="1"></label>
+            <label class="approval-step"><input type="checkbox" id="approvalGeneral" checked> المدير العام <input type="number" id="approvalGeneralOrder" value="4" min="1"></label>
+          </div>
+          <div class="actions"><button onclick="inventorySaveApprovalSettings()">حفظ مسار الاعتماد</button><button class="light" onclick="inventoryLoadApprovalSettings(true)">استعادة المسار الافتراضي</button></div>
+          <div id="inventoryApprovalPreview" class="sup-help"></div>
+        </div>
         <div class="report-premium-wrap">
           <div class="card report-form-card">
             <h2>طلب صرف من المخزون</h2>
-            <p class="muted">المسار: المشرف → المدير التشغيلي → المدير المالي → المدير العام. بعد اعتماد المدير العام يتم الصرف من المخزون تلقائيًا.</p>
+            <p class="muted">المسار قابل للتحديد من الإدارة: مدير المخازن / المدير التشغيلي / المدير المالي / المدير العام. بعد آخر موافقة يتم الصرف من المخزون تلقائيًا.</p>
             <label>الصنف</label><select id="inventoryRequestItem"></select>
             <div class="split"><div><label>الكمية المطلوبة</label><input type="number" id="inventoryRequestQty" step="0.01"></div><div><label>تاريخ الطلب</label><input type="date" id="inventoryRequestDate"></div></div>
             <div class="split"><div><label>المشروع</label><select id="inventoryRequestProject"></select></div><div><label>المشرف الطالب</label><select id="inventoryRequestSupervisor"></select></div></div>
@@ -523,7 +535,7 @@
             <div class="actions"><button onclick="inventorySaveRequest(this)">إرسال طلب الصرف</button><button class="light" onclick="inventoryClearRequestForm()">تفريغ</button></div>
           </div>
           <div class="card">
-            <div class="table-head"><h2>طلبات الصرف والاعتمادات</h2><select id="inventoryRequestStatusFilter" onchange="inventoryRenderRequests()"><option value="">كل الحالات</option><option value="pending_ops">بانتظار المدير التشغيلي</option><option value="pending_finance">بانتظار المدير المالي</option><option value="pending_general">بانتظار المدير العام</option><option value="approved">معتمد ومصروف</option><option value="rejected">مرفوض</option></select></div>
+            <div class="table-head"><h2>طلبات الصرف والاعتمادات</h2><select id="inventoryRequestStatusFilter" onchange="inventoryRenderRequests()"><option value="">كل الحالات</option><option value="pending_warehouse">بانتظار مدير المخازن</option><option value="pending_ops">بانتظار المدير التشغيلي</option><option value="pending_finance">بانتظار المدير المالي</option><option value="pending_general">بانتظار المدير العام</option><option value="approved">معتمد ومصروف</option><option value="rejected">مرفوض</option></select></div>
             <div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المشرف</th><th>المشروع</th><th>الصنف</th><th>الكمية</th><th>سبب الصرف</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="inventoryRequestsBody"></tbody></table></div>
           </div>
         </div>
@@ -571,6 +583,6 @@
     <section id="export" class="page hidden"><div class="card"><h2>التصدير</h2><p>صدّر بيانات النظام الحالية بصيغة CSV.</p><div class="actions"><button onclick="exportTable('app_users')">المستخدمين</button><button onclick="exportTable('projects')">المشاريع</button><button onclick="exportTable('workers')">العمال</button><button onclick="exportTable('attendance')">الحضور</button><button onclick="exportTable('time_logs')">التسجيلات اليومية</button><button onclick="exportTable('tickets')">التكتات</button></div></div></section>
   </main>
 </div>
-<script src="app.js?v=107"></script>
+<script src="app.js?v=108"></script>
 </body>
 </html>

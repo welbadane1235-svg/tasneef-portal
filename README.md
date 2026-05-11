@@ -61,3 +61,17 @@ V104 Finance RLS Fix:
 - إصلاح مشكلة num is not defined.
 - إصلاح حساب إجمالي المصروف مباشرة عند إدخال المبلغ والضريبة.
 - تحديث رقم نسخة app.js لمنع الكاش القديم.
+
+
+## V108 Inventory Approval Workflow
+
+تمت إضافة مسار اعتماد صرف المخزون القابل للتحديد:
+- مدير المخازن
+- المدير التشغيلي
+- المدير المالي
+- المدير العام
+
+قبل التجربة شغّل الملف التالي في Supabase SQL Editor:
+`schema_update_v108_inventory_approval_workflow.sql`
+
+ثم ارفع النسخة واعمل Ctrl + F5.

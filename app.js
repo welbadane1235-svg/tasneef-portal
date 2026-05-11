@@ -317,7 +317,7 @@ function toCSV(rows){ if(!rows.length) return ''; const keys=Object.keys(rows[0]
 function download(name,text){ const blob=new Blob([text],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); URL.revokeObjectURL(a.href); }
 async function exportTable(table){ const {data:rows,error}=await sb.from(table).select('*'); if(error) return msg(error.message,'err'); download(`${table}.csv`, toCSV(rows||[])); }
 function exportMonthlyCSV(){ const rows=[...document.querySelectorAll('#monthlyBody tr')].map(tr=>[...tr.children].map(td=>td.textContent)); const csv=['المشرف,المشروع,عدد السجلات,الساعات المطلوبة,الساعات الفعلية,وقت الانتقال,نسبة العمل,حالة الأداء',...rows.map(r=>r.map(x=>'"'+x+'"').join(','))].join('\n'); download('monthly.csv',csv); }
-async function initSupervisor(){ const u=requireRole('supervisor'); if(!u) return; await loadAll(); data.projects=data.projects.filter(p=>String(p.supervisor_id)===String(u.id)); data.workers=data.workers.filter(w=>String(workerSupId(w))===String(u.id)); data.logs=data.logs.filter(l=>String(l.supervisor_id)===String(u.id)); const supProjectIds = new Set(data.projects.map(p=>String(p.id))); data.tickets=data.tickets.filter(t=>String(t.supervisor_id)===String(u.id) || String(t.created_by)===String(u.id) || supProjectIds.has(String(t.project_id))); $('supTitle').textContent=`لوحة المشرف - ${u.full_name}`; fillSelect('logProject',data.projects,'name','اختر المشروع'); fillSelect('attendanceProject',data.projects,'name','اختر المشروع'); fillSelect('ticketProject',data.projects,'name','اختر المشروع'); if($('logDate')) $('logDate').value=today(); if($('attendanceDate')) $('attendanceDate').value=today(); renderSupervisorAttendanceList(); renderTimeLogs(); }
+async function initSupervisor(){ const u=requireRole('supervisor'); if(!u) return; await loadAll(); data.projects=data.projects.filter(p=>String(p.supervisor_id)===String(u.id)); data.workers=data.workers.filter(w=>String(workerSupId(w))===String(u.id)); data.logs=data.logs.filter(l=>String(l.supervisor_id)===String(u.id)); const supProjectIds = new Set(data.projects.map(p=>String(p.id))); data.tickets=data.tickets.filter(t=>String(t.supervisor_id)===String(u.id) || String(t.created_by)===String(u.id) || supProjectIds.has(String(t.project_id))); $('supTitle').textContent=`لوحة المشرف - ${u.full_name}`; fillSelect('logProject',data.projects,'name','اختر المشروع'); fillSelect('attendanceProject',data.projects,'name','اختر المشروع'); fillSelect('ticketProject',data.projects,'name','اختر المشروع'); if($('logDate')) $('logDate').value=today(); if($('attendanceDate')) $('attendanceDate').value=today(); renderSupervisorAttendanceList(); renderTimeLogs(); await supervisorInventoryLoad(); }
 async function supervisorCheckIn(){ if(!$('logProject').value) return msg('اختر المشروع','err'); $('logDate').value=today(); $('logIn').value=nowTime(); $('logOut').value=''; await saveTimeLog(); await initSupervisor(); }
 async function supervisorCheckOut(){ const u=session(); const pid=$('logProject').value; const open=data.logs.find(l=>String(l.project_id)===String(pid)&&!l.check_out); if(open) editTimeLog(open.id); $('logOut').value=nowTime(); await saveTimeLog(); await initSupervisor(); }
 function renderSupervisorAttendanceList(){ const div=$('supervisorAttendanceList'); if(!div) return; div.innerHTML=data.workers.map(w=>`<div class="quick-item"><b>${esc(w.name)}</b><select data-worker="${w.id}"><option value="present">حاضر</option><option value="absent">غائب</option></select></div>`).join('')||'<div class="quick-item">لا يوجد عمال مرتبطين بك</div>'; }
@@ -2763,6 +2763,46 @@ function exportPremiumReportsCSV(){
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}), a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='client_reports.csv'; a.click();
 }
 
+
+
+/* ===== V108 Supervisor Inventory Requests ===== */
+async function supervisorInventoryLoad(){
+  try{
+    const u=session()||{};
+    const [items,reqs]=await Promise.all([
+      sb.from('inventory_items').select('*').order('name',{ascending:true}),
+      sb.from('inventory_requests').select('*').order('created_at',{ascending:false})
+    ]);
+    data.inventoryItems=items.data||[];
+    data.inventoryRequests=(reqs.data||[]).filter(r=>String(r.supervisor_id)===String(u.id));
+    fillSelect('supInventoryRequestProject', data.projects, 'name', 'اختر المشروع');
+    const itemEl=$('supInventoryRequestItem'); if(itemEl) itemEl.innerHTML='<option value="">اختر الصنف</option>'+data.inventoryItems.map(i=>`<option value="${i.id}">${esc(i.name)} - المتوفر ${num(i.quantity)} ${esc(i.unit||'')}</option>`).join('');
+    if($('supInventoryRequestDate') && !$('supInventoryRequestDate').value) $('supInventoryRequestDate').value=today();
+    renderSupervisorInventoryRequests();
+  }catch(e){ console.warn(e); }
+}
+async function supervisorSaveInventoryRequest(btn){
+  try{
+    if(btn) btn.disabled=true;
+    const u=session()||{};
+    const itemId=$('supInventoryRequestItem')?.value;
+    const pid=$('supInventoryRequestProject')?.value;
+    const qty=num($('supInventoryRequestQty')?.value);
+    if(!itemId) throw new Error('اختر الصنف'); if(!pid) throw new Error('اختر المشروع'); if(qty<=0) throw new Error('الكمية مطلوبة');
+    const item=(data.inventoryItems||[]).find(i=>String(i.id)===String(itemId));
+    const path=inventoryGetApprovalPath(); const first=path[0]||'warehouse';
+    const row={item_id:Number(itemId),item_name:item?.name||'',quantity:qty,project_id:Number(pid),project_name:projectName(pid),supervisor_id:u.id,supervisor_name:u.full_name||u.username||'',request_date:$('supInventoryRequestDate')?.value||today(),reason:$('supInventoryRequestReason')?.value||'',notes:$('supInventoryRequestNotes')?.value||'',status:'pending_'+first,current_step:first,approval_path:path,approval_log:[]};
+    const {error}=await sb.from('inventory_requests').insert(row); if(error) throw error;
+    msg('تم إرسال طلب الصرف للإدارة');
+    ['supInventoryRequestItem','supInventoryRequestQty','supInventoryRequestReason','supInventoryRequestNotes'].forEach(id=>$(id)&&($(id).value='')); if($('supInventoryRequestProject')) $('supInventoryRequestProject').value='';
+    await supervisorInventoryLoad();
+  }catch(e){ msg(e.message||String(e),'err'); } finally{ if(btn) btn.disabled=false; }
+}
+function renderSupervisorInventoryRequests(){
+  const b=$('supInventoryRequestsBody'); if(!b) return;
+  b.innerHTML=(data.inventoryRequests||[]).map(r=>`<tr><td>${esc(r.request_date||'')}</td><td>${esc(r.project_name||projectName(r.project_id))}</td><td><b>${esc(r.item_name||'')}</b></td><td>${num(r.quantity)}</td><td>${esc(r.reason||'-')}</td><td><span class="badge ${inventoryRequestStatusClass(r.status)}">${inventoryRequestStatusText(r.status)}</span><br><small>${inventoryRequestNextRole(r.status)}</small></td></tr>`).join('')||'<tr><td colspan="6">لا توجد طلبات صرف</td></tr>';
+}
+
 // Initialize report form when the admin page is ready
 setTimeout(()=>{ if($('premiumReportDate') && !premiumServicesState.length){ clearPremiumReportForm(); } }, 800);
 
@@ -2776,7 +2816,7 @@ function financeHydrateForms(){
   financeMonthOptions();
   const pros=(data.projects||[]).map(p=>({id:p.id,name:p.name}));
   ['financeProjectFilter','financeExpenseProject','inventoryMovementProject','inventoryRequestProject'].forEach(id=>fillSelect(id, pros, 'name', id==='inventoryMovementProject'?'بدون مشروع':'كل المشاريع'));
-  inventoryFillItemSelect(); inventoryFillRequestSelect(); financeFillSupervisorSelect();
+  inventoryFillItemSelect(); inventoryFillRequestSelect(); financeFillSupervisorSelect(); inventoryLoadApprovalSettings();
   if($('financeExpenseDate') && !$('financeExpenseDate').value) $('financeExpenseDate').value=today();
   if($('inventoryMovementDate') && !$('inventoryMovementDate').value) $('inventoryMovementDate').value=today();
   if($('inventoryRequestDate') && !$('inventoryRequestDate').value) $('inventoryRequestDate').value=today();
@@ -2833,9 +2873,70 @@ function inventoryFillItemSelect(){ const el=$('inventoryMovementItem'); if(!el)
 
 function inventoryFillRequestSelect(){ const el=$('inventoryRequestItem'); if(!el) return; el.innerHTML='<option value="">اختر الصنف</option>'+ (data.inventoryItems||[]).map(i=>`<option value="${i.id}">${esc(i.name)} - المتوفر ${num(i.quantity)} ${esc(i.unit||'')}</option>`).join(''); }
 function financeFillSupervisorSelect(){ const el=$('inventoryRequestSupervisor'); if(!el) return; const rows=(data.supervisors||[]).length?data.supervisors:(data.users||[]); el.innerHTML='<option value="">اختر المشرف</option>'+ rows.map(u=>`<option value="${u.id}">${esc(u.full_name||u.username||u.name)}</option>`).join(''); }
-function inventoryRequestStatusText(st){ return ({pending_ops:'بانتظار المدير التشغيلي',pending_finance:'بانتظار المدير المالي',pending_general:'بانتظار المدير العام',approved:'معتمد ومصروف',rejected:'مرفوض'})[st] || st || '-'; }
+
+const INVENTORY_APPROVAL_ROLES={
+  warehouse:'مدير المخازن',
+  ops:'المدير التشغيلي',
+  finance:'المدير المالي',
+  general:'المدير العام'
+};
+function inventoryDefaultApprovalPath(){ return ['warehouse','ops','finance','general']; }
+function inventoryGetApprovalPath(){
+  const saved=localStorage.getItem('tasneef_inventory_approval_path');
+  if(saved){ try{ const arr=JSON.parse(saved); if(Array.isArray(arr)&&arr.length) return arr.filter(r=>INVENTORY_APPROVAL_ROLES[r]); }catch(e){} }
+  return inventoryDefaultApprovalPath();
+}
+function inventoryReadApprovalPathFromForm(){
+  const items=[
+    {role:'warehouse', checked:$('approvalWarehouse')?.checked, order:num($('approvalWarehouseOrder')?.value)||1},
+    {role:'ops', checked:$('approvalOps')?.checked, order:num($('approvalOpsOrder')?.value)||2},
+    {role:'finance', checked:$('approvalFinance')?.checked, order:num($('approvalFinanceOrder')?.value)||3},
+    {role:'general', checked:$('approvalGeneral')?.checked, order:num($('approvalGeneralOrder')?.value)||4}
+  ].filter(x=>x.checked).sort((a,b)=>a.order-b.order).map(x=>x.role);
+  return items.length?items:inventoryDefaultApprovalPath();
+}
+function inventoryLoadApprovalSettings(reset=false){
+  if(reset) localStorage.removeItem('tasneef_inventory_approval_path');
+  const path=inventoryGetApprovalPath();
+  Object.keys(INVENTORY_APPROVAL_ROLES).forEach((role,idx)=>{
+    const cap=role==='ops'?'Ops':role.charAt(0).toUpperCase()+role.slice(1);
+    const chk=$('approval'+cap), ord=$('approval'+cap+'Order');
+    if(chk) chk.checked=path.includes(role);
+    if(ord) ord.value=path.includes(role)?path.indexOf(role)+1:idx+1;
+  });
+  inventoryRenderApprovalPreview();
+}
+function inventoryRenderApprovalPreview(){
+  const el=$('inventoryApprovalPreview'); if(!el) return;
+  const path=inventoryReadApprovalPathFromForm();
+  el.innerHTML='<b>المسار الحالي:</b> '+path.map((r,i)=>`${i+1}. ${INVENTORY_APPROVAL_ROLES[r]}`).join(' ← ');
+}
+function inventorySaveApprovalSettings(){
+  const path=inventoryReadApprovalPathFromForm();
+  localStorage.setItem('tasneef_inventory_approval_path', JSON.stringify(path));
+  inventoryRenderApprovalPreview();
+  msg('تم حفظ مسار اعتماد صرف المخزون');
+}
+function inventoryRequestStatusText(st){
+  if(st && st.startsWith('pending_')) return 'بانتظار '+(INVENTORY_APPROVAL_ROLES[st.replace('pending_','')]||st);
+  return ({approved:'معتمد ومصروف',rejected:'مرفوض',returned:'معاد للتعديل'})[st] || st || '-';
+}
 function inventoryRequestStatusClass(st){ return st==='approved'?'green':(st==='rejected'?'red':'amber'); }
-function inventoryRequestNextRole(st){ return ({pending_ops:'المدير التشغيلي',pending_finance:'المدير المالي',pending_general:'المدير العام',approved:'مكتمل',rejected:'مغلق'})[st] || '-'; }
+function inventoryRequestNextRole(st){ return st&&st.startsWith('pending_') ? (INVENTORY_APPROVAL_ROLES[st.replace('pending_','')]||'-') : (st==='approved'?'مكتمل':(st==='rejected'?'مغلق':'-')); }
+function inventoryRequestPath(r){
+  if(Array.isArray(r.approval_path) && r.approval_path.length) return r.approval_path;
+  if(typeof r.approval_path==='string' && r.approval_path){ try{ const p=JSON.parse(r.approval_path); if(Array.isArray(p)&&p.length) return p; }catch(e){} }
+  return ['warehouse','ops','finance','general'].filter(role=>r.status===('pending_'+role) || r[role+'_approved_by'] || ['warehouse','ops','finance','general'].indexOf(role)>=0);
+}
+function inventoryRequestStepHtml(r){
+  const path=inventoryRequestPath(r);
+  const cur=(r.current_step||String(r.status||'').replace('pending_',''));
+  return `<div class="approval-track">${path.map((role,i)=>{
+    const done=!!r[role+'_approved_by'] || r.status==='approved';
+    const active=cur===role && String(r.status||'').startsWith('pending_');
+    return `<span class="badge ${done?'green':active?'amber':''}">${i+1}. ${INVENTORY_APPROVAL_ROLES[role]||role}${done?' ✓':''}</span>`;
+  }).join(' ')}</div>`;
+}
 async function inventorySaveRequest(btn){
   try{
     if(btn) btn.disabled=true;
@@ -2847,8 +2948,10 @@ async function inventorySaveRequest(btn){
     if(!pid) throw new Error('اختر المشروع');
     if(!supervisorId) throw new Error('اختر المشرف');
     if(qty<=0) throw new Error('الكمية مطلوبة');
+    const path=inventoryGetApprovalPath();
+    const first=path[0]||'warehouse';
     const item=(data.inventoryItems||[]).find(i=>String(i.id)===String(itemId));
-    const row={item_id:Number(itemId), item_name:item?.name||'', quantity:qty, project_id:Number(pid), project_name:projectName(pid), supervisor_id:Number(supervisorId), supervisor_name:supervisorName(supervisorId), request_date:$('inventoryRequestDate')?.value||today(), reason:$('inventoryRequestReason')?.value||'', notes:$('inventoryRequestNotes')?.value||'', status:'pending_ops', current_step:'ops'};
+    const row={item_id:Number(itemId), item_name:item?.name||'', quantity:qty, project_id:Number(pid), project_name:projectName(pid), supervisor_id:Number(supervisorId), supervisor_name:supervisorName(supervisorId), request_date:$('inventoryRequestDate')?.value||today(), reason:$('inventoryRequestReason')?.value||'', notes:$('inventoryRequestNotes')?.value||'', status:'pending_'+first, current_step:first, approval_path:path, approval_log:[]};
     const {error}=await sb.from('inventory_requests').insert(row);
     if(error) throw error;
     msg('تم إرسال طلب الصرف للاعتماد');
@@ -2861,15 +2964,21 @@ async function inventoryApproveRequest(id,step,btn){
     if(btn) btn.disabled=true;
     const r=(data.inventoryRequests||[]).find(x=>String(x.id)===String(id));
     if(!r) throw new Error('الطلب غير موجود');
-    const u=session()||{}; let row={};
-    if(step==='ops'){
-      if(r.status!=='pending_ops') throw new Error('هذا الطلب ليس في مرحلة المدير التشغيلي');
-      row={status:'pending_finance',current_step:'finance',ops_approved_by:u.full_name||u.username||'مدير تشغيلي',ops_approved_at:new Date().toISOString()};
-    }else if(step==='finance'){
-      if(r.status!=='pending_finance') throw new Error('هذا الطلب ليس في مرحلة المدير المالي');
-      row={status:'pending_general',current_step:'general',finance_approved_by:u.full_name||u.username||'مدير مالي',finance_approved_at:new Date().toISOString()};
-    }else if(step==='general'){
-      if(r.status!=='pending_general') throw new Error('هذا الطلب ليس في مرحلة المدير العام');
+    if(r.status!==('pending_'+step)) throw new Error('هذا الطلب ليس في مرحلة '+(INVENTORY_APPROVAL_ROLES[step]||step));
+    const u=session()||{};
+    const approver=u.full_name||u.username||INVENTORY_APPROVAL_ROLES[step]||'مدير';
+    const now=new Date().toISOString();
+    const path=inventoryRequestPath(r);
+    const idx=path.indexOf(step);
+    const next=path[idx+1];
+    const log=Array.isArray(r.approval_log)?r.approval_log:[];
+    log.push({step,role:INVENTORY_APPROVAL_ROLES[step]||step,by:approver,at:now});
+    let row={current_step:next||'done', approval_log:log};
+    row[step+'_approved_by']=approver;
+    row[step+'_approved_at']=now;
+    if(next){
+      row.status='pending_'+next;
+    }else{
       const item=(data.inventoryItems||[]).find(i=>String(i.id)===String(r.item_id));
       if(!item) throw new Error('الصنف غير موجود في المخزون');
       if(num(item.quantity)<num(r.quantity)) throw new Error('الكمية المتوفرة لا تكفي للصرف');
@@ -2879,11 +2988,12 @@ async function inventoryApproveRequest(id,step,btn){
       const newQty=num(item.quantity)-num(r.quantity);
       const upd=await sb.from('inventory_items').update({quantity:newQty}).eq('id',r.item_id);
       if(upd.error) throw upd.error;
-      row={status:'approved',current_step:'done',general_approved_by:u.full_name||u.username||'مدير عام',general_approved_at:new Date().toISOString(),movement_id:mv.data?.id||null};
+      row.status='approved'; row.current_step='done'; row.movement_id=mv.data?.id||null;
     }
     const res=await sb.from('inventory_requests').update(row).eq('id',id);
     if(res.error) throw res.error;
-    msg('تم تحديث طلب الصرف'); await financeLoadAll();
+    msg(next?'تم اعتماد الطلب ونقله إلى '+(INVENTORY_APPROVAL_ROLES[next]||next):'تم اعتماد الطلب نهائيًا وصرف المخزون');
+    await financeLoadAll();
   }catch(e){ msg(e.message||String(e),'err'); } finally{ if(btn) btn.disabled=false; }
 }
 async function inventoryRejectRequest(id,btn){
@@ -2892,21 +3002,24 @@ async function inventoryRejectRequest(id,btn){
 }
 function inventoryRenderRequests(){
   const b=$('inventoryRequestsBody'); if(!b) return;
+  inventoryLoadApprovalSettings();
   let rows=financeFilterRows(data.inventoryRequests||[],'request_date');
   const st=$('inventoryRequestStatusFilter')?.value; if(st) rows=rows.filter(r=>r.status===st);
   b.innerHTML=rows.map(r=>{
     const actions=[];
-    if(r.status==='pending_ops') actions.push(`<button onclick="inventoryApproveRequest('${r.id}','ops',this)">اعتماد تشغيلي</button>`);
-    if(r.status==='pending_finance') actions.push(`<button onclick="inventoryApproveRequest('${r.id}','finance',this)">اعتماد مالي</button>`);
-    if(r.status==='pending_general') actions.push(`<button onclick="inventoryApproveRequest('${r.id}','general',this)">اعتماد المدير العام وصرف</button>`);
-    if(!['approved','rejected'].includes(r.status)) actions.push(`<button class="danger" onclick="inventoryRejectRequest('${r.id}',this)">رفض</button>`);
-    return `<tr><td>${esc(r.request_date||'')}</td><td><b>${esc(r.supervisor_name||supervisorName(r.supervisor_id))}</b></td><td>${esc(r.project_name||financeProjectName(r.project_id))}</td><td>${esc(r.item_name||'')}</td><td>${num(r.quantity)}</td><td>${esc(r.reason||'-')}</td><td><span class="badge ${inventoryRequestStatusClass(r.status)}">${inventoryRequestStatusText(r.status)}</span><br><small>المرحلة: ${inventoryRequestNextRole(r.status)}</small></td><td class="row-actions">${actions.join(' ')||'-'}</td></tr>`;
+    if(String(r.status||'').startsWith('pending_')){
+      const step=String(r.status).replace('pending_','');
+      actions.push(`<button onclick="inventoryApproveRequest('${r.id}','${step}',this)">اعتماد ${esc(INVENTORY_APPROVAL_ROLES[step]||step)}</button>`);
+      actions.push(`<button class="danger" onclick="inventoryRejectRequest('${r.id}',this)">رفض</button>`);
+    }
+    return `<tr><td>${esc(r.request_date||'')}</td><td><b>${esc(r.supervisor_name||supervisorName(r.supervisor_id))}</b></td><td>${esc(r.project_name||financeProjectName(r.project_id))}</td><td>${esc(r.item_name||'')}</td><td>${num(r.quantity)}</td><td>${esc(r.reason||'-')}</td><td><span class="badge ${inventoryRequestStatusClass(r.status)}">${inventoryRequestStatusText(r.status)}</span><br><small>المرحلة: ${inventoryRequestNextRole(r.status)}</small>${inventoryRequestStepHtml(r)}</td><td class="row-actions">${actions.join(' ')||'-'}</td></tr>`;
   }).join('')||`<tr><td colspan="8">${data.financeError||'لا توجد طلبات صرف'}</td></tr>`;
 }
 
+
 async function inventorySaveItem(btn){ try{ if(btn) btn.disabled=true; const name=($('inventoryItemName')?.value||'').trim(); if(!name) throw new Error('اسم الصنف مطلوب'); const row={name,category:$('inventoryItemCategory')?.value||'أخرى',unit:$('inventoryItemUnit')?.value||'حبة',quantity:num($('inventoryItemQty')?.value),min_quantity:num($('inventoryItemMin')?.value),unit_cost:num($('inventoryItemCost')?.value),supplier:$('inventoryItemSupplier')?.value||'',notes:$('inventoryItemNotes')?.value||''}; const id=$('inventoryItemId')?.value; const res=id?await sb.from('inventory_items').update(row).eq('id',id):await sb.from('inventory_items').insert(row); if(res.error) throw res.error; msg('تم حفظ الصنف'); inventoryClearItemForm(); await financeLoadAll(); }catch(e){ msg(e.message||String(e),'err'); } finally{ if(btn) btn.disabled=false; } }
 function inventoryClearItemForm(){ ['inventoryItemId','inventoryItemName','inventoryItemUnit','inventoryItemQty','inventoryItemMin','inventoryItemCost','inventoryItemSupplier','inventoryItemNotes'].forEach(id=>$(id)&&($(id).value='')); if($('inventoryItemCategory')) $('inventoryItemCategory').value='كهرباء'; if($('inventoryItemMin')) $('inventoryItemMin').value=0; }
-function inventoryRenderItems(){ const b=$('inventoryItemsBody'); if(!b) return; const q=($('financeSearch')?.value||'').trim(); let rows=[...(data.inventoryItems||[])]; if(q) rows=rows.filter(i=>[i.name,i.category,i.supplier,i.notes].join(' ').includes(q)); b.innerHTML=rows.map(i=>`<tr><td><b>${esc(i.name)}</b></td><td>${esc(i.category||'')}</td><td>${num(i.quantity)<=num(i.min_quantity)?`<span class="badge red">${num(i.quantity)}</span>`:num(i.quantity)}</td><td>${esc(i.unit||'')}</td><td>${num(i.min_quantity)}</td><td>${money(i.unit_cost)}</td><td>${esc(i.supplier||'-')}</td><td class="row-actions"><button onclick="inventoryEditItem('${i.id}')">تعديل</button><button class="danger" onclick="financeDelete('inventory_items','${i.id}')">حذف</button></td></tr>`).join('')||`<tr><td colspan="8">${data.financeError||'لا توجد أصناف مخزون'}</td></tr>`; inventoryFillItemSelect(); inventoryFillRequestSelect(); financeFillSupervisorSelect(); }
+function inventoryRenderItems(){ const b=$('inventoryItemsBody'); if(!b) return; const q=($('financeSearch')?.value||'').trim(); let rows=[...(data.inventoryItems||[])]; if(q) rows=rows.filter(i=>[i.name,i.category,i.supplier,i.notes].join(' ').includes(q)); b.innerHTML=rows.map(i=>`<tr><td><b>${esc(i.name)}</b></td><td>${esc(i.category||'')}</td><td>${num(i.quantity)<=num(i.min_quantity)?`<span class="badge red">${num(i.quantity)}</span>`:num(i.quantity)}</td><td>${esc(i.unit||'')}</td><td>${num(i.min_quantity)}</td><td>${money(i.unit_cost)}</td><td>${esc(i.supplier||'-')}</td><td class="row-actions"><button onclick="inventoryEditItem('${i.id}')">تعديل</button><button class="danger" onclick="financeDelete('inventory_items','${i.id}')">حذف</button></td></tr>`).join('')||`<tr><td colspan="8">${data.financeError||'لا توجد أصناف مخزون'}</td></tr>`; inventoryFillItemSelect(); inventoryFillRequestSelect(); financeFillSupervisorSelect(); inventoryLoadApprovalSettings(); }
 function inventoryEditItem(id){ const i=(data.inventoryItems||[]).find(x=>String(x.id)===String(id)); if(!i) return; $('inventoryItemId').value=i.id; $('inventoryItemName').value=i.name||''; $('inventoryItemCategory').value=i.category||'أخرى'; $('inventoryItemUnit').value=i.unit||''; $('inventoryItemQty').value=i.quantity||0; $('inventoryItemMin').value=i.min_quantity||0; $('inventoryItemCost').value=i.unit_cost||0; $('inventoryItemSupplier').value=i.supplier||''; $('inventoryItemNotes').value=i.notes||''; financeShowTab('inventory',document.querySelectorAll('.finance-tab')[2]); $('inventoryItemId')?.scrollIntoView({behavior:'smooth'}); }
 async function inventorySaveMovement(btn){ try{ if(btn) btn.disabled=true; const itemId=$('inventoryMovementItem')?.value; if(!itemId) throw new Error('اختر الصنف'); const item=(data.inventoryItems||[]).find(i=>String(i.id)===String(itemId)); const type=$('inventoryMovementType')?.value||'out', qty=num($('inventoryMovementQty')?.value); if(qty<=0) throw new Error('الكمية مطلوبة'); const pid=$('inventoryMovementProject')?.value||null; const row={item_id:Number(itemId),item_name:item?.name||'',movement_type:type,quantity:qty,movement_date:$('inventoryMovementDate')?.value||today(),project_id:pid?Number(pid):null,project_name:pid?projectName(pid):'',receiver:$('inventoryMovementReceiver')?.value||'',reason:$('inventoryMovementReason')?.value||'',notes:$('inventoryMovementNotes')?.value||''}; const id=$('inventoryMovementId')?.value; if(id) throw new Error('تعديل حركة المخزون غير متاح؛ احذف الحركة وأضف حركة جديدة للحفاظ على دقة الرصيد'); const res=await sb.from('inventory_movements').insert(row); if(res.error) throw res.error; let newQty=num(item?.quantity); if(type==='in') newQty+=qty; else if(type==='out') newQty-=qty; else if(type==='adjust') newQty=qty; const upd=await sb.from('inventory_items').update({quantity:newQty}).eq('id',itemId); if(upd.error) throw upd.error; msg('تم حفظ حركة المخزون وتحديث الرصيد'); inventoryClearMovementForm(); await financeLoadAll(); }catch(e){ msg(e.message||String(e),'err'); } finally{ if(btn) btn.disabled=false; } }
 function inventoryClearMovementForm(){ ['inventoryMovementId','inventoryMovementItem','inventoryMovementQty','inventoryMovementReceiver','inventoryMovementReason','inventoryMovementNotes'].forEach(id=>$(id)&&($(id).value='')); if($('inventoryMovementType')) $('inventoryMovementType').value='out'; if($('inventoryMovementDate')) $('inventoryMovementDate').value=today(); if($('inventoryMovementProject')) $('inventoryMovementProject').value=''; }
