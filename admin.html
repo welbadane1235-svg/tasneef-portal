@@ -24,6 +24,23 @@
 #inventoryItemsBody img.inventory-thumb,#inventoryItemsBody img.inventory-product-img{width:58px!important;height:58px!important;min-width:58px!important;min-height:58px!important;max-width:58px!important;max-height:58px!important;object-fit:contain!important;display:block!important;border:0!important;border-radius:9px!important;background:#fff!important;padding:0!important;margin:0!important;cursor:pointer!important;}
 .inventory-image-empty{font-size:11px;color:var(--muted);display:inline-block;width:64px;text-align:center}
 
+
+/* V119 inventory layout fix */
+.inventory-filter-bar{display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap;margin:8px 0 12px}
+.inventory-filter-bar input,.inventory-filter-bar select{max-width:230px}
+.inventory-main-table{table-layout:fixed;width:100%}
+.inventory-main-table th,.inventory-main-table td{vertical-align:middle;white-space:normal;word-break:break-word}
+.inventory-main-table th:nth-child(1),.inventory-main-table td:nth-child(1){width:82px;text-align:center}
+.inventory-main-table th:nth-child(2),.inventory-main-table td:nth-child(2){width:105px;text-align:center}
+.inventory-main-table th:nth-child(4),.inventory-main-table td:nth-child(4){width:90px;text-align:center}
+.inventory-main-table th:nth-child(5),.inventory-main-table td:nth-child(5){width:85px;text-align:center}
+.inventory-main-table th:nth-child(6),.inventory-main-table td:nth-child(6){width:110px;text-align:center}
+.inventory-main-table th:nth-child(7),.inventory-main-table td:nth-child(7){width:135px;text-align:center}
+.inventory-main-table th:nth-child(8),.inventory-main-table td:nth-child(8){width:120px;text-align:center}
+.product-meta{display:block;color:#5f6f69;font-size:11px;margin-top:4px;line-height:1.5}
+.inventory-thumb-v119{width:56px!important;height:56px!important;object-fit:contain!important;border:1px solid #dce6e2!important;border-radius:10px!important;background:#fff!important;padding:2px!important}
+.vat-readonly{background:#f7faf8!important;color:#064b38!important;font-weight:800!important}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -497,11 +514,17 @@
             <div class="split"><div><label>وحدة القياس</label><input id="inventoryItemUnit" placeholder="حبة / كرتون / لتر / متر"></div><div><label>حد إعادة الطلب</label><input type="number" id="inventoryItemMin" step="0.01" value="0"></div></div>
             <label>صورة المنتج <b style="color:#b42318">إلزامية</b></label><label class="stage-upload">+ اختيار صورة المنتج<input type="file" accept="image/*" onchange="inventoryHandleItemImage(this)"></label><div id="inventoryItemImagePreview" class="img-previews"></div>
             <div class="split"><div><label>الكمية الحالية</label><input type="number" id="inventoryItemQty" step="0.01"></div><div><label>سعر الوحدة قبل الضريبة</label><input type="number" id="inventoryItemCost" step="0.01" oninput="inventoryCalcItemVatPreview()"></div></div>
-            <div class="split"><div><label>ضريبة 15%</label><input id="inventoryItemVatPreview" readonly></div><div><label>سعر الوحدة شامل الضريبة</label><input id="inventoryItemGrossPreview" readonly></div></div>
+            <div class="split"><div><label>ضريبة 15%</label><input id="inventoryItemVatPreview" class="vat-readonly" readonly value="0.00"></div><div><label>سعر الوحدة شامل الضريبة</label><input id="inventoryItemGrossPreview" class="vat-readonly" readonly value="0.00"></div></div>
             <label>ملاحظات</label><textarea id="inventoryItemNotes"></textarea>
             <div class="actions"><button onclick="inventorySaveItem(this)">حفظ الصنف</button><button class="light" onclick="inventoryClearItemForm()">تفريغ</button></div>
           </div>
-          <div class="card"><h2>قائمة المخزون</h2><div class="table-wrap"><table><thead><tr><th>الصورة</th><th>كود المنتج</th><th>باركود المورد</th><th>الصنف</th><th>التصنيف</th><th>النوع</th><th>الكمية</th><th>الوحدة</th><th>حد إعادة الطلب</th><th>سعر الوحدة</th><th>المورد</th><th>إجراء</th></tr></thead><tbody id="inventoryItemsBody"></tbody></table></div></div>
+          <div class="card"><div class="table-head"><h2>قائمة المخزون</h2></div>
+            <div class="inventory-filter-bar">
+              <input id="inventorySearch" oninput="inventoryRenderItems()" placeholder="بحث: منتج / كود / باركود">
+              <select id="inventorySupplierFilter" onchange="inventoryRenderItems()"><option value="">كل الموردين</option></select>
+              <select id="inventoryCategoryFilter" onchange="inventoryRenderItems()"><option value="">كل التصنيفات</option><option>كهرباء</option><option>سباكة</option><option>نظافة</option><option>مبيدات</option><option>معدات</option><option>أخرى</option></select>
+            </div>
+            <div class="table-wrap"><table class="inventory-main-table"><thead><tr><th>الصورة</th><th>كود المنتج</th><th>الصنف</th><th>الكمية</th><th>الوحدة</th><th>سعر الوحدة</th><th>المورد</th><th>إجراء</th></tr></thead><tbody id="inventoryItemsBody"></tbody></table></div></div>
         </div>
       </div>
 
@@ -604,6 +627,6 @@
     <section id="export" class="page hidden"><div class="card"><h2>التصدير</h2><p>صدّر بيانات النظام الحالية بصيغة CSV.</p><div class="actions"><button onclick="exportTable('app_users')">المستخدمين</button><button onclick="exportTable('projects')">المشاريع</button><button onclick="exportTable('workers')">العمال</button><button onclick="exportTable('attendance')">الحضور</button><button onclick="exportTable('time_logs')">التسجيلات اليومية</button><button onclick="exportTable('tickets')">التكتات</button></div></div></section>
   </main>
 </div>
-<script src="app.js?v=118"></script>
+<script src="app.js?v=119"></script>
 </body>
 </html>
