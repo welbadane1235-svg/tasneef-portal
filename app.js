@@ -4240,3 +4240,141 @@ function financePrintReport(kind){
   };
   window.addEventListener('load', ()=>setTimeout(()=>{ v119BindVatEvents(); v118FillReportFilters(); inventoryRenderItems(); financeRenderReports(); }, 600));
 })();
+
+
+/* =========================
+   V120 Detailed Inventory Reports + Print Logo
+   ========================= */
+(function(){
+  const LOGO_URL = 'tasneef_logo_print.png';
+  function unitPrice(itemOrCost){
+    if(typeof itemOrCost === 'object') return num(itemOrCost?.unit_cost);
+    return num(itemOrCost);
+  }
+  function grossUnit(item){ return v118Gross(unitPrice(item)); }
+  function lineValue(qty, cost){ return num(qty) * num(cost); }
+  function itemFor(row){ return v118ItemById(row.item_id) || {}; }
+  function productDisplayName(i){ return i?.name || '-'; }
+  function moneyCell(v){ return money(num(v)); }
+  function totalsBlockV120(totalBefore, label='Total Value with 15% VAT'){
+    const sub=num(totalBefore), vat=v118Vat(sub), gross=v118Gross(sub);
+    return `<div class="totals-v120"><p><b>Total amount before 15% VAT:</b> ${money(sub)}</p><p><b>Total VAT 15%:</b> ${money(vat)}</p><p><b>${esc(label)}:</b> ${money(gross)}</p></div>`;
+  }
+  function setTableHead(tableBodyId, headers){
+    const body=$(tableBodyId); const tbl=body?.closest('table'); const tr=tbl?.querySelector('thead tr');
+    if(tr) tr.innerHTML=headers.map(h=>`<th>${esc(h)}</th>`).join('');
+  }
+  function setReportHeadsV120(){
+    setTableHead('stockReportBody',['كود المنتج','اسم المنتج','المورد','سعر الحبة قبل الضريبة','سعر الحبة شامل الضريبة','الكمية المتبقية','حد الطلب','قيمة المتبقي قبل الضريبة','ضريبة 15%','الإجمالي شامل الضريبة']);
+    setTableHead('stockOutByProjectBody',['المشروع','كود المنتج','اسم المنتج','سعر الحبة','المستهلك','المتبقي','قيمة الاستهلاك','ضريبة 15%','الإجمالي شامل الضريبة']);
+    setTableHead('stockOutBySupervisorBody',['المشرف / المستلم','المشروع','كود المنتج','اسم المنتج','سعر الحبة','المستهلك','المتبقي','قيمة الاستهلاك','ضريبة 15%','الإجمالي شامل الضريبة']);
+    setTableHead('inventoryUsageDetailBody',['التاريخ','المشروع','المشرف / المستلم','كود المنتج','اسم المنتج','المورد','سعر الحبة','الكمية','المتبقي','القيمة','ضريبة 15%','الإجمالي','سبب الاستخدام','نوع العملية','منذ كم يوم','المرجع']);
+  }
+  function filteredUsageV120(){
+    let rows=(typeof v118AllUsageRows==='function'?v118AllUsageRows():[]).map(r=>{
+      const it=itemFor(r);
+      const cost=num(r.unit_cost || it.unit_cost);
+      const qty=num(r.qty);
+      const val=lineValue(qty,cost);
+      return {...r, itemObj:it, cost, val, vat:v118Vat(val), gross:v118Gross(val), current:num(it.quantity), supplier:it.supplier||'', product_code:r.product_code||v118ProductCode(it)};
+    });
+    const prod=$('inventoryReportProduct')?.value||'';
+    const person=$('inventoryReportPerson')?.value||'';
+    const sup=$('inventoryReportSupplier')?.value||'';
+    if(prod) rows=rows.filter(v=>String(v.item_id)===String(prod));
+    if(person) rows=rows.filter(v=>String(v.person)===String(person));
+    if(sup) rows=rows.filter(v=>String(v.supplier||'')===String(sup));
+    return rows;
+  }
+  function renderDetailedRowsByProject(rows){
+    return rows.sort((a,b)=>String(a.project).localeCompare(String(b.project),'ar') || String(a.item).localeCompare(String(b.item),'ar'))
+      .map(v=>`<tr><td>${esc(v.project||'-')}</td><td>${esc(v.product_code||'-')}</td><td><b>${esc(v.item||'-')}</b></td><td>${moneyCell(v.cost)}</td><td>${num(v.qty)}</td><td>${num(v.current)}</td><td>${moneyCell(v.val)}</td><td>${moneyCell(v.vat)}</td><td>${moneyCell(v.gross)}</td></tr>`).join('') || '<tr><td colspan="9">لا توجد بيانات</td></tr>';
+  }
+  function renderDetailedRowsBySupervisor(rows){
+    return rows.sort((a,b)=>String(a.person).localeCompare(String(b.person),'ar') || String(a.project).localeCompare(String(b.project),'ar'))
+      .map(v=>`<tr><td>${esc(v.person||'-')}</td><td>${esc(v.project||'-')}</td><td>${esc(v.product_code||'-')}</td><td><b>${esc(v.item||'-')}</b></td><td>${moneyCell(v.cost)}</td><td>${num(v.qty)}</td><td>${num(v.current)}</td><td>${moneyCell(v.val)}</td><td>${moneyCell(v.vat)}</td><td>${moneyCell(v.gross)}</td></tr>`).join('') || '<tr><td colspan="10">لا توجد بيانات</td></tr>';
+  }
+  function renderUsageDetailRows(rows){
+    return rows.sort((a,b)=>String(b.date).localeCompare(String(a.date)) || String(a.project).localeCompare(String(b.project),'ar'))
+      .map(v=>`<tr><td>${esc(v.date||'')}</td><td>${esc(v.project||'-')}</td><td>${esc(v.person||'-')}</td><td>${esc(v.product_code||'-')}</td><td><b>${esc(v.item||'-')}</b></td><td>${esc(v.supplier||'-')}</td><td>${moneyCell(v.cost)}</td><td>${num(v.qty)}</td><td>${num(v.current)}</td><td>${moneyCell(v.val)}</td><td>${moneyCell(v.vat)}</td><td>${moneyCell(v.gross)}</td><td>${esc(v.reason||'-')}</td><td>${esc(v.type||'-')}</td><td>${esc(daysAgoText(v.date))}</td><td>${esc(v.ref||'-')}</td></tr>`).join('') || '<tr><td colspan="16">لا توجد بيانات استهلاك</td></tr>';
+  }
+  function renderStockRowsV120(items){
+    return items.map(i=>{
+      const cost=unitPrice(i), qty=num(i.quantity), val=qty*cost;
+      return `<tr><td>${esc(v118ProductCode(i))}</td><td><b>${esc(i.name||'-')}</b><br><small>${esc(v118Barcode(i)||'')}</small></td><td>${esc(i.supplier||'-')}</td><td>${moneyCell(cost)}</td><td>${moneyCell(v118Gross(cost))}</td><td>${qty}</td><td>${num(i.min_quantity)}</td><td>${moneyCell(val)}</td><td>${moneyCell(v118Vat(val))}</td><td>${moneyCell(v118Gross(val))}</td></tr>`;
+    }).join('') || '<tr><td colspan="10">لا توجد بيانات</td></tr>';
+  }
+  window.financeRenderReports = function(){
+    if(typeof v118FillReportFilters==='function') v118FillReportFilters();
+    setReportHeadsV120();
+    const ep=$('expenseByProjectBody');
+    if(ep){
+      const map={}; (financeFilterRows(data.financeExpenses||[],'expense_date')).forEach(e=>{ const k=e.project_name||financeProjectName(e.project_id)||'بدون مشروع'; map[k]=map[k]||{total:0,count:0}; map[k].total+=num(e.total); map[k].count++; });
+      const rows=Object.entries(map).sort((a,b)=>b[1].total-a[1].total); ep.innerHTML=rows.map(([k,v])=>`<tr><td>${esc(k)}</td><td>${money(v.total)}</td><td>${v.count}</td></tr>`).join('')||'<tr><td colspan="3">لا توجد بيانات</td></tr>';
+    }
+    const usage=filteredUsageV120();
+    const sp=$('stockOutByProjectBody'); if(sp) sp.innerHTML=renderDetailedRowsByProject(usage);
+    const sr=$('stockOutBySupervisorBody'); if(sr) sr.innerHTML=renderDetailedRowsBySupervisor(usage);
+    const ud=$('inventoryUsageDetailBody'); if(ud) ud.innerHTML=renderUsageDetailRows(usage);
+    const stock=$('stockReportBody');
+    if(stock){
+      let items=[...(data.inventoryItems||[])]; const sup=$('inventoryReportSupplier')?.value||''; if(sup) items=items.filter(i=>String(i.supplier||'')===String(sup));
+      stock.innerHTML=renderStockRowsV120(items);
+      const sub=items.reduce((a,i)=>a+num(i.quantity)*num(i.unit_cost),0);
+      if($('stockReportTotals')) $('stockReportTotals').innerHTML=totalsBlockV120(sub,'Total Value with 15% VAT');
+    }
+    if(typeof v118RenderProductDetailReport==='function') v118RenderProductDetailReport();
+  };
+  window.v118RenderProductDetailReport = function(){
+    const box=$('inventoryProductDetailBox'); if(!box) return; const id=$('inventoryReportProduct')?.value; const sup=$('inventoryReportSupplier')?.value||'';
+    if(!id && sup){
+      const rows=(data.inventoryItems||[]).filter(i=>String(i.supplier||'')===String(sup));
+      const sub=rows.reduce((a,i)=>a+num(i.quantity)*num(i.unit_cost),0);
+      box.innerHTML=`<h3>منتجات المورد: ${esc(sup)}</h3><div class="table-wrap"><table><thead><tr><th>كود المنتج</th><th>اسم المنتج</th><th>باركود المورد</th><th>سعر الحبة</th><th>شامل الضريبة</th><th>المتبقي</th><th>قيمة المتبقي</th></tr></thead><tbody>${rows.map(i=>`<tr><td>${esc(v118ProductCode(i))}</td><td><b>${esc(i.name)}</b></td><td>${esc(v118Barcode(i)||'-')}</td><td>${moneyCell(i.unit_cost)}</td><td>${moneyCell(v118Gross(i.unit_cost))}</td><td>${num(i.quantity)}</td><td>${moneyCell(num(i.quantity)*num(i.unit_cost))}</td></tr>`).join('')||'<tr><td colspan="7">لا توجد منتجات لهذا المورد</td></tr>'}</tbody></table></div>${totalsBlockV120(sub,'Total Value with 15% VAT')}`;
+      return;
+    }
+    if(!id){ box.innerHTML='<p class="muted">اختر منتجًا لعرض تفاصيله وحركته، أو اختر موردًا لعرض منتجاته.</p>'; return; }
+    const item=v118ItemById(id); if(!item){ box.innerHTML='<p class="muted">المنتج غير موجود.</p>'; return; }
+    const adds=(data.inventoryMovements||[]).filter(m=>String(m.item_id)===String(id)&&m.movement_type==='in');
+    const rows=filteredUsageV120().filter(r=>String(r.item_id)===String(id));
+    const addedQty=adds.reduce((a,m)=>a+num(m.quantity),0);
+    const addedVal=adds.reduce((a,m)=>a+num(m.quantity)*num(m.unit_cost||item.unit_cost),0);
+    const consumedQty=rows.reduce((a,r)=>a+num(r.qty),0);
+    const consumedVal=rows.reduce((a,r)=>a+num(r.val),0);
+    const img=item.image_url?`<img src="${esc(item.image_url)}" style="width:115px;height:115px;object-fit:contain;border:1px solid #dce6e2;border-radius:14px;background:#fff">`:'';
+    const addRows=adds.map(m=>`<tr><td>${esc(m.id)}</td><td>${esc(m.movement_date||'')}</td><td>${num(m.quantity)}</td><td>${moneyCell(m.unit_cost||item.unit_cost)}</td><td>${moneyCell(v118Gross(num(m.unit_cost||item.unit_cost)))}</td><td>${moneyCell(num(m.quantity)*num(m.unit_cost||item.unit_cost))}</td></tr>`).join('')||'<tr><td colspan="6">لا توجد إضافات مسجلة</td></tr>';
+    const useRows=rows.map(r=>`<tr><td>${esc(r.date)}</td><td>${esc(r.person)}</td><td>${esc(r.project)}</td><td>${num(r.qty)}</td><td>0</td><td>${num(r.qty)}</td><td>${num(item.quantity)}</td><td>${moneyCell(r.cost)}</td><td>${moneyCell(r.val)}</td><td>${moneyCell(r.vat)}</td><td>${moneyCell(r.gross)}</td></tr>`).join('')||'<tr><td colspan="11">لا يوجد استهلاك</td></tr>';
+    box.innerHTML=`<div class="card soft-card"><div style="display:flex;gap:16px;align-items:center;justify-content:space-between"><div><h3>${esc(item.name)}</h3><p>كود المنتج: <b>${esc(v118ProductCode(item))}</b> | باركود المورد: <b>${esc(v118Barcode(item)||'-')}</b></p><p>المورد: ${esc(item.supplier||'-')} | التصنيف: ${esc(item.category||'-')} | النوع: ${esc(v118ItemType(item)||'-')}</p><p>سعر الحبة: <b>${moneyCell(item.unit_cost)}</b> | سعر الحبة شامل الضريبة: <b>${moneyCell(v118Gross(item.unit_cost))}</b> | المتبقي: <b>${num(item.quantity)} ${esc(item.unit||'')}</b> | المستهلك: <b>${consumedQty}</b></p></div>${img}</div></div><h3>إضافة المنتج</h3><div class="table-wrap"><table><thead><tr><th>ID</th><th>Date</th><th>Quantity Added</th><th>Unit Price</th><th>Unit Price with VAT</th><th>Value</th></tr></thead><tbody>${addRows}</tbody></table></div>${totalsBlockV120(addedVal,'Total Value with 15% VAT')}<h3>Consumed</h3><div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>Employee</th><th>Project</th><th>out</th><th>Return</th><th>Consumed</th><th>Current Quantity</th><th>Unit Price</th><th>Consumption Value</th><th>VAT 15%</th><th>Total with VAT</th></tr></thead><tbody>${useRows}</tbody></table></div>${totalsBlockV120(consumedVal,'Total Consumption Value with 15% VAT')}`;
+  };
+  window.financePrintWindow = function(title, bodyHtml){
+    const css=`@page{size:A4;margin:10mm}*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;direction:rtl;color:#111;margin:0;background:#fff}.page{padding:10px;min-height:100vh}.logo-wrap{text-align:center;margin:0 0 22px}.logo-wrap img{width:250px;max-width:70%;height:auto;object-fit:contain}.meta-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:18px;align-items:flex-start}.meta-head h1{margin:0;font-size:22px;color:#111}.muted{color:#555;font-size:12px}.box{border:1px solid #bbb;border-radius:8px;padding:9px;margin:8px 0}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}h2,h3{color:#111;margin:18px 0 8px}table{width:100%;border-collapse:collapse;margin-top:12px;font-size:11px;direction:rtl}th{background:#d0d0d0;color:#111;border:1px solid #333;padding:7px;font-weight:800}td{border:1px solid #333;padding:6px;text-align:center;vertical-align:middle}tr:nth-child(even) td{background:#fafafa}.totals-v120{margin-top:18px;font-size:15px;line-height:1.9;direction:ltr;text-align:left}.totals-v120 p{margin:6px 0}.sig{height:60px;border-bottom:1px dashed #777;margin-top:18px}.footer{text-align:center;margin-top:20px;color:#666;font-size:11px}.no-print{display:none}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}.page{padding:0}.box,.grid,table{break-inside:auto}tr{break-inside:avoid}}`;
+    const w=window.open('','_blank');
+    if(!w){ msg('المتصفح منع نافذة الطباعة','err'); return; }
+    w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(title)}</title><style>${css}</style></head><body><div class="page"><div class="logo-wrap"><img src="${LOGO_URL}" alt="Tasneef Logo"></div><div class="meta-head"><div><h1>${esc(title)}</h1><div class="muted">نظام المصروفات والمخزون</div></div><div class="muted">تاريخ الطباعة: ${new Date().toLocaleString('ar-SA')}</div></div>${bodyHtml}<div class="footer">تم إنشاء هذا المستند من نظام تصنيف</div></div><script>window.onload=function(){setTimeout(function(){window.print()},500)}<\/script></body></html>`);
+    w.document.close();
+  };
+  window.financePrintReport = function(kind){
+    const titles={expensesByProject:'تقرير مصروفات حسب المشروع',stockOutByProject:'تقرير صرف المخزون حسب المشروع',stockOutBySupervisor:'تقرير استهلاك المشرفين حسب المشروع',inventoryUsageDetail:'تقرير تفصيلي للاستهلاك',productDetail:'تقرير تفاصيل منتج',stockReport:'تقرير المخزون العام'};
+    if(kind==='productDetail'){ window.financePrintWindow(titles[kind], $('inventoryProductDetailBox')?.innerHTML||'<p>لا توجد بيانات</p>'); return; }
+    if(kind==='stockReport'){
+      const table=$('stockReportBody')?.closest('table'); window.financePrintWindow(titles[kind], `<table>${table?.innerHTML||''}</table>${$('stockReportTotals')?.innerHTML||''}`); return;
+    }
+    const bodyIds={expensesByProject:'expenseByProjectBody',stockOutByProject:'stockOutByProjectBody',stockOutBySupervisor:'stockOutBySupervisorBody',inventoryUsageDetail:'inventoryUsageDetailBody'};
+    const table=$(bodyIds[kind])?.closest('table');
+    let totalHtml='';
+    if(kind==='stockOutByProject'||kind==='stockOutBySupervisor'||kind==='inventoryUsageDetail'){
+      const total=filteredUsageV120().reduce((a,r)=>a+num(r.val),0); totalHtml=totalsBlockV120(total,'Total Consumption Value with 15% VAT');
+    }
+    window.financePrintWindow(titles[kind]||'تقرير', table?`<table>${table.innerHTML}</table>${totalHtml}`:'<p>لا توجد بيانات</p>');
+  };
+  window.inventoryPrintRequest = function(id){
+    const r=(data.inventoryRequests||[]).find(x=>String(x.id)===String(id)); if(!r){msg('الطلب غير موجود','err');return;}
+    const log=Array.isArray(r.approval_log)?r.approval_log:[]; const lines=v118LineItems(r).map(l=>{ const it=v118ItemById(l.item_id)||{}; const cost=num(l.unit_cost||it.unit_cost); const qty=num(l.quantity); return {...l,it,cost,qty,val:qty*cost}; });
+    const lineRows=lines.map(l=>`<tr><td>${esc(l.product_code||v118ProductCode(l.it)||'')}</td><td>${esc(l.item_name||l.it.name||'')}</td><td>${esc(l.it.supplier||'-')}</td><td>${num(l.available||l.it.quantity)}</td><td>${num(l.qty)}</td><td>${moneyCell(l.cost)}</td><td>${moneyCell(v118Gross(l.cost))}</td><td>${moneyCell(l.val)}</td></tr>`).join('')||'<tr><td colspan="8">لا توجد أصناف</td></tr>';
+    const logRows=log.map(l=>`<tr><td>${esc(l.role||l.step)}</td><td>${esc(l.by||'-')}</td><td>${esc(l.at?new Date(l.at).toLocaleString('ar-SA'):'-')}</td></tr>`).join('')||'<tr><td colspan="3">لا يوجد سجل اعتماد</td></tr>';
+    const total=lines.reduce((a,l)=>a+num(l.val),0);
+    const body=`<div class="grid"><div class="box"><b>رقم الطلب</b><br>OUT-${esc(r.id)}</div><div class="box"><b>الحالة</b><br>${esc(inventoryRequestStatusText(r.status))}</div><div class="box"><b>التاريخ</b><br>${esc(r.request_date||'')}</div></div><table><tr><th>المشرف / الفني</th><td>${esc(r.supervisor_name||supervisorName(r.supervisor_id))}</td><th>المشروع</th><td>${esc(r.project_name||financeProjectName(r.project_id))}</td></tr><tr><th>سبب الصرف</th><td colspan="3">${esc(r.reason||'-')}</td></tr><tr><th>ملاحظات</th><td colspan="3">${esc(r.notes||'-')}</td></tr></table><h3>الأصناف المطلوبة</h3><table><thead><tr><th>كود المنتج</th><th>الصنف</th><th>المورد</th><th>المتوفر</th><th>الكمية</th><th>سعر الحبة</th><th>سعر الحبة شامل الضريبة</th><th>القيمة</th></tr></thead><tbody>${lineRows}</tbody></table>${totalsBlockV120(total,'Total Value with 15% VAT')}<h3>سجل الاعتماد</h3><table><thead><tr><th>المرحلة</th><th>المعتمد</th><th>الوقت</th></tr></thead><tbody>${logRows}</tbody></table><div class="grid"><div><b>المستلم</b><div class="sig"></div></div><div><b>مدير المخازن</b><div class="sig"></div></div><div><b>الاعتماد النهائي</b><div class="sig"></div></div></div>`;
+    window.financePrintWindow('أمر صرف مخزون متعدد الأصناف', body);
+  };
+  window.addEventListener('load',()=>setTimeout(()=>{setReportHeadsV120(); if($('financeDashboard')) financeRenderReports();},900));
+})();
