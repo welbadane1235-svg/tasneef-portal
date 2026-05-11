@@ -3093,3 +3093,279 @@ function financeResetFilters(){ ['financeSearch','financeProjectFilter','finance
   }
   window.addEventListener('load', function(){ setTimeout(refreshPermsV112, 300); setTimeout(refreshPermsV112, 1200); });
 })();
+
+
+/* ===== V113: strict sidebar permissions for all admin-area roles ===== */
+(function(){
+  'use strict';
+
+  const PERMISSIONS_V113 = [
+    ['can_dashboard','لوحة التحكم'],
+    ['can_time_logs','التسجيلات اليومية'],
+    ['can_manage_users','إدارة المستخدمين'],
+    ['can_projects','المشاريع'],
+    ['can_contracts','العقود والخدمات'],
+    ['can_manage_workers','العمال'],
+    ['can_attendance','الحضور والغياب'],
+    ['can_monthly','الأوقات الشهرية'],
+    ['can_tickets','التكتات'],
+    ['can_client_reports','تقارير العملاء'],
+    ['can_client_ratings','تقييمات العملاء'],
+    ['can_expenses_inventory','المصروفات والمخزون'],
+    ['can_inventory_requests','طلبات صرف المخزون'],
+    ['can_manage_inventory','إدارة المخزون'],
+    ['can_alerts','التنبيهات'],
+    ['can_assistant','مساعد تصنيف'],
+    ['can_export','التصدير']
+  ];
+
+  const NAV_PERM_MAP_V113 = {
+    dashboard:'can_dashboard',
+    daily:'can_time_logs',
+    users:'can_manage_users',
+    projects:'can_projects',
+    contracts:'can_contracts',
+    workers:'can_manage_workers',
+    attendance:'can_attendance',
+    monthly:'can_monthly',
+    tickets:'can_tickets',
+    clientReports:'can_client_reports',
+    clientRatings:'can_client_ratings',
+    financeDashboard:'can_expenses_inventory',
+    alerts:'can_alerts',
+    assistant:'can_assistant',
+    export:'can_export'
+  };
+
+  function parsePerms(extra){
+    if(typeof extra === 'string'){
+      try{ return JSON.parse(extra || '{}') || {}; }catch(e){ return {}; }
+    }
+    return extra || {};
+  }
+
+  function allPerms(v){ return Object.fromEntries(PERMISSIONS_V113.map(([k])=>[k, !!v])); }
+
+  function roleDefaultsV113(role){
+    if(role === 'admin' || role === 'general_manager') return allPerms(true);
+    if(role === 'warehouse_manager') return {
+      can_dashboard:true,
+      can_expenses_inventory:true,
+      can_inventory_requests:true,
+      can_manage_inventory:true
+    };
+    if(role === 'operations_manager') return {
+      can_dashboard:true,
+      can_time_logs:true,
+      can_projects:true,
+      can_contracts:true,
+      can_manage_workers:true,
+      can_attendance:true,
+      can_monthly:true,
+      can_tickets:true,
+      can_client_reports:true,
+      can_client_ratings:true,
+      can_expenses_inventory:true,
+      can_inventory_requests:true,
+      can_alerts:true,
+      can_assistant:true,
+      can_export:true
+    };
+    if(role === 'financial_manager') return {
+      can_dashboard:true,
+      can_client_reports:true,
+      can_client_ratings:true,
+      can_expenses_inventory:true,
+      can_inventory_requests:true,
+      can_export:true
+    };
+    if(role === 'technician') return {
+      can_dashboard:true,
+      can_tickets:true,
+      can_inventory_requests:true
+    };
+    // مشرف
+    return {
+      can_dashboard:true,
+      can_time_logs:true,
+      can_projects:false,
+      can_manage_workers:false,
+      can_attendance:true,
+      can_tickets:true,
+      can_client_reports:false,
+      can_client_ratings:false,
+      can_expenses_inventory:false,
+      can_inventory_requests:true
+    };
+  }
+
+  function normalizePermsV113(user){
+    user = user || (typeof session === 'function' ? session() : null) || {};
+    const base = roleDefaultsV113(user.role);
+    const extra = parsePerms(user.permissions);
+    // دعم مفاتيح قديمة
+    if(extra.can_reports === true){
+      if(extra.can_client_reports === undefined) extra.can_client_reports = true;
+      if(extra.can_client_ratings === undefined) extra.can_client_ratings = true;
+    }
+    if(extra.can_journey === true && extra.can_dashboard === undefined) extra.can_dashboard = true;
+    if(extra.can_edit_time_logs === true && extra.can_time_logs === undefined) extra.can_time_logs = true;
+    return Object.assign({}, base, extra || {});
+  }
+  window.getUserPermissionsV72 = normalizePermsV113;
+  window.getUserPermissionsV113 = normalizePermsV113;
+
+  function setPermInputsV113(perms){
+    perms = perms || {};
+    PERMISSIONS_V113.forEach(([key])=>{
+      const el = document.getElementById('perm_'+key);
+      if(el) el.checked = !!perms[key];
+    });
+  }
+  function readPermInputsV113(){
+    const out = {};
+    PERMISSIONS_V113.forEach(([key])=>{
+      const el = document.getElementById('perm_'+key);
+      if(el) out[key] = !!el.checked;
+    });
+    return out;
+  }
+  function permissionsTextV113(perms){
+    perms = perms || {};
+    const labels = PERMISSIONS_V113.filter(([k])=>perms[k]).map(x=>x[1]);
+    return labels.length ? labels.join('، ') : '-';
+  }
+
+  function injectPermissionsBoxV113(){
+    const active = document.getElementById('userActive');
+    if(!active) return;
+    let box = document.getElementById('userPermissionsBoxV72');
+    const html = '<label>الصلاحيات</label><div class="perm-grid-v72">' + PERMISSIONS_V113.map(([key,label]) =>
+      `<label class="perm-item-v72"><input type="checkbox" id="perm_${key}" data-perm="${key}"> <span>${label}</span></label>`
+    ).join('') + '</div><div class="footer-note">تحدد هذه الصلاحيات ما يظهر للمستخدم داخل التطبيق. أي صلاحية غير محددة لن تظهر في القائمة الجانبية للمستخدم.</div>';
+    if(!box){
+      box = document.createElement('div');
+      box.id = 'userPermissionsBoxV72';
+      box.className = 'perm-box-v72';
+      active.parentElement.insertBefore(box, active.nextSibling);
+    }
+    if(!box.querySelector('#perm_can_projects') || !box.querySelector('#perm_can_client_reports') || !box.querySelector('#perm_can_alerts')){
+      box.innerHTML = html;
+    }
+    const role = document.getElementById('userRole');
+    if(role && !role.dataset.permHookedV113){
+      role.dataset.permHookedV113='1';
+      role.addEventListener('change', ()=>setPermInputsV113(roleDefaultsV113(role.value)));
+    }
+    // فقط عند الإضافة الجديدة، لا نكسر التعديل الحالي
+    if(!document.getElementById('userId')?.value) setPermInputsV113(roleDefaultsV113(role?.value || 'supervisor'));
+  }
+
+  const oldHydrateV113 = window.hydrateForms;
+  window.hydrateForms = function(){
+    if(typeof oldHydrateV113 === 'function') oldHydrateV113.apply(this, arguments);
+    injectPermissionsBoxV113();
+    applyCurrentPermissionsV113();
+  };
+
+  window.saveUser = async function(){
+    const id=$('userId')?.value;
+    const row={
+      full_name:$('userFullName')?.value.trim(),
+      username:$('userUsername')?.value.trim(),
+      password:$('userPassword')?.value.trim()||'123456',
+      role:$('userRole')?.value,
+      is_active:$('userActive')?.value==='true',
+      permissions: readPermInputsV113()
+    };
+    if(!row.full_name||!row.username) return msg('الاسم واسم المستخدم مطلوبان','err');
+    let res = id ? await sb.from('app_users').update(row).eq('id',id) : await sb.from('app_users').insert(row);
+    if(res.error && String(res.error.message||'').includes('permissions')){
+      const safeRow = Object.assign({}, row); delete safeRow.permissions;
+      res = id ? await sb.from('app_users').update(safeRow).eq('id',id) : await sb.from('app_users').insert(safeRow);
+      if(!res.error) msg('تم حفظ المستخدم، لكن عمود الصلاحيات غير موجود في قاعدة البيانات','err');
+    }
+    if(res.error) return msg(res.error.message,'err');
+    msg('تم حفظ المستخدم والصلاحيات');
+    if(typeof clearUserForm === 'function') clearUserForm();
+    await refreshAll();
+    injectPermissionsBoxV113();
+    applyCurrentPermissionsV113();
+  };
+
+  window.renderUsers = function(){
+    const b=$('usersBody'); if(!b) return;
+    const table=b.closest('table');
+    if(table && table.tHead){
+      table.tHead.innerHTML='<tr><th>الاسم</th><th>المستخدم</th><th>الدور</th><th>الحالة</th><th>الصلاحيات</th><th>إجراء</th></tr>';
+    }
+    b.innerHTML=(data.users||[]).map(u=>{
+      const perms = normalizePermsV113(u);
+      return `<tr><td>${esc(u.full_name)}</td><td>${esc(u.username)}</td><td><span class="badge">${esc(userRoleLabel(u.role))}</span></td><td><span class="badge ${u.is_active?'green':'red'}">${u.is_active?'نشط':'موقوف'}</span></td><td style="white-space:normal;min-width:220px">${esc(permissionsTextV113(perms))}</td><td class="row-actions"><button onclick="editUser(${u.id})">تعديل</button><button class="danger" onclick="deleteRow('app_users',${u.id})">حذف</button></td></tr>`;
+    }).join('') || '<tr><td colspan="6">لا يوجد مستخدمون</td></tr>';
+  };
+
+  window.editUser = function(id){
+    const u=(data.users||[]).find(x=>String(x.id)===String(id)); if(!u)return;
+    injectPermissionsBoxV113();
+    $('userId').value=u.id;
+    $('userFullName').value=u.full_name||'';
+    $('userUsername').value=u.username||'';
+    $('userPassword').value=u.password||'';
+    $('userRole').value=u.role;
+    $('userActive').value=String(u.is_active!==false);
+    $('userFormTitle').textContent='تعديل مستخدم';
+    setPermInputsV113(normalizePermsV113(u));
+  };
+
+  const oldClearV113 = window.clearUserForm;
+  window.clearUserForm = function(){
+    if(typeof oldClearV113 === 'function') oldClearV113.apply(this, arguments);
+    injectPermissionsBoxV113();
+    const role = document.getElementById('userRole')?.value || 'supervisor';
+    setPermInputsV113(roleDefaultsV113(role));
+  };
+
+  function applyCurrentPermissionsV113(){
+    const u = (typeof session === 'function') ? session() : null;
+    if(!u) return;
+    const perms = normalizePermsV113(u);
+    const navButtons = [...document.querySelectorAll('.side .nav:not(.danger)')];
+    navButtons.forEach(btn=>{
+      const on = String(btn.getAttribute('onclick')||'');
+      const match = on.match(/showPage\('([^']+)'/);
+      if(!match) return;
+      const page = match[1];
+      const permKey = NAV_PERM_MAP_V113[page];
+      if(!permKey) return;
+      if(perms[permKey]) btn.classList.remove('hidden');
+      else btn.classList.add('hidden');
+    });
+
+    // إذا كان المستخدم واقفًا في صفحة لا يملك صلاحيتها، حوّله لأول صفحة مسموحة.
+    const visibleActive = document.querySelector('.side .nav.active:not(.hidden):not(.danger)');
+    if(!visibleActive){
+      const firstAllowed = document.querySelector('.side .nav:not(.hidden):not(.danger)');
+      if(firstAllowed) firstAllowed.click();
+    }
+  }
+  window.applyCurrentPermissionsV113 = applyCurrentPermissionsV113;
+
+  const oldShowPageV113 = window.showPage || showPage;
+  window.showPage = function(id, btn){
+    const u = (typeof session === 'function') ? session() : null;
+    const permKey = NAV_PERM_MAP_V113[id];
+    if(u && permKey && !normalizePermsV113(u)[permKey]){
+      msg('ليست لديك صلاحية الدخول لهذه الصفحة','err');
+      applyCurrentPermissionsV113();
+      return;
+    }
+    oldShowPageV113(id, btn);
+    setTimeout(applyCurrentPermissionsV113, 0);
+  };
+
+  window.addEventListener('load', function(){
+    setTimeout(()=>{ injectPermissionsBoxV113(); applyCurrentPermissionsV113(); }, 250);
+    setTimeout(()=>{ injectPermissionsBoxV113(); applyCurrentPermissionsV113(); }, 1000);
+  });
+})();
