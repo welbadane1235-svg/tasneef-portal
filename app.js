@@ -19,8 +19,8 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;
 let data = { users:[], supervisors:[], projects:[], workers:[], attendance:[], logs:[], tickets:[], contractServices:[], financeContracts:[], financeInvoices:[], financeReceipts:[], financeExpenses:[], inventoryItems:[], inventoryMovements:[], inventoryRequests:[] };
 function msg(text, type='ok'){ const el=$('globalMsg')||$('loginMsg'); if(!el) return; el.className='msg '+(type==='err'?'err':''); el.textContent=text; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'),4000); }
 function playAppSound(type){ try{ const files={checkin:'sounds/checkin.wav', checkout:'sounds/checkout.wav', ticket:'sounds/ticket.wav'}; const src=files[type]; if(!src) return; const a=new Audio(src); a.volume=0.75; a.play().catch(()=>{}); }catch(e){} }
-function roleHomeUrl(role){ return ['admin','general_manager','financial_manager','operations_manager'].includes(role) ? 'admin.html' : (role==='technician' ? 'technician.html' : 'supervisor.html'); }
-function isAdminAreaRole(role){ return ['admin','general_manager','financial_manager','operations_manager'].includes(role); }
+function roleHomeUrl(role){ return ['admin','general_manager','financial_manager','operations_manager','warehouse_manager'].includes(role) ? 'admin.html' : (role==='technician' ? 'technician.html' : 'supervisor.html'); }
+function isAdminAreaRole(role){ return ['admin','general_manager','financial_manager','operations_manager','warehouse_manager'].includes(role); }
 function requireRole(role){ const u=session(); if(!u){ location.href='index.html'; return null; } if(role==='admin' && isAdminAreaRole(u.role)) return u; if(role && u.role!==role){ location.href = roleHomeUrl(u.role); return null; } return u; }
 async function login(){
   const username=$('loginUsername').value.trim(), password=$('loginPassword').value.trim();
@@ -59,8 +59,8 @@ async function loadAll(){
   data.contractServicesError = contractServices.error ? contractServices.error.message : '';
 }
 function fillSelect(id, rows, label='name', allLabel=null, value='id'){ const el=$(id); if(!el) return; el.innerHTML = (allLabel!==null?`<option value="">${allLabel}</option>`:'') + rows.map(r=>`<option value="${r[value]}">${esc(r[label]||r.full_name||r.username)}</option>`).join(''); }
-function userRoleLabel(role){ return ({admin:'مدير عام',general_manager:'مدير عام',financial_manager:'مدير مالي',operations_manager:'مدير تشغيلي',technician:'فني',supervisor:'مشرف'}[role] || role || '-'); }
-function approvalRoleForUser(){ const u=session()||{}; return u.role==='general_manager' ? 'general' : (u.role==='admin' ? 'general' : (u.role==='financial_manager' ? 'finance' : (u.role==='operations_manager' ? 'ops' : ''))); }
+function userRoleLabel(role){ return ({admin:'مدير عام',general_manager:'مدير عام',financial_manager:'مدير مالي',operations_manager:'مدير تشغيلي',warehouse_manager:'مدير مخازن',technician:'فني',supervisor:'مشرف'}[role] || role || '-'); }
+function approvalRoleForUser(){ const u=session()||{}; return u.role==='general_manager' ? 'general' : (u.role==='admin' ? 'general' : (u.role==='financial_manager' ? 'finance' : (u.role==='operations_manager' ? 'ops' : (u.role==='warehouse_manager' ? 'warehouse' : '')))); }
 function supervisorName(id){ return data.users.find(u=>String(u.id)===String(id))?.full_name || data.supervisors.find(u=>String(u.id)===String(id))?.full_name || '-'; }
 function projectName(id){ return data.projects.find(p=>String(p.id)===String(id))?.name || '-'; }
 function workerName(id){ return data.workers.find(w=>String(w.id)===String(id))?.name || '-'; }
@@ -1577,12 +1577,19 @@ function monthlyReportRowsV58(){return monthlyRowsV60()}
     ['can_monthly','الأوقات الشهرية'],
     ['can_edit_time_logs','تعديل السجلات اليومية'],
     ['can_manage_users','إدارة المستخدمين'],
-    ['can_manage_workers','إدارة العمال']
+    ['can_manage_workers','إدارة العمال'],
+    ['can_expenses_inventory','المصروفات والمخزون'],
+    ['can_inventory_requests','طلبات صرف المخزون'],
+    ['can_manage_inventory','إدارة المخزون']
   ];
 
   function roleDefaults(role){
     if(role === 'admin') return Object.fromEntries(PERMISSIONS_V72.map(p=>[p[0], true]));
-    if(role === 'technician') return {can_tickets:true};
+    if(role === 'technician') return {can_tickets:true, can_inventory_requests:true};
+    if(role === 'warehouse_manager') return {can_expenses_inventory:true, can_inventory_requests:true, can_manage_inventory:true};
+    if(role === 'operations_manager') return {can_time_logs:true,can_journey:true,can_attendance:true,can_tickets:true,can_reports:true,can_monthly:true,can_expenses_inventory:true,can_inventory_requests:true,can_manage_inventory:false,can_edit_time_logs:true,can_manage_users:false,can_manage_workers:true};
+    if(role === 'financial_manager') return {can_reports:true,can_expenses_inventory:true,can_inventory_requests:true,can_manage_inventory:false};
+    if(role === 'general_manager') return Object.fromEntries(PERMISSIONS_V72.map(p=>[p[0], true]));
     return {
       can_time_logs:true,
       can_journey:true,
@@ -1592,7 +1599,10 @@ function monthlyReportRowsV58(){return monthlyRowsV60()}
       can_monthly:false,
       can_edit_time_logs:false,
       can_manage_users:false,
-      can_manage_workers:false
+      can_manage_workers:false,
+      can_expenses_inventory:false,
+      can_inventory_requests:true,
+      can_manage_inventory:false
     };
   }
   function getPerms(user){
@@ -1705,7 +1715,7 @@ function monthlyReportRowsV58(){return monthlyRowsV60()}
     const p = getPerms(u);
     if(u.role === 'admin'){
       const navMap = [
-        ['users','can_manage_users'], ['workers','can_manage_workers'], ['daily','can_time_logs'], ['attendance','can_attendance'], ['monthly','can_monthly'], ['tickets','can_tickets']
+        ['users','can_manage_users'], ['workers','can_manage_workers'], ['daily','can_time_logs'], ['attendance','can_attendance'], ['monthly','can_monthly'], ['tickets','can_tickets'], ['financeDashboard','can_expenses_inventory']
       ];
       navMap.forEach(([page,perm])=>{
         const btn=[...document.querySelectorAll('.nav')].find(b=>String(b.getAttribute('onclick')||'').includes(`'${page}'`));
@@ -2838,9 +2848,9 @@ async function financeLoadAll(showMessage=false){
     data.inventoryItems=items.data||[];
     data.inventoryMovements=movements.data||[];
     data.inventoryRequests=requests.data||[];
-    data.financeError = expenses.error||items.error||movements.error||requests.error ? 'شغّل ملف schema_update_v106_expenses_inventory_requests.sql في Supabase' : '';
+    data.financeError = expenses.error||items.error||movements.error||requests.error ? 'شغّل ملف schema_update_v111_warehouse_manager_permissions.sql في Supabase' : '';
     financeLoaded=true; financeHydrateForms(); financeRenderAll(); if(showMessage) msg(data.financeError||'تم تحديث المصروفات والمخزون');
-  }catch(e){ console.error(e); data.financeError='شغّل ملف schema_update_v106_expenses_inventory_requests.sql في Supabase'; financeRenderAll(); if(showMessage) msg(data.financeError,'err'); }
+  }catch(e){ console.error(e); data.financeError='شغّل ملف schema_update_v111_warehouse_manager_permissions.sql في Supabase'; financeRenderAll(); if(showMessage) msg(data.financeError,'err'); }
 }
 function financeShowTab(tab,btn){ financeCurrentTab=tab; document.querySelectorAll('.finance-tab-page').forEach(x=>x.classList.add('hidden')); $('financeTab'+tab[0].toUpperCase()+tab.slice(1))?.classList.remove('hidden'); document.querySelectorAll('.finance-tab').forEach(x=>x.classList.remove('active')); btn?.classList.add('active'); if(!financeLoaded) financeLoadAll(); financeRenderAll(); }
 function financeProjectName(id){ return projectName(id); }
@@ -2879,11 +2889,12 @@ function inventoryFillRequestSelect(){ const el=$('inventoryRequestItem'); if(!e
 function financeFillSupervisorSelect(){ const el=$('inventoryRequestSupervisor'); if(!el) return; const rows=(data.supervisors||[]).length?data.supervisors:(data.users||[]); el.innerHTML='<option value="">اختر المشرف</option>'+ rows.map(u=>`<option value="${u.id}">${esc(u.full_name||u.username||u.name)}</option>`).join(''); }
 
 const INVENTORY_APPROVAL_ROLES={
+  warehouse:'مدير مخازن',
   ops:'مدير تشغيلي',
   finance:'مدير مالي',
   general:'مدير عام'
 };
-function inventoryDefaultApprovalPath(){ return ['ops','finance','general']; }
+function inventoryDefaultApprovalPath(){ return ['warehouse','ops','finance','general']; }
 function inventoryGetApprovalPath(){
   const saved=localStorage.getItem('tasneef_inventory_approval_path');
   if(saved){ try{ const arr=JSON.parse(saved); if(Array.isArray(arr)&&arr.length) return arr.filter(r=>INVENTORY_APPROVAL_ROLES[r]); }catch(e){} }
@@ -2891,9 +2902,10 @@ function inventoryGetApprovalPath(){
 }
 function inventoryReadApprovalPathFromForm(){
   const items=[
-    {role:'ops', checked:$('approvalOps')?.checked, order:num($('approvalOpsOrder')?.value)||1},
-    {role:'finance', checked:$('approvalFinance')?.checked, order:num($('approvalFinanceOrder')?.value)||2},
-    {role:'general', checked:$('approvalGeneral')?.checked, order:num($('approvalGeneralOrder')?.value)||3}
+    {role:'warehouse', checked:$('approvalWarehouse')?.checked, order:num($('approvalWarehouseOrder')?.value)||1},
+    {role:'ops', checked:$('approvalOps')?.checked, order:num($('approvalOpsOrder')?.value)||2},
+    {role:'finance', checked:$('approvalFinance')?.checked, order:num($('approvalFinanceOrder')?.value)||3},
+    {role:'general', checked:$('approvalGeneral')?.checked, order:num($('approvalGeneralOrder')?.value)||4}
   ].filter(x=>x.checked).sort((a,b)=>a.order-b.order).map(x=>x.role);
   return items.length?items:inventoryDefaultApprovalPath();
 }
@@ -2953,7 +2965,7 @@ async function inventorySaveRequest(btn){
     if(!supervisorId) throw new Error('اختر المشرف');
     if(qty<=0) throw new Error('الكمية مطلوبة');
     const path=inventoryGetApprovalPath();
-    const first=path[0]||'ops';
+    const first=path[0]||'warehouse';
     const item=(data.inventoryItems||[]).find(i=>String(i.id)===String(itemId));
     const row={item_id:Number(itemId), item_name:item?.name||'', quantity:qty, project_id:Number(pid), project_name:projectName(pid), supervisor_id:Number(supervisorId), supervisor_name:supervisorName(supervisorId), request_date:$('inventoryRequestDate')?.value||today(), reason:$('inventoryRequestReason')?.value||'', notes:$('inventoryRequestNotes')?.value||'', status:'pending_'+first, current_step:first, approval_path:path, approval_log:[]};
     const {error}=await sb.from('inventory_requests').insert(row);
@@ -2970,6 +2982,11 @@ async function inventoryApproveRequest(id,step,btn){
     if(!r) throw new Error('الطلب غير موجود');
     if(r.status!==('pending_'+step)) throw new Error('هذا الطلب ليس في مرحلة '+(INVENTORY_APPROVAL_ROLES[step]||step));
     if(!inventoryCurrentUserCanApprove(step)) throw new Error('ليس لديك صلاحية اعتماد هذه المرحلة');
+    if(step==='warehouse'){
+      const item=(data.inventoryItems||[]).find(i=>String(i.id)===String(r.item_id));
+      if(!item) throw new Error('الصنف غير موجود في المخزون');
+      if(num(item.quantity)<num(r.quantity)) throw new Error('الكمية غير متوفرة في المخزون ولا يمكن اعتماد مدير المخازن');
+    }
     const u=session()||{};
     const approver=u.full_name||u.username||INVENTORY_APPROVAL_ROLES[step]||'مدير';
     const now=new Date().toISOString();

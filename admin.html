@@ -78,7 +78,7 @@
     </section>
 
     <section id="users" class="page hidden">
-      <div class="grid two"><div class="card"><h2 id="userFormTitle">إضافة مستخدم</h2><input type="hidden" id="userId"><label>الاسم الكامل</label><input id="userFullName"><label>اسم المستخدم</label><input id="userUsername"><label>كلمة المرور</label><input id="userPassword"><label>الدور</label><select id="userRole"><option value="admin">مدير عام</option><option value="financial_manager">مدير مالي</option><option value="operations_manager">مدير تشغيلي</option><option value="technician">فني</option><option value="supervisor">مشرف</option></select><label>الحالة</label><select id="userActive"><option value="true">نشط</option><option value="false">موقوف</option></select><div class="actions"><button onclick="saveUser()">حفظ</button><button class="light" onclick="clearUserForm()">جديد</button></div></div><div class="card"><h2>المستخدمون</h2><div class="table-wrap"><table><thead><tr><th>الاسم</th><th>المستخدم</th><th>الدور</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="usersBody"></tbody></table></div></div></div>
+      <div class="grid two"><div class="card"><h2 id="userFormTitle">إضافة مستخدم</h2><input type="hidden" id="userId"><label>الاسم الكامل</label><input id="userFullName"><label>اسم المستخدم</label><input id="userUsername"><label>كلمة المرور</label><input id="userPassword"><label>الدور</label><select id="userRole"><option value="admin">مدير عام</option><option value="financial_manager">مدير مالي</option><option value="operations_manager">مدير تشغيلي</option><option value="warehouse_manager">مدير مخازن</option><option value="technician">فني</option><option value="supervisor">مشرف</option></select><label>الحالة</label><select id="userActive"><option value="true">نشط</option><option value="false">موقوف</option></select><div class="actions"><button onclick="saveUser()">حفظ</button><button class="light" onclick="clearUserForm()">جديد</button></div></div><div class="card"><h2>المستخدمون</h2><div class="table-wrap"><table><thead><tr><th>الاسم</th><th>المستخدم</th><th>الدور</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="usersBody"></tbody></table></div></div></div>
     </section>
 
     <section id="projects" class="page hidden">
@@ -515,9 +515,10 @@
           <h2>إعدادات مسار اعتماد صرف المخزون</h2>
           <p class="muted">اختر الجهات المطلوبة للموافقة ورتبها بالأرقام. إذا تركت جهة بدون تحديد لن تدخل في المسار.</p>
           <div class="approval-grid">
-            <label class="approval-step"><input type="checkbox" id="approvalOps" checked> مدير تشغيلي <input type="number" id="approvalOpsOrder" value="1" min="1"></label>
-            <label class="approval-step"><input type="checkbox" id="approvalFinance" checked> مدير مالي <input type="number" id="approvalFinanceOrder" value="2" min="1"></label>
-            <label class="approval-step"><input type="checkbox" id="approvalGeneral" checked> مدير عام <input type="number" id="approvalGeneralOrder" value="3" min="1"></label>
+            <label class="approval-step"><input type="checkbox" id="approvalWarehouse" checked> مدير مخازن <input type="number" id="approvalWarehouseOrder" value="1" min="1"></label>
+            <label class="approval-step"><input type="checkbox" id="approvalOps" checked> مدير تشغيلي <input type="number" id="approvalOpsOrder" value="2" min="1"></label>
+            <label class="approval-step"><input type="checkbox" id="approvalFinance" checked> مدير مالي <input type="number" id="approvalFinanceOrder" value="3" min="1"></label>
+            <label class="approval-step"><input type="checkbox" id="approvalGeneral" checked> مدير عام <input type="number" id="approvalGeneralOrder" value="4" min="1"></label>
           </div>
           <div class="actions"><button onclick="inventorySaveApprovalSettings()">حفظ مسار الاعتماد</button><button class="light" onclick="inventoryLoadApprovalSettings(true)">استعادة المسار الافتراضي</button></div>
           <div id="inventoryApprovalPreview" class="sup-help"></div>
@@ -525,7 +526,7 @@
         <div class="report-premium-wrap">
           <div class="card report-form-card">
             <h2>طلب صرف من المخزون</h2>
-            <p class="muted">المسار قابل للتحديد من الإدارة: مدير تشغيلي / مدير مالي / مدير عام. لا يظهر زر الاعتماد إلا للحساب صاحب المرحلة الحالية فقط.</p>
+            <p class="muted">المسار قابل للتحديد من الإدارة: مدير مخازن / مدير تشغيلي / مدير مالي / مدير عام. لا يظهر زر الاعتماد إلا للحساب صاحب المرحلة الحالية فقط.</p>
             <label>الصنف</label><select id="inventoryRequestItem"></select>
             <div class="split"><div><label>الكمية المطلوبة</label><input type="number" id="inventoryRequestQty" step="0.01"></div><div><label>تاريخ الطلب</label><input type="date" id="inventoryRequestDate"></div></div>
             <div class="split"><div><label>المشروع</label><select id="inventoryRequestProject"></select></div><div><label>المشرف الطالب</label><select id="inventoryRequestSupervisor"></select></div></div>
@@ -534,7 +535,7 @@
             <div class="actions"><button onclick="inventorySaveRequest(this)">إرسال طلب الصرف</button><button class="light" onclick="inventoryClearRequestForm()">تفريغ</button></div>
           </div>
           <div class="card">
-            <div class="table-head"><h2>طلبات الصرف والاعتمادات</h2><select id="inventoryRequestStatusFilter" onchange="inventoryRenderRequests()"><option value="">كل الحالات</option><option value="pending_ops">بانتظار مدير تشغيلي</option><option value="pending_finance">بانتظار مدير مالي</option><option value="pending_general">بانتظار مدير عام</option><option value="approved">معتمد ومصروف</option><option value="rejected">مرفوض</option></select></div>
+            <div class="table-head"><h2>طلبات الصرف والاعتمادات</h2><select id="inventoryRequestStatusFilter" onchange="inventoryRenderRequests()"><option value="">كل الحالات</option><option value="pending_warehouse">بانتظار مدير مخازن</option><option value="pending_ops">بانتظار مدير تشغيلي</option><option value="pending_finance">بانتظار مدير مالي</option><option value="pending_general">بانتظار مدير عام</option><option value="approved">معتمد ومصروف</option><option value="rejected">مرفوض</option></select></div>
             <div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المشرف</th><th>المشروع</th><th>الصنف</th><th>الكمية</th><th>سبب الصرف</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="inventoryRequestsBody"></tbody></table></div>
           </div>
         </div>

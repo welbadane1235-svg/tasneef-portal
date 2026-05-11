@@ -75,3 +75,11 @@ V104 Finance RLS Fix:
 `schema_update_v108_inventory_approval_workflow.sql`
 
 ثم ارفع النسخة واعمل Ctrl + F5.
+
+## V111 Warehouse Manager Permissions
+- إضافة دور مدير مخازن.
+- تحديث قائمة الصلاحيات لتشمل المصروفات والمخزون وطلبات صرف المخزون وإدارة المخزون.
+- إضافة مدير مخازن ضمن مسار اعتماد طلبات صرف المخزون.
+- لا يظهر زر الاعتماد إلا لصاحب المرحلة المحددة فقط.
+- مدير المخازن لا يستطيع اعتماد الطلب إذا الكمية غير متوفرة في المخزون.
+- شغّل ملف schema_update_v111_warehouse_manager_permissions.sql في Supabase.
