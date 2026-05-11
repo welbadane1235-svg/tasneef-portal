@@ -4971,3 +4971,84 @@ function financePrintReport(kind){
 
   document.addEventListener('DOMContentLoaded',()=>{ ensureRequestHidden(); addSmartReturnStyles(); });
 })();
+
+/* V128: Smart invoice preview + clean action buttons for inventory requests/movements */
+(function(){
+  'use strict';
+  function e(v){ return (typeof esc==='function') ? esc(v) : String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+  function n(v){ return (typeof num==='function') ? num(v) : (Number(String(v??0).replace(/,/g,''))||0); }
+  function q(v){ return n(v).toLocaleString('en-US',{maximumFractionDigits:2}); }
+  function m(v){ return `${n(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} ر.س`; }
+  function item(id){ return (data.inventoryItems||[]).find(x=>String(x.id)===String(id)) || {}; }
+  function lines(r){ return (typeof v118LineItems==='function') ? v118LineItems(r) : (Array.isArray(r.request_items)?r.request_items:(Array.isArray(r.items)?r.items:[])); }
+  function code(i){ return (typeof v118ProductCode==='function') ? v118ProductCode(i) : (i.serial_number||i.product_code||('INV-'+(i.id||''))); }
+  function reqStatusText(s){ return (typeof inventoryRequestStatusText==='function') ? inventoryRequestStatusText(s) : (s||'-'); }
+  function reqStatusClass(s){ return (typeof inventoryRequestStatusClass==='function') ? inventoryRequestStatusClass(s) : ''; }
+  function nextRole(s){ return (typeof inventoryRequestNextRole==='function') ? inventoryRequestNextRole(s) : '-'; }
+  function stepHtml(r){ return (typeof inventoryRequestStepHtml==='function') ? inventoryRequestStepHtml(r) : ''; }
+  function canApprove(step){ return (typeof inventoryCurrentUserCanApprove==='function') ? inventoryCurrentUserCanApprove(step) : false; }
+  function stepRole(step){ const map={warehouse:'مدير المخازن',ops:'مدير تشغيلي',finance:'مدير مالي',general:'مدير عام'}; return map[step]||step||''; }
+  function retQty(reqId,itemId){
+    return (data.inventoryMovements||[]).filter(x=>String(x.request_id||'')===String(reqId||'') && String(x.item_id||'')===String(itemId||'') && x.movement_type==='return').reduce((a,x)=>a+n(x.quantity),0);
+  }
+  function effectType(t){ return t==='in'?'إدخال':(t==='out'?'صرف':(t==='return'?'مرتجع':(t==='consume'?'استهلاك':'تعديل رصيد'))); }
+  function invoiceTotals(rows){
+    const sub=rows.reduce((a,r)=>a+n(r.value),0); const vat=sub*0.15; return {sub,vat,total:sub+vat};
+  }
+  function totalsHtml(total, label='Total Value with 15% VAT'){
+    const sub=n(total), vat=sub*0.15, gross=sub+vat;
+    return `<div class="totals-v128"><p><b>Total amount before 15% VAT:</b> ${m(sub)}</p><p><b>Total VAT 15%:</b> ${m(vat)}</p><p><b>${e(label)}:</b> ${m(gross)}</p></div>`;
+  }
+  function requestInvoiceBody(id){
+    const r=(data.inventoryRequests||[]).find(x=>String(x.id)===String(id)); if(!r) return '<p>الطلب غير موجود</p>';
+    const log=Array.isArray(r.approval_log)?r.approval_log:[];
+    const arr=lines(r).map(l=>{ const it=item(l.item_id); const unit=n(l.unit_cost||it.unit_cost); const out=n(l.quantity); const returned=retQty(r.id,l.item_id); const consumed=Math.max(0,out-returned); return {...l,it,unit,out,returned,consumed,value:consumed*unit}; });
+    const lineRows=arr.map(l=>`<tr><td>${e(l.product_code||code(l.it)||'')}</td><td><b>${e(l.item_name||l.it.name||'')}</b></td><td>${e(l.it.supplier||'-')}</td><td>${q(l.out)}</td><td>${q(l.returned)}</td><td><b>${q(l.consumed)}</b></td><td>${m(l.unit)}</td><td>${m(l.unit*1.15)}</td><td>${m(l.value)}</td></tr>`).join('') || '<tr><td colspan="9">لا توجد أصناف</td></tr>';
+    const retRows=arr.filter(l=>l.returned>0).map(l=>`<tr><td>${e(l.product_code||code(l.it)||'')}</td><td>${e(l.item_name||l.it.name||'')}</td><td>${q(l.returned)}</td><td>${m(l.unit)}</td><td>${m(l.returned*l.unit)}</td></tr>`).join('') || '<tr><td colspan="5">لا توجد مرتجعات مسجلة على هذا الأمر</td></tr>';
+    const logRows=log.map(l=>`<tr><td>${e(stepRole(l.step||l.role)||l.role||'-')}</td><td>${e(l.by||'-')}</td><td>${e(l.at?new Date(l.at).toLocaleString('en-US'):'-')}</td></tr>`).join('') || '<tr><td colspan="3">لا يوجد سجل اعتماد</td></tr>';
+    const total=arr.reduce((a,l)=>a+n(l.value),0), retTotal=arr.reduce((a,l)=>a+n(l.returned)*n(l.unit),0);
+    return `<div class="invoice-head-v128"><div><h2>أمر صرف مخزون</h2><p>OUT-${e(r.id)} — ${e(reqStatusText(r.status))}</p></div><div><b>التاريخ</b><br>${e(r.request_date||'')}</div></div>
+    <div class="grid"><div class="box"><b>المشرف / الفني</b><br>${e(r.supervisor_name||supervisorName(r.supervisor_id))}</div><div class="box"><b>المشروع</b><br>${e(r.project_name||projectName(r.project_id))}</div><div class="box"><b>مركز التكلفة</b><br>${e(r.cost_center_name||'-')}</div></div>
+    <table><tr><th>سبب الصرف</th><td>${e(r.reason||'-')}</td></tr><tr><th>ملاحظات</th><td>${e(r.notes||'-')}</td></tr></table>
+    <h3>الأصناف المصروفة</h3><table><thead><tr><th>كود المنتج</th><th>الصنف</th><th>المورد</th><th>الصادر</th><th>مرتجع</th><th>المستهلك</th><th>سعر الحبة</th><th>شامل الضريبة</th><th>قيمة الاستهلاك</th></tr></thead><tbody>${lineRows}</tbody></table>${totalsHtml(total,'Total Consumption Value with 15% VAT')}
+    <h3>مرتجع</h3><table><thead><tr><th>كود المنتج</th><th>الصنف</th><th>كمية المرتجع</th><th>سعر الحبة</th><th>قيمة المرتجع</th></tr></thead><tbody>${retRows}</tbody></table>${totalsHtml(retTotal,'Total Return Value with 15% VAT')}
+    <h3>سجل الاعتماد</h3><table><thead><tr><th>المرحلة</th><th>المعتمد</th><th>الوقت</th></tr></thead><tbody>${logRows}</tbody></table>`;
+  }
+  function movementInvoiceBody(id){
+    const x=(data.inventoryMovements||[]).find(mv=>String(mv.id)===String(id)); if(!x) return '<p>الحركة غير موجودة</p>';
+    const it=item(x.item_id); const unit=n(x.unit_cost||it.unit_cost); const qty=n(x.quantity); const value=unit*qty;
+    return `<div class="invoice-head-v128"><div><h2>حركة مخزون</h2><p>MOV-${e(x.id)} — ${e(effectType(x.movement_type))}</p></div><div><b>التاريخ</b><br>${e(x.movement_date||'')}</div></div>
+    <div class="grid"><div class="box"><b>الصنف</b><br>${e(x.item_name||it.name||'-')}</div><div class="box"><b>المشروع</b><br>${e(x.project_name||projectName(x.project_id)||'-')}</div><div class="box"><b>مركز التكلفة</b><br>${e(x.cost_center_name||'-')}</div></div>
+    <table><thead><tr><th>كود المنتج</th><th>الصنف</th><th>نوع الحركة</th><th>المستلم</th><th>الكمية</th><th>سعر الحبة</th><th>شامل الضريبة</th><th>القيمة</th></tr></thead><tbody><tr><td>${e(x.product_code||code(it)||'')}</td><td>${e(x.item_name||it.name||'-')}</td><td>${e(effectType(x.movement_type))}</td><td>${e(x.receiver||'-')}</td><td>${q(qty)}</td><td>${m(unit)}</td><td>${m(unit*1.15)}</td><td>${m(value)}</td></tr></tbody></table>${totalsHtml(value,'Total Value with 15% VAT')}
+    <table><tr><th>سبب الحركة</th><td>${e(x.reason||'-')}</td></tr><tr><th>ملاحظات</th><td>${e(x.notes||'-')}</td></tr></table>`;
+  }
+  function ensureInvoiceModalStyle(){
+    if(document.getElementById('invoiceV128Style')) return;
+    const st=document.createElement('style'); st.id='invoiceV128Style'; st.textContent=`
+      .smart-invoice-backdrop{position:fixed;inset:0;background:rgba(0,35,28,.55);z-index:9999;display:grid;place-items:center;padding:18px;backdrop-filter:blur(4px)}
+      .smart-invoice-modal{width:min(1120px,96vw);max-height:92vh;overflow:auto;background:#fff;border-radius:24px;border:1px solid #cfe2dc;box-shadow:0 28px 70px rgba(0,0,0,.28);direction:rtl;color:#10231d}
+      .smart-invoice-top{position:sticky;top:0;background:linear-gradient(135deg,#0A4033,#0f5a47);color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;z-index:2}.smart-invoice-top h2{margin:0;color:#fff}.smart-invoice-top button{background:#fff;color:#0A4033}.smart-invoice-body{padding:22px}.smart-invoice-body table{width:100%;border-collapse:collapse;margin:12px 0;font-size:12px}.smart-invoice-body th{background:#d0d0d0;color:#111;border:1px solid #333;padding:8px}.smart-invoice-body td{border:1px solid #333;padding:7px;text-align:center}.invoice-head-v128{display:flex;align-items:start;justify-content:space-between;gap:12px;margin-bottom:12px}.invoice-head-v128 h2{margin:0;color:#0A4033}.totals-v128{direction:ltr;text-align:left;margin:16px 0;font-size:15px;line-height:1.9}.smart-invoice-actions{display:flex;gap:8px;flex-wrap:wrap}.row-actions.inventory-actions-v128{min-width:280px!important;width:auto!important;justify-content:flex-start!important;flex-wrap:wrap!important;gap:6px!important}.row-actions.inventory-actions-v128 button{min-width:86px!important;border-radius:10px!important;padding:8px 10px!important}.row-actions.inventory-actions-v128 .btn-view{background:#0f766e!important}.row-actions.inventory-actions-v128 .btn-print{background:#0A4033!important}.row-actions.inventory-actions-v128 .btn-edit{background:#eef6f3!important;color:#0A4033!important;border:1px solid #cfe2dc!important}.row-actions.inventory-actions-v128 .btn-return{background:#fff5da!important;color:#8a6700!important;border:1px solid #ead28d!important}.row-actions.inventory-actions-v128 .btn-delete{background:#b83232!important;color:#fff!important}@media print{.smart-invoice-backdrop{position:static;background:#fff;display:block;padding:0}.smart-invoice-top{display:none}.smart-invoice-modal{box-shadow:none;border:0;max-height:none;width:auto}.smart-invoice-body{padding:0}}`;
+    document.head.appendChild(st);
+  }
+  window.inventoryOpenRequestInvoice=function(id){ ensureInvoiceModalStyle(); const div=document.createElement('div'); div.className='smart-invoice-backdrop'; div.id='smartInvoiceV128'; div.innerHTML=`<div class="smart-invoice-modal"><div class="smart-invoice-top"><h2>عرض الفاتورة</h2><div class="smart-invoice-actions"><button onclick="inventoryPrintRequest('${e(id)}')">طباعة</button><button onclick="document.getElementById('smartInvoiceV128')?.remove()">إغلاق</button></div></div><div class="smart-invoice-body">${requestInvoiceBody(id)}</div></div>`; document.body.appendChild(div); };
+  window.inventoryOpenMovementInvoice=function(id){ ensureInvoiceModalStyle(); const div=document.createElement('div'); div.className='smart-invoice-backdrop'; div.id='smartInvoiceV128'; div.innerHTML=`<div class="smart-invoice-modal"><div class="smart-invoice-top"><h2>عرض حركة المخزون</h2><div class="smart-invoice-actions"><button onclick="inventoryPrintMovement('${e(id)}')">طباعة</button><button onclick="document.getElementById('smartInvoiceV128')?.remove()">إغلاق</button></div></div><div class="smart-invoice-body">${movementInvoiceBody(id)}</div></div>`; document.body.appendChild(div); };
+  window.inventoryPrintRequest=function(id){ if(typeof financePrintWindow==='function') financePrintWindow('أمر صرف مخزون', requestInvoiceBody(id)); };
+  window.inventoryPrintMovement=function(id){ if(typeof financePrintWindow==='function') financePrintWindow('حركة مخزون', movementInvoiceBody(id)); };
+
+  window.inventoryRenderRequests=function(){
+    const b=document.getElementById('inventoryRequestsBody'); if(!b) return; if(typeof inventoryLoadApprovalSettings==='function') inventoryLoadApprovalSettings(); let rows=(typeof financeFilterRows==='function')?financeFilterRows(data.inventoryRequests||[],'request_date'):(data.inventoryRequests||[]); const st=document.getElementById('inventoryRequestStatusFilter')?.value; if(st) rows=rows.filter(r=>r.status===st);
+    b.innerHTML=rows.map(r=>{ const arr=lines(r); const itemsHtml=arr.map(l=>{ const returned=retQty(r.id,l.item_id), consumed=Math.max(0,n(l.quantity)-returned); return `${e(l.product_code||'')} ${e(l.item_name)}<br><small>صادر ${q(l.quantity)} | مرتجع ${q(returned)} | مستهلك ${q(consumed)}</small>`; }).join('<hr style="border:none;border-top:1px solid #e6eeee;margin:4px 0">')||e(r.item_name||''); const totalOut=arr.reduce((a,l)=>a+n(l.quantity),0)||n(r.quantity); const totalRet=arr.reduce((a,l)=>a+retQty(r.id,l.item_id),0); const actions=[];
+      actions.push(`<button class="btn-view" onclick="inventoryOpenRequestInvoice('${e(r.id)}')">عرض الفاتورة</button>`);
+      actions.push(`<button class="btn-print" onclick="inventoryPrintRequest('${e(r.id)}')">طباعة</button>`);
+      if(String(r.status||'').startsWith('pending_') || r.status==='rejected') actions.push(`<button class="btn-edit" onclick="inventoryEditRequest('${e(r.id)}')">تعديل</button>`);
+      if(String(r.status||'').startsWith('pending_')){ const step=String(r.status).replace('pending_',''); if(canApprove(step)){ actions.push(`<button onclick="inventoryApproveRequest('${e(r.id)}','${e(step)}',this)">اعتماد</button>`); actions.push(`<button class="btn-edit" onclick="inventoryAutoApproveRequest('${e(r.id)}',this)">اعتماد تلقائي</button>`); actions.push(`<button class="btn-delete" onclick="inventoryRejectRequest('${e(r.id)}',this)">رفض</button>`); } else actions.push(`<span class="badge neutral">بانتظار ${e(stepRole(step)||'المرحلة التالية')}</span>`); }
+      if(r.status==='approved') actions.push(`<button class="btn-return" onclick="inventoryReturnRequest('${e(r.id)}',this)">مرتجع</button>`);
+      return `<tr><td>${e(r.request_date||'')}</td><td><b>${e(r.supervisor_name||supervisorName(r.supervisor_id))}</b></td><td>${e(r.project_name||projectName(r.project_id))}</td><td>${e(r.cost_center_name||'-')}</td><td>${itemsHtml}</td><td>صادر ${q(totalOut)}<br>مرتجع ${q(totalRet)}<br><b>مستهلك ${q(Math.max(0,totalOut-totalRet))}</b></td><td>${e(r.reason||'-')}</td><td><span class="badge ${reqStatusClass(r.status)}">${e(reqStatusText(r.status))}</span><br><small>المرحلة: ${e(nextRole(r.status))}</small>${stepHtml(r)}</td><td class="row-actions inventory-actions-v128">${actions.join(' ')||'-'}</td></tr>`; }).join('')||`<tr><td colspan="9">${e(data.financeError||'لا توجد طلبات صرف')}</td></tr>`;
+  };
+
+  window.inventoryRenderMovements=function(){
+    const b=document.getElementById('inventoryMovementsBody'); if(!b) return; let rows=(typeof financeFilterRows==='function')?financeFilterRows(data.inventoryMovements||[],'movement_date'):(data.inventoryMovements||[]);
+    b.innerHTML=rows.map(x=>{ const type=effectType(x.movement_type); const cls=x.movement_type==='out'?'amber':((x.movement_type==='in'||x.movement_type==='return')?'green':''); return `<tr><td>${e(x.movement_date||'')}</td><td><b>${e(x.item_name||'')}</b><br><small>${e(x.product_code||'')}</small></td><td><span class="badge ${cls}">${e(type)}</span></td><td>${q(x.quantity)}</td><td>${e(x.project_name||projectName(x.project_id)||'-')}</td><td>${e(x.receiver||'-')}</td><td class="row-actions inventory-actions-v128"><button class="btn-view" onclick="inventoryOpenMovementInvoice('${e(x.id)}')">عرض</button><button class="btn-print" onclick="inventoryPrintMovement('${e(x.id)}')">طباعة</button><button class="btn-edit" onclick="inventoryEditMovement('${e(x.id)}')">تعديل</button><button class="btn-delete" onclick="financeDelete('inventory_movements','${e(x.id)}',true)">حذف</button></td></tr>`; }).join('')||`<tr><td colspan="7">${e(data.financeError||'لا توجد حركة مخزون')}</td></tr>`;
+  };
+  window.addEventListener('load',()=>setTimeout(()=>{ ensureInvoiceModalStyle(); try{ if(document.getElementById('inventoryRequestsBody')) window.inventoryRenderRequests(); if(document.getElementById('inventoryMovementsBody')) window.inventoryRenderMovements(); }catch(e){} },1300));
+})();
