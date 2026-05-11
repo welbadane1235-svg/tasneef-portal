@@ -51,7 +51,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style id="smart-ui-framework-v129">
-/* V129 Smart UI Framework */
+/* V130 Smart UI Framework Fix */
 .smart-shell-v129{display:grid;gap:16px}
 .smart-list-table thead{display:none!important}
 .smart-list-table,.smart-list-table tbody,.smart-list-table tr,.smart-list-table td{display:block!important;width:100%!important;border:0!important;background:transparent!important}
@@ -67,6 +67,23 @@
 @media (max-width:760px){.smart-meta-v129{grid-template-columns:1fr}.smart-card-head-v129{flex-direction:column}.smart-img-v129{width:84px;height:84px}.smart-hero-v129{flex-direction:column;align-items:flex-start}.smart-grid-v129{grid-template-columns:1fr}.smart-card-actions-v129 button{flex:1}}
 </style>
 
+
+<style id="smart-ui-framework-v130-fix">
+/* V130: إصلاح عرض الكروت وحذف شريط الواجهة الذكية */
+.smart-hero-v129{display:none!important;}
+.smart-list-table{display:block!important;width:100%!important;table-layout:auto!important;}
+.smart-list-table tbody{display:block!important;width:100%!important;}
+.smart-list-table tr{display:block!important;width:100%!important;}
+.smart-list-table td.smart-row-cell{display:block!important;width:100%!important;min-width:0!important;max-width:none!important;padding:0!important;border:0!important;}
+#inventoryItemsBody td.smart-row-cell,#inventoryMovementsBody td.smart-row-cell,#inventoryRequestsBody td.smart-row-cell,#financeExpensesBody td.smart-row-cell{width:100%!important;min-width:0!important;max-width:none!important;text-align:initial!important;overflow:visible!important;}
+#inventoryItemsBody .smart-grid-v129,#inventoryMovementsBody .smart-grid-v129,#inventoryRequestsBody .smart-grid-v129,#financeExpensesBody .smart-grid-v129{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(310px,1fr))!important;gap:14px!important;width:100%!important;align-items:stretch!important;}
+.smart-card-v129{min-width:0!important;width:100%!important;}
+.smart-card-actions-v129{display:flex!important;flex-direction:row!important;gap:8px!important;align-items:center!important;justify-content:flex-start!important;flex-wrap:wrap!important;}
+.smart-card-actions-v129 button,.smart-card-actions-v129 .smart-status-v129{writing-mode:horizontal-tb!important;min-width:auto!important;width:auto!important;white-space:nowrap!important;}
+.card .table-wrap:has(.smart-list-table){max-height:none!important;overflow:visible!important;padding:12px!important;}
+@supports not selector(:has(*)){.smart-list-table{overflow:visible!important;}}
+@media(max-width:700px){#inventoryItemsBody .smart-grid-v129,#inventoryMovementsBody .smart-grid-v129,#inventoryRequestsBody .smart-grid-v129,#financeExpensesBody .smart-grid-v129{grid-template-columns:1fr!important}.card .table-wrap:has(.smart-list-table){padding:8px!important}}
+</style>
 </head>
 <body onload="initAdmin()">
 <div class="app-shell">
@@ -683,6 +700,6 @@
     <section id="export" class="page hidden"><div class="card"><h2>التصدير</h2><p>صدّر بيانات النظام الحالية بصيغة CSV.</p><div class="actions"><button onclick="exportTable('app_users')">المستخدمين</button><button onclick="exportTable('projects')">المشاريع</button><button onclick="exportTable('workers')">العمال</button><button onclick="exportTable('attendance')">الحضور</button><button onclick="exportTable('time_logs')">التسجيلات اليومية</button><button onclick="exportTable('tickets')">التكتات</button></div></div></section>
   </main>
 </div>
-<script src="app.js?v=129"></script>
+<script src="app.js?v=130"></script>
 </body>
 </html>

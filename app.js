@@ -5053,7 +5053,7 @@ function financePrintReport(kind){
   window.addEventListener('load',()=>setTimeout(()=>{ ensureInvoiceModalStyle(); try{ if(document.getElementById('inventoryRequestsBody')) window.inventoryRenderRequests(); if(document.getElementById('inventoryMovementsBody')) window.inventoryRenderMovements(); }catch(e){} },1300));
 })();
 
-// ================= V129 Smart UI Framework =================
+// ================= V130 Smart UI Framework Fix =================
 (function(){
   const byId = id => document.getElementById(id);
   const e = s => String(s ?? '').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
@@ -5089,13 +5089,7 @@ function financePrintReport(kind){
   }
   window.smartOpenV129 = smartOpen;
 
-  function initFinanceHero(){
-    const dash=byId('financeDashboard'); if(!dash || byId('smartHeroFinanceV129')) return;
-    const firstCard=dash.querySelector('.card'); if(!firstCard) return;
-    const hero=document.createElement('div'); hero.id='smartHeroFinanceV129'; hero.className='smart-hero-v129';
-    hero.innerHTML=`<div><h2>واجهة ذكية للمصروفات والمخزون</h2><p>عرض مختصر وسريع لكل المصروفات، المخزون، طلبات الصرف، والحركات.</p></div><div class="smart-quick-v129"><span class="pill">كروت ذكية</span><span class="pill">نوافذ تفاصيل</span><span class="pill">طباعة وفواتير</span></div>`;
-    firstCard.parentNode.insertBefore(hero, firstCard);
-  }
+  function initFinanceHero(){ return; }
 
   window.financeOpenExpenseSmart = function(id){
     const x=(data.financeExpenses||[]).find(r=>String(r.id)===String(id)); if(!x) return msg('المصروف غير موجود','err');
