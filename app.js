@@ -12,6 +12,7 @@ const fmt = d => d ? new Date(d).toLocaleString('ar-SA') : '-';
 const timeOnly = d => d ? new Date(d).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}) : '-';
 const minsToText = m => { m=Number(m||0); const h=Math.floor(m/60), mm=m%60; return `${h}:${String(mm).padStart(2,'0')}`; };
 function num(v){ const n = Number(String(v ?? 0).replace(/,/g,'').trim()); return Number.isFinite(n) ? n : 0; }
+function safeQtyEn(v){ return num(v).toLocaleString('en-US',{maximumFractionDigits:2}); }
 function money(v){ return `${num(v).toLocaleString('ar-SA', {minimumFractionDigits:2, maximumFractionDigits:2})} ر.س`; }
 window.num = num;
 window.money = money;
@@ -2786,12 +2787,12 @@ function exportPremiumReportsCSV(){
 
 /* ===== V108 Supervisor Inventory Requests ===== */
 let supInventoryRequestLines = [];
-function supInventoryItemLabel(i){ return `${esc(i.name)} ${v118ProductCode(i)?'('+esc(v118ProductCode(i))+')':''} - المتوفر ${qtyEn?qtyEn(i.quantity):num(i.quantity)} ${esc(i.unit||'')}`; }
+function supInventoryItemLabel(i){ return `${esc(i.name)} ${v118ProductCode(i)?'('+esc(v118ProductCode(i))+')':''} - المتوفر ${safeQtyEn(i.quantity)} ${esc(i.unit||'')}`; }
 function renderSupInventoryRequestLines(){
   const b=$('supInventoryRequestLinesBody'); if(!b) return;
   b.innerHTML=supInventoryRequestLines.map((l,idx)=>{
     const it=(data.inventoryItems||[]).find(i=>String(i.id)===String(l.item_id))||{};
-    return `<tr><td>${esc(v118ProductCode(it)||l.product_code||'')}</td><td>${esc(l.item_name||it.name||'')}</td><td>${qtyEn?qtyEn(l.available):num(l.available)}</td><td>${qtyEn?qtyEn(l.quantity):num(l.quantity)}</td><td><button class="danger mini" type="button" onclick="supRemoveInventoryLine(${idx})">حذف</button></td></tr>`;
+    return `<tr><td>${esc(v118ProductCode(it)||l.product_code||'')}</td><td>${esc(l.item_name||it.name||'')}</td><td>${safeQtyEn(l.available)}</td><td>${safeQtyEn(l.quantity)}</td><td><button class="danger mini" type="button" onclick="supRemoveInventoryLine(${idx})">حذف</button></td></tr>`;
   }).join('') || '<tr><td colspan="5">لم تتم إضافة أصناف بعد</td></tr>';
 }
 function supRemoveInventoryLine(idx){ supInventoryRequestLines.splice(idx,1); renderSupInventoryRequestLines(); }
@@ -2854,7 +2855,7 @@ async function supervisorSaveInventoryRequest(btn){
 }
 function renderSupervisorInventoryRequests(){
   const b=$('supInventoryRequestsBody'); if(!b) return;
-  b.innerHTML=(data.inventoryRequests||[]).map(r=>{ const lines=v118LineItems(r); const items=lines.map(l=>`${esc(l.product_code||'')} ${esc(l.item_name)} × ${qtyEn?qtyEn(l.quantity):num(l.quantity)}`).join('<br>')||esc(r.item_name||''); const total=lines.reduce((a,l)=>a+num(l.quantity),0)||num(r.quantity); return `<tr><td>${esc(r.request_date||'')}</td><td>${esc(r.project_name||projectName(r.project_id))}</td><td><b>${items}</b></td><td>${qtyEn?qtyEn(total):num(total)}</td><td>${esc(r.reason||'-')}</td><td><span class="badge ${inventoryRequestStatusClass(r.status)}">${inventoryRequestStatusText(r.status)}</span><br><small>${inventoryRequestNextRole(r.status)}</small></td></tr>`; }).join('')||'<tr><td colspan="6">لا توجد طلبات صرف</td></tr>';
+  b.innerHTML=(data.inventoryRequests||[]).map(r=>{ const lines=v118LineItems(r); const items=lines.map(l=>`${esc(l.product_code||'')} ${esc(l.item_name)} × ${safeQtyEn(l.quantity)}`).join('<br>')||esc(r.item_name||''); const total=lines.reduce((a,l)=>a+num(l.quantity),0)||num(r.quantity); return `<tr><td>${esc(r.request_date||'')}</td><td>${esc(r.project_name||projectName(r.project_id))}</td><td><b>${items}</b></td><td>${safeQtyEn(total)}</td><td>${esc(r.reason||'-')}</td><td><span class="badge ${inventoryRequestStatusClass(r.status)}">${inventoryRequestStatusText(r.status)}</span><br><small>${inventoryRequestNextRole(r.status)}</small></td></tr>`; }).join('')||'<tr><td colspan="6">لا توجد طلبات صرف</td></tr>';
 }
 
 // Initialize report form when the admin page is ready
