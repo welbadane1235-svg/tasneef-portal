@@ -44,3 +44,10 @@
 @media(max-width:900px){.approval-grid{grid-template-columns:1fr 1fr}}@media(max-width:560px){.approval-grid{grid-template-columns:1fr}}
 
 .inventory-thumb{width:56px;height:56px;object-fit:contain;border-radius:12px;border:1px solid var(--border);background:#fff;cursor:pointer;padding:3px}.wide-card{grid-column:1 / -1}.muted{color:var(--muted)}
+
+/* ===== V116: inventory product image size fix ===== */
+.inventory-thumb,.inventory-product-img{width:54px!important;height:54px!important;max-width:54px!important;max-height:54px!important;object-fit:contain!important;border-radius:10px;border:1px solid var(--line);background:#fff;padding:3px;cursor:pointer;display:block;margin:auto}
+#inventoryItemsBody td:first-child{width:72px!important;max-width:72px!important;text-align:center;overflow:hidden}
+#inventoryItemsBody td:first-child img{width:54px!important;height:54px!important;max-width:54px!important;max-height:54px!important;object-fit:contain!important}
+.table-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.table-head h2{margin:0}
+@media print{.no-print,button,.actions,.filters,.finance-tabs,.side,.hero{display:none!important}.content{padding:0!important}.card{box-shadow:none!important;border:1px solid #dce6e2!important}.table-wrap{max-height:none!important;overflow:visible!important}}

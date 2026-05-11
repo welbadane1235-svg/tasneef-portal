@@ -544,10 +544,10 @@
 
       <div id="financeTabReports" class="finance-tab-page hidden">
         <div class="split">
-          <div class="card"><h2>مصروفات حسب المشروع</h2><div class="table-wrap"><table><thead><tr><th>المشروع</th><th>إجمالي المصروفات</th><th>عدد العمليات</th></tr></thead><tbody id="expenseByProjectBody"></tbody></table></div></div>
-          <div class="card"><h2>صرف المخزون حسب المشروع</h2><div class="table-wrap"><table><thead><tr><th>المشروع</th><th>عدد الحركات</th><th>إجمالي الكميات المصروفة</th></tr></thead><tbody id="stockOutByProjectBody"></tbody></table></div></div>
-          <div class="card"><h2>استهلاك المشرفين حسب المشروع</h2><div class="table-wrap"><table><thead><tr><th>المشرف</th><th>المشروع</th><th>عدد الطلبات</th><th>إجمالي الكمية</th></tr></thead><tbody id="stockOutBySupervisorBody"></tbody></table></div></div>
-          <div class="card wide-card"><h2>تقرير تفصيلي للاستهلاك: ماذا استُخدم وخلال كم يوم</h2><div class="table-wrap"><table><thead><tr><th>المشروع</th><th>المشرف / المستلم</th><th>الصنف</th><th>إجمالي الكمية</th><th>عدد العمليات</th><th>من تاريخ</th><th>إلى تاريخ</th><th>مدة الاستخدام</th></tr></thead><tbody id="inventoryUsageDetailBody"></tbody></table></div></div>
+          <div class="card"><div class="table-head"><h2>مصروفات حسب المشروع</h2><button class="light" onclick="financePrintReport('expensesByProject')">طباعة</button></div><div class="table-wrap"><table><thead><tr><th>المشروع</th><th>إجمالي المصروفات</th><th>عدد العمليات</th></tr></thead><tbody id="expenseByProjectBody"></tbody></table></div></div>
+          <div class="card"><div class="table-head"><h2>صرف المخزون حسب المشروع</h2><button class="light" onclick="financePrintReport('stockOutByProject')">طباعة</button></div><div class="table-wrap"><table><thead><tr><th>المشروع</th><th>عدد الحركات</th><th>إجمالي الكميات المصروفة</th></tr></thead><tbody id="stockOutByProjectBody"></tbody></table></div></div>
+          <div class="card"><div class="table-head"><h2>استهلاك المشرفين حسب المشروع</h2><button class="light" onclick="financePrintReport('stockOutBySupervisor')">طباعة</button></div><div class="table-wrap"><table><thead><tr><th>المشرف</th><th>المشروع</th><th>عدد الطلبات</th><th>إجمالي الكمية</th></tr></thead><tbody id="stockOutBySupervisorBody"></tbody></table></div></div>
+          <div class="card wide-card"><div class="table-head"><h2>تقرير توضيحي للاستهلاك: ماذا استُخدم ومتى ولأي مشروع</h2><button class="light" onclick="financePrintReport('inventoryUsageDetail')">طباعة</button></div><div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المشروع</th><th>المشرف / المستلم</th><th>الصنف</th><th>الكمية</th><th>سبب الاستخدام</th><th>نوع العملية</th><th>منذ كم يوم</th><th>المرجع</th></tr></thead><tbody id="inventoryUsageDetailBody"></tbody></table></div></div>
         </div>
       </div>
     </section>
@@ -585,6 +585,6 @@
     <section id="export" class="page hidden"><div class="card"><h2>التصدير</h2><p>صدّر بيانات النظام الحالية بصيغة CSV.</p><div class="actions"><button onclick="exportTable('app_users')">المستخدمين</button><button onclick="exportTable('projects')">المشاريع</button><button onclick="exportTable('workers')">العمال</button><button onclick="exportTable('attendance')">الحضور</button><button onclick="exportTable('time_logs')">التسجيلات اليومية</button><button onclick="exportTable('tickets')">التكتات</button></div></div></section>
   </main>
 </div>
-<script src="app.js?v=115"></script>
+<script src="app.js?v=116"></script>
 </body>
 </html>
