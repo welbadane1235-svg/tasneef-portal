@@ -16,6 +16,14 @@
 
 
 .finance-tabs{display:flex;gap:8px;flex-wrap:wrap}.finance-tab.active{background:var(--brand);color:#fff}.finance-kpis .kpi b{font-size:22px}.money-pos{color:#137a4b;font-weight:900}.money-neg{color:#b83232;font-weight:900}.finance-status-paid{background:#dff7ea;color:#137a4b}.finance-status-due{background:#fff1cc;color:#8a5b00}.finance-status-bad{background:#fde8e8;color:#b83232}.finance-status-neutral{background:#edf2f7;color:#334155}@media(max-width:1100px){.finance-tabs{display:grid;grid-template-columns:1fr 1fr}.finance-tabs button{width:100%}}
+
+
+/* V117: ضبط حجم صور المنتجات داخل جدول المخزون */
+#inventoryItemsBody td:first-child{width:86px!important;min-width:86px!important;max-width:86px!important;text-align:center!important;overflow:hidden!important;vertical-align:middle!important;}
+#inventoryItemsBody .inventory-img-box{width:64px!important;height:64px!important;max-width:64px!important;max-height:64px!important;margin:auto!important;display:flex!important;align-items:center!important;justify-content:center!important;border:1px solid var(--line)!important;border-radius:12px!important;background:#fff!important;overflow:hidden!important;padding:3px!important;}
+#inventoryItemsBody img.inventory-thumb,#inventoryItemsBody img.inventory-product-img{width:58px!important;height:58px!important;min-width:58px!important;min-height:58px!important;max-width:58px!important;max-height:58px!important;object-fit:contain!important;display:block!important;border:0!important;border-radius:9px!important;background:#fff!important;padding:0!important;margin:0!important;cursor:pointer!important;}
+.inventory-image-empty{font-size:11px;color:var(--muted);display:inline-block;width:64px;text-align:center}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -585,6 +593,6 @@
     <section id="export" class="page hidden"><div class="card"><h2>التصدير</h2><p>صدّر بيانات النظام الحالية بصيغة CSV.</p><div class="actions"><button onclick="exportTable('app_users')">المستخدمين</button><button onclick="exportTable('projects')">المشاريع</button><button onclick="exportTable('workers')">العمال</button><button onclick="exportTable('attendance')">الحضور</button><button onclick="exportTable('time_logs')">التسجيلات اليومية</button><button onclick="exportTable('tickets')">التكتات</button></div></div></section>
   </main>
 </div>
-<script src="app.js?v=116"></script>
+<script src="app.js?v=117"></script>
 </body>
 </html>
