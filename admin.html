@@ -513,7 +513,8 @@
             <div class="split"><div><label>التصنيف</label><select id="inventoryItemCategory"><option>كهرباء</option><option>سباكة</option><option>نظافة</option><option>مكافحة حشرات</option><option>تكييف</option><option>زراعة</option><option>معدات</option><option>أخرى</option></select></div><div><label>نوع المنتج</label><select id="inventoryItemType"><option>مادة</option><option>أداة</option><option>معدات</option><option>قطعة غيار</option><option>أخرى</option></select></div></div>
             <div class="split"><div><label>وحدة القياس</label><input id="inventoryItemUnit" placeholder="حبة / كرتون / لتر / متر"></div><div><label>حد إعادة الطلب</label><input type="number" id="inventoryItemMin" step="0.01" value="0"></div></div>
             <label>صورة المنتج <b style="color:#b42318">إلزامية</b></label><label class="stage-upload">+ اختيار صورة المنتج<input type="file" accept="image/*" onchange="inventoryHandleItemImage(this)"></label><div id="inventoryItemImagePreview" class="img-previews"></div>
-            <div class="split"><div><label>الكمية الحالية</label><input type="number" id="inventoryItemQty" step="0.01"></div><div><label>سعر الوحدة قبل الضريبة</label><input type="number" id="inventoryItemCost" step="0.01" oninput="inventoryCalcItemVatPreview()"></div></div>
+            <div class="split"><div><label>الكمية الحالية</label><input type="number" id="inventoryItemQty" step="0.01"></div><div><label>سعر الوحدة</label><input type="number" id="inventoryItemCost" step="0.01" oninput="inventoryCalcItemVatPreview()"></div></div>
+            <label>حالة الضريبة</label><select id="inventoryItemVatMode" onchange="inventoryCalcItemVatPreview()"><option value="exclusive">غير شامل الضريبة</option><option value="inclusive">شامل الضريبة</option><option value="exempt">خالي الضريبة</option></select>
             <div class="split"><div><label>ضريبة 15%</label><input id="inventoryItemVatPreview" class="vat-readonly" readonly value="0.00"></div><div><label>سعر الوحدة شامل الضريبة</label><input id="inventoryItemGrossPreview" class="vat-readonly" readonly value="0.00"></div></div>
             <label>ملاحظات</label><textarea id="inventoryItemNotes"></textarea>
             <div class="actions"><button onclick="inventorySaveItem(this)">حفظ الصنف</button><button class="light" onclick="inventoryClearItemForm()">تفريغ</button></div>
@@ -582,6 +583,7 @@
       </div>
 
       <div id="financeTabReports" class="finance-tab-page hidden">
+        <div class="card wide-card"><h2>فلاتر التقارير</h2><div class="report-filters-panel"><select id="inventoryReportDateMode" onchange="financeRenderReports()"><option value="all">كل الفترات</option><option value="day">اليوم</option><option value="month">الشهر</option></select><input type="date" id="inventoryReportDay" onchange="financeRenderReports()"><input type="month" id="inventoryReportMonth" onchange="financeRenderReports()"><button class="light" onclick="inventoryClearReportDateFilter()">مسح فلتر التاريخ</button></div></div>
         <div class="split">
           <div class="card"><div class="table-head"><h2>مصروفات حسب المشروع</h2><button class="light" onclick="financePrintReport('expensesByProject')">طباعة</button></div><div class="table-wrap"><table><thead><tr><th>المشروع</th><th>إجمالي المصروفات</th><th>عدد العمليات</th></tr></thead><tbody id="expenseByProjectBody"></tbody></table></div></div>
           <div class="card"><div class="table-head"><h2>صرف المخزون حسب المشروع</h2><button class="light" onclick="financePrintReport('stockOutByProject')">طباعة</button></div><div class="table-wrap"><table><thead><tr><th>المشروع</th><th>عدد الحركات</th><th>إجمالي الكميات المصروفة</th></tr></thead><tbody id="stockOutByProjectBody"></tbody></table></div></div>
@@ -627,6 +629,6 @@
     <section id="export" class="page hidden"><div class="card"><h2>التصدير</h2><p>صدّر بيانات النظام الحالية بصيغة CSV.</p><div class="actions"><button onclick="exportTable('app_users')">المستخدمين</button><button onclick="exportTable('projects')">المشاريع</button><button onclick="exportTable('workers')">العمال</button><button onclick="exportTable('attendance')">الحضور</button><button onclick="exportTable('time_logs')">التسجيلات اليومية</button><button onclick="exportTable('tickets')">التكتات</button></div></div></section>
   </main>
 </div>
-<script src="app.js?v=120"></script>
+<script src="app.js?v=121"></script>
 </body>
 </html>
