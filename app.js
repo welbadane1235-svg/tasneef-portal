@@ -4786,3 +4786,25 @@ function financePrintReport(kind){
 
   window.addEventListener('load',()=>setTimeout(()=>{ costCenterFillSelects(); costCenterRender(); if($('financeDashboard')) financeRenderReports(); },1500));
 })();
+
+/* =========================
+   V126: Smart report slides and fixed action buttons
+   ========================= */
+(function(){
+  'use strict';
+  window.financeShowSmartReport = function(kind, btn){
+    document.querySelectorAll('.smart-report-card').forEach(x=>x.classList.remove('active'));
+    if(btn) btn.classList.add('active');
+    document.querySelectorAll('.smart-report-panel').forEach(p=>p.classList.remove('active'));
+    const panel=document.querySelector(`[data-report-panel="${kind}"]`);
+    if(panel){
+      panel.classList.add('active');
+      panel.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+  };
+  window.addEventListener('load',()=>setTimeout(()=>{
+    if(document.querySelector('.smart-report-panel') && !document.querySelector('.smart-report-panel.active')){
+      window.financeShowSmartReport('expensesByProject', document.querySelector('.smart-report-card[data-report="expensesByProject"]'));
+    }
+  },900));
+})();
