@@ -5052,3 +5052,108 @@ function financePrintReport(kind){
   };
   window.addEventListener('load',()=>setTimeout(()=>{ ensureInvoiceModalStyle(); try{ if(document.getElementById('inventoryRequestsBody')) window.inventoryRenderRequests(); if(document.getElementById('inventoryMovementsBody')) window.inventoryRenderMovements(); }catch(e){} },1300));
 })();
+
+// ================= V129 Smart UI Framework =================
+(function(){
+  const byId = id => document.getElementById(id);
+  const e = s => String(s ?? '').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
+  const n = v => (typeof num==='function'?num(v):Number(v||0));
+  const q = v => Number(n(v)).toLocaleString('en-US',{maximumFractionDigits:2});
+  const m = v => (typeof money==='function'?money(v):`${Number(n(v)).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} ر.س`);
+  const proj = id => (typeof financeProjectName==='function'?financeProjectName(id):((data.projects||[]).find(p=>String(p.id)===String(id))?.name||'-'));
+  const sup = id => (typeof supervisorName==='function'?supervisorName(id):((data.users||[]).find(u=>String(u.id)===String(id))?.full_name||'-'));
+  const item = id => (data.inventoryItems||[]).find(x=>String(x.id)===String(id)) || {};
+  const img = it => it.image_url || it.image || it.photo_url || it.product_image || '';
+  const code = it => it.product_code || it.serial_number || it.code || '';
+  const barcode = it => it.barcode || it.supplier_barcode || '';
+  const lineItems = r => {
+    if(typeof v118LineItems==='function') return v118LineItems(r);
+    if(Array.isArray(r.request_items)) return r.request_items;
+    if(Array.isArray(r.items)) return r.items;
+    return r.item_id ? [{item_id:r.item_id,item_name:r.item_name,quantity:r.quantity,product_code:r.product_code,unit_cost:r.unit_cost}] : [];
+  };
+  const returnedFor = (reqId,itemId) => (data.inventoryMovements||[]).filter(x=>String(x.request_id)===String(reqId)&&String(x.item_id)===String(itemId)&&x.movement_type==='return').reduce((a,x)=>a+n(x.quantity),0);
+  const requestStatusText = s => (typeof inventoryRequestStatusText==='function'?inventoryRequestStatusText(s):(s||'-'));
+  const requestStatusClass = s => String(s||'').includes('rejected')?'danger':(String(s||'').includes('pending')?'warn':(s==='approved'?'green':'neutral'));
+  const canApproveStep = step => (typeof inventoryCurrentUserCanApprove==='function'?inventoryCurrentUserCanApprove(step):false);
+  const stepRole = step => ({warehouse:'مدير مخازن',ops:'مدير تشغيلي',finance:'مدير مالي',general:'مدير عام'}[step]||step||'-');
+  const setSmartTable = body => { try{ body.closest('table')?.classList.add('smart-list-table'); }catch(_){} };
+  const cardShell = html => `<tr><td class="smart-row-cell" colspan="20"><div class="smart-grid-v129">${html}</div></td></tr>`;
+  const statusSpan = (text, cls='neutral') => `<span class="smart-status-v129 ${cls}">${e(text)}</span>`;
+  function smartOpen(title, bodyHtml, actions=''){
+    document.getElementById('smartModalV129')?.remove();
+    const div=document.createElement('div');
+    div.className='smart-modal-v129'; div.id='smartModalV129';
+    div.innerHTML=`<div class="smart-modal-box-v129"><div class="smart-modal-top-v129"><h2>${e(title)}</h2><div style="display:flex;gap:8px;flex-wrap:wrap">${actions}<button class="light" onclick="document.getElementById('smartModalV129')?.remove()">إغلاق</button></div></div><div class="smart-modal-body-v129">${bodyHtml}</div></div>`;
+    document.body.appendChild(div);
+  }
+  window.smartOpenV129 = smartOpen;
+
+  function initFinanceHero(){
+    const dash=byId('financeDashboard'); if(!dash || byId('smartHeroFinanceV129')) return;
+    const firstCard=dash.querySelector('.card'); if(!firstCard) return;
+    const hero=document.createElement('div'); hero.id='smartHeroFinanceV129'; hero.className='smart-hero-v129';
+    hero.innerHTML=`<div><h2>واجهة ذكية للمصروفات والمخزون</h2><p>عرض مختصر وسريع لكل المصروفات، المخزون، طلبات الصرف، والحركات.</p></div><div class="smart-quick-v129"><span class="pill">كروت ذكية</span><span class="pill">نوافذ تفاصيل</span><span class="pill">طباعة وفواتير</span></div>`;
+    firstCard.parentNode.insertBefore(hero, firstCard);
+  }
+
+  window.financeOpenExpenseSmart = function(id){
+    const x=(data.financeExpenses||[]).find(r=>String(r.id)===String(id)); if(!x) return msg('المصروف غير موجود','err');
+    smartOpen('تفاصيل المصروف', `<div class="smart-meta-v129"><div class="m"><small>التاريخ</small><b>${e(x.expense_date||'-')}</b></div><div class="m"><small>المشروع</small><b>${e(x.project_name||proj(x.project_id))}</b></div><div class="m"><small>النوع</small><b>${e(x.category||'-')}</b></div><div class="m"><small>المورد</small><b>${e(x.supplier||'-')}</b></div><div class="m"><small>قبل الضريبة</small><b>${m(x.amount)}</b></div><div class="m"><small>الضريبة</small><b>${m(x.vat)}</b></div><div class="m"><small>الإجمالي</small><b>${m(x.total)}</b></div><div class="m"><small>طريقة الدفع</small><b>${e(x.payment_method||'-')}</b></div></div><h3>ملاحظات</h3><p>${e(x.notes||'لا توجد ملاحظات')}</p>`);
+  };
+
+  window.financeRenderExpenses = function(){
+    const b=byId('financeExpensesBody'); if(!b) return; setSmartTable(b);
+    let rows=(typeof financeFilterRows==='function'?financeFilterRows(data.financeExpenses||[],'expense_date'):(data.financeExpenses||[])); const cat=byId('financeExpenseTypeFilter')?.value; if(cat) rows=rows.filter(x=>x.category===cat);
+    if(!rows.length){ b.innerHTML=`<tr><td colspan="20">${e(data.financeError||'لا توجد مصروفات')}</td></tr>`; return; }
+    b.innerHTML=cardShell(rows.map(x=>`<article class="smart-card-v129"><div class="smart-card-head-v129"><div><h3 class="smart-title-v129">${e(x.category||'مصروف')}</h3><div class="smart-sub-v129">${e(x.expense_date||'-')} — ${e(x.project_name||proj(x.project_id))}</div></div>${statusSpan(m(x.total),'neutral')}</div><div class="smart-meta-v129"><div class="m"><small>المورد</small><b>${e(x.supplier||'-')}</b></div><div class="m"><small>الدفع</small><b>${e(x.payment_method||'-')}</b></div><div class="m"><small>قبل الضريبة</small><b>${m(x.amount)}</b></div><div class="m"><small>الضريبة</small><b>${m(x.vat)}</b></div></div><div class="smart-card-actions-v129"><button onclick="financeOpenExpenseSmart('${e(x.id)}')">عرض</button><button class="light" onclick="financeEditExpense('${e(x.id)}')">تعديل</button><button class="danger" onclick="financeDelete('finance_expenses','${e(x.id)}')">حذف</button></div></article>`).join(''));
+  };
+
+  window.inventoryOpenItemSmart = function(id){
+    const it=item(id); if(!it.id) return msg('الصنف غير موجود','err');
+    const movs=(data.inventoryMovements||[]).filter(x=>String(x.item_id)===String(id));
+    const out=movs.filter(x=>x.movement_type==='out').reduce((a,x)=>a+n(x.quantity),0), ret=movs.filter(x=>x.movement_type==='return').reduce((a,x)=>a+n(x.quantity),0), cons=movs.filter(x=>x.movement_type==='consume').reduce((a,x)=>a+n(x.quantity),0);
+    const rows=movs.slice(0,30).map(x=>`<tr><td>${e(x.movement_date||'-')}</td><td>${e(x.movement_type||'-')}</td><td>${q(x.quantity)}</td><td>${e(x.project_name||proj(x.project_id))}</td><td>${e(x.receiver||'-')}</td><td>${e(x.reason||'-')}</td></tr>`).join('') || '<tr><td colspan="6">لا توجد حركات مسجلة</td></tr>';
+    smartOpen('تفاصيل المنتج', `<div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap"><img class="smart-img-v129" style="width:150px;height:150px" src="${e(img(it))}" onerror="this.style.display='none'"><div style="flex:1;min-width:260px"><h2>${e(it.name||'-')}</h2><div class="smart-meta-v129"><div class="m"><small>كود المنتج</small><b>${e(code(it)||'-')}</b></div><div class="m"><small>باركود المورد</small><b>${e(barcode(it)||'-')}</b></div><div class="m"><small>المورد</small><b>${e(it.supplier||'-')}</b></div><div class="m"><small>التصنيف</small><b>${e(it.category||'-')}</b></div><div class="m"><small>الكمية الحالية</small><b>${q(it.quantity)} ${e(it.unit||'')}</b></div><div class="m"><small>حد إعادة الطلب</small><b>${q(it.min_quantity||it.reorder_level||0)}</b></div><div class="m"><small>سعر الحبة</small><b>${m(it.unit_cost)}</b></div><div class="m"><small>سعر شامل الضريبة</small><b>${m(n(it.unit_cost)*1.15)}</b></div></div></div></div><h3>ملخص الحركة</h3><div class="smart-meta-v129"><div class="m"><small>الصادر</small><b>${q(out)}</b></div><div class="m"><small>المرتجع</small><b>${q(ret)}</b></div><div class="m"><small>الاستهلاك المسجل</small><b>${q(cons)}</b></div><div class="m"><small>عدد الحركات</small><b>${movs.length}</b></div></div><h3>آخر الحركات</h3><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>الكمية</th><th>المشروع</th><th>المستلم</th><th>السبب</th></tr></thead><tbody>${rows}</tbody></table>`, `<button onclick="financePrintReport && financePrintReport('productDetail')">طباعة</button>`);
+  };
+
+  window.inventoryRenderItems = function(){
+    const b=byId('inventoryItemsBody'); if(!b) return; setSmartTable(b);
+    let rows=data.inventoryItems||[]; const qtext=(byId('inventorySearch')?.value||'').toLowerCase(); const supFilter=byId('inventorySupplierFilter')?.value||''; const catFilter=byId('inventoryCategoryFilter')?.value||'';
+    if(qtext) rows=rows.filter(it=>[it.name,code(it),barcode(it),it.supplier].some(v=>String(v||'').toLowerCase().includes(qtext)));
+    if(supFilter) rows=rows.filter(it=>String(it.supplier||'')===String(supFilter)); if(catFilter) rows=rows.filter(it=>String(it.category||'')===String(catFilter));
+    if(!rows.length){ b.innerHTML=`<tr><td colspan="20">${e(data.financeError||'لا توجد أصناف مخزون')}</td></tr>`; return; }
+    b.innerHTML=cardShell(rows.map(it=>{ const low=n(it.quantity)<=n(it.min_quantity||it.reorder_level); return `<article class="smart-card-v129"><div class="smart-card-head-v129"><div style="display:flex;gap:12px;align-items:center"><img class="smart-img-v129" src="${e(img(it))}" onerror="this.outerHTML='<div class=&quot;smart-img-v129&quot; style=&quot;display:grid;place-items:center;color:#789&quot;>لا صورة</div>'"><div><h3 class="smart-title-v129">${e(it.name||'-')}</h3><div class="smart-sub-v129">${e(code(it)||'-')} — ${e(barcode(it)||'بدون باركود')}</div></div></div>${statusSpan(low?'منخفض':'متوفر',low?'danger':'green')}</div><div class="smart-meta-v129"><div class="m"><small>الكمية</small><b>${q(it.quantity)} ${e(it.unit||'')}</b></div><div class="m"><small>حد الطلب</small><b>${q(it.min_quantity||it.reorder_level||0)}</b></div><div class="m"><small>سعر الحبة</small><b>${m(it.unit_cost)}</b></div><div class="m"><small>المورد</small><b>${e(it.supplier||'-')}</b></div><div class="m"><small>التصنيف</small><b>${e(it.category||'-')}</b></div><div class="m"><small>النوع</small><b>${e(it.item_type||it.type||'-')}</b></div></div><div class="smart-card-actions-v129"><button onclick="inventoryOpenItemSmart('${e(it.id)}')">عرض المنتج</button><button class="light" onclick="inventoryEditItem('${e(it.id)}')">تعديل</button><button class="danger" onclick="financeDelete('inventory_items','${e(it.id)}',true)">حذف</button></div></article>`; }).join(''));
+  };
+
+  window.inventoryOpenMovementSmart = function(id){
+    const x=(data.inventoryMovements||[]).find(m=>String(m.id)===String(id)); if(!x) return msg('الحركة غير موجودة','err');
+    const it=item(x.item_id); const type=x.movement_type==='in'?'إدخال':(x.movement_type==='out'?'صرف':(x.movement_type==='return'?'مرتجع':(x.movement_type==='consume'?'استهلاك':'تعديل')));
+    smartOpen('تفاصيل حركة المخزون', `<div class="smart-meta-v129"><div class="m"><small>التاريخ</small><b>${e(x.movement_date||'-')}</b></div><div class="m"><small>نوع الحركة</small><b>${e(type)}</b></div><div class="m"><small>الصنف</small><b>${e(x.item_name||it.name||'-')}</b></div><div class="m"><small>الكمية</small><b>${q(x.quantity)}</b></div><div class="m"><small>المشروع</small><b>${e(x.project_name||proj(x.project_id))}</b></div><div class="m"><small>المستلم</small><b>${e(x.receiver||'-')}</b></div><div class="m"><small>مركز التكلفة</small><b>${e(x.cost_center_name||'-')}</b></div><div class="m"><small>المرجع</small><b>${e(x.request_id?('REQ-'+x.request_id):'-')}</b></div></div><h3>السبب</h3><p>${e(x.reason||'-')}</p><h3>ملاحظات</h3><p>${e(x.notes||'-')}</p>`, `<button onclick="inventoryPrintMovement && inventoryPrintMovement('${e(id)}')">طباعة</button>`);
+  };
+
+  window.inventoryRenderMovements = function(){
+    const b=byId('inventoryMovementsBody'); if(!b) return; setSmartTable(b);
+    let rows=(typeof financeFilterRows==='function'?financeFilterRows(data.inventoryMovements||[],'movement_date'):(data.inventoryMovements||[]));
+    if(!rows.length){ b.innerHTML=`<tr><td colspan="20">${e(data.financeError||'لا توجد حركة مخزون')}</td></tr>`; return; }
+    b.innerHTML=cardShell(rows.map(x=>{ const type=x.movement_type==='in'?'إدخال':(x.movement_type==='out'?'صرف':(x.movement_type==='return'?'مرتجع':(x.movement_type==='consume'?'استهلاك':'تعديل رصيد'))); const cls=x.movement_type==='out'?'warn':((x.movement_type==='in'||x.movement_type==='return')?'green':'neutral'); return `<article class="smart-card-v129"><div class="smart-card-head-v129"><div><h3 class="smart-title-v129">${e(x.item_name||'-')}</h3><div class="smart-sub-v129">${e(x.movement_date||'-')} — ${e(x.product_code||'')}</div></div>${statusSpan(type,cls)}</div><div class="smart-meta-v129"><div class="m"><small>الكمية</small><b>${q(x.quantity)}</b></div><div class="m"><small>المشروع</small><b>${e(x.project_name||proj(x.project_id))}</b></div><div class="m"><small>المستلم</small><b>${e(x.receiver||'-')}</b></div><div class="m"><small>مركز التكلفة</small><b>${e(x.cost_center_name||'-')}</b></div></div><div class="smart-card-actions-v129"><button onclick="inventoryOpenMovementSmart('${e(x.id)}')">عرض</button><button onclick="inventoryPrintMovement && inventoryPrintMovement('${e(x.id)}')">طباعة</button><button class="light" onclick="inventoryEditMovement('${e(x.id)}')">تعديل</button><button class="danger" onclick="financeDelete('inventory_movements','${e(x.id)}',true)">حذف</button></div></article>`; }).join(''));
+  };
+
+  window.inventoryOpenRequestSmart = function(id){
+    const r=(data.inventoryRequests||[]).find(x=>String(x.id)===String(id)); if(!r) return msg('الطلب غير موجود','err');
+    const lines=lineItems(r); const rows=lines.map(l=>{ const ret=returnedFor(r.id,l.item_id); const consumed=Math.max(0,n(l.quantity)-ret); const it=item(l.item_id); return `<tr><td>${e(l.product_code||code(it)||'-')}</td><td>${e(l.item_name||it.name||'-')}</td><td>${q(l.quantity)}</td><td>${q(ret)}</td><td>${q(consumed)}</td><td>${m(l.unit_cost||it.unit_cost)}</td><td>${m(consumed*n(l.unit_cost||it.unit_cost))}</td></tr>`; }).join('') || '<tr><td colspan="7">لا توجد أصناف</td></tr>';
+    smartOpen('تفاصيل أمر الصرف', `<div class="smart-meta-v129"><div class="m"><small>رقم الطلب</small><b>REQ-${e(r.id)}</b></div><div class="m"><small>التاريخ</small><b>${e(r.request_date||'-')}</b></div><div class="m"><small>المشرف</small><b>${e(r.supervisor_name||sup(r.supervisor_id))}</b></div><div class="m"><small>المشروع</small><b>${e(r.project_name||proj(r.project_id))}</b></div><div class="m"><small>مركز التكلفة</small><b>${e(r.cost_center_name||'-')}</b></div><div class="m"><small>الحالة</small><b>${e(requestStatusText(r.status))}</b></div></div><h3>الأصناف</h3><table><thead><tr><th>الكود</th><th>الصنف</th><th>الصادر</th><th>المرتجع</th><th>المستهلك</th><th>سعر الحبة</th><th>قيمة الاستهلاك</th></tr></thead><tbody>${rows}</tbody></table><h3>سبب الصرف</h3><p>${e(r.reason||'-')}</p><h3>ملاحظات</h3><p>${e(r.notes||'-')}</p>`, `<button onclick="inventoryPrintRequest && inventoryPrintRequest('${e(id)}')">طباعة</button>`);
+  };
+
+  window.inventoryRenderRequests = function(){
+    const b=byId('inventoryRequestsBody'); if(!b) return; setSmartTable(b); if(typeof inventoryLoadApprovalSettings==='function') inventoryLoadApprovalSettings();
+    let rows=(typeof financeFilterRows==='function'?financeFilterRows(data.inventoryRequests||[],'request_date'):(data.inventoryRequests||[])); const st=byId('inventoryRequestStatusFilter')?.value; if(st) rows=rows.filter(r=>r.status===st);
+    if(!rows.length){ b.innerHTML=`<tr><td colspan="20">${e(data.financeError||'لا توجد طلبات صرف')}</td></tr>`; return; }
+    b.innerHTML=cardShell(rows.map(r=>{ const arr=lineItems(r); const totalOut=arr.reduce((a,l)=>a+n(l.quantity),0)||n(r.quantity); const totalRet=arr.reduce((a,l)=>a+returnedFor(r.id,l.item_id),0); const status=String(r.status||''); const step=status.replace('pending_',''); const lines=arr.map(l=>{ const ret=returnedFor(r.id,l.item_id); return `<div class="smart-line-v129"><b>${e(l.item_name||'-')}</b><br><small>${e(l.product_code||'')} — صادر ${q(l.quantity)} | مرتجع ${q(ret)} | مستهلك ${q(Math.max(0,n(l.quantity)-ret))}</small></div>`; }).join(''); let acts=[`<button onclick="inventoryOpenRequestSmart('${e(r.id)}')">عرض ذكي</button>`,`<button onclick="inventoryOpenRequestInvoice && inventoryOpenRequestInvoice('${e(r.id)}')">عرض الفاتورة</button>`,`<button onclick="inventoryPrintRequest && inventoryPrintRequest('${e(r.id)}')">طباعة</button>`]; if(status.startsWith('pending_')||status==='rejected') acts.push(`<button class="light" onclick="inventoryEditRequest('${e(r.id)}')">تعديل</button>`); if(status.startsWith('pending_')){ if(canApproveStep(step)){ acts.push(`<button onclick="inventoryApproveRequest('${e(r.id)}','${e(step)}',this)">اعتماد</button>`); acts.push(`<button class="light" onclick="inventoryAutoApproveRequest('${e(r.id)}',this)">اعتماد تلقائي</button>`); acts.push(`<button class="danger" onclick="inventoryRejectRequest('${e(r.id)}',this)">رفض</button>`); } else acts.push(`<span class="smart-status-v129 neutral">بانتظار ${e(stepRole(step))}</span>`); } if(status==='approved') acts.push(`<button class="light" onclick="inventoryReturnRequest('${e(r.id)}',this)">مرتجع</button>`);
+      return `<article class="smart-card-v129"><div class="smart-card-head-v129"><div><h3 class="smart-title-v129">أمر صرف REQ-${e(r.id)}</h3><div class="smart-sub-v129">${e(r.request_date||'-')} — ${e(r.supervisor_name||sup(r.supervisor_id))}</div></div>${statusSpan(requestStatusText(r.status),requestStatusClass(r.status))}</div><div class="smart-meta-v129"><div class="m"><small>المشروع</small><b>${e(r.project_name||proj(r.project_id))}</b></div><div class="m"><small>مركز التكلفة</small><b>${e(r.cost_center_name||'-')}</b></div><div class="m"><small>الصادر</small><b>${q(totalOut)}</b></div><div class="m"><small>المرتجع</small><b>${q(totalRet)}</b></div><div class="m"><small>المستهلك</small><b>${q(Math.max(0,totalOut-totalRet))}</b></div><div class="m"><small>عدد الأصناف</small><b>${arr.length}</b></div></div><div class="smart-lines-v129">${lines}</div><div class="smart-card-actions-v129">${acts.join('')}</div></article>`; }).join(''));
+  };
+
+  const oldFinanceShowTabV129 = window.financeShowTab;
+  window.financeShowTab = function(tab, btn){ if(oldFinanceShowTabV129) oldFinanceShowTabV129.apply(this, arguments); setTimeout(()=>{ initFinanceHero(); try{ financeRenderExpenses(); inventoryRenderItems(); inventoryRenderMovements(); inventoryRenderRequests(); }catch(_){} },60); };
+  window.addEventListener('load',()=>setTimeout(()=>{ initFinanceHero(); try{ if(byId('financeDashboard')){ financeRenderExpenses(); inventoryRenderItems(); inventoryRenderMovements(); inventoryRenderRequests(); } }catch(e){ console.warn('V129 smart UI render warning',e); } },1500));
+})();
