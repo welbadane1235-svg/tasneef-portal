@@ -2839,7 +2839,7 @@ async function supervisorSaveInventoryRequest(btn){
       item_id:Number(firstLine.item_id),
       item_name:firstLine.item_name||'',
       quantity:supInventoryRequestLines.reduce((a,l)=>a+num(l.quantity),0),
-      request_lines:supInventoryRequestLines,
+      request_items:supInventoryRequestLines, items:supInventoryRequestLines,
       project_id:Number(pid),project_name:projectName(pid),
       supervisor_id:u.id,supervisor_name:u.full_name||u.username||'',
       request_date:$('supInventoryRequestDate')?.value||today(),
@@ -3841,7 +3841,7 @@ function v118Barcode(i){ return i?.supplier_barcode || i?.barcode || i?.supplier
 function v118ItemType(i){ return i?.item_type || i?.type || ''; }
 function v118ItemById(id){ return (data.inventoryItems||[]).find(i=>String(i.id)===String(id)); }
 function v118LineItems(r){
-  let raw = r?.request_items || r?.items || r?.products || null;
+  let raw = r?.request_items || r?.items || r?.request_lines || r?.products || null;
   if(typeof raw === 'string' && raw.trim()){ try{ raw=JSON.parse(raw); }catch(e){ raw=null; } }
   if(Array.isArray(raw) && raw.length){
     return raw.map(x=>({
@@ -4610,4 +4610,179 @@ function financePrintReport(kind){
     financePrintWindow('أمر صرف مخزون متعدد الأصناف', body);
   };
   window.addEventListener('load',()=>setTimeout(()=>{ if($('financeDashboard')){ financeRenderReports(); inventoryCalcItemVatPreview(); } },1200));
+})();
+
+/* =========================
+   V125: Auto approval, returns in same order, cost centers
+   ========================= */
+(function(){
+  'use strict';
+  if(!window.data) window.data = data || {};
+  data.costCenters = data.costCenters || [];
+
+  function ccEsc(v){ return typeof esc==='function'?esc(v):String(v??''); }
+  function ccNum(v){ return typeof num==='function'?num(v):Number(String(v??0).replace(/,/g,''))||0; }
+  function ccMoney(v){ return typeof moneyEn==='function'?moneyEn(v):(ccNum(v).toFixed(2)+' ر.س'); }
+  function ccQty(v){ return typeof qtyEn==='function'?qtyEn(v):String(ccNum(v)); }
+  function costCenterPseudoRows(){
+    const rows = (data.costCenters||[]).filter(c=>String(c.status||'active')!=='inactive');
+    if(rows.length) return rows;
+    return (data.projects||[]).map(p=>({id:'project-'+p.id, code:'PRJ-'+p.id, name:p.name, type:'مشروع', status:'active', project_id:p.id, pseudo:true}));
+  }
+  window.costCenterName = function(id, fallbackProjectId){
+    if(!id && fallbackProjectId) return projectName(fallbackProjectId);
+    const c = costCenterPseudoRows().find(x=>String(x.id)===String(id));
+    return c ? c.name : (fallbackProjectId?projectName(fallbackProjectId):'');
+  };
+  function costCenterValueFromProject(pid){
+    const rows=costCenterPseudoRows();
+    const byProj=rows.find(c=>String(c.project_id||'')===String(pid));
+    if(byProj) return String(byProj.id);
+    const pname=projectName(pid);
+    const byName=rows.find(c=>String(c.name||'')===String(pname));
+    return byName?String(byName.id):'';
+  }
+  function selectedCostCenterPayload(selectId, projectId){
+    let cid = $(selectId)?.value || '';
+    if(!cid && projectId) cid = costCenterValueFromProject(projectId);
+    const c = costCenterPseudoRows().find(x=>String(x.id)===String(cid));
+    return { cost_center_id: c && !c.pseudo ? Number(c.id) : null, cost_center_name: c?.name || (projectId?projectName(projectId):'') };
+  }
+  window.costCenterFillSelects = function(){
+    const rows=costCenterPseudoRows();
+    const html='<option value="">اختر مركز التكلفة</option>'+rows.map(c=>`<option value="${ccEsc(c.id)}">${ccEsc(c.code||'')} - ${ccEsc(c.name||'')}</option>`).join('');
+    ['financeExpenseCostCenter','inventoryMovementCostCenter','inventoryRequestCostCenter','supInventoryRequestCostCenter'].forEach(id=>{ const el=$(id); if(el){ const old=el.value; el.innerHTML=html; if(old) el.value=old; }});
+  };
+  window.costCenterRender = function(){
+    const b=$('costCentersBody'); if(!b) return;
+    const rows=data.costCenters||[];
+    b.innerHTML=rows.map(c=>`<tr><td>${ccEsc(c.code||'-')}</td><td><b>${ccEsc(c.name||'')}</b></td><td>${ccEsc(c.type||'-')}</td><td><span class="badge ${String(c.status||'active')==='active'?'green':'neutral'}">${String(c.status||'active')==='active'?'نشط':'موقوف'}</span></td><td class="row-actions"><button onclick="costCenterEdit('${c.id}')">تعديل</button><button class="danger" onclick="costCenterDelete('${c.id}')">حذف</button></td></tr>`).join('')||'<tr><td colspan="5">لا توجد مراكز تكلفة بعد. يمكنك إنشاؤها من المشاريع.</td></tr>';
+  };
+  window.costCenterClearForm = function(){ ['costCenterId','costCenterCode','costCenterName','costCenterNotes'].forEach(id=>$(id)&&($(id).value='')); if($('costCenterType')) $('costCenterType').value='مشروع'; if($('costCenterStatus')) $('costCenterStatus').value='active'; };
+  window.costCenterEdit = function(id){ const c=(data.costCenters||[]).find(x=>String(x.id)===String(id)); if(!c) return; $('costCenterId').value=c.id; $('costCenterCode').value=c.code||''; $('costCenterName').value=c.name||''; $('costCenterType').value=c.type||'مشروع'; $('costCenterStatus').value=c.status||'active'; $('costCenterNotes').value=c.notes||''; financeShowTab('costCenters', document.querySelectorAll('.finance-tab')[6]); $('costCenterId')?.scrollIntoView({behavior:'smooth'}); };
+  window.costCenterSave = async function(btn){
+    try{ if(btn) btn.disabled=true; const name=($('costCenterName')?.value||'').trim(); if(!name) throw new Error('اسم مركز التكلفة مطلوب');
+      const row={code:($('costCenterCode')?.value||'').trim()||('CC-'+Date.now()), name, type:$('costCenterType')?.value||'عام', status:$('costCenterStatus')?.value||'active', notes:$('costCenterNotes')?.value||''};
+      const id=$('costCenterId')?.value; const res=id?await sb.from('cost_centers').update(row).eq('id',id):await sb.from('cost_centers').insert(row); if(res.error) throw res.error; msg('تم حفظ مركز التكلفة'); costCenterClearForm(); await financeLoadAll();
+    }catch(e){ msg(e.message||String(e),'err'); } finally{ if(btn) btn.disabled=false; }
+  };
+  window.costCenterDelete = async function(id){ if(!confirm('تأكيد حذف مركز التكلفة؟')) return; try{ const {error}=await sb.from('cost_centers').delete().eq('id',id); if(error) throw error; msg('تم حذف مركز التكلفة'); await financeLoadAll(); }catch(e){ msg(e.message||String(e),'err'); } };
+  window.costCenterCreateFromProjects = async function(){
+    try{
+      const existing=new Set((data.costCenters||[]).map(c=>String(c.name||'')));
+      const rows=(data.projects||[]).filter(p=>!existing.has(String(p.name||''))).map(p=>({code:'PRJ-'+p.id,name:p.name,type:'مشروع',status:'active',project_id:p.id}));
+      if(!rows.length){ msg('كل المشاريع لديها مراكز تكلفة أو لا توجد مشاريع جديدة'); return; }
+      const {error}=await sb.from('cost_centers').insert(rows); if(error) throw error; msg('تم إنشاء مراكز تكلفة من المشاريع'); await financeLoadAll();
+    }catch(e){ msg(e.message||String(e),'err'); }
+  };
+
+  const oldFinanceLoadAllV125 = window.financeLoadAll || (typeof financeLoadAll==='function'?financeLoadAll:null);
+  if(oldFinanceLoadAllV125){
+    window.financeLoadAll = async function(showMessage=false){
+      await oldFinanceLoadAllV125.call(this, showMessage);
+      try{ const cc=await sb.from('cost_centers').select('*').order('name',{ascending:true}); data.costCenters=cc.data||[]; if(cc.error) console.warn('cost_centers:', cc.error.message); }
+      catch(e){ console.warn('cost centers unavailable', e); data.costCenters=[]; }
+      costCenterFillSelects(); costCenterRender(); financeRenderAll();
+    };
+  }
+  const oldFinanceHydrateFormsV125 = window.financeHydrateForms || (typeof financeHydrateForms==='function'?financeHydrateForms:null);
+  if(oldFinanceHydrateFormsV125){
+    window.financeHydrateForms = function(){ oldFinanceHydrateFormsV125.apply(this, arguments); costCenterFillSelects(); costCenterRender();
+      const hooks=[['inventoryRequestProject','inventoryRequestCostCenter'],['inventoryMovementProject','inventoryMovementCostCenter'],['financeExpenseProject','financeExpenseCostCenter'],['supInventoryRequestProject','supInventoryRequestCostCenter']];
+      hooks.forEach(([p,s])=>{ const pe=$(p); if(pe && !pe.dataset.ccHook){ pe.dataset.ccHook='1'; pe.addEventListener('change',()=>{ const val=costCenterValueFromProject(pe.value); if($(s) && val) $(s).value=val; }); } });
+    };
+  }
+
+  // Override expense save to carry cost center
+  const oldFinanceSaveExpenseV125 = window.financeSaveExpense || (typeof financeSaveExpense==='function'?financeSaveExpense:null);
+  if(oldFinanceSaveExpenseV125){
+    window.financeSaveExpense = async function(btn){
+      try{ if(btn) btn.disabled=true; const pid=$('financeExpenseProject')?.value; if(!pid) throw new Error('اختر المشروع'); const cc=selectedCostCenterPayload('financeExpenseCostCenter', pid); if(!cc.cost_center_name) throw new Error('اختر مركز التكلفة');
+        const sub=ccNum($('financeExpenseSubtotal')?.value), vat=ccNum($('financeExpenseVat')?.value); const row={project_id:Number(pid),project_name:projectName(pid),cost_center_id:cc.cost_center_id,cost_center_name:cc.cost_center_name,category:$('financeExpenseCategory')?.value||'مصروف عام',expense_date:$('financeExpenseDate')?.value||today(),subtotal:sub,vat,total:sub+vat,supplier:$('financeExpenseSupplier')?.value||'',payment_method:$('financeExpenseMethod')?.value||'تحويل',notes:$('financeExpenseNotes')?.value||''};
+        const id=$('financeExpenseId')?.value; const res=id?await sb.from('finance_expenses').update(row).eq('id',id):await sb.from('finance_expenses').insert(row); if(res.error) throw res.error; msg('تم حفظ المصروف'); financeClearExpenseForm(); await financeLoadAll();
+      }catch(e){ msg(e.message||String(e),'err'); } finally{ if(btn) btn.disabled=false; }
+    };
+  }
+
+  function lineReturnQty(requestId, itemId){ return (data.inventoryMovements||[]).filter(m=>String(m.request_id)===String(requestId) && String(m.item_id)===String(itemId) && m.movement_type==='return').reduce((a,m)=>a+ccNum(m.quantity),0); }
+  function requestLineStats(r){
+    const lines=v118LineItems(r); let out=0, ret=0, cons=0, val=0, vat=0, gross=0;
+    lines.forEach(l=>{ const it=v118ItemById(l.item_id)||{}; const o=ccNum(l.quantity), rr=lineReturnQty(r.id,l.item_id), c=Math.max(0,o-rr), cost=ccNum(l.unit_cost||it.unit_cost); out+=o; ret+=rr; cons+=c; const v=c*cost; val+=v; vat+=(typeof vatOfAmount==='function'?vatOfAmount(v,it):v*0.15); gross+=(typeof grossOfAmount==='function'?grossOfAmount(v,it):v*1.15); });
+    return {out,ret,cons,val,vat,gross};
+  }
+
+  window.inventorySaveRequest = async function(btn){
+    try{ if(btn) btn.disabled=true; const pid=$('inventoryRequestProject')?.value; const supervisorId=$('inventoryRequestSupervisor')?.value; if(!pid) throw new Error('اختر المشروع'); if(!supervisorId) throw new Error('اختر المشرف / الفني'); if(!inventoryRequestLines.length) throw new Error('أضف صنفًا واحدًا على الأقل إلى أمر الصرف'); const cc=selectedCostCenterPayload('inventoryRequestCostCenter', pid); if(!cc.cost_center_name) throw new Error('اختر مركز التكلفة');
+      const path=inventoryGetApprovalPath(); const first=path[0]||'warehouse'; const totalQty=inventoryRequestLines.reduce((a,x)=>a+ccNum(x.quantity),0);
+      const row={item_id:Number(inventoryRequestLines[0].item_id), item_name:inventoryRequestLines.map(x=>x.item_name).join('، '), quantity:totalQty, request_items:inventoryRequestLines, items:inventoryRequestLines, project_id:Number(pid), project_name:projectName(pid), cost_center_id:cc.cost_center_id, cost_center_name:cc.cost_center_name, supervisor_id:Number(supervisorId), supervisor_name:supervisorName(supervisorId), request_date:$('inventoryRequestDate')?.value||today(), reason:$('inventoryRequestReason')?.value||'', notes:$('inventoryRequestNotes')?.value||'', status:'pending_'+first, current_step:first, approval_path:path, approval_log:[]};
+      const {error}=await sb.from('inventory_requests').insert(row); if(error) throw error; msg('تم إرسال أمر الصرف للاعتماد'); inventoryClearRequestForm(); await financeLoadAll();
+    }catch(e){ msg(e.message||String(e),'err'); } finally{ if(btn) btn.disabled=false; }
+  };
+
+  window.inventorySaveMovement = async function(btn){
+    try{ if(btn) btn.disabled=true; const itemId=$('inventoryMovementItem')?.value; if(!itemId) throw new Error('اختر الصنف'); const item=v118ItemById(itemId); const qty=ccNum($('inventoryMovementQty')?.value); if(qty<=0) throw new Error('الكمية مطلوبة'); const type=$('inventoryMovementType')?.value||'out'; const pid=$('inventoryMovementProject')?.value; const cc=selectedCostCenterPayload('inventoryMovementCostCenter', pid); if(!cc.cost_center_name) throw new Error('اختر مركز التكلفة'); if(['out','consume'].includes(type) && ccNum(item.quantity)<qty) throw new Error('الكمية المتوفرة لا تكفي');
+      const row={item_id:Number(itemId),item_name:item?.name||'',movement_type:type,quantity:qty,movement_date:$('inventoryMovementDate')?.value||today(),project_id:pid?Number(pid):null,project_name:pid?projectName(pid):'',cost_center_id:cc.cost_center_id,cost_center_name:cc.cost_center_name,receiver:$('inventoryMovementReceiver')?.value||'',reason:$('inventoryMovementReason')?.value||'',notes:$('inventoryMovementNotes')?.value||'',product_code:v118ProductCode(item),barcode:v118Barcode(item),unit_cost:ccNum(item.unit_cost)};
+      const res=await sb.from('inventory_movements').insert(row).select('*').single(); if(res.error) throw res.error; let newQty=ccNum(item.quantity); if(type==='in'||type==='return') newQty+=qty; else if(type==='out'||type==='consume') newQty-=qty; else if(type==='adjust') newQty=qty; const upd=await sb.from('inventory_items').update({quantity:newQty}).eq('id',itemId); if(upd.error) throw upd.error; msg('تم حفظ حركة المخزون'); inventoryClearMovementForm(); await financeLoadAll();
+    }catch(e){ msg(e.message||String(e),'err'); } finally{ if(btn) btn.disabled=false; }
+  };
+
+  async function finalizeRequestDirect(r, autoLabel){
+    const lines=v118LineItems(r); if(!lines.length) throw new Error('لا توجد أصناف في الطلب');
+    const missing=[]; lines.forEach(l=>{ const it=v118ItemById(l.item_id); if(!it || ccNum(it.quantity)<ccNum(l.quantity)) missing.push(`${l.item_name}: المتوفر ${it?ccNum(it.quantity):0} والمطلوب ${ccNum(l.quantity)}`); });
+    if(missing.length) throw new Error('لا يمكن الاعتماد التلقائي لوجود أصناف غير متوفرة: '+missing.join(' / '));
+    const movementIds=[];
+    for(const l of lines){ const it=v118ItemById(l.item_id); const movement={item_id:Number(l.item_id),item_name:l.item_name,movement_type:'out',quantity:ccNum(l.quantity),movement_date:today(),project_id:r.project_id,project_name:r.project_name,cost_center_id:r.cost_center_id||null,cost_center_name:r.cost_center_name||r.project_name||'',receiver:r.supervisor_name,reason:(autoLabel||'صرف بناءً على أمر معتمد رقم ')+r.id,notes:r.reason||'',request_id:Number(r.id),product_code:l.product_code||v118ProductCode(it),barcode:l.barcode||v118Barcode(it),unit_cost:ccNum(it.unit_cost)}; const mv=await sb.from('inventory_movements').insert(movement).select('*').single(); if(mv.error) throw mv.error; movementIds.push(mv.data?.id); const upd=await sb.from('inventory_items').update({quantity:ccNum(it.quantity)-ccNum(l.quantity)}).eq('id',l.item_id); if(upd.error) throw upd.error; it.quantity=ccNum(it.quantity)-ccNum(l.quantity); }
+    const u=session()||{}; const now=new Date().toISOString(); const log=Array.isArray(r.approval_log)?r.approval_log:[]; log.push({step:'auto',role:'اعتماد تلقائي',by:u.full_name||u.username||'مستخدم',at:now});
+    const res=await sb.from('inventory_requests').update({status:'approved',current_step:'done',approval_log:log,auto_approved_by:u.full_name||u.username||'',auto_approved_at:now,movement_id:movementIds[0]||null,movement_ids:movementIds}).eq('id',r.id); if(res.error) throw res.error;
+  }
+  window.inventoryAutoApproveRequest = async function(id, btn){
+    if(!confirm('سيتم اعتماد الطلب وصرفه مباشرة إذا كانت الكميات متوفرة. هل تريد المتابعة؟')) return;
+    try{ if(btn) btn.disabled=true; const r=(data.inventoryRequests||[]).find(x=>String(x.id)===String(id)); if(!r) throw new Error('الطلب غير موجود'); if(r.status==='approved') throw new Error('الطلب معتمد مسبقًا'); await finalizeRequestDirect(r,'اعتماد تلقائي وصرف مباشر رقم '); msg('تم الاعتماد التلقائي وصرف المخزون'); await financeLoadAll(); }
+    catch(e){ msg(e.message||String(e),'err'); } finally{ if(btn) btn.disabled=false; }
+  };
+
+  // Strengthen final approval to attach cost center to movements
+  const oldApproveV125=window.inventoryApproveRequest;
+  window.inventoryApproveRequest = async function(id,step,btn){
+    const r=(data.inventoryRequests||[]).find(x=>String(x.id)===String(id));
+    const path=r?inventoryRequestPath(r):[]; const isLast=r && path.indexOf(step)===path.length-1;
+    if(isLast){
+      try{ if(btn) btn.disabled=true; if(r.status!==('pending_'+step)) throw new Error('هذا الطلب ليس في مرحلة '+(INVENTORY_APPROVAL_ROLES[step]||step)); if(!inventoryCurrentUserCanApprove(step)) throw new Error('ليس لديك صلاحية اعتماد هذه المرحلة');
+        const u=session()||{}; const approver=u.full_name||u.username||INVENTORY_APPROVAL_ROLES[step]||'مدير'; const now=new Date().toISOString(); const log=Array.isArray(r.approval_log)?r.approval_log:[]; log.push({step,role:INVENTORY_APPROVAL_ROLES[step]||step,by:approver,at:now}); r.approval_log=log; await finalizeRequestDirect(r,'صرف بناءً على أمر معتمد رقم '); const row={}; row[step+'_approved_by']=approver; row[step+'_approved_at']=now; try{ await sb.from('inventory_requests').update(row).eq('id',id); }catch(e){} msg('تم اعتماد أمر الصرف نهائيًا وخصم الأصناف من المخزون'); await financeLoadAll(); }
+      catch(e){ msg(e.message||String(e),'err'); } finally{ if(btn) btn.disabled=false; }
+    } else return oldApproveV125.apply(this, arguments);
+  };
+
+  window.inventoryReturnRequest = async function(id, btn){
+    try{ if(btn) btn.disabled=true; const r=(data.inventoryRequests||[]).find(x=>String(x.id)===String(id)); if(!r) throw new Error('الطلب غير موجود'); const lines=v118LineItems(r); const returns=[]; let any=false;
+      for(const l of lines){ const it=v118ItemById(l.item_id)||{}; const already=lineReturnQty(r.id,l.item_id); const max=Math.max(0,ccNum(l.quantity)-already); if(max<=0) continue; const ans=prompt(`مرتجع للصنف: ${l.item_name}\nالمصروف: ${ccNum(l.quantity)}\nالمرتجع السابق: ${already}\nالمتاح للإرجاع: ${max}\nاكتب كمية المرتجع أو اتركها فارغة لتجاوز الصنف`, ''); if(ans===null || String(ans).trim()==='') continue; const q=ccNum(ans); if(q<=0) continue; if(q>max) throw new Error('كمية المرتجع أكبر من المصروف للصنف: '+l.item_name); const row={item_id:Number(l.item_id),item_name:l.item_name,movement_type:'return',quantity:q,movement_date:today(),project_id:r.project_id,project_name:r.project_name,cost_center_id:r.cost_center_id||null,cost_center_name:r.cost_center_name||r.project_name||'',receiver:r.supervisor_name||supervisorName(r.supervisor_id),reason:'مرتجع من أمر صرف REQ-'+r.id,notes:r.reason||'',request_id:Number(r.id),product_code:l.product_code||v118ProductCode(it),barcode:l.barcode||v118Barcode(it),unit_cost:ccNum(it.unit_cost)}; const ins=await sb.from('inventory_movements').insert(row); if(ins.error) throw ins.error; const upd=await sb.from('inventory_items').update({quantity:ccNum(it.quantity)+q}).eq('id',l.item_id); if(upd.error) throw upd.error; returns.push({item_id:l.item_id,item_name:l.item_name,quantity:q,at:new Date().toISOString()}); any=true; }
+      if(any){ try{ await sb.from('inventory_requests').update({return_items:returns, has_return:true, return_updated_at:new Date().toISOString()}).eq('id',id); }catch(e){} msg('تم تسجيل المرتجع داخل نفس أمر الصرف'); await financeLoadAll(); } else msg('لم يتم تسجيل أي مرتجع');
+    }catch(e){ msg(e.message||String(e),'err'); } finally{ if(btn) btn.disabled=false; }
+  };
+
+  window.inventoryRenderRequests=function(){
+    const b=$('inventoryRequestsBody'); if(!b) return; inventoryLoadApprovalSettings(); let rows=financeFilterRows(data.inventoryRequests||[],'request_date'); const st=$('inventoryRequestStatusFilter')?.value; if(st) rows=rows.filter(r=>r.status===st);
+    b.innerHTML=rows.map(r=>{ const lines=v118LineItems(r); const itemsHtml=lines.map(l=>{ const returned=lineReturnQty(r.id,l.item_id), consumed=Math.max(0,ccNum(l.quantity)-returned); return `${ccEsc(l.product_code||'')} ${ccEsc(l.item_name)}<br><small>صادر ${ccQty(l.quantity)} | مرتجع ${ccQty(returned)} | مستهلك ${ccQty(consumed)}</small>`; }).join('<hr style="border:none;border-top:1px solid #e6eeee;margin:4px 0">')||ccEsc(r.item_name||''); const stt=requestLineStats(r); const actions=[];
+      if(String(r.status||'').startsWith('pending_')){ const step=String(r.status).replace('pending_',''); if(inventoryCurrentUserCanApprove(step)){ actions.push(`<button onclick="inventoryApproveRequest('${r.id}','${step}',this)">اعتماد ${ccEsc(INVENTORY_APPROVAL_ROLES[step]||step)}</button>`); actions.push(`<button class="light" onclick="inventoryAutoApproveRequest('${r.id}',this)">اعتماد تلقائي وصرف</button>`); actions.push(`<button class="danger" onclick="inventoryRejectRequest('${r.id}',this)">رفض</button>`); } else actions.push(`<span class="badge neutral">بانتظار ${ccEsc(INVENTORY_APPROVAL_ROLES[step]||'المرحلة التالية')}</span>`); }
+      actions.unshift(`<button class="light" onclick="inventoryPrintRequest('${r.id}')">طباعة</button>`); if(r.status==='approved') actions.push(`<button class="light" onclick="inventoryReturnRequest('${r.id}',this)">مرتجع</button>`);
+      return `<tr><td>${ccEsc(r.request_date||'')}</td><td><b>${ccEsc(r.supervisor_name||supervisorName(r.supervisor_id))}</b></td><td>${ccEsc(r.project_name||financeProjectName(r.project_id))}</td><td>${ccEsc(r.cost_center_name||costCenterName(r.cost_center_id,r.project_id)||'-')}</td><td>${itemsHtml}</td><td>صادر ${ccQty(stt.out)}<br>مرتجع ${ccQty(stt.ret)}<br><b>مستهلك ${ccQty(stt.cons)}</b></td><td>${ccEsc(r.reason||'-')}</td><td><span class="badge ${inventoryRequestStatusClass(r.status)}">${inventoryRequestStatusText(r.status)}</span><br><small>المرحلة: ${inventoryRequestNextRole(r.status)}</small>${inventoryRequestStepHtml(r)}</td><td class="row-actions">${actions.join(' ')||'-'}</td></tr>`; }).join('')||`<tr><td colspan="9">${data.financeError||'لا توجد طلبات صرف'}</td></tr>`;
+  };
+
+  // Cost center report built from filtered usage rows
+  const oldFinanceRenderReportsV125 = window.financeRenderReports || (typeof financeRenderReports==='function'?financeRenderReports:null);
+  window.financeRenderReports = function(){ if(oldFinanceRenderReportsV125) oldFinanceRenderReportsV125.apply(this, arguments); const b=$('costCenterReportBody'); if(!b) return; const rows=(typeof filteredUsageV121==='function'?filteredUsageV121():[]); const map={}; rows.forEach(r=>{ const key=r.cost_center_name || costCenterName(r.cost_center_id) || r.project || 'غير محدد'; map[key]=map[key]||{count:0,out:0,ret:0,cons:0,val:0,vat:0,gross:0}; map[key].count++; map[key].out+=ccNum(r.out); map[key].ret+=ccNum(r.returned); map[key].cons+=ccNum(r.consumed||r.qty); map[key].val+=ccNum(r.val); map[key].vat+=ccNum(r.vat); map[key].gross+=ccNum(r.gross); }); const vals=Object.entries(map).sort((a,b)=>b[1].gross-a[1].gross); b.innerHTML=vals.map(([k,v])=>`<tr><td>${ccEsc(k)}</td><td>${v.count}</td><td>${ccQty(v.out)}</td><td>${ccQty(v.ret)}</td><td>${ccQty(v.cons)}</td><td>${ccMoney(v.val)}</td><td>${ccMoney(v.vat)}</td><td>${ccMoney(v.gross)}</td></tr>`).join('')||'<tr><td colspan="8">لا توجد بيانات مراكز تكلفة</td></tr>'; };
+
+  const oldFinancePrintReportV125 = window.financePrintReport;
+  window.financePrintReport=function(kind){ if(kind==='costCenters'){ const table=$('costCenterReportBody')?.closest('table'); financePrintWindow('تقرير مراكز التكلفة', table?`<table>${table.innerHTML}</table>`:'<p>لا توجد بيانات</p>'); return; } return oldFinancePrintReportV125.apply(this, arguments); };
+
+  // Supervisor cost center support
+  const oldSupervisorInventoryLoadV125 = window.supervisorInventoryLoad || (typeof supervisorInventoryLoad==='function'?supervisorInventoryLoad:null);
+  if(oldSupervisorInventoryLoadV125){ window.supervisorInventoryLoad=async function(){ await oldSupervisorInventoryLoadV125.apply(this, arguments); try{ const cc=await sb.from('cost_centers').select('*').order('name',{ascending:true}); data.costCenters=cc.data||[]; }catch(e){} costCenterFillSelects(); }; }
+  const oldSupervisorSaveInventoryRequestV125 = window.supervisorSaveInventoryRequest || (typeof supervisorSaveInventoryRequest==='function'?supervisorSaveInventoryRequest:null);
+  if(oldSupervisorSaveInventoryRequestV125){ window.supervisorSaveInventoryRequest=async function(btn){
+    try{ if(btn) btn.disabled=true; const u=session()||{}; const pid=$('supInventoryRequestProject')?.value; if(!pid) throw new Error('اختر المشروع'); if(!supInventoryRequestLines.length) throw new Error('أضف صنف واحد على الأقل للطلب'); const cc=selectedCostCenterPayload('supInventoryRequestCostCenter', pid); if(!cc.cost_center_name) throw new Error('اختر مركز التكلفة'); const path=inventoryGetApprovalPath(); const first=path[0]||'warehouse'; const firstLine=supInventoryRequestLines[0]||{}; const row={item_id:Number(firstLine.item_id),item_name:firstLine.item_name||'',quantity:supInventoryRequestLines.reduce((a,l)=>a+ccNum(l.quantity),0),request_items:supInventoryRequestLines,items:supInventoryRequestLines,project_id:Number(pid),project_name:projectName(pid),cost_center_id:cc.cost_center_id,cost_center_name:cc.cost_center_name,supervisor_id:u.id,supervisor_name:u.full_name||u.username||'',request_date:$('supInventoryRequestDate')?.value||today(),reason:$('supInventoryRequestReason')?.value||'',notes:$('supInventoryRequestNotes')?.value||'',status:'pending_'+first,current_step:first,approval_path:path,approval_log:[]}; const {error}=await sb.from('inventory_requests').insert(row); if(error) throw error; msg('تم إرسال طلب الصرف للإدارة'); supInventoryRequestLines=[]; renderSupInventoryRequestLines(); ['supInventoryRequestItem','supInventoryRequestQty','supInventoryRequestReason','supInventoryRequestNotes'].forEach(id=>$(id)&&($(id).value='')); if($('supInventoryRequestProject')) $('supInventoryRequestProject').value=''; if($('supInventoryRequestCostCenter')) $('supInventoryRequestCostCenter').value=''; await supervisorInventoryLoad(); }
+    catch(e){ msg(e.message||String(e),'err'); } finally{ if(btn) btn.disabled=false; }
+  }; }
+
+  window.addEventListener('load',()=>setTimeout(()=>{ costCenterFillSelects(); costCenterRender(); if($('financeDashboard')) financeRenderReports(); },1500));
 })();
