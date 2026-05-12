@@ -6373,17 +6373,62 @@ function financePrintReport(kind){
     if(typeof window.download==='function') window.download('monthly.csv',csv);
   };
   window.printMonthlyReportV57 = function(){
-    const rows=window.monthlyRowsV141();
+    const rows = window.monthlyRowsV141();
     if(!rows.length){ if(typeof window.msg==='function') msg('لا توجد بيانات في الأوقات الشهرية للطباعة','err'); return; }
-    const month=$('monthlyMonth')?.value||today().slice(0,7);
-    const groups={}; rows.forEach(r=>{ const s=String(r.s||''); (groups[s]=groups[s]||[]).push(r); });
-    const cards=Object.keys(groups).map(sid=>{
-      const arr=groups[sid]; const total=arr.reduce((a,r)=>a+num(r.a),0);
-      const projectRows=arr.map(r=>`<tr><td class="pname">${esc(projName(r.p))}</td><td>${num(r.a).toLocaleString('en-US')}</td><td>${esc(pctText(r.percent))}</td></tr>`).join('') + `<tr class="sum"><td></td><td>${num(total).toLocaleString('en-US')}</td><td>100%</td></tr>`;
-      const workers=[...new Set(arr.flatMap(r=>String(r.workers||'').split(/[،,\n]+/).map(x=>x.trim()).filter(Boolean)))].join('<br>') || '-';
-      return `<div class="sup-card"><h3>${esc(supName(sid))}</h3><table><tbody>${projectRows}</tbody></table><div class="workers"><b>أسماء العمال</b><p>${workers}</p></div></div>`;
+    const month = $('monthlyMonth')?.value || today().slice(0,7);
+    const sup = $('monthlySupervisor')?.value ? supName($('monthlySupervisor').value) : 'الكل';
+    const groups = new Map();
+    rows.forEach(r=>{ const sid=String(r.s||''); if(!groups.has(sid)) groups.set(sid,[]); groups.get(sid).push(r); });
+    const now = new Date();
+    const dateTxt = now.toLocaleDateString('en-GB');
+    const timeTxt = now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+    function fmtMin(v){ return String(Math.round(num(v))).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    function pctOne(v){ if(!isFinite(Number(v))) return '-'; return (Math.round(Number(v||0)*10)/10).toFixed(1).replace(/\.0$/,'') + '%'; }
+    function workerList(arr){
+      const parts=[...new Set(arr.flatMap(r=>String(r.workers||'').split(/[،,\n]+/).map(x=>x.trim()).filter(Boolean)))];
+      if(!parts.length) return '<div class="empty-line"></div><div class="empty-line"></div><div class="empty-line"></div>';
+      return parts.map(n=>`<div class="worker-row"><span>•</span><b>${esc(n)}</b></div>`).join('');
+    }
+    const cards=[...groups.entries()].map(([sid,arr])=>{
+      const total=arr.reduce((a,r)=>a+num(r.a),0);
+      const body=arr.map(r=>`<tr><td class="project">${esc(projName(r.p))}</td><td>${fmtMin(r.a)}</td><td>${total ? pctOne(num(r.a)/total*100) : '-'}</td></tr>`).join('');
+      return `<section class="super-card">
+        <div class="super-title">${esc(supName(sid))}</div>
+        <table class="mini-table">
+          <thead><tr><th>المشروع</th><th>الوقت (دقيقة)</th><th>النسبة</th></tr></thead>
+          <tbody>${body}</tbody>
+          <tfoot><tr><td>الإجمالي</td><td>${fmtMin(total)}</td><td>100%</td></tr></tfoot>
+        </table>
+        <div class="workers-box"><h4>أسماء العمال</h4>${workerList(arr)}</div>
+      </section>`;
     }).join('');
-    const html=`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>الأوقات الشهرية</title><style>@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;color:#000;margin:0;background:#fff;font-size:12px}.sheet{border:2px solid #000;margin:auto;min-height:170mm;padding:0 0 10px}.head{text-align:center;border-bottom:2px solid #000;padding:8px 0 6px;line-height:1.6}.head b{display:block;font-weight:400}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;direction:ltr}.sup-card{direction:rtl;min-height:150mm;border-left:2px solid #000;padding:6px 7px}.sup-card:last-child{border-left:0}.sup-card h3{text-align:center;margin:0 0 5px;font-size:13px;font-weight:400}table{width:100%;border-collapse:collapse}td{padding:2px 3px;text-align:center;vertical-align:top}.pname{text-align:right}.sum td{border-top:1px solid transparent;font-weight:700}.workers{text-align:center;margin-top:42px;line-height:1.75}.workers b{font-weight:400}.workers p{margin:8px 0 0}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}.sheet{break-inside:avoid}}</style></head><body><div class="sheet"><div class="head"><b>${esc(monthLabel(month))}</b><b>مشاريع الصيانة اليومية</b></div><div class="grid">${cards}</div></div><script>window.onload=function(){setTimeout(function(){window.print()},350)}</script></body></html>`;
+    const totalActual = rows.reduce((a,r)=>a+num(r.a),0);
+    const totalProjects = rows.length;
+    const totalSupervisors = groups.size;
+    const html=`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير الأوقات الشهرية</title><style>
+      @page{size:A4 landscape;margin:7mm}
+      *{box-sizing:border-box}
+      body{margin:0;background:#fff;font-family:Tahoma,Arial,sans-serif;color:#061a2e;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .page{min-height:190mm;border:1.6px solid #aeb8c4;border-radius:12px;padding:10px 12px 9px;background:linear-gradient(180deg,#fff 0%,#fbfdff 100%)}
+      .header{display:grid;grid-template-columns:250px 1fr 250px;gap:10px;align-items:center;border-bottom:1.5px solid #d5dce5;padding-bottom:8px;margin-bottom:8px}
+      .meta{display:grid;gap:6px;font-size:12px;color:#0b2440}.meta-row{display:grid;grid-template-columns:28px 78px 1fr;align-items:center;gap:5px}.ico{font-size:18px;color:#062f5f;text-align:center}.meta b{color:#061a2e}.meta span{font-weight:700;color:#111}
+      .center{text-align:center}.center h1{margin:0;color:#062f5f;font-size:29px;font-weight:900;letter-spacing:-.5px}.center h2{margin:4px 0 7px;color:#223c5b;font-size:18px;font-weight:700}.month-pill{display:inline-block;min-width:210px;background:linear-gradient(90deg,#062f5f,#0a477e);color:white;border-radius:18px;padding:5px 36px;font-size:18px;font-weight:900;box-shadow:0 2px 8px rgba(6,47,95,.18)}
+      .brand{text-align:right;display:grid;grid-template-columns:1fr 78px;gap:10px;align-items:center}.brand h3{margin:0;color:#111;font-size:21px}.brand p{margin:6px 0 0;color:#1d2d44;font-size:12px}.brand small{display:block;margin-top:10px;color:#062f5f;font-size:13px}.brand img{width:76px;max-height:76px;object-fit:contain}
+      .summary-strip{display:flex;gap:8px;justify-content:center;margin:7px 0 8px}.chip{background:#f3f7fb;border:1px solid #d4dce5;border-radius:999px;padding:5px 13px;font-size:11px;color:#17324d}.chip b{color:#062f5f}
+      .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;align-items:start}.super-card{border:1.4px solid #bcc7d3;border-radius:8px;overflow:hidden;background:white;min-height:124mm;display:flex;flex-direction:column}.super-title{background:linear-gradient(90deg,#062f5f,#073966);color:white;text-align:center;font-size:18px;font-weight:900;padding:7px 5px}.mini-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:11px}.mini-table th{background:#f2f5f8;color:#061a2e;border:1px solid #d8dee6;padding:6px 3px}.mini-table td{border:1px solid #e1e6ed;padding:5px 3px;text-align:center;height:24px}.mini-table .project{text-align:right;font-weight:700}.mini-table tfoot td{font-weight:900;color:#062f5f;background:#f9fbfe;border-top:1.5px solid #062f5f}.workers-box{border-top:1.2px solid #062f5f;margin-top:auto;padding:8px 12px 10px;min-height:43mm;text-align:center}.workers-box h4{margin:0 0 7px;color:#062f5f;font-size:13px}.worker-row{display:flex;justify-content:center;gap:8px;align-items:center;border-bottom:1px dashed #d4dce5;min-height:19px;color:#111}.worker-row span{font-size:15px}.worker-row b{font-size:11px;font-weight:500}.empty-line{height:19px;border-bottom:1px dashed #d4dce5}
+      .footer{display:grid;grid-template-columns:250px 1fr 1.35fr;gap:8px;margin-top:9px}.footer-card{border:1.2px solid #d1d9e3;border-radius:8px;background:#fff;padding:10px;min-height:27mm}.qr-card{display:grid;grid-template-columns:74px 1fr;gap:10px;align-items:center}.qr{width:72px;height:72px;border:5px solid #111;background:repeating-linear-gradient(45deg,#111 0 4px,#fff 4px 8px);position:relative}.qr:after{content:'QR';position:absolute;inset:22px 14px;background:#fff;text-align:center;font-weight:900;line-height:20px}.qr-text{font-size:12px;line-height:1.7;color:#112}.notes h4,.sign h4{margin:0 0 6px;color:#062f5f;text-align:center}.notes ul{margin:0;padding-right:18px;font-size:11px;line-height:1.8}.sign{display:grid;grid-template-columns:repeat(3,1fr);gap:0;padding:0}.sig-box{padding:9px;text-align:center;border-left:1px solid #d1d9e3}.sig-box:first-child{border-left:0}.sig-box h4{font-size:12px}.person{font-size:26px;margin:8px 0;color:#111}.sig-line{border-bottom:1px dotted #444;height:18px;margin:0 18px}
+      @media print{.page{border-radius:0}.super-card,.footer-card{break-inside:avoid}}
+    </style></head><body><main class="page">
+      <header class="header">
+        <div class="meta"><div class="meta-row"><span class="ico">📅</span><b>تاريخ التقرير:</b><span>${dateTxt}</span></div><div class="meta-row"><span class="ico">🕒</span><b>وقت التقرير:</b><span>${timeTxt}</span></div><div class="meta-row"><span class="ico">👤</span><b>المستخدم:</b><span>وائل شاكر</span></div></div>
+        <div class="center"><h1>تقرير الأوقات الشهرية</h1><h2>مشاريع الصيانة اليومية</h2><div class="month-pill">${esc(monthLabel(month))}</div></div>
+        <div class="brand"><div><h3>شركة تصنيف</h3><p>إدارة المرافق والتشغيل والصيانة</p><small>إدارة التقارير</small></div><img src="tasneef_logo_print.png" alt="Tasneef"></div>
+      </header>
+      <div class="summary-strip"><span class="chip">المشرف: <b>${esc(sup)}</b></span><span class="chip">عدد المشرفين: <b>${totalSupervisors}</b></span><span class="chip">عدد المشاريع: <b>${totalProjects}</b></span><span class="chip">إجمالي الدقائق: <b>${fmtMin(totalActual)}</b></span></div>
+      <section class="cards">${cards}</section>
+      <footer class="footer"><div class="footer-card qr-card"><div class="qr"></div><div class="qr-text">للتأكد من صحة التقرير<br>امسح كود QR</div></div><div class="footer-card notes"><h4>ملاحظات</h4><ul><li>جميع الأوقات محسوبة بالدقيقة.</li><li>النسبة = وقت المشروع ÷ إجمالي وقت المشرف × 100.</li><li>التقرير يشمل المشاريع النشطة خلال الشهر.</li></ul></div><div class="footer-card sign"><div class="sig-box"><h4>إعداد التقرير</h4><div class="person">♙</div><div class="sig-line"></div></div><div class="sig-box"><h4>مراجعة</h4><div class="person">♙</div><div class="sig-line"></div></div><div class="sig-box"><h4>اعتماد</h4><div class="person">♙</div><div class="sig-line"></div></div></div></footer>
+      <script>window.onload=function(){setTimeout(function(){window.print()},450)}</script>
+    </main></body></html>`;
     const w=window.open('','_blank'); if(w){w.document.write(html);w.document.close();}
   };
   window.addEventListener('load',()=>setTimeout(()=>{ try{ if($('monthlyBody')) window.renderMonthly(); }catch(e){console.warn('V141 monthly',e)} },2400));
