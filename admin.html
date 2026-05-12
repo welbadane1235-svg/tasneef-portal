@@ -401,8 +401,8 @@
     <section id="clientReports" class="page hidden">
       <div class="card section-head">
         <div>
-          <h2>بوابة تقارير العملاء - V95 Premium</h2>
-          <p>إنشاء تقرير مستقل لرئيس الجمعية مع بوابات خدمات، صور قبل/أثناء/بعد، اعتماد ونشر، تقييمات، وفلاتر قوية.</p>
+          <h2>بوابة تقارير العملاء - شرائح ذكية</h2>
+          <p>نظام شرائح ذكية: المشرف يرفع الصور، والإدارة تتحكم في النص والترتيب والإضافة والاعتماد والنشر.</p>
         </div>
         <button class="light" onclick="clearPremiumReportForm(); document.getElementById('premiumReportFormCard')?.scrollIntoView({behavior:'smooth'})">تقرير جديد</button>
       </div>
@@ -428,10 +428,10 @@
             <div>
               <label>إضافة خدمة داخل التقرير</label>
               <select id="premiumAddServiceType">
-                <option>مكافحة الحشرات</option><option>غسيل الخزانات</option><option>تنظيف الأسطح</option><option>تنظيف البيسمنت</option><option>تنظيف المناور</option><option>تنظيف المكيفات</option><option>صيانة كهرباء</option><option>صيانة سباكة</option><option>صيانة مصعد</option><option>أعمال زراعة</option><option>أخرى</option>
+                <option>مكافحة الحشرات</option><option>غسيل الخزانات</option><option>تنظيف الأسطح</option><option>تنظيف البيسمنت</option><option>تنظيف المناور</option><option>تنظيف المكيفات</option><option>صيانة كهرباء</option><option>صيانة سباكة</option><option>صيانة مصعد</option><option>أعمال زراعة</option><option>شريحة مخصصة</option><option>أخرى</option>
               </select>
             </div>
-            <button onclick="addSelectedPremiumService()">+ إضافة الخدمة المختارة</button>
+            <button onclick="addSelectedPremiumService()">+ إضافة الشريحة المختارة</button><button type="button" class="light" onclick="addCustomPremiumSlide()">+ شريحة من الإدارة</button>
           </div>
           <div class="quick-service-row">
             <button class="light" onclick="addPremiumService('مكافحة الحشرات')">+ مكافحة</button>
@@ -456,7 +456,7 @@
             <div class="report-filters-panel">
               <input id="premiumReportSearch" oninput="renderPremiumReports()" placeholder="بحث باسم المشروع، رقم التقرير، العنوان أو الخدمة">
               <select id="premiumReportFilterProject" onchange="renderPremiumReports()"><option value="">كل المشاريع</option></select>
-              <select id="premiumReportFilterService" onchange="renderPremiumReports()"><option value="">كل الخدمات</option><option>مكافحة الحشرات</option><option>غسيل الخزانات</option><option>تنظيف الأسطح</option><option>تنظيف البيسمنت</option><option>تنظيف المناور</option><option>تنظيف المكيفات</option><option>صيانة كهرباء</option><option>صيانة سباكة</option><option>صيانة مصعد</option><option>أعمال زراعة</option><option>أخرى</option></select>
+              <select id="premiumReportFilterService" onchange="renderPremiumReports()"><option value="">كل الخدمات</option><option>مكافحة الحشرات</option><option>غسيل الخزانات</option><option>تنظيف الأسطح</option><option>تنظيف البيسمنت</option><option>تنظيف المناور</option><option>تنظيف المكيفات</option><option>صيانة كهرباء</option><option>صيانة سباكة</option><option>صيانة مصعد</option><option>أعمال زراعة</option><option>شريحة مخصصة</option><option>أخرى</option></select>
               <select id="premiumReportFilterStatus" onchange="renderPremiumReports()"><option value="">كل الحالات</option><option value="draft">مسودة</option><option value="published">معتمد ومنشور</option><option value="unpublished">غير منشور</option></select>
               <select id="premiumReportFilterRating" onchange="renderPremiumReports()"><option value="">كل التقييمات</option><option value="ممتاز">ممتاز</option><option value="جيد جدًا">جيد جدًا</option><option value="جيد">جيد</option><option value="يحتاج تحسين">يحتاج تحسين</option><option value="none">لم يتم التقييم</option></select>
               <input type="month" id="premiumReportFilterMonth" onchange="renderPremiumReports()"><input id="premiumServiceSmartSearch" list="premiumServiceSmartList" oninput="renderPremiumReports()" placeholder="بحث ذكي: خدمة / مشروع"><datalist id="premiumServiceSmartList"></datalist>
@@ -700,6 +700,6 @@
     <section id="export" class="page hidden"><div class="card"><h2>التصدير</h2><p>صدّر بيانات النظام الحالية بصيغة CSV.</p><div class="actions"><button onclick="exportTable('app_users')">المستخدمين</button><button onclick="exportTable('projects')">المشاريع</button><button onclick="exportTable('workers')">العمال</button><button onclick="exportTable('attendance')">الحضور</button><button onclick="exportTable('time_logs')">التسجيلات اليومية</button><button onclick="exportTable('tickets')">التكتات</button></div></div></section>
   </main>
 </div>
-<script src="app.js?v=133"></script>
+<script src="app.js?v=134"></script>
 </body>
 </html>

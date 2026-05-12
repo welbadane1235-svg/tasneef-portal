@@ -2499,7 +2499,7 @@ function exportContractServicesCSV(){
 })();
 
 /* ===================== V95 Premium Client Reports - Clean Build ===================== */
-const PREMIUM_SERVICE_TYPES = ['مكافحة الحشرات','غسيل الخزانات','تنظيف الأسطح','تنظيف البيسمنت','تنظيف المناور','تنظيف المكيفات','صيانة كهرباء','صيانة سباكة','صيانة مصعد','أعمال زراعة','أخرى'];
+const PREMIUM_SERVICE_TYPES = ['مكافحة الحشرات','غسيل الخزانات','تنظيف الأسطح','تنظيف البيسمنت','تنظيف المناور','تنظيف المكيفات','صيانة كهرباء','صيانة سباكة','صيانة مصعد','أعمال زراعة','شريحة مخصصة','أخرى'];
 let premiumServicesState = [];
 let premiumWithoutMode = false;
 
@@ -2564,7 +2564,7 @@ function clearPremiumReportForm(){
 }
 function makeService(type=''){
   const t=type||'مكافحة الحشرات';
-  return {service_type:t,title:t,service_description:'',scope_work:'',notes:'',before_images:[],during_images:[],after_images:[]};
+  return {service_type:t,title:t,service_description:'',scope_work:'',notes:'',before_images:[],during_images:[],after_images:[], source:'admin'};
 }
 function addPremiumService(type=''){
   premiumServicesState.push(makeService(type));
@@ -2572,6 +2572,13 @@ function addPremiumService(type=''){
   setTimeout(()=>{ document.querySelectorAll('.service-editor-card')[premiumServicesState.length-1]?.scrollIntoView({behavior:'smooth',block:'center'}); },50);
 }
 function addSelectedPremiumService(){ addPremiumService($('premiumAddServiceType')?.value || 'مكافحة الحشرات'); }
+function addCustomPremiumSlide(){
+  const title = prompt('اكتب اسم الشريحة التي تريد إضافتها في التقرير:');
+  if(!title) return;
+  premiumServicesState.push({service_type:'شريحة مخصصة', title:title.trim(), service_description:'', scope_work:'', notes:'', before_images:[], during_images:[], after_images:[], source:'admin'});
+  renderPremiumServicesEditor();
+  setTimeout(()=>{ document.querySelectorAll('.service-editor-card')[premiumServicesState.length-1]?.scrollIntoView({behavior:'smooth',block:'center'}); },50);
+}
 function countServiceImages(s){ return (s.before_images||[]).length + (s.during_images||[]).length + (s.after_images||[]).length; }
 function movePremiumService(i,dir){ const j=i+dir; if(j<0||j>=premiumServicesState.length) return; [premiumServicesState[i],premiumServicesState[j]]=[premiumServicesState[j],premiumServicesState[i]]; renderPremiumServicesEditor(); }
 
@@ -2587,15 +2594,15 @@ function renderPremiumServicesEditor(){
         <div class="service-title-line"><span class="service-number">${i+1}</span><div><b>${esc(s.title||s.service_type||'خدمة')}</b><div class="service-counts"><span class="service-chip">قبل: ${(s.before_images||[]).length}</span><span class="service-chip">أثناء: ${(s.during_images||[]).length}</span><span class="service-chip">بعد: ${(s.after_images||[]).length}</span><span class="service-chip">الإجمالي: ${countServiceImages(s)}</span></div></div></div>
         <div class="row-actions"><button class="light" onclick="movePremiumService(${i},-1)">↑</button><button class="light" onclick="movePremiumService(${i},1)">↓</button><button class="danger" onclick="removePremiumService(${i})">حذف</button></div>
       </div>
-      <div class="split"><div><label>نوع الخدمة</label><select onchange="setPremiumServiceField(${i},'service_type',this.value); if(!premiumServicesState[${i}].title || PREMIUM_SERVICE_TYPES.includes(premiumServicesState[${i}].title)) setPremiumServiceField(${i},'title',this.value); renderPremiumServicesEditor()">${serviceTypeOptions(s.service_type)}</select></div><div><label>عنوان الخدمة الظاهر للعميل</label><input value="${esc(s.title||'')}" oninput="setPremiumServiceField(${i},'title',this.value)"></div></div>
-      <label>وصف الخدمة</label><textarea oninput="setPremiumServiceField(${i},'service_description',this.value)" placeholder="وصف مختصر للخدمة يظهر داخل التقرير">${esc(s.service_description||'')}</textarea>
-      <label>نطاق العمل</label><textarea oninput="setPremiumServiceField(${i},'scope_work',this.value)" placeholder="مثال: الممرات، المداخل، المناور، غرف الخدمات">${esc(s.scope_work||'')}</textarea>
+      <div class="split"><div><label>نوع الخدمة</label><select onchange="setPremiumServiceField(${i},'service_type',this.value); if(!premiumServicesState[${i}].title || PREMIUM_SERVICE_TYPES.includes(premiumServicesState[${i}].title)) setPremiumServiceField(${i},'title',this.value); renderPremiumServicesEditor()">${serviceTypeOptions(s.service_type)}</select></div><div><label>عنوان الشريحة الظاهر للعميل</label><input value="${esc(s.title||'')}" oninput="setPremiumServiceField(${i},'title',this.value)"></div></div>
+      <label>النص التوضيحي للشريحة</label><textarea oninput="setPremiumServiceField(${i},'service_description',this.value)" placeholder="وصف مختصر للخدمة يظهر داخل التقرير">${esc(s.service_description||'')}</textarea>
+      <label>نطاق العمل / محتوى الشريحة</label><textarea oninput="setPremiumServiceField(${i},'scope_work',this.value)" placeholder="مثال: الممرات، المداخل، المناور، غرف الخدمات">${esc(s.scope_work||'')}</textarea>
       <div class="stage-grid">
         ${renderStageBox(i,'before_images','قبل التنفيذ','صور توضح حالة الموقع قبل العمل',s.before_images)}
         ${renderStageBox(i,'during_images','أثناء التنفيذ','صور توثيق تنفيذ الخدمة',s.during_images)}
         ${renderStageBox(i,'after_images','بعد التنفيذ','صور النتيجة النهائية',s.after_images)}
       </div>
-      <label>ملاحظات الإدارة على الخدمة</label><textarea oninput="setPremiumServiceField(${i},'notes',this.value)" placeholder="اختياري ولا يظهر إذا تركته فارغًا">${esc(s.notes||'')}</textarea>
+      <label>ملاحظات الإدارة على الشريحة</label><textarea oninput="setPremiumServiceField(${i},'notes',this.value)" placeholder="اختياري ولا يظهر إذا تركته فارغًا">${esc(s.notes||'')}</textarea>
     </div>`).join('');
 }
 function renderStageBox(i, field, title, hint, imgs=[]){
@@ -5511,7 +5518,7 @@ function financePrintReport(kind){
 (function(){
   const $v133 = id => document.getElementById(id);
   const MAX_STAGE_PHOTOS_V133 = 9;
-  const DAILY_TYPES_V133 = ['النظافة اليومية','إزالة النفايات','تنظيف الممرات','تنظيف المصاعد','تنظيف البيسمنت','تنظيف الأسطح','مكافحة الحشرات','غسيل خزانات','صيانة كهرباء','صيانة سباكة','أخرى'];
+  const DAILY_TYPES_V133 = ['النظافة اليومية','إزالة النفايات','تنظيف الممرات','تنظيف المصاعد','تنظيف البيسمنت','تنظيف الأسطح','مكافحة الحشرات','غسيل خزانات','صيانة كهرباء','صيانة سباكة','شريحة مخصصة','أخرى'];
   let supClientServicesState = [];
   function v133Esc(v){ return (typeof esc==='function') ? esc(v) : String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
   function v133Msg(t,kind){ try{ msg(t,kind); }catch(_){ alert(t); } }
@@ -5582,8 +5589,17 @@ function financePrintReport(kind){
   }
   function supClientRenderServices(){
     const box=$v133('supClientServicesEditor'); if(!box) return;
-    box.innerHTML=supClientServicesState.map((s,i)=>`<div class="service-editor-card"><div class="service-editor-head"><div class="service-title-line"><span class="service-number">${i+1}</span><div><b>${v133Esc(s.title||s.service_type)}</b><div class="service-counts"><span class="service-chip">${v133CountImages(s)} صورة</span></div></div></div><div class="row-actions"><button class="danger" type="button" onclick="supClientRemoveService(${i})">حذف</button></div></div><div class="split"><div><label>نوع الخدمة</label><select onchange="supClientSetService(${i},'service_type',this.value); supClientSetService(${i},'title',this.value); supClientRenderServices()">${DAILY_TYPES_V133.map(t=>`<option ${t===s.service_type?'selected':''}>${v133Esc(t)}</option>`).join('')}</select></div><div><label>عنوان الخدمة</label><input value="${v133Esc(s.title||'')}" oninput="supClientSetService(${i},'title',this.value)"></div></div><label>وصف الخدمة</label><textarea oninput="supClientSetService(${i},'service_description',this.value)">${v133Esc(s.service_description||'')}</textarea><label>نطاق العمل</label><textarea oninput="supClientSetService(${i},'scope_work',this.value)">${v133Esc(s.scope_work||'')}</textarea><div class="stage-grid">${supClientStageBox(i,'before_images','قبل التنفيذ')}${supClientStageBox(i,'during_images','أثناء التنفيذ')}${supClientStageBox(i,'after_images','بعد التنفيذ')}</div><label>ملاحظات</label><textarea oninput="supClientSetService(${i},'notes',this.value)">${v133Esc(s.notes||'')}</textarea></div>`).join('');
+    box.innerHTML=supClientServicesState.map((s,i)=>`<div class="service-editor-card daily-photo-slide">
+      <div class="service-editor-head">
+        <div class="service-title-line"><span class="service-number">${i+1}</span><div><b>${v133Esc(s.title||s.service_type)}</b><div class="service-counts"><span class="service-chip">${v133CountImages(s)} صورة</span><span class="service-chip">المشرف يرفع الصور فقط</span></div></div></div>
+        <div class="row-actions"><button class="danger" type="button" onclick="supClientRemoveService(${i})">حذف الشريحة</button></div>
+      </div>
+      <div class="split"><div><label>الشريحة / الخدمة</label><select onchange="supClientSetService(${i},'service_type',this.value); supClientSetService(${i},'title',this.value); supClientRenderServices()">${DAILY_TYPES_V133.map(t=>`<option ${t===s.service_type?'selected':''}>${v133Esc(t)}</option>`).join('')}</select></div><div><label>اسم الشريحة</label><input value="${v133Esc(s.title||'')}" oninput="supClientSetService(${i},'title',this.value)" placeholder="مثال: تنظيف الممرات"></div></div>
+      <div class="footer-note">ارفع الصور فقط. النص النهائي وترتيب العرض والاعتماد يتم من لوحة الإدارة.</div>
+      <div class="stage-grid">${supClientStageBox(i,'before_images','قبل التنفيذ')}${supClientStageBox(i,'during_images','أثناء التنفيذ')}${supClientStageBox(i,'after_images','بعد التنفيذ')}</div>
+    </div>`).join('');
   }
+
   window.supClientSaveDailyReport = async function(btn){
     try{
       if(btn) btn.disabled=true;
@@ -5593,7 +5609,7 @@ function financePrintReport(kind){
       const u=session()||{}; const p=v133ProjectName(pid); const reportDate=$v133('supClientReportDate')?.value||today();
       const reportRow={report_no:genReportNo(), project_id:Number(pid), project_name:p, chairman_name:'', chairman_phone:'', title:$v133('supClientReportTitle')?.value||('تقرير يومي - '+p), report_type:'تقرير يومي من المشرف', report_date:reportDate, executive_summary:$v133('supClientReportSummary')?.value||v133DefaultSummary(), status:'draft', public_token:null};
       const {data:rep,error}=await sb.from('client_reports').insert(reportRow).select('id').single(); if(error) throw error;
-      const rows=valid.map((s,i)=>({report_id:rep.id,sort_order:i+1,service_type:s.service_type,title:s.title||s.service_type,service_description:s.service_description||'',scope_work:s.scope_work||'',notes:[s.notes||'', `المشرف: ${u.full_name||u.username||''}`].filter(Boolean).join('\n'),before_images:s.before_images||[],during_images:s.during_images||[],after_images:s.after_images||[]}));
+      const rows=valid.map((s,i)=>({report_id:rep.id,sort_order:i+1,service_type:s.service_type,title:s.title||s.service_type,service_description:'',scope_work:'',notes:`المشرف: ${u.full_name||u.username||''}`,before_images:s.before_images||[],during_images:s.during_images||[],after_images:s.after_images||[]}));
       const {error:se}=await sb.from('client_report_services').insert(rows); if(se) throw se;
       v133Msg('تم إرسال التقرير اليومي للإدارة كمسودة');
       supClientReportReset(); await loadPremiumReportsOnly(false); supClientRenderMyReports();
@@ -5690,4 +5706,21 @@ function financePrintReport(kind){
   document.head.appendChild(st);
 
   window.addEventListener('load',()=>setTimeout(()=>{ try{ injectFinanceMainFilters133(); renderClientReportProjectSlides133(); }catch(e){ console.warn('V133 load warning',e); } },900));
+})();
+
+
+/* ===================== V134 Smart Daily Client Slides ===================== */
+(function(){
+  function v134Ready(fn){ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',fn); else fn(); }
+  v134Ready(()=>{
+    try{
+      const note=document.createElement('style');
+      note.textContent=`
+      .daily-photo-slide textarea{display:none!important}
+      .smart-admin-note{background:#ecfdf5;border:1px solid #b7e4cf;border-radius:14px;padding:10px 12px;margin:10px 0;color:#064e3b;font-weight:700}
+      .premium-slide-helper{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+      `;
+      document.head.appendChild(note);
+    }catch(e){}
+  });
 })();
