@@ -459,7 +459,7 @@
               <select id="premiumReportFilterService" onchange="renderPremiumReports()"><option value="">كل الخدمات</option><option>مكافحة الحشرات</option><option>غسيل الخزانات</option><option>تنظيف الأسطح</option><option>تنظيف البيسمنت</option><option>تنظيف المناور</option><option>تنظيف المكيفات</option><option>صيانة كهرباء</option><option>صيانة سباكة</option><option>صيانة مصعد</option><option>أعمال زراعة</option><option>أخرى</option></select>
               <select id="premiumReportFilterStatus" onchange="renderPremiumReports()"><option value="">كل الحالات</option><option value="draft">مسودة</option><option value="published">معتمد ومنشور</option><option value="unpublished">غير منشور</option></select>
               <select id="premiumReportFilterRating" onchange="renderPremiumReports()"><option value="">كل التقييمات</option><option value="ممتاز">ممتاز</option><option value="جيد جدًا">جيد جدًا</option><option value="جيد">جيد</option><option value="يحتاج تحسين">يحتاج تحسين</option><option value="none">لم يتم التقييم</option></select>
-              <input type="month" id="premiumReportFilterMonth" onchange="renderPremiumReports()">
+              <input type="month" id="premiumReportFilterMonth" onchange="renderPremiumReports()"><input id="premiumServiceSmartSearch" list="premiumServiceSmartList" oninput="renderPremiumReports()" placeholder="بحث ذكي: خدمة / مشروع"><datalist id="premiumServiceSmartList"></datalist>
             </div>
             <div class="actions">
               <button class="light" onclick="toggleProjectsWithoutReports()">المشاريع بدون تقارير هذا الشهر</button>
@@ -643,7 +643,7 @@
       </div>
 
       <div id="financeTabReports" class="finance-tab-page hidden">
-        <div class="card wide-card"><h2>فلاتر التقارير</h2><div class="report-filters-panel"><select id="inventoryReportDateMode" onchange="financeRenderReports()"><option value="all">كل الفترات</option><option value="day">اليوم</option><option value="month">الشهر</option></select><input type="date" id="inventoryReportDay" onchange="financeRenderReports()"><input type="month" id="inventoryReportMonth" onchange="financeRenderReports()"><button class="light" onclick="inventoryClearReportDateFilter()">مسح فلتر التاريخ</button></div></div>
+        <div class="card wide-card"><h2>فلاتر التقارير</h2><div class="report-filters-panel"><input id="financeReportQuickSearch" oninput="financeRenderReports()" placeholder="بحث ذكي في التقارير: منتج / مورد / مشروع / مشرف"><select id="financeReportCostCodeFilter" onchange="financeRenderReports()"><option value="">كل رموز التكلفة</option><option value="FM">FM - مشاريع</option><option value="CN">CN - إداري / كلين</option></select><select id="inventoryReportDateMode" onchange="financeRenderReports()"><option value="all">كل الفترات</option><option value="day">اليوم</option><option value="month">الشهر</option></select><input type="date" id="inventoryReportDay" onchange="financeRenderReports()"><input type="month" id="inventoryReportMonth" onchange="financeRenderReports()"><button class="light" onclick="inventoryClearReportDateFilter()">مسح فلتر التاريخ</button></div></div>
         <div class="smart-reports-deck" id="smartReportsDeck">
           <button type="button" class="smart-report-card active" data-report="expensesByProject" onclick="financeShowSmartReport('expensesByProject',this)"><span>مصروفات المشاريع</span><b>عرض التقرير</b><small>إجمالي المصروفات وعدد العمليات حسب المشروع</small></button>
           <button type="button" class="smart-report-card" data-report="stockOutByProject" onclick="financeShowSmartReport('stockOutByProject',this)"><span>صرف المخزون</span><b>عرض التقرير</b><small>الكميات المصروفة حسب كل مشروع</small></button>
@@ -700,6 +700,6 @@
     <section id="export" class="page hidden"><div class="card"><h2>التصدير</h2><p>صدّر بيانات النظام الحالية بصيغة CSV.</p><div class="actions"><button onclick="exportTable('app_users')">المستخدمين</button><button onclick="exportTable('projects')">المشاريع</button><button onclick="exportTable('workers')">العمال</button><button onclick="exportTable('attendance')">الحضور</button><button onclick="exportTable('time_logs')">التسجيلات اليومية</button><button onclick="exportTable('tickets')">التكتات</button></div></div></section>
   </main>
 </div>
-<script src="app.js?v=132"></script>
+<script src="app.js?v=133"></script>
 </body>
 </html>

@@ -27,6 +27,7 @@
     <button class="sup-tab" onclick="showSupervisorWindow('supTickets',this)">التكتات</button>
     <button class="sup-tab" onclick="showSupervisorWindow('supSummary',this)">الملخص اليومي</button>
     <button class="sup-tab" onclick="showSupervisorWindow('supInventory',this); supervisorInventoryLoad()">طلبات المخزون</button>
+    <button class="sup-tab" onclick="showSupervisorWindow('supClientDailyReport',this); supClientReportInit()">تقرير يومي</button>
   </nav>
 
   <section id="supLogs" class="sup-page active">
@@ -60,10 +61,22 @@
     <section class="card"><h2>طلباتي من المخزون</h2><div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المشروع</th><th>الصنف</th><th>الكمية</th><th>السبب</th><th>الحالة</th></tr></thead><tbody id="supInventoryRequestsBody"></tbody></table></div></section>
   </section>
 
+
+  <section id="supClientDailyReport" class="sup-page">
+    <section class="card"><h2>تقرير يومي للعميل</h2><div class="sup-help">صوّر الخدمات اليومية للمشروع. الحد الأقصى 9 صور لكل مرحلة. أي مرحلة بدون صور لا تظهر في تقرير العميل. التقرير يصل للإدارة كمسودة للمراجعة والاعتماد.</div>
+      <div class="split"><div><label>المشروع</label><select id="supClientReportProject" onchange="supClientReportProjectChanged()"></select></div><div><label>تاريخ التقرير</label><input type="date" id="supClientReportDate"></div></div>
+      <label>عنوان التقرير</label><input id="supClientReportTitle" placeholder="مثال: تقرير النظافة اليومية">
+      <label>ملخص مختصر</label><textarea id="supClientReportSummary" placeholder="اكتب ملخصًا قصيرًا عن الأعمال المنفذة اليوم"></textarea>
+      <div class="nested-card"><h3>الخدمات المنفذة</h3><div class="split"><div><label>إضافة خدمة</label><select id="supClientReportServiceType"><option>النظافة اليومية</option><option>إزالة النفايات</option><option>تنظيف الممرات</option><option>تنظيف المصاعد</option><option>تنظيف البيسمنت</option><option>تنظيف الأسطح</option><option>مكافحة الحشرات</option><option>غسيل خزانات</option><option>صيانة كهرباء</option><option>صيانة سباكة</option><option>أخرى</option></select></div><div style="display:flex;align-items:end"><button type="button" class="light" onclick="supClientAddService()">+ إضافة خدمة</button></div></div><div id="supClientServicesEditor"></div></div>
+      <div class="actions"><button onclick="supClientSaveDailyReport(this)">إرسال التقرير للإدارة</button><button class="light" onclick="supClientReportReset()">تفريغ</button></div>
+    </section>
+    <section class="card"><h2>تقاريري اليومية</h2><div id="supClientReportsList" class="quick-list"></div></section>
+  </section>
+
   <section id="supSummary" class="sup-page">
     <section class="card"><h2>الملخص اليومي</h2><div class="date-filter-row"><div><label>فلتر الأيام</label><select id="summaryRange" onchange="renderSupervisorDailySummary()"><option value="today">اليوم</option><option value="yesterday">أمس</option><option value="week">هذا الأسبوع</option><option value="custom">تاريخ محدد</option></select></div><div><label>تاريخ محدد</label><input type="date" id="summaryDate" onchange="renderSupervisorDailySummary()"></div></div><div id="supervisorSummaryCards" class="summary-card-grid" style="margin-top:12px"></div><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>البند</th><th>العدد / الوقت</th></tr></thead><tbody id="supervisorSummaryBody"></tbody></table></div></section>
   </section>
 </div>
-<script src="app.js?v=132"></script>
+<script src="app.js?v=133"></script>
 </body>
 </html>

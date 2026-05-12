@@ -5505,3 +5505,189 @@ function financePrintReport(kind){
     try{ hydrateProjectSupervisorSelects132(); bindProjectToCostCenter132(); renderCostCenterReport132(); }catch(e){ console.warn('V132 warning', e); }
   },1200));
 })();
+
+
+/* ===================== V133 Client Daily Reports + Smart Filters ===================== */
+(function(){
+  const $v133 = id => document.getElementById(id);
+  const MAX_STAGE_PHOTOS_V133 = 9;
+  const DAILY_TYPES_V133 = ['النظافة اليومية','إزالة النفايات','تنظيف الممرات','تنظيف المصاعد','تنظيف البيسمنت','تنظيف الأسطح','مكافحة الحشرات','غسيل خزانات','صيانة كهرباء','صيانة سباكة','أخرى'];
+  let supClientServicesState = [];
+  function v133Esc(v){ return (typeof esc==='function') ? esc(v) : String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function v133Msg(t,kind){ try{ msg(t,kind); }catch(_){ alert(t); } }
+  function v133ProjectName(pid){ try{return projectName(pid)}catch(_){ const p=(data.projects||[]).find(x=>String(x.id)===String(pid)); return p?.name||''; } }
+  function v133DefaultSummary(){ return 'تم تنفيذ الأعمال اليومية للمشروع حسب الخطة التشغيلية، مع توثيق الخدمات المنفذة بالصور، ورفع التقرير للإدارة لاعتماده قبل ظهوره للعميل.'; }
+  function v133ServiceTemplate(t){ return {service_type:t||'النظافة اليومية', title:t||'النظافة اليومية', service_description:'', scope_work:'', notes:'', before_images:[], during_images:[], after_images:[]}; }
+  function v133CountImages(s){ return (s.before_images||[]).length+(s.during_images||[]).length+(s.after_images||[]).length; }
+
+  // Admin reports: enforce 9 images per stage as requested
+  const oldHandlePremiumImages133 = window.handlePremiumImages;
+  window.handlePremiumImages = async function(i, field, input){
+    if(!premiumServicesState[i]) return;
+    const current = premiumServicesState[i][field] || [];
+    const files=[...(input.files||[])].slice(0, Math.max(0, MAX_STAGE_PHOTOS_V133-current.length));
+    if(!files.length){ v133Msg('الحد الأقصى 9 صور لكل قسم في الخدمة','err'); input.value=''; return; }
+    v133Msg('جاري تجهيز الصور...');
+    for(const f of files){
+      try{ const data=await compressImageToDataUrl(f, 1400, 0.82); current.push({name:f.name,type:'image/jpeg',data}); }
+      catch(e){ console.warn(e); }
+    }
+    premiumServicesState[i][field]=current.slice(0,MAX_STAGE_PHOTOS_V133);
+    if((input.files||[]).length>files.length) v133Msg('تمت إضافة الصور مع الاكتفاء بأول 9 صور لكل قسم');
+    else v133Msg('تمت إضافة الصور');
+    renderPremiumServicesEditor(); input.value='';
+  };
+
+  // Supervisor daily client reports
+  window.supClientReportInit = function(){
+    try{
+      fillSelect('supClientReportProject', data.projects||[], 'name', 'اختر المشروع');
+      if($v133('supClientReportDate') && !$v133('supClientReportDate').value) $v133('supClientReportDate').value=today();
+      if(!supClientServicesState.length) supClientServicesState=[v133ServiceTemplate('النظافة اليومية')];
+      supClientRenderServices(); supClientRenderMyReports();
+    }catch(e){ console.warn(e); }
+  };
+  window.supClientReportProjectChanged = function(){
+    const p=v133ProjectName($v133('supClientReportProject')?.value);
+    if($v133('supClientReportTitle') && !$v133('supClientReportTitle').value) $v133('supClientReportTitle').value='تقرير يومي - '+p;
+    if($v133('supClientReportSummary') && !$v133('supClientReportSummary').value) $v133('supClientReportSummary').value=v133DefaultSummary();
+  };
+  window.supClientReportReset = function(){
+    supClientServicesState=[v133ServiceTemplate('النظافة اليومية')];
+    ['supClientReportTitle','supClientReportSummary'].forEach(id=>{ if($v133(id)) $v133(id).value=''; });
+    if($v133('supClientReportDate')) $v133('supClientReportDate').value=today();
+    supClientRenderServices();
+  };
+  window.supClientAddService = function(){
+    supClientServicesState.push(v133ServiceTemplate($v133('supClientReportServiceType')?.value||'النظافة اليومية'));
+    supClientRenderServices();
+  };
+  window.supClientRemoveService = function(i){ supClientServicesState.splice(i,1); if(!supClientServicesState.length) supClientServicesState=[v133ServiceTemplate('النظافة اليومية')]; supClientRenderServices(); };
+  window.supClientSetService = function(i,f,v){ if(supClientServicesState[i]) supClientServicesState[i][f]=v; };
+  window.supClientRemoveImg = function(i,f,j){ supClientServicesState[i]?.[f]?.splice(j,1); supClientRenderServices(); };
+  window.supClientHandleImages = async function(i, field, input){
+    const s=supClientServicesState[i]; if(!s) return;
+    const arr=s[field]||[]; const allowed=MAX_STAGE_PHOTOS_V133-arr.length;
+    const files=[...(input.files||[])].slice(0, Math.max(0,allowed));
+    if(!files.length){ v133Msg('الحد الأقصى 9 صور لكل قسم','err'); input.value=''; return; }
+    v133Msg('جاري تجهيز الصور...');
+    for(const f of files){ try{ const data=await compressImageToDataUrl(f, 1200, .80); arr.push({name:f.name,type:'image/jpeg',data}); }catch(e){console.warn(e)} }
+    s[field]=arr.slice(0,MAX_STAGE_PHOTOS_V133);
+    if((input.files||[]).length>files.length) v133Msg('تمت إضافة الصور مع الاكتفاء بـ 9 صور لكل قسم'); else v133Msg('تمت إضافة الصور');
+    supClientRenderServices(); input.value='';
+  };
+  function supClientStageBox(i, field, title){
+    const imgs=supClientServicesState[i]?.[field]||[];
+    return `<div class="stage-box"><h4>${title}</h4><label class="stage-upload">+ صور ${title}<input type="file" accept="image/*" multiple onchange="supClientHandleImages(${i},'${field}',this)"></label><div class="img-previews">${imgs.map((im,j)=>`<div class="preview-img"><img src="${im.data||''}"><button onclick="supClientRemoveImg(${i},'${field}',${j})">×</button></div>`).join('')}</div><small>${imgs.length}/9 صور</small></div>`;
+  }
+  function supClientRenderServices(){
+    const box=$v133('supClientServicesEditor'); if(!box) return;
+    box.innerHTML=supClientServicesState.map((s,i)=>`<div class="service-editor-card"><div class="service-editor-head"><div class="service-title-line"><span class="service-number">${i+1}</span><div><b>${v133Esc(s.title||s.service_type)}</b><div class="service-counts"><span class="service-chip">${v133CountImages(s)} صورة</span></div></div></div><div class="row-actions"><button class="danger" type="button" onclick="supClientRemoveService(${i})">حذف</button></div></div><div class="split"><div><label>نوع الخدمة</label><select onchange="supClientSetService(${i},'service_type',this.value); supClientSetService(${i},'title',this.value); supClientRenderServices()">${DAILY_TYPES_V133.map(t=>`<option ${t===s.service_type?'selected':''}>${v133Esc(t)}</option>`).join('')}</select></div><div><label>عنوان الخدمة</label><input value="${v133Esc(s.title||'')}" oninput="supClientSetService(${i},'title',this.value)"></div></div><label>وصف الخدمة</label><textarea oninput="supClientSetService(${i},'service_description',this.value)">${v133Esc(s.service_description||'')}</textarea><label>نطاق العمل</label><textarea oninput="supClientSetService(${i},'scope_work',this.value)">${v133Esc(s.scope_work||'')}</textarea><div class="stage-grid">${supClientStageBox(i,'before_images','قبل التنفيذ')}${supClientStageBox(i,'during_images','أثناء التنفيذ')}${supClientStageBox(i,'after_images','بعد التنفيذ')}</div><label>ملاحظات</label><textarea oninput="supClientSetService(${i},'notes',this.value)">${v133Esc(s.notes||'')}</textarea></div>`).join('');
+  }
+  window.supClientSaveDailyReport = async function(btn){
+    try{
+      if(btn) btn.disabled=true;
+      const pid=$v133('supClientReportProject')?.value; if(!pid) throw new Error('اختر المشروع');
+      const valid=supClientServicesState.filter(s=>v133CountImages(s)>0);
+      if(!valid.length) throw new Error('أضف صورًا لخدمة واحدة على الأقل');
+      const u=session()||{}; const p=v133ProjectName(pid); const reportDate=$v133('supClientReportDate')?.value||today();
+      const reportRow={report_no:genReportNo(), project_id:Number(pid), project_name:p, chairman_name:'', chairman_phone:'', title:$v133('supClientReportTitle')?.value||('تقرير يومي - '+p), report_type:'تقرير يومي من المشرف', report_date:reportDate, executive_summary:$v133('supClientReportSummary')?.value||v133DefaultSummary(), status:'draft', public_token:null};
+      const {data:rep,error}=await sb.from('client_reports').insert(reportRow).select('id').single(); if(error) throw error;
+      const rows=valid.map((s,i)=>({report_id:rep.id,sort_order:i+1,service_type:s.service_type,title:s.title||s.service_type,service_description:s.service_description||'',scope_work:s.scope_work||'',notes:[s.notes||'', `المشرف: ${u.full_name||u.username||''}`].filter(Boolean).join('\n'),before_images:s.before_images||[],during_images:s.during_images||[],after_images:s.after_images||[]}));
+      const {error:se}=await sb.from('client_report_services').insert(rows); if(se) throw se;
+      v133Msg('تم إرسال التقرير اليومي للإدارة كمسودة');
+      supClientReportReset(); await loadPremiumReportsOnly(false); supClientRenderMyReports();
+    }catch(e){ v133Msg(e.message||String(e),'err'); } finally{ if(btn) btn.disabled=false; }
+  };
+  function supClientRenderMyReports(){
+    const box=$v133('supClientReportsList'); if(!box) return;
+    const u=session()||{}; const name=(u.full_name||u.username||'');
+    const reports=(data.clientReports||[]).filter(r=>String(r.report_type||'').includes('المشرف') || (getReportServices(r.id)||[]).some(s=>String(s.notes||'').includes(name))).slice(0,20);
+    box.innerHTML=reports.map(r=>`<div class="quick-item"><div><b>${v133Esc(r.title)}</b><br><small>${v133Esc(r.project_name)} - ${v133Esc(r.report_date)} - ${reportStatusText(r.status)}</small></div><span class="badge ${reportStatusClass(r.status)}">${v133Esc(reportStatusText(r.status))}</span></div>`).join('') || '<div class="quick-item">لا توجد تقارير يومية بعد</div>';
+  }
+
+  // Override initSupervisor to prepare daily report UI after normal loading
+  const oldInitSup133 = window.initSupervisor;
+  window.initSupervisor = async function(){
+    if(oldInitSup133) await oldInitSup133.apply(this, arguments);
+    try{ supClientReportInit(); }catch(e){ console.warn('V133 supervisor daily report warning',e); }
+  };
+
+  // Project/service smart slides in client reports admin
+  function renderClientReportProjectSlides133(){
+    const box=$v133('clientReportProjectSlides'); if(!box) return;
+    const reports=data.clientReports||[]; const services=data.clientReportServices||[];
+    const by=new Map();
+    reports.forEach(r=>{ const k=String(r.project_id||r.project_name); if(!by.has(k)) by.set(k,{project_id:r.project_id,project:r.project_name,total:0,published:0,draft:0,services:{}}); const g=by.get(k); g.total++; if(r.status==='published') g.published++; if(r.status==='draft') g.draft++; (services.filter(s=>String(s.report_id)===String(r.id))).forEach(s=>{ const nm=s.service_type||s.title||'خدمة'; g.services[nm]=(g.services[nm]||0)+1; }); });
+    const cards=[...by.values()].sort((a,b)=>b.published-a.published).map(g=>`<button type="button" class="smart-report-card" onclick="document.getElementById('premiumReportFilterProject').value='${g.project_id||''}'; renderPremiumReports(); this.scrollIntoView({behavior:'smooth',block:'nearest'})"><span>${v133Esc(g.project)}</span><b>${g.published} منشور / ${g.total} تقرير</b><small>${Object.entries(g.services).slice(0,4).map(([n,c])=>`${v133Esc(n)}: ${c}`).join(' | ')||'لا توجد خدمات'}</small></button>`).join('');
+    box.innerHTML=cards||'<div class="footer-note">لا توجد تقارير بعد</div>';
+    const dl=$v133('premiumServiceSmartList'); if(dl){ const names=new Set(); reports.forEach(r=>{names.add(r.project_name);names.add(r.title);}); services.forEach(s=>{names.add(s.service_type);names.add(s.title);}); dl.innerHTML=[...names].filter(Boolean).map(x=>`<option value="${v133Esc(x)}"></option>`).join(''); }
+  }
+  const oldRenderPremiumReports133 = window.renderPremiumReports;
+  window.renderPremiumReports = function(){
+    if(oldRenderPremiumReports133) oldRenderPremiumReports133.apply(this, arguments);
+    const smart=($v133('premiumServiceSmartSearch')?.value||'').trim();
+    if(smart && $v133('premiumReportSearch')){ /* keep original search untouched; hide rows post-render */
+      const rows=[...document.querySelectorAll('#premiumReportsBody tr')]; rows.forEach(tr=>{ tr.style.display=tr.textContent.includes(smart)?'':'none'; });
+    }
+    renderClientReportProjectSlides133();
+  };
+
+  // Finance/inventory smart filters: cost code + quick search + existing date
+  function normalize133(v){ return String(v??'').toLowerCase().trim(); }
+  function applyFinanceReportRowFilters133(){
+    const q=normalize133($v133('financeReportQuickSearch')?.value||''); const code=$v133('financeReportCostCodeFilter')?.value||'';
+    document.querySelectorAll('.smart-report-panel table tbody tr').forEach(tr=>{
+      if(tr.querySelector('td[colspan]')) return;
+      const txt=normalize133(tr.textContent); let show=true;
+      if(q && !txt.includes(q)) show=false;
+      if(code){
+        const ccText=txt.toUpperCase();
+        if(!ccText.includes(code)) show=false;
+      }
+      tr.style.display=show?'':'none';
+    });
+  }
+  const oldFinanceRenderReports133 = window.financeRenderReports;
+  window.financeRenderReports = function(){
+    if(oldFinanceRenderReports133) oldFinanceRenderReports133.apply(this, arguments);
+    setTimeout(applyFinanceReportRowFilters133,0);
+  };
+
+  // Add a cost code/date/search filter row to main expenses & inventory overview if missing
+  function injectFinanceMainFilters133(){
+    const panel=$v133('financeDashboard'); if(!panel || $v133('financeCostCodeMainFilter')) return;
+    const target=$v133('financeSearch')?.closest('.filters'); if(!target) return;
+    const cc=document.createElement('select'); cc.id='financeCostCodeMainFilter'; cc.innerHTML='<option value="">كل رموز التكلفة</option><option value="FM">FM</option><option value="CN">CN</option>'; cc.onchange=()=>{ if(typeof financeRenderAll==='function') financeRenderAll(); };
+    const date=document.createElement('input'); date.id='financeExactDateFilter'; date.type='date'; date.onchange=()=>{ if(typeof financeRenderAll==='function') financeRenderAll(); };
+    target.insertBefore(cc, target.lastElementChild); target.insertBefore(date, target.lastElementChild);
+  }
+  const oldFinanceRenderAll133 = window.financeRenderAll;
+  window.financeRenderAll = function(){
+    if(oldFinanceRenderAll133) oldFinanceRenderAll133.apply(this, arguments);
+    injectFinanceMainFilters133();
+  };
+
+  // Post-filter smart cards/tables in finance tabs by quick search/date where possible
+  function filterFinanceVisibleRows133(){
+    const q=normalize133($v133('financeSearch')?.value||''); const exact=$v133('financeExactDateFilter')?.value||'';
+    ['financeExpensesBody','inventoryMovementsBody','inventoryRequestsBody'].forEach(id=>{
+      document.querySelectorAll(`#${id} tr`).forEach(tr=>{
+        const txt=normalize133(tr.textContent); let show=true; if(q && !txt.includes(q)) show=false; if(exact && !txt.includes(exact)) show=false; tr.style.display=show?'':'none';
+      });
+    });
+  }
+  const oldInvRenderReq133=window.inventoryRenderRequests;
+  window.inventoryRenderRequests=function(){ if(oldInvRenderReq133) oldInvRenderReq133.apply(this,arguments); setTimeout(filterFinanceVisibleRows133,0); };
+  const oldInvRenderMov133=window.inventoryRenderMovements;
+  window.inventoryRenderMovements=function(){ if(oldInvRenderMov133) oldInvRenderMov133.apply(this,arguments); setTimeout(filterFinanceVisibleRows133,0); };
+  const oldFinanceRenderExp133=window.financeRenderExpenses;
+  window.financeRenderExpenses=function(){ if(oldFinanceRenderExp133) oldFinanceRenderExp133.apply(this,arguments); setTimeout(filterFinanceVisibleRows133,0); };
+
+  // Styles for smart report/project cards if missing
+  const st=document.createElement('style'); st.textContent=`
+    .stage-box .stage-upload input{display:none}.img-previews{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.preview-img{position:relative;width:72px;height:72px;border:1px solid #dce6e2;border-radius:12px;overflow:hidden;background:#f7fbfa}.preview-img img{width:100%;height:100%;object-fit:cover}.preview-img button{position:absolute;top:2px;left:2px;border-radius:8px;padding:1px 6px;background:#b83232}.nested-card{background:#fbfdfc;border:1px solid #dce6e2;border-radius:18px;padding:12px;margin:10px 0}.smart-report-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}.smart-report-card{text-align:right;border:1px solid #dce6e2;background:#fff;color:#0A4033;border-radius:18px;padding:14px;display:grid;gap:6px;min-height:95px}.smart-report-card b{font-size:18px}.smart-report-card small{color:#60706a;line-height:1.6}`;
+  document.head.appendChild(st);
+
+  window.addEventListener('load',()=>setTimeout(()=>{ try{ injectFinanceMainFilters133(); renderClientReportProjectSlides133(); }catch(e){ console.warn('V133 load warning',e); } },900));
+})();
