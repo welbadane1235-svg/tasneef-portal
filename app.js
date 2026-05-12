@@ -5761,3 +5761,305 @@ function financePrintReport(kind){
     }catch(e){}
   });
 })();
+
+/* ===== V138: Reliable inventory report filters + clean printing + full-month monthly records ===== */
+(function(){
+  'use strict';
+  const $v138 = id => document.getElementById(id);
+  const n138 = v => { const x = Number(String(v ?? 0).replace(/,/g,'').trim()); return Number.isFinite(x) ? x : 0; };
+  const esc138 = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const money138 = v => Number(n138(v)).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' ر.س';
+  const qty138 = v => Number(n138(v)).toLocaleString('en-US',{maximumFractionDigits:2});
+  const today138 = () => new Date().toISOString().slice(0,10);
+  const dateOnly138 = v => String(v || '').slice(0,10);
+  const monthStart138 = m => (m || today138().slice(0,7)) + '-01';
+  const monthEnd138 = m => {
+    m = m || today138().slice(0,7);
+    const [y,mo] = m.split('-').map(Number);
+    const d = new Date(y, mo, 0).getDate();
+    return `${m}-${String(d).padStart(2,'0')}`;
+  };
+  function inRange138(d,start,end){ d=dateOnly138(d); return !!d && (!start || d>=start) && (!end || d<=end); }
+  function projectRows138(){
+    const rows = (window.data?.projects || []);
+    const seen = new Set();
+    return rows.filter(p=>{ const id=String(p.id||''); if(!id || seen.has(id)) return false; seen.add(id); return true; });
+  }
+  function userRows138(){
+    const seen = new Set();
+    return [...(window.data?.users||[]), ...(window.data?.supervisors||[])].filter(u=>{ const id=String(u.id||''); if(!id || seen.has(id)) return false; seen.add(id); return true; });
+  }
+  function projectName138(id){ return projectRows138().find(p=>String(p.id)===String(id))?.name || (typeof window.projectName==='function' ? window.projectName(id) : '') || ''; }
+  function personName138(id){ const u=userRows138().find(x=>String(x.id)===String(id)); return u?.full_name || u?.name || u?.username || (typeof window.supervisorName==='function'?window.supervisorName(id):'') || ''; }
+  function item138(id){ return (window.data?.inventoryItems||[]).find(i=>String(i.id)===String(id)) || {}; }
+  function code138(it){ return (typeof window.v118ProductCode==='function' ? window.v118ProductCode(it) : '') || it.product_code || it.serial_number || it.code || ''; }
+  function barcode138(it){ return (typeof window.v118Barcode==='function' ? window.v118Barcode(it) : '') || it.barcode || it.supplier_barcode || ''; }
+  function lineItems138(r){
+    if(typeof window.v118LineItems === 'function') return window.v118LineItems(r) || [];
+    return Array.isArray(r?.request_items) ? r.request_items : (Array.isArray(r?.items) ? r.items : []);
+  }
+  function returnQty138(requestId,itemId){
+    return (window.data?.inventoryMovements||[])
+      .filter(m=>String(m.request_id||'')===String(requestId||'') && String(m.item_id||'')===String(itemId||'') && String(m.movement_type)==='return')
+      .reduce((a,m)=>a+n138(m.quantity),0);
+  }
+  function itemUnitCost138(it){ return n138(it.unit_cost ?? it.unit_price ?? it.price ?? 0); }
+  function vatAmount138(amount,it){
+    const mode = String(it?.vat_mode || it?.tax_mode || 'exclusive');
+    amount = n138(amount);
+    if(mode==='zero' || mode==='none' || mode==='خالي الضريبة') return 0;
+    if(mode==='inclusive' || mode==='شامل الضريبة') return amount - (amount / 1.15);
+    return amount * 0.15;
+  }
+  function grossAmount138(amount,it){
+    const mode = String(it?.vat_mode || it?.tax_mode || 'exclusive');
+    amount = n138(amount);
+    if(mode==='zero' || mode==='none' || mode==='خالي الضريبة') return amount;
+    if(mode==='inclusive' || mode==='شامل الضريبة') return amount;
+    return amount * 1.15;
+  }
+  function unitWithVat138(it){
+    const cost = itemUnitCost138(it);
+    return grossAmount138(cost,it);
+  }
+  function daysAgo138(d){
+    if(!d) return '-';
+    const a = new Date(dateOnly138(d)+'T00:00:00');
+    const b = new Date(today138()+'T00:00:00');
+    if(isNaN(a)) return '-';
+    const diff = Math.max(0, Math.round((b-a)/86400000));
+    return diff===0 ? 'اليوم' : (diff===1 ? 'منذ يوم' : `منذ ${diff} يوم`);
+  }
+  function costCode138(name,row){
+    const projectMatch = !!row?.project_id || projectRows138().some(p=>String(p.name||'')===String(name||''));
+    const type = String(row?.cost_center_type || row?.cost_type || '');
+    if(type.includes('مشروع')) return 'FM';
+    return projectMatch ? 'FM' : 'CN';
+  }
+  function reportDatePass138(date){
+    date=dateOnly138(date);
+    const mode=$v138('inventoryReportDateMode')?.value || 'all';
+    if(mode==='day'){
+      const d=$v138('inventoryReportDay')?.value || today138();
+      return date===d;
+    }
+    if(mode==='month'){
+      const m=$v138('inventoryReportMonth')?.value || today138().slice(0,7);
+      return inRange138(date, monthStart138(m), monthEnd138(m));
+    }
+    return true;
+  }
+  function quickPass138(row){
+    const q=($v138('financeReportQuickSearch')?.value || '').trim().toLowerCase();
+    if(!q) return true;
+    return [row.project,row.person,row.item,row.product_code,row.barcode,row.supplier,row.reason,row.ref,row.cost_center_name]
+      .join(' ').toLowerCase().includes(q);
+  }
+  function codePass138(row){
+    const code=$v138('financeReportCostCodeFilter')?.value || '';
+    if(!code) return true;
+    return costCode138(row.cost_center_name,row)===code;
+  }
+  function productPass138(row){ const prod=$v138('inventoryReportProduct')?.value || ''; return !prod || String(row.item_id)===String(prod); }
+  function supplierPass138(row){ const sup=$v138('inventoryReportSupplier')?.value || ''; return !sup || String(row.supplier||'')===String(sup); }
+  function personPass138(row){
+    const person=$v138('inventoryReportPerson')?.value || '';
+    if(!person) return true;
+    const pName=personName138(person);
+    return String(row.person)===String(pName) || String(row.person_id||'')===String(person) || String(row.person)===String(person);
+  }
+  function usageRows138(){
+    const rows=[];
+    (window.data?.inventoryRequests||[]).filter(r=>String(r.status)==='approved').forEach(r=>{
+      const date = dateOnly138(r.request_date || r.created_at || today138());
+      const project = r.project_name || projectName138(r.project_id) || 'بدون مشروع';
+      const person = r.supervisor_name || personName138(r.supervisor_id) || 'بدون مستلم';
+      lineItems138(r).forEach(l=>{
+        const it=item138(l.item_id); const out=n138(l.quantity); const returned=returnQty138(r.id,l.item_id); const consumed=Math.max(0,out-returned);
+        const unit=n138(l.unit_cost || it.unit_cost || it.unit_price || 0); const val=consumed*unit;
+        rows.push({date, project, project_id:r.project_id, person, person_id:r.supervisor_id, item:l.item_name||it.name||'', item_id:l.item_id, product_code:l.product_code||code138(it), barcode:l.barcode||barcode138(it), supplier:it.supplier||'', out, returned, consumed, qty:consumed, current:n138(it.quantity), unit_cost:unit, unit_gross:grossAmount138(unit,it), val, vat:vatAmount138(val,it), gross:grossAmount138(val,it), reason:r.reason||r.notes||'-', type:'أمر صرف معتمد', ref:'REQ-'+r.id, cost_center_id:r.cost_center_id||'', cost_center_name:r.cost_center_name||project||'غير محدد', itemObj:it});
+      });
+    });
+    (window.data?.inventoryMovements||[]).filter(m=>['out','consume'].includes(String(m.movement_type)) && !m.request_id).forEach(m=>{
+      const it=item138(m.item_id); const date=dateOnly138(m.movement_date||m.created_at||today138()); const qty=n138(m.quantity); const unit=n138(m.unit_cost || it.unit_cost || it.unit_price || 0); const val=qty*unit;
+      const project=m.project_name || projectName138(m.project_id) || 'بدون مشروع';
+      rows.push({date, project, project_id:m.project_id, person:m.receiver||'بدون مستلم', person_id:m.receiver_id||'', item:m.item_name||it.name||'', item_id:m.item_id, product_code:m.product_code||code138(it), barcode:m.barcode||barcode138(it), supplier:it.supplier||'', out:qty, returned:0, consumed:qty, qty, current:n138(it.quantity), unit_cost:unit, unit_gross:grossAmount138(unit,it), val, vat:vatAmount138(val,it), gross:grossAmount138(val,it), reason:m.reason||m.notes||'-', type:m.movement_type==='consume'?'استهلاك مباشر':'صرف مباشر', ref:'MOV-'+m.id, cost_center_id:m.cost_center_id||'', cost_center_name:m.cost_center_name||project||'غير محدد', itemObj:it});
+    });
+    return rows;
+  }
+  function filteredUsageRows138(){
+    return usageRows138().filter(r=>reportDatePass138(r.date) && quickPass138(r) && codePass138(r) && productPass138(r) && supplierPass138(r) && personPass138(r));
+  }
+  function filteredExpenseRows138(){
+    const q=($v138('financeReportQuickSearch')?.value || $v138('financeSearch')?.value || '').trim().toLowerCase();
+    const code=$v138('financeReportCostCodeFilter')?.value || '';
+    let rows=[...(window.data?.financeExpenses||[])];
+    rows=rows.filter(e=>reportDatePass138(e.expense_date || e.created_at));
+    if(code){ rows=rows.filter(e=> costCode138(e.project_name || projectName138(e.project_id), e)===code); }
+    if(q) rows=rows.filter(e=>[e.project_name,projectName138(e.project_id),e.supplier,e.category,e.notes,e.total,e.payment_method].join(' ').toLowerCase().includes(q));
+    const pid=$v138('financeProjectFilter')?.value||''; if(pid) rows=rows.filter(e=>String(e.project_id)===String(pid));
+    return rows;
+  }
+  function renderReportSelects138(){
+    const supVal=$v138('inventoryReportSupplier')?.value || '';
+    const prodVal=$v138('inventoryReportProduct')?.value || '';
+    const perVal=$v138('inventoryReportPerson')?.value || '';
+    const suppliers=[...new Set((window.data?.inventoryItems||[]).map(i=>i.supplier).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'ar'));
+    const sup=$v138('inventoryReportSupplier'); if(sup) { sup.innerHTML='<option value="">كل الموردين</option>'+suppliers.map(s=>`<option value="${esc138(s)}">${esc138(s)}</option>`).join(''); sup.value=supVal; }
+    const supplierFilter=supVal;
+    const items=(window.data?.inventoryItems||[]).filter(i=>!supplierFilter || String(i.supplier||'')===String(supplierFilter));
+    const prod=$v138('inventoryReportProduct'); if(prod){ prod.innerHTML='<option value="">كل المنتجات</option>'+items.map(i=>`<option value="${esc138(i.id)}">${esc138(code138(i))} - ${esc138(i.name||'')}</option>`).join(''); if([...prod.options].some(o=>o.value===String(prodVal))) prod.value=prodVal; }
+    const people=[...new Map(userRows138().map(u=>[String(u.id),u])).values()];
+    const per=$v138('inventoryReportPerson'); if(per){ per.innerHTML='<option value="">كل المشرفين/المستلمين</option>'+people.map(u=>`<option value="${esc138(u.id)}">${esc138(u.full_name||u.name||u.username||'')}</option>`).join(''); per.value=perVal; }
+  }
+  function renderReports138(){
+    renderReportSelects138();
+    const usage=filteredUsageRows138();
+    // مصروفات حسب المشروع
+    const expBody=$v138('expenseByProjectBody');
+    if(expBody){
+      const map={}; filteredExpenseRows138().forEach(e=>{ const p=e.project_name||projectName138(e.project_id)||'بدون مشروع'; map[p]=map[p]||{count:0,total:0}; map[p].count++; map[p].total+=n138(e.total); });
+      const vals=Object.entries(map).sort((a,b)=>b[1].total-a[1].total);
+      expBody.innerHTML=vals.map(([p,v])=>`<tr><td>${esc138(p)}</td><td>${money138(v.total)}</td><td>${v.count}</td></tr>`).join('') || '<tr><td colspan="3">لا توجد بيانات</td></tr>';
+    }
+    // صرف المخزون حسب المشروع
+    const byProject=$v138('stockOutByProjectBody');
+    if(byProject){
+      const map={}; usage.forEach(r=>{ const p=r.project||'بدون مشروع'; map[p]=map[p]||{count:0,out:0,ret:0,cons:0,val:0,gross:0}; const v=map[p]; v.count++; v.out+=r.out; v.ret+=r.returned; v.cons+=r.consumed; v.val+=r.val; v.gross+=r.gross; });
+      const vals=Object.entries(map).sort((a,b)=>b[1].gross-a[1].gross);
+      byProject.innerHTML=vals.map(([p,v])=>`<tr><td>${esc138(p)}</td><td>${v.count}</td><td>${qty138(v.out)}</td><td>${qty138(v.ret)}</td><td>${qty138(v.cons)}</td><td>${money138(v.val)}</td><td>${money138(v.gross)}</td></tr>`).join('') || '<tr><td colspan="7">لا توجد بيانات</td></tr>';
+      const table=byProject.closest('table'); if(table?.tHead) table.tHead.innerHTML='<tr><th>المشروع</th><th>عدد العمليات</th><th>الصادر</th><th>المرتجع</th><th>المستهلك</th><th>قيمة الاستهلاك</th><th>الإجمالي شامل الضريبة</th></tr>';
+    }
+    // استهلاك المشرفين
+    const bySup=$v138('stockOutBySupervisorBody');
+    if(bySup){
+      const map={}; usage.forEach(r=>{ const k=(r.person||'بدون مستلم')+'|||'+(r.project||'بدون مشروع'); map[k]=map[k]||{person:r.person||'بدون مستلم',project:r.project||'بدون مشروع',count:0,out:0,ret:0,cons:0,gross:0}; const v=map[k]; v.count++; v.out+=r.out; v.ret+=r.returned; v.cons+=r.consumed; v.gross+=r.gross; });
+      const vals=Object.values(map).sort((a,b)=>String(a.person).localeCompare(String(b.person),'ar') || String(a.project).localeCompare(String(b.project),'ar'));
+      bySup.innerHTML=vals.map(v=>`<tr><td>${esc138(v.person)}</td><td>${esc138(v.project)}</td><td>${v.count}</td><td>${qty138(v.out)}</td><td>${qty138(v.ret)}</td><td>${qty138(v.cons)}</td><td>${money138(v.gross)}</td></tr>`).join('') || '<tr><td colspan="7">لا توجد بيانات</td></tr>';
+      const table=bySup.closest('table'); if(table?.tHead) table.tHead.innerHTML='<tr><th>المشرف / المستلم</th><th>المشروع</th><th>عدد العمليات</th><th>الصادر</th><th>المرتجع</th><th>المستهلك</th><th>الإجمالي شامل الضريبة</th></tr>';
+    }
+    // المخزون العام
+    const stock=$v138('stockReportBody');
+    if(stock){
+      const q=($v138('financeReportQuickSearch')?.value||'').trim().toLowerCase();
+      const supplier=$v138('inventoryReportSupplier')?.value||'';
+      let items=[...(window.data?.inventoryItems||[])];
+      if(supplier) items=items.filter(i=>String(i.supplier||'')===String(supplier));
+      if(q) items=items.filter(i=>[i.name,code138(i),barcode138(i),i.supplier,i.category,i.type].join(' ').toLowerCase().includes(q));
+      stock.innerHTML=items.map(i=>{ const sub=n138(i.quantity)*itemUnitCost138(i); return `<tr><td>${esc138(code138(i))}</td><td>${esc138(i.name||'')}</td><td>${esc138(i.supplier||'-')}</td><td>${qty138(i.quantity)}</td><td>${qty138(i.min_quantity)}</td><td>${money138(itemUnitCost138(i))}</td><td>${money138(unitWithVat138(i))}</td><td>${money138(sub)}</td><td>${money138(grossAmount138(sub,i))}</td></tr>`; }).join('') || '<tr><td colspan="9">لا توجد بيانات</td></tr>';
+      const table=stock.closest('table'); if(table?.tHead) table.tHead.innerHTML='<tr><th>كود المنتج</th><th>اسم المنتج</th><th>المورد</th><th>المخزون</th><th>حد الطلب</th><th>سعر الحبة</th><th>سعر الحبة شامل الضريبة</th><th>قيمة المخزون</th><th>الإجمالي شامل الضريبة</th></tr>';
+      const sub=items.reduce((a,i)=>a+n138(i.quantity)*itemUnitCost138(i),0); const vat=items.reduce((a,i)=>a+vatAmount138(n138(i.quantity)*itemUnitCost138(i),i),0); const gross=items.reduce((a,i)=>a+grossAmount138(n138(i.quantity)*itemUnitCost138(i),i),0);
+      if($v138('stockReportTotals')) $v138('stockReportTotals').innerHTML=`Total amount before 15% VAT: <b>${money138(sub)}</b> | Total VAT 15%: <b>${money138(vat)}</b> | Total Value with 15% VAT: <b>${money138(gross)}</b>`;
+    }
+    // مراكز التكلفة
+    const cc=$v138('costCenterReportBody');
+    if(cc){
+      const map={}; usage.forEach(r=>{ const name=r.cost_center_name||r.project||'غير محدد'; const code=costCode138(name,r); map[name]=map[name]||{code,count:0,out:0,ret:0,cons:0,val:0,vat:0,gross:0}; const v=map[name]; v.count++; v.out+=r.out; v.ret+=r.returned; v.cons+=r.consumed; v.val+=r.val; v.vat+=r.vat; v.gross+=r.gross; });
+      const vals=Object.entries(map).sort((a,b)=>b[1].gross-a[1].gross);
+      cc.innerHTML=vals.map(([name,v])=>`<tr><td>${esc138(name)}</td><td><span class="badge ${v.code==='FM'?'green':'neutral'}">${v.code}</span></td><td>${v.count}</td><td>${qty138(v.out)}</td><td>${qty138(v.ret)}</td><td>${qty138(v.cons)}</td><td>${money138(v.val)}</td><td>${money138(v.vat)}</td><td>${money138(v.gross)}</td></tr>`).join('') || '<tr><td colspan="9">لا توجد بيانات</td></tr>';
+    }
+    // تفصيلي الاستهلاك
+    const detail=$v138('inventoryUsageDetailBody');
+    if(detail){
+      const rows=[...usage].sort((a,b)=>String(b.date).localeCompare(String(a.date)) || String(a.project).localeCompare(String(b.project),'ar'));
+      detail.innerHTML=rows.map(r=>`<tr><td>${esc138(r.date)}</td><td>${esc138(r.project)}</td><td>${esc138(r.person)}</td><td>${esc138(r.product_code)} - ${esc138(r.item)}</td><td>${qty138(r.out)}</td><td>${qty138(r.returned)}</td><td>${qty138(r.consumed)}</td><td>${money138(r.unit_cost)}</td><td>${money138(r.gross)}</td><td>${esc138(r.reason)}</td><td>${esc138(daysAgo138(r.date))}</td><td>${esc138(r.ref)}</td></tr>`).join('') || '<tr><td colspan="12">لا توجد بيانات</td></tr>';
+      const table=detail.closest('table'); if(table?.tHead) table.tHead.innerHTML='<tr><th>التاريخ</th><th>المشروع</th><th>المشرف / المستلم</th><th>الصنف</th><th>الصادر</th><th>المرتجع</th><th>المستهلك</th><th>سعر الحبة</th><th>الإجمالي شامل الضريبة</th><th>سبب الاستخدام</th><th>منذ كم يوم</th><th>المرجع</th></tr>';
+    }
+    renderProductBox138(usage);
+  }
+  function renderProductBox138(usage){
+    const box=$v138('inventoryProductDetailBox'); if(!box) return;
+    const id=$v138('inventoryReportProduct')?.value || '';
+    if(!id){ box.innerHTML='<p class="muted">اختر منتجًا لعرض تفاصيله، أو استخدم الفلاتر لعرض بقية التقارير.</p>'; return; }
+    const it=item138(id); const rows=usage.filter(r=>String(r.item_id)===String(id));
+    const out=rows.reduce((a,r)=>a+r.out,0), ret=rows.reduce((a,r)=>a+r.returned,0), cons=rows.reduce((a,r)=>a+r.consumed,0), val=rows.reduce((a,r)=>a+r.val,0), vat=rows.reduce((a,r)=>a+r.vat,0), gross=rows.reduce((a,r)=>a+r.gross,0);
+    const img=it.image_url||it.photo_url||it.image||'';
+    const rowsHtml=rows.map(r=>`<tr><td>${esc138(r.date)}</td><td>${esc138(r.project)}</td><td>${esc138(r.person)}</td><td>${qty138(r.out)}</td><td>${qty138(r.returned)}</td><td>${qty138(r.consumed)}</td><td>${money138(r.unit_cost)}</td><td>${money138(r.gross)}</td><td>${esc138(r.ref)}</td></tr>`).join('') || '<tr><td colspan="9">لا توجد حركة لهذا المنتج ضمن الفلاتر الحالية</td></tr>';
+    box.innerHTML=`<div class="product-detail-head"><div>${img?`<img src="${esc138(img)}" class="product-detail-img">`:''}</div><div><h3>${esc138(it.name||'')}</h3><p>كود المنتج: <b>${esc138(code138(it))}</b> | الباركود: <b>${esc138(barcode138(it)||'-')}</b> | المورد: <b>${esc138(it.supplier||'-')}</b></p><p>سعر الحبة: <b>${money138(itemUnitCost138(it))}</b> | سعر الحبة شامل الضريبة: <b>${money138(unitWithVat138(it))}</b> | المتبقي: <b>${qty138(it.quantity)} ${esc138(it.unit||'')}</b></p></div></div><div class="kpis small"><div class="kpi"><small>الصادر</small><b>${qty138(out)}</b></div><div class="kpi"><small>المرتجع</small><b>${qty138(ret)}</b></div><div class="kpi"><small>المستهلك</small><b>${qty138(cons)}</b></div><div class="kpi"><small>قيمة الاستهلاك</small><b>${money138(val)}</b></div><div class="kpi"><small>الضريبة</small><b>${money138(vat)}</b></div><div class="kpi"><small>الإجمالي شامل الضريبة</small><b>${money138(gross)}</b></div></div><div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المشروع</th><th>المشرف / المستلم</th><th>الصادر</th><th>المرتجع</th><th>المستهلك</th><th>سعر الحبة</th><th>الإجمالي</th><th>المرجع</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
+  }
+  const oldRenderReports138 = window.financeRenderReports;
+  window.financeRenderReports = function(){
+    try{ renderReports138(); }catch(err){ console.warn('V138 reports warning', err); if(oldRenderReports138) oldRenderReports138.apply(this, arguments); }
+  };
+  function activeReportKind138(){ return document.querySelector('.smart-report-panel:not(.hidden)')?.getAttribute('data-report-panel') || document.querySelector('.smart-report-card.active')?.getAttribute('data-report') || 'expensesByProject'; }
+  function printableHtml138(kind){
+    renderReports138();
+    const map={
+      expensesByProject:['تقرير مصروفات المشاريع','expenseByProjectBody'],
+      stockOutByProject:['تقرير صرف المخزون حسب المشروع','stockOutByProjectBody'],
+      stockOutBySupervisor:['تقرير استهلاك المشرفين','stockOutBySupervisorBody'],
+      stockReport:['تقرير المخزون العام','stockReportBody'],
+      costCenters:['تقرير مراكز التكلفة','costCenterReportBody'],
+      inventoryUsageDetail:['تقرير تفصيلي للاستهلاك','inventoryUsageDetailBody']
+    };
+    if(kind==='productDetail'){
+      return ['تقرير تفاصيل منتج', $v138('inventoryProductDetailBox')?.innerHTML || '<p>لا توجد بيانات</p>'];
+    }
+    const [title,id]=map[kind]||map.expensesByProject;
+    const table=$v138(id)?.closest('table');
+    return [title, table ? `<table>${table.innerHTML}</table>` : '<p>لا توجد بيانات</p>'];
+  }
+  const oldPrintReport138 = window.financePrintReport;
+  window.financePrintReport = function(kind){
+    kind = kind || activeReportKind138();
+    const [title,html]=printableHtml138(kind);
+    if(typeof window.financePrintWindow === 'function') return window.financePrintWindow(title, html);
+    return oldPrintReport138 ? oldPrintReport138.apply(this, arguments) : undefined;
+  };
+  // Ensure filter changes always repaint all visible reports and print only the selected report.
+  window.inventoryClearReportDateFilter = function(){
+    if($v138('inventoryReportDateMode')) $v138('inventoryReportDateMode').value='all';
+    if($v138('inventoryReportDay')) $v138('inventoryReportDay').value='';
+    if($v138('inventoryReportMonth')) $v138('inventoryReportMonth').value='';
+    renderReports138();
+  };
+  // Full-month monthly time calculation: count every record dated from the first to the last day of the selected month.
+  window.monthlyRowsV60 = function(){
+    const month = $v138('monthlyMonth')?.value || today138().slice(0,7);
+    const sid = $v138('monthlySupervisor')?.value || '';
+    const start = monthStart138(month), end = monthEnd138(month);
+    let logs = (window.data?.logs||[]).filter(l=>{
+      const d=dateOnly138(l.log_date || l.check_in || l.created_at);
+      return inRange138(d,start,end);
+    });
+    if(sid) logs=logs.filter(l=>String(l.supervisor_id)===String(sid));
+    const map=new Map();
+    logs.forEach(l=>{
+      const d=dateOnly138(l.log_date || l.check_in || l.created_at);
+      const k=String(l.supervisor_id||'')+'_'+String(l.project_id||'');
+      if(!map.has(k)) map.set(k,{s:l.supervisor_id,p:l.project_id,a:0,r:0,t:0,c:0,days:new Set(),reqByDay:{}});
+      const x=map.get(k); x.c++; x.days.add(d);
+      const actual = typeof window.logActualMinutes==='function' ? window.logActualMinutes(l) : (n138(l.duration_minutes) || (typeof window.minutesBetween==='function'?window.minutesBetween(l.check_in,l.check_out):0));
+      const required = typeof window.logRequiredMinutes==='function' ? window.logRequiredMinutes(l) : n138(l.required_minutes);
+      x.a += n138(actual);
+      // Count required time once per project/day even if there are repeated records, including records without checkout.
+      if(d && x.reqByDay[d] === undefined) x.reqByDay[d] = n138(required);
+      x.t += n138(l.travel_minutes);
+    });
+    map.forEach(x=>{ x.uniqueDays=x.days.size; x.r=Object.values(x.reqByDay).reduce((a,v)=>a+n138(v),0); });
+    const vals=[...map.values()];
+    const supTotals={}; vals.forEach(r=>{ const s=String(r.s||''); supTotals[s]=(supTotals[s]||0)+n138(r.a); });
+    return vals.map(r=>{
+      const supTotal=supTotals[String(r.s||'')]||0;
+      const workPercent=supTotal ? r.a/supTotal*100 : 0;
+      const commitmentPercent=r.r ? r.a/r.r*100 : 0;
+      const diff=r.a-r.r;
+      const st=typeof window.monthlyStatusFromDiffV60==='function' ? window.monthlyStatusFromDiffV60(diff,r.r) : {text:diff>=0?'ممتاز':'ناقص وقت', cls:diff>=0?'green':'red'};
+      return {...r, supTotal, workers:(typeof window.uniqueWorkersForProjectTextV60==='function'?window.uniqueWorkersForProjectTextV60(r.p):'-'), dailyReqText:(typeof window.dailyRequiredTextV81==='function'?window.dailyRequiredTextV81(r.p):''), workPercent, commitmentPercent, ccls:(typeof window.monthlyCommitmentClassV60==='function'?window.monthlyCommitmentClassV60(commitmentPercent,r.r):'green'), diff, st:st.text, cls:st.cls};
+    }).sort((a,b)=>String(personName138(a.s)).localeCompare(String(personName138(b.s)),'ar') || String(projectName138(a.p)).localeCompare(String(projectName138(b.p)),'ar'));
+  };
+  const oldRenderMonthly138=window.renderMonthly;
+  window.renderMonthly=function(){
+    try{
+      const body=$v138('monthlyBody'); if(!body) return;
+      const table=body.closest('table');
+      if(table?.tHead) table.tHead.innerHTML='<tr><th>المشرف</th><th>المشروع</th><th>أسماء العمال</th><th>عدد السجلات</th><th>أيام الزيارة</th><th>الوقت اليومي المطلوب</th><th>إجمالي الوقت المطلوب</th><th>الساعات الفعلية</th><th>وقت الانتقال</th><th>نسبة الالتزام</th><th>حالة الأداء</th></tr>';
+      const vals=window.monthlyRowsV60();
+      body.innerHTML=vals.map(r=>`<tr><td>${esc138(personName138(r.s))}</td><td>${esc138(projectName138(r.p))}</td><td>${esc138(r.workers||'-')}</td><td>${r.c||0}</td><td>${r.uniqueDays||0}</td><td>${esc138(r.dailyReqText||'')}</td><td>${typeof window.minsToText==='function'?window.minsToText(r.r):r.r}</td><td>${typeof window.minsToText==='function'?window.minsToText(r.a):r.a}</td><td>${qty138(r.t)} دقيقة</td><td><span class="badge ${r.ccls}">${typeof window.percentText==='function'?window.percentText(r.commitmentPercent):qty138(r.commitmentPercent)+'%'}</span></td><td><span class="badge ${r.cls}">${esc138(r.st)}</span></td></tr>`).join('') || '<tr><td colspan="11">لا توجد سجلات من أول الشهر إلى نهايته</td></tr>';
+      const total=vals.reduce((a,r)=>a+n138(r.a),0), required=vals.reduce((a,r)=>a+n138(r.r),0), travel=vals.reduce((a,r)=>a+n138(r.t),0), records=vals.reduce((a,r)=>a+n138(r.c),0), days=vals.reduce((a,r)=>a+n138(r.uniqueDays),0), commitment=required?total/required*100:0;
+      const diff=total-required; const st=typeof window.monthlyStatusFromDiffV60==='function'?window.monthlyStatusFromDiffV60(diff,required):{text:diff>=0?'ممتاز':'ناقص وقت',cls:diff>=0?'green':'red'};
+      if($v138('monthlySummary')) $v138('monthlySummary').innerHTML=`<div class="kpi"><small>عدد السجلات</small><b>${records}</b></div><div class="kpi"><small>أيام الزيارة</small><b>${days}</b></div><div class="kpi"><small>إجمالي الوقت المطلوب</small><b>${typeof window.minsToText==='function'?window.minsToText(required):required}</b></div><div class="kpi"><small>الساعات الفعلية</small><b>${typeof window.minsToText==='function'?window.minsToText(total):total}</b></div><div class="kpi"><small>فرق الوقت</small><b>${typeof window.monthlyDiffTextV57==='function'?window.monthlyDiffTextV57(diff):diff}</b></div><div class="kpi"><small>وقت الانتقال</small><b>${qty138(travel)} دقيقة</b></div><div class="kpi"><small>نسبة الالتزام</small><b>${typeof window.percentText==='function'?window.percentText(commitment):qty138(commitment)+'%'}</b></div><div class="kpi"><small>حالة الأداء</small><b><span class="badge ${st.cls}">${esc138(st.text)}</span></b></div>`;
+    }catch(err){ console.warn('V138 monthly warning',err); if(oldRenderMonthly138) oldRenderMonthly138.apply(this,arguments); }
+  };
+  window.addEventListener('load',()=>setTimeout(()=>{ try{ renderReports138(); if($v138('monthlyBody')) window.renderMonthly(); }catch(e){ console.warn('V138 init',e); } },1800));
+})();
