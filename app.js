@@ -5608,14 +5608,33 @@ function financePrintReport(kind){
     const sub=$v133('supClientSlideModalSub'); if(sub) sub.textContent='ارفع الصور فقط. الأقسام الفارغة لن تظهر في تقرير العميل.';
     body.innerHTML=`<div class="smart-slide-edit-head"><div><label>نوع الشريحة</label><select onchange="supClientSetService(${i},'service_type',this.value); supClientSetService(${i},'title',this.value)">${DAILY_TYPES_V133.map(t=>`<option ${t===s.service_type?'selected':''}>${v133Esc(t)}</option>`).join('')}</select></div><div><label>اسم الشريحة</label><input value="${v133Esc(s.title||'')}" oninput="supClientSetService(${i},'title',this.value)" placeholder="مثال: تنظيف الممرات"></div></div><div class="smart-stage-grid-modal">${supClientStageModalBox(i,'before_images')}${supClientStageModalBox(i,'during_images')}${supClientStageModalBox(i,'after_images')}</div>`;
   };
+  function supClientGatewayIcon(type){
+    const t=String(type||'');
+    if(t.includes('بيسمنت')) return '🅿️';
+    if(t.includes('حشرات')) return '🛡️';
+    if(t.includes('أسطح')) return '🏢';
+    if(t.includes('خزانات')) return '💧';
+    if(t.includes('مكيف')) return '❄️';
+    if(t.includes('كهرب')) return '💡';
+    if(t.includes('سباك')) return '🔧';
+    if(t.includes('نفايات')) return '🗑️';
+    if(t.includes('مصاعد')) return '🛗';
+    if(t.includes('ممرات')) return '🧹';
+    return '📷';
+  }
   function supClientRenderServices(){
     const box=$v133('supClientServicesEditor'); if(!box) return;
-    box.innerHTML=supClientServicesState.map((s,i)=>`<div class="smart-service-slide-card ${v133CountImages(s)>0?'has-images':''}">
-      <div class="smart-service-slide-top"><span class="service-number">${i+1}</span><span class="status-pill">${supClientSlideStatus(s)}</span></div>
-      <h3>${v133Esc(s.title||s.service_type)}</h3>
-      <div class="smart-stage-counts"><span>قبل: ${supClientStageCount(s,'before_images')}</span><span>أثناء: ${supClientStageCount(s,'during_images')}</span><span>بعد: ${supClientStageCount(s,'after_images')}</span></div>
-      <div class="smart-slide-actions"><button type="button" onclick="supClientOpenSlideModal(${i})">عرض / رفع الصور</button><button class="danger" type="button" onclick="supClientRemoveService(${i})">حذف</button></div>
-    </div>`).join('');
+    box.innerHTML=supClientServicesState.map((s,i)=>{
+      const total=v133CountImages(s);
+      const status=total>0?'مكتمل':'بانتظار الصور';
+      const statusClass=total>0?'complete':'pending';
+      return `<button type="button" class="smart-service-gateway-v136 ${total>0?'has-images':''}" onclick="supClientOpenSlideModal(${i})" aria-label="فتح شريحة ${v133Esc(s.title||s.service_type)}">
+        <span class="gateway-icon-v136">${supClientGatewayIcon(s.service_type||s.title)}</span>
+        <span class="gateway-title-v136">${v133Esc(s.title||s.service_type)}</span>
+        <span class="gateway-badges-v136"><span>${total} صورة</span><span class="${statusClass}">${status}</span></span>
+        <span class="gateway-actions-v136"><span>فتح الشريحة</span><span class="gateway-delete-v136" onclick="event.stopPropagation(); supClientRemoveService(${i});">حذف</span></span>
+      </button>`;
+    }).join('');
   }
 
   window.supClientSaveDailyReport = async function(btn){
