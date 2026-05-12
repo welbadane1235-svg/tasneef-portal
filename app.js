@@ -6926,3 +6926,126 @@ function financePrintReport(kind){
     }catch(e){ console.warn('V146 cost centers render warning', e); }
   };
 })();
+
+/* ===== V147: Smart Tickets UI - visual layer only, same workflow ===== */
+(function(){
+  const $id = (id)=>document.getElementById(id);
+  const safe = (v)=> (typeof esc === 'function' ? esc(v) : String(v ?? '').replace(/[&<>\"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[m])));
+  const fdate = (v)=> (typeof fmt === 'function' ? fmt(v) : (v ? new Date(v).toLocaleString('ar-SA') : '-'));
+  const pName = (id)=> (typeof projectName === 'function' ? projectName(id) : '-');
+  const sName = (id)=> (typeof supervisorName === 'function' ? supervisorName(id) : '-');
+  const no = (t)=> t.ticket_number || ('T-' + String(t.id||0).padStart(4,'0'));
+  const minsBetweenSafe = (a,b)=>{ try{ return typeof minutesBetween==='function' ? minutesBetween(a,b) : Math.max(0, Math.round((new Date(b||Date.now())-new Date(a||Date.now()))/60000)); }catch(e){ return 0; } };
+  const duration = (t)=>{ try{ const m = (t.status==='closed' && t.open_duration_minutes != null) ? Number(t.open_duration_minutes||0) : minsBetweenSafe(t.created_at, new Date().toISOString()); return (typeof durationLabel==='function') ? durationLabel(m) : (Math.floor(m/60)+'س '+(m%60)+'د'); }catch(e){return '-';} };
+  const stLabel = (st)=> st==='closed'?'مغلق':(st==='processing'?'تحت المعالجة':'مفتوح');
+  const prLabel = (p)=> p==='urgent'?'عاجل':(p==='high'?'مهم':(p==='low'?'منخفض':'عادي'));
+  const stClass = (st)=> st==='closed'?'done':(st==='processing'?'doing':'open');
+  const prClass = (p)=> p==='urgent'?'urgent':(p==='high'?'high':(p==='low'?'low':'normal'));
+  function filterAdmin(rows){
+    const st=$id('ticketFilterStatus')?.value||'';
+    const q=($id('ticketSearch')?.value||'').trim().toLowerCase();
+    let list=[...(rows||[])];
+    if(st) list=list.filter(t=>String(t.status||'open')===String(st));
+    if(q) list=list.filter(t=>[no(t),t.title,t.description,pName(t.project_id),sName(t.supervisor_id),stLabel(t.status),prLabel(t.priority),t.claimed_by_name,t.closed_by_name,t.closure_note].join(' ').toLowerCase().includes(q));
+    return list;
+  }
+  function filterSupervisor(rows){
+    const st=$id('supTicketFilterStatus')?.value||'';
+    const pid=$id('supTicketFilterProject')?.value||'';
+    const q=($id('supTicketSearch')?.value||'').trim().toLowerCase();
+    let list=[...(rows||[])];
+    if(pid) list=list.filter(t=>String(t.project_id)===String(pid));
+    if(st) list=list.filter(t=>String(t.status||'open')===String(st));
+    if(q) list=list.filter(t=>[no(t),t.title,t.description,pName(t.project_id),stLabel(t.status),prLabel(t.priority),t.claimed_by_name,t.closed_by_name,t.closure_note].join(' ').toLowerCase().includes(q));
+    return list;
+  }
+  function summaryHtml(list){
+    const total=list.length, open=list.filter(t=>(t.status||'open')==='open').length, proc=list.filter(t=>t.status==='processing').length, closed=list.filter(t=>t.status==='closed').length, urgent=list.filter(t=>['urgent','high'].includes(t.priority)).length;
+    return `
+      <div class="smart-ticket-kpi"><b>${total}</b><span>إجمالي التكتات</span></div>
+      <div class="smart-ticket-kpi red"><b>${open}</b><span>مفتوحة</span></div>
+      <div class="smart-ticket-kpi amber"><b>${proc}</b><span>تحت المعالجة</span></div>
+      <div class="smart-ticket-kpi green"><b>${closed}</b><span>مغلقة</span></div>
+      <div class="smart-ticket-kpi dark"><b>${urgent}</b><span>عاجلة / مهمة</span></div>`;
+  }
+  function cardHtml(t, mode){
+    const canDelete = mode==='admin';
+    const waFn = (typeof window.sendTicketWhatsAppV43 === 'function') ? 'sendTicketWhatsAppV43' : ((typeof window.sendTicketWhatsApp === 'function') ? 'sendTicketWhatsApp' : 'sendTicketWhatsAppV43');
+    const actions = `
+      <button type="button" onclick="viewTicketSmartV147(${Number(t.id)||0})">عرض</button>
+      <button type="button" class="light" onclick="editTicket(${Number(t.id)||0})">تعديل</button>
+      ${t.status==='closed' ? `<button type="button" class="light" onclick="setTicketStatus(${Number(t.id)||0},'open')">إعادة فتح</button>` : `${t.status!=='processing'?`<button type="button" class="light" onclick="claimTicket(${Number(t.id)||0})">استلام</button>`:''}<button type="button" onclick="closeTicket(${Number(t.id)||0})">إغلاق</button>`}
+      ${typeof window[waFn] === 'function' ? `<button type="button" class="ticket-wa-v147" onclick="${waFn}(${Number(t.id)||0})">واتساب</button>` : ''}
+      ${canDelete?`<button type="button" class="danger" onclick="deleteRow('tickets',${Number(t.id)||0})">حذف</button>`:''}`;
+    return `<article class="smart-ticket-card ${stClass(t.status)} ${prClass(t.priority)}">
+      <div class="smart-ticket-top">
+        <div><strong>${safe(no(t))}</strong><small>${safe(fdate(t.created_at))}</small></div>
+        <span class="smart-ticket-status ${stClass(t.status)}">${safe(stLabel(t.status))}</span>
+      </div>
+      <h3>${safe(t.title||'-')}</h3>
+      <div class="smart-ticket-meta">
+        <span>المشروع: <b>${safe(pName(t.project_id))}</b></span>
+        <span>المشرف: <b>${safe(sName(t.supervisor_id))}</b></span>
+        <span>الأولوية: <b>${safe(prLabel(t.priority))}</b></span>
+        <span>مدة الفتح: <b>${safe(duration(t))}</b></span>
+      </div>
+      <p>${safe(t.description||'لا يوجد وصف')}</p>
+      <div class="smart-ticket-mini">
+        <span>استلم: ${safe(t.claimed_by_name||'-')}</span>
+        <span>أغلق: ${safe(t.closed_by_name||'-')}</span>
+      </div>
+      ${t.closure_note?`<div class="smart-ticket-note">الحل: ${safe(t.closure_note)}</div>`:''}
+      <div class="smart-ticket-actions">${actions}</div>
+    </article>`;
+  }
+  function renderInto(containerId, summaryId, list, mode){
+    const body=$id(containerId); if(!body) return;
+    const sum=$id(summaryId); if(sum) sum.innerHTML=summaryHtml(list);
+    body.classList.add('smart-ticket-grid');
+    body.innerHTML = list.map(t=>cardHtml(t,mode)).join('') || '<div class="empty-smart-ticket">لا توجد تكتات مطابقة للبحث الحالي</div>';
+  }
+  window.renderTickets = function(){
+    const all=[...(data.tickets||[])];
+    if($id('ticketsBody')) renderInto('ticketsBody','ticketsSmartSummary', filterAdmin(all), 'admin');
+    if($id('supTicketsBody')) renderInto('supTicketsBody','supTicketsSmartSummary', filterSupervisor(all), 'supervisor');
+  };
+  window.viewTicketSmartV147 = function(id){
+    const t=(data.tickets||[]).find(x=>String(x.id)===String(id)); if(!t) return msg && msg('التكت غير موجود','err');
+    let modal=$id('ticketSmartModalV147');
+    if(!modal){ modal=document.createElement('div'); modal.id='ticketSmartModalV147'; modal.className='smart-modal-v147 hidden'; document.body.appendChild(modal); }
+    modal.innerHTML=`<div class="smart-modal-backdrop" onclick="closeTicketSmartV147()"></div>
+      <div class="smart-modal-card">
+        <button class="smart-modal-close" onclick="closeTicketSmartV147()">×</button>
+        <div class="smart-modal-head"><div><small>${safe(no(t))}</small><h2>${safe(t.title||'-')}</h2></div><span class="smart-ticket-status ${stClass(t.status)}">${safe(stLabel(t.status))}</span></div>
+        <div class="smart-modal-grid">
+          <div><label>المشروع</label><b>${safe(pName(t.project_id))}</b></div>
+          <div><label>المشرف</label><b>${safe(sName(t.supervisor_id))}</b></div>
+          <div><label>الأولوية</label><b>${safe(prLabel(t.priority))}</b></div>
+          <div><label>مدة الفتح</label><b>${safe(duration(t))}</b></div>
+          <div><label>تاريخ الإنشاء</label><b>${safe(fdate(t.created_at))}</b></div>
+          <div><label>تاريخ الإغلاق</label><b>${safe(t.closed_at?fdate(t.closed_at):'-')}</b></div>
+        </div>
+        <div class="smart-modal-section"><h3>وصف البلاغ</h3><p>${safe(t.description||'لا يوجد وصف')}</p></div>
+        <div class="smart-modal-section"><h3>سجل المعالجة</h3>
+          <div class="ticket-timeline-v147">
+            <div><b>تم إنشاء التكت</b><span>${safe(fdate(t.created_at))}</span></div>
+            ${t.claimed_at?`<div><b>تم استلام التكت</b><span>${safe(t.claimed_by_name||'-')} - ${safe(fdate(t.claimed_at))}</span></div>`:''}
+            ${t.closed_at?`<div><b>تم إغلاق التكت</b><span>${safe(t.closed_by_name||'-')} - ${safe(fdate(t.closed_at))}</span></div>`:''}
+          </div>
+        </div>
+        ${t.closure_note?`<div class="smart-modal-section"><h3>طريقة الإغلاق</h3><p>${safe(t.closure_note)}</p></div>`:''}
+        <div class="smart-modal-actions">
+          <button onclick="editTicket(${Number(t.id)||0});closeTicketSmartV147();">تعديل</button>
+          ${t.status==='closed'?`<button class="light" onclick="setTicketStatus(${Number(t.id)||0},'open');closeTicketSmartV147();">إعادة فتح</button>`:`${t.status!=='processing'?`<button class="light" onclick="claimTicket(${Number(t.id)||0});closeTicketSmartV147();">استلام</button>`:''}<button onclick="closeTicket(${Number(t.id)||0});closeTicketSmartV147();">إغلاق</button>`}
+        </div>
+      </div>`;
+    modal.classList.remove('hidden');
+  };
+  window.closeTicketSmartV147 = function(){ const m=$id('ticketSmartModalV147'); if(m) m.classList.add('hidden'); };
+  const css=document.createElement('style'); css.textContent=`
+    .smart-ticket-summary{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:10px;margin:10px 0 14px}.smart-ticket-kpi{background:#fff;border:1px solid #e5ece7;border-radius:16px;padding:12px;text-align:center;box-shadow:0 8px 22px rgba(0,0,0,.05)}.smart-ticket-kpi b{display:block;font-size:22px;color:#174d35}.smart-ticket-kpi span{font-size:12px;color:#61716a}.smart-ticket-kpi.red b{color:#b83232}.smart-ticket-kpi.amber b{color:#b7791f}.smart-ticket-kpi.green b{color:#138a4b}.smart-ticket-kpi.dark b{color:#1f2937}
+    .smart-ticket-grid{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px;align-items:stretch}.smart-ticket-card{background:#fff;border:1px solid #e5ece7;border-radius:20px;padding:16px;box-shadow:0 10px 26px rgba(0,0,0,.06);position:relative;overflow:hidden}.smart-ticket-card:before{content:"";position:absolute;inset-inline-start:0;top:0;bottom:0;width:5px;background:#174d35}.smart-ticket-card.open:before{background:#b83232}.smart-ticket-card.doing:before{background:#d69e2e}.smart-ticket-card.done:before{background:#138a4b}.smart-ticket-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.smart-ticket-top strong{font-size:15px;color:#153f2c}.smart-ticket-top small{display:block;color:#7b8a83;margin-top:3px}.smart-ticket-status{border-radius:999px;padding:5px 10px;font-size:12px;font-weight:700;white-space:nowrap}.smart-ticket-status.open{background:#fde8e8;color:#9b1c1c}.smart-ticket-status.doing{background:#fff7db;color:#8a5a00}.smart-ticket-status.done{background:#e5f7ec;color:#116c3b}.smart-ticket-card h3{margin:12px 0 8px;font-size:18px;color:#10291d}.smart-ticket-meta{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:8px 0}.smart-ticket-meta span,.smart-ticket-mini span{background:#f7faf8;border:1px solid #edf3ef;border-radius:12px;padding:7px;font-size:12px;color:#60726a}.smart-ticket-card p{color:#43534c;line-height:1.65;margin:10px 0;min-height:42px}.smart-ticket-mini{display:grid;grid-template-columns:1fr 1fr;gap:7px}.smart-ticket-note{margin-top:8px;background:#f4fbf6;border:1px dashed #bfe1c9;border-radius:12px;padding:8px;font-size:12px;color:#24563b}.smart-ticket-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.smart-ticket-actions button,.smart-modal-actions button{padding:8px 10px;border-radius:11px}.ticket-wa-v147{background:#128C7E!important;color:#fff!important}.empty-smart-ticket{grid-column:1/-1;text-align:center;background:#fff;border-radius:16px;padding:25px;color:#6b7d74;border:1px dashed #d3ded8}
+    .smart-modal-v147.hidden{display:none}.smart-modal-v147{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}.smart-modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(2px)}.smart-modal-card{position:relative;background:#fff;border-radius:24px;padding:22px;max-width:760px;width:min(760px,96vw);max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)}.smart-modal-close{position:absolute;top:12px;left:12px;border-radius:50%;width:34px;height:34px;padding:0;background:#f2f5f3;color:#333}.smart-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;border-bottom:1px solid #edf2ef;padding-bottom:12px;margin-bottom:14px}.smart-modal-head small{color:#6b7d74}.smart-modal-head h2{margin:4px 0 0;color:#173c2b}.smart-modal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.smart-modal-grid div{background:#f8fbf9;border:1px solid #edf3ef;border-radius:14px;padding:10px}.smart-modal-grid label{display:block;font-size:11px;color:#718078;margin-bottom:5px}.smart-modal-section{margin-top:14px;background:#fff;border:1px solid #edf3ef;border-radius:16px;padding:12px}.smart-modal-section h3{margin:0 0 8px;color:#173c2b}.ticket-timeline-v147{display:grid;gap:8px}.ticket-timeline-v147 div{border-right:3px solid #174d35;background:#f8fbf9;border-radius:12px;padding:9px}.ticket-timeline-v147 span{display:block;color:#6b7d74;font-size:12px;margin-top:3px}.smart-modal-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.page#tickets .grid.two{grid-template-columns:minmax(280px,360px) 1fr!important}
+    @media(max-width:900px){.smart-ticket-summary{grid-template-columns:repeat(2,1fr)}.smart-modal-grid{grid-template-columns:1fr}.page#tickets .grid.two{grid-template-columns:1fr!important}.smart-ticket-meta{grid-template-columns:1fr}}
+  `; document.head.appendChild(css);
+})();

@@ -391,7 +391,7 @@
             <select id="ticketFilterStatus" onchange="renderTickets()"><option value="">كل الحالات</option><option value="open">مفتوح</option><option value="processing">تحت المعالجة</option><option value="closed">مغلق</option></select>
             <input id="ticketSearch" oninput="renderTickets()" placeholder="بحث برقم التكت، المشروع، العنوان أو الوصف">
           </div>
-          <div class="table-wrap"><table><thead><tr><th>رقم التكت</th><th>المشروع</th><th>المشرف</th><th>العنوان</th><th>الوصف</th><th>الأولوية</th><th>الحالة</th><th>التاريخ</th><th>مدة الفتح</th><th>استلم بواسطة</th><th>أغلق بواسطة</th><th>كيف تم الإغلاق</th><th>واتساب</th><th>إجراء</th></tr></thead><tbody id="ticketsBody"></tbody></table></div>
+          <div id="ticketsSmartSummary" class="smart-ticket-summary"></div><div id="ticketsBody" class="smart-ticket-grid"></div>
         </div>
       </div>
     </section>
@@ -700,6 +700,6 @@
     <section id="export" class="page hidden"><div class="card"><h2>التصدير</h2><p>صدّر بيانات النظام الحالية بصيغة CSV.</p><div class="actions"><button onclick="exportTable('app_users')">المستخدمين</button><button onclick="exportTable('projects')">المشاريع</button><button onclick="exportTable('workers')">العمال</button><button onclick="exportTable('attendance')">الحضور</button><button onclick="exportTable('time_logs')">التسجيلات اليومية</button><button onclick="exportTable('tickets')">التكتات</button></div></div></section>
   </main>
 </div>
-<script src="app.js?v=146"></script>
+<script src="app.js?v=147"></script>
 </body>
 </html>
