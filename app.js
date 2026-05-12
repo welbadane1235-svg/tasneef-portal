@@ -6063,3 +6063,149 @@ function financePrintReport(kind){
   };
   window.addEventListener('load',()=>setTimeout(()=>{ try{ renderReports138(); if($v138('monthlyBody')) window.renderMonthly(); }catch(e){ console.warn('V138 init',e); } },1800));
 })();
+
+
+/* ===== V139: Monthly back to original style + all calendar days, and correct FM/CN cost code ===== */
+(function(){
+  'use strict';
+  const $v139 = id => document.getElementById(id);
+  const n139 = v => { const x=Number(String(v??0).replace(/,/g,'').trim()); return Number.isFinite(x)?x:0; };
+  const esc139 = v => String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const qty139 = v => Number(n139(v)).toLocaleString('en-US',{maximumFractionDigits:2});
+  const money139 = v => Number(n139(v)).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' ر.س';
+  function dateStr139(d){ return d.toISOString().slice(0,10); }
+  function daysOfMonth139(month){
+    const [y,m]=String(month||'').split('-').map(Number);
+    if(!y||!m) return [];
+    const last=new Date(y,m,0).getDate();
+    const out=[];
+    for(let day=1; day<=last; day++) out.push(`${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`);
+    return out;
+  }
+  function dateOnly139(v){
+    const s=String(v||'');
+    if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+    const d=new Date(s); return isNaN(d)?'':dateStr139(d);
+  }
+  function projectName139(id){
+    if(typeof window.projectName==='function') return window.projectName(id);
+    return (window.data?.projects||[]).find(p=>String(p.id)===String(id))?.name || '-';
+  }
+  function personName139(id){
+    if(typeof window.supervisorName==='function') return window.supervisorName(id);
+    const u=(window.data?.users||[]).find(x=>String(x.id)===String(id));
+    return u?.full_name||u?.name||u?.username||'-';
+  }
+  function minsText139(v){ return typeof window.minsToText==='function' ? window.minsToText(v) : String(v||0); }
+  function percentText139(v){ return typeof window.percentText==='function' ? window.percentText(v) : (Number(v||0).toFixed(1)+'%'); }
+  function reqForProjectDate139(projectId, d){
+    if(typeof window.requiredMinutesForLog==='function') return n139(window.requiredMinutesForLog(projectId,d));
+    const p=(window.data?.projects||[]).find(x=>String(x.id)===String(projectId));
+    if(!p) return 0;
+    const day=new Date(d+'T00:00:00').getDay();
+    if(day===5 && n139(p.friday_minutes)>0) return n139(p.friday_minutes);
+    return n139(p.required_daily_minutes || p.required_minutes || 0);
+  }
+  function dailyReqText139(projectId){
+    if(typeof window.dailyRequiredTextV81==='function') return window.dailyRequiredTextV81(projectId);
+    const p=(window.data?.projects||[]).find(x=>String(x.id)===String(projectId));
+    return p ? minsText139(n139(p.required_daily_minutes||p.required_minutes||0)) : 'غير محدد';
+  }
+  function status139(pct, req){
+    if(typeof window.performanceStatus==='function') return window.performanceStatus(pct,req);
+    if(!req) return {text:'غير محدد',cls:'neutral'};
+    if(pct>=90 && pct<=110) return {text:'ممتاز',cls:'green'};
+    if(pct>110) return {text:'زيادة',cls:'amber'};
+    return {text:'ضعيف',cls:'red'};
+  }
+
+  // يرجع الحساب للشكل الأول: تجميع حسب المشرف والمشروع، لكن المطلوب يحسب كل أيام الشهر كاملة.
+  window.monthlyRowsV139 = function(){
+    const month=$v139('monthlyMonth')?.value || new Date().toISOString().slice(0,7);
+    const sid=$v139('monthlySupervisor')?.value || '';
+    const allDays=daysOfMonth139(month);
+    let logs=(window.data?.logs||[]).filter(l=>{
+      const d=dateOnly139(l.log_date || l.check_in || l.created_at);
+      return d && d.slice(0,7)===month;
+    });
+    if(sid) logs=logs.filter(l=>String(l.supervisor_id)===String(sid));
+    const map=new Map();
+    logs.forEach(l=>{
+      const key=String(l.supervisor_id||'')+'_'+String(l.project_id||'');
+      if(!map.has(key)) map.set(key,{s:l.supervisor_id,p:l.project_id,c:0,a:0,t:0,logDays:new Set()});
+      const x=map.get(key); x.c++; x.logDays.add(dateOnly139(l.log_date||l.check_in||l.created_at));
+      const actual=typeof window.logActualMinutes==='function' ? window.logActualMinutes(l) : n139(l.duration_minutes);
+      x.a += n139(actual);
+      x.t += n139(l.travel_minutes);
+    });
+    const vals=[...map.values()].map(x=>{
+      x.monthDays=allDays.length;
+      x.r=allDays.reduce((sum,d)=>sum+reqForProjectDate139(x.p,d),0);
+      const pct=x.r ? x.a/x.r*100 : 0;
+      const perf=status139(pct,x.r);
+      return {...x,percent:pct,perf, dailyReqText:dailyReqText139(x.p)};
+    });
+    vals.sort((a,b)=>String(personName139(a.s)).localeCompare(String(personName139(b.s)),'ar') || String(projectName139(a.p)).localeCompare(String(projectName139(b.p)),'ar'));
+    return vals;
+  };
+  window.renderMonthly = function(){
+    const body=$v139('monthlyBody'); if(!body) return;
+    const vals=window.monthlyRowsV139();
+    const table=body.closest('table');
+    if(table?.tHead) table.tHead.innerHTML='<tr><th>المشرف</th><th>المشروع</th><th>عدد السجلات</th><th>أيام الشهر</th><th>الوقت اليومي المطلوب</th><th>الساعات المطلوبة</th><th>الساعات الفعلية</th><th>وقت الانتقال</th><th>نسبة العمل</th><th>حالة الأداء</th></tr>';
+    body.innerHTML=vals.map(r=>`<tr><td>${esc139(personName139(r.s))}</td><td>${esc139(projectName139(r.p))}</td><td>${r.c}</td><td>${r.monthDays}</td><td>${esc139(r.dailyReqText||'')}</td><td>${minsText139(r.r)}</td><td>${minsText139(r.a)}</td><td>${qty139(r.t)} دقيقة</td><td><span class="badge ${r.perf.cls}">${percentText139(r.percent)}</span></td><td><span class="badge ${r.perf.cls}">${esc139(r.perf.text)}</span></td></tr>`).join('') || '<tr><td colspan="10">لا توجد بيانات</td></tr>';
+    const total=vals.reduce((a,r)=>a+n139(r.a),0), required=vals.reduce((a,r)=>a+n139(r.r),0), travel=vals.reduce((a,r)=>a+n139(r.t),0), records=vals.reduce((a,r)=>a+n139(r.c),0), monthDays=vals[0]?.monthDays || daysOfMonth139($v139('monthlyMonth')?.value || new Date().toISOString().slice(0,7)).length;
+    const pct=required?total/required*100:0; const perf=status139(pct,required);
+    if($v139('monthlySummary')) $v139('monthlySummary').innerHTML=`<div class="kpi"><small>عدد التسجيلات</small><b>${records}</b></div><div class="kpi"><small>أيام الشهر</small><b>${monthDays}</b></div><div class="kpi"><small>الساعات المطلوبة</small><b>${minsText139(required)}</b></div><div class="kpi"><small>الساعات الفعلية</small><b>${minsText139(total)}</b></div><div class="kpi"><small>وقت الانتقال</small><b>${qty139(travel)} دقيقة</b></div><div class="kpi"><small>نسبة العمل</small><b>${percentText139(pct)}</b></div><div class="kpi"><small>حالة الأداء</small><b><span class="badge ${perf.cls}">${esc139(perf.text)}</span></b></div>`;
+  };
+
+  function costCenters139(){ return (window.data?.costCenters||[]).filter(c=>String(c.status||'active')!=='inactive'); }
+  function costCenter139(row,name){
+    if(row?.cost_center_id){ const byId=costCenters139().find(c=>String(c.id)===String(row.cost_center_id)); if(byId) return byId; }
+    const n=String(name||row?.cost_center_name||'');
+    return costCenters139().find(c=>String(c.name||'')===n) || null;
+  }
+  function costCode139(name,row){
+    const c=costCenter139(row,name);
+    if(c){
+      const type=String(c.type||c.cost_type||'').trim();
+      // أي مركز تكلفة إداري/قسم/عام/تشغيلي يصنف CN حتى لو كان اسمه يشبه مشروعًا.
+      if(/إداري|اداري|قسم|عام|شركة|تشغيلي|كلين|CN/i.test(type+' '+(c.code||''))) return 'CN';
+      if(c.project_id || /مشروع|FM/i.test(type+' '+(c.code||''))) return 'FM';
+      return 'CN';
+    }
+    // إذا لا يوجد مركز تكلفة محفوظ، نعتمد على وجود project_id فقط.
+    if(row?.project_id) return 'FM';
+    return 'CN';
+  }
+  function item139(id){ return (window.data?.inventoryItems||[]).find(i=>String(i.id)===String(id))||{}; }
+  function lineItems139(r){ if(typeof window.v118LineItems==='function') return window.v118LineItems(r)||[]; return Array.isArray(r?.request_items)?r.request_items:(Array.isArray(r?.items)?r.items:[]); }
+  function retQty139(requestId,itemId){ return (window.data?.inventoryMovements||[]).filter(m=>String(m.request_id||'')===String(requestId||'') && String(m.item_id||'')===String(itemId||'') && String(m.movement_type)==='return').reduce((a,m)=>a+n139(m.quantity),0); }
+  function vat139(amount,it){ if(typeof window.vatAmount138==='function') return window.vatAmount138(amount,it); if(typeof window.vatOfAmount==='function') return window.vatOfAmount(amount,it); return amount*0.15; }
+  function gross139(amount,it){ if(typeof window.grossAmount138==='function') return window.grossAmount138(amount,it); if(typeof window.grossOfAmount==='function') return window.grossOfAmount(amount,it); return amount+vat139(amount,it); }
+  function usageRows139(){
+    const rows=[];
+    (window.data?.inventoryRequests||[]).filter(r=>String(r.status)==='approved').forEach(r=>{
+      const date=dateOnly139(r.request_date||r.created_at||new Date()); const project=projectName139(r.project_id)||r.project_name||'بدون مشروع'; const person=personName139(r.supervisor_id)||r.supervisor_name||'بدون مستلم';
+      lineItems139(r).forEach(l=>{ const it=item139(l.item_id); const out=n139(l.quantity); const returned=retQty139(r.id,l.item_id); const consumed=Math.max(0,out-returned); const unit=n139(l.unit_cost||it.unit_cost||it.unit_price); const val=consumed*unit; rows.push({date,project,project_id:r.project_id,person,person_id:r.supervisor_id,item:l.item_name||it.name||'',item_id:l.item_id,supplier:it.supplier||'',out,returned,consumed,val,vat:vat139(val,it),gross:gross139(val,it),cost_center_id:r.cost_center_id||'',cost_center_name:r.cost_center_name||project,ref:'REQ-'+r.id}); });
+    });
+    (window.data?.inventoryMovements||[]).filter(m=>['out','consume'].includes(String(m.movement_type)) && !m.request_id).forEach(m=>{ const it=item139(m.item_id); const qty=n139(m.quantity); const unit=n139(m.unit_cost||it.unit_cost||it.unit_price); const val=qty*unit; const project=projectName139(m.project_id)||m.project_name||'بدون مشروع'; rows.push({date:dateOnly139(m.movement_date||m.created_at||new Date()),project,project_id:m.project_id,person:m.receiver||'بدون مستلم',person_id:m.receiver_id||'',item:m.item_name||it.name||'',item_id:m.item_id,supplier:it.supplier||'',out:qty,returned:0,consumed:qty,val,vat:vat139(val,it),gross:gross139(val,it),cost_center_id:m.cost_center_id||'',cost_center_name:m.cost_center_name||project,ref:'MOV-'+m.id}); });
+    return rows;
+  }
+  function reportPass139(r){
+    const code=$v139('financeReportCostCodeFilter')?.value||''; if(code && costCode139(r.cost_center_name,r)!==code) return false;
+    const q=($v139('financeReportQuickSearch')?.value||'').trim().toLowerCase(); if(q && ![r.project,r.person,r.item,r.supplier,r.cost_center_name,r.ref].join(' ').toLowerCase().includes(q)) return false;
+    return true;
+  }
+  const oldFinanceRenderReports139=window.financeRenderReports;
+  window.financeRenderReports=function(){
+    if(oldFinanceRenderReports139) oldFinanceRenderReports139.apply(this,arguments);
+    try{
+      const cc=$v139('costCenterReportBody'); if(!cc) return;
+      const map={}; usageRows139().filter(reportPass139).forEach(r=>{ const name=r.cost_center_name||r.project||'غير محدد'; const code=costCode139(name,r); map[name]=map[name]||{code,count:0,out:0,ret:0,cons:0,val:0,vat:0,gross:0}; const v=map[name]; v.count++; v.out+=n139(r.out); v.ret+=n139(r.returned); v.cons+=n139(r.consumed); v.val+=n139(r.val); v.vat+=n139(r.vat); v.gross+=n139(r.gross); });
+      const vals=Object.entries(map).sort((a,b)=>b[1].gross-a[1].gross);
+      cc.innerHTML=vals.map(([name,v])=>`<tr><td>${esc139(name)}</td><td><span class="badge ${v.code==='FM'?'green':'neutral'}">${v.code}</span></td><td>${v.count}</td><td>${qty139(v.out)}</td><td>${qty139(v.ret)}</td><td>${qty139(v.cons)}</td><td>${money139(v.val)}</td><td>${money139(v.vat)}</td><td>${money139(v.gross)}</td></tr>`).join('') || '<tr><td colspan="9">لا توجد بيانات</td></tr>';
+    }catch(e){ console.warn('V139 cost report warning',e); }
+  };
+  window.addEventListener('load',()=>setTimeout(()=>{ try{ window.renderMonthly(); window.financeRenderReports?.(); }catch(e){ console.warn('V139 init',e); } },1800));
+})();
