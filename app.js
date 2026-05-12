@@ -6308,3 +6308,83 @@ function financePrintReport(kind){
   };
   window.addEventListener('load',()=>setTimeout(()=>{ try{ if($v140('monthlyBody')) window.renderMonthly(); }catch(e){} },2200));
 })();
+
+
+/* ===== V141: Monthly totals visible + Excel-like print blocks ===== */
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const num = v => { const n=Number(String(v ?? 0).replace(/,/g,'')); return Number.isFinite(n)?n:0; };
+  const dateOnly = v => String(v || '').slice(0,10);
+  const today = () => new Date().toISOString().slice(0,10);
+  function inMonth(d,month){ d=dateOnly(d); return d && d.slice(0,7)===(month||today().slice(0,7)); }
+  function minsText(m){ return (typeof window.minsToText==='function') ? window.minsToText(num(m)) : String(num(m)); }
+  function pctText(v){ return (typeof window.percentText==='function') ? window.percentText(num(v)) : (num(v).toFixed(1)+'%'); }
+  function supName(id){ return (typeof window.supervisorName==='function'?window.supervisorName(id):'') || ((window.data?.users||[]).find(u=>String(u.id)===String(id))?.full_name) || '-'; }
+  function projName(id){ return (typeof window.projectName==='function'?window.projectName(id):'') || ((window.data?.projects||[]).find(p=>String(p.id)===String(id))?.name) || '-'; }
+  function workerNames(pid){ return (typeof window.uniqueWorkersForProjectTextV60==='function'?window.uniqueWorkersForProjectTextV60(pid):'-') || '-'; }
+  function actualMins(l){ return (typeof window.logActualMinutes==='function') ? num(window.logActualMinutes(l)) : (num(l.duration_minutes) || (typeof window.minutesBetween==='function' ? num(window.minutesBetween(l.check_in,l.check_out)) : 0)); }
+  function status(p){ p=num(p); if(p>=90&&p<=110) return {text:'ممتاز',cls:'ok'}; if((p>=70&&p<90)||(p>110&&p<=140)) return {text:'جيد',cls:'warn'}; return {text:'ضعيف',cls:'bad'}; }
+  function monthLabel(month){
+    const parts=(month||today().slice(0,7)).split('-');
+    const y=parts[0], m=Number(parts[1]||1);
+    const en=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return (en[m-1]||month)+'-'+String(y).slice(-2);
+  }
+  window.monthlyRowsV141 = function(){
+    const month = $('monthlyMonth')?.value || today().slice(0,7);
+    const sid = $('monthlySupervisor')?.value || '';
+    let logs = (window.data?.logs || []).filter(l => inMonth(l.log_date || l.check_in || l.created_at, month));
+    if(sid) logs = logs.filter(l => String(l.supervisor_id) === String(sid));
+    const map = new Map();
+    logs.forEach(l=>{
+      const k=String(l.supervisor_id||'')+'_'+String(l.project_id||'');
+      if(!map.has(k)) map.set(k,{s:l.supervisor_id,p:l.project_id,a:0});
+      map.get(k).a += actualMins(l);
+    });
+    const rows=[...map.values()];
+    const totals={}; rows.forEach(r=>{ const s=String(r.s||''); totals[s]=(totals[s]||0)+num(r.a); });
+    return rows.map(r=>{ const total=totals[String(r.s||'')]||0; const percent=total? r.a/total*100 : 0; const st=status(percent); return {...r,total,percent,workers:workerNames(r.p),st:st.text,cls:st.cls}; })
+      .sort((a,b)=>String(supName(a.s)).localeCompare(String(supName(b.s)),'ar') || String(projName(a.p)).localeCompare(String(projName(b.p)),'ar'));
+  };
+  window.renderMonthly = function(){
+    const body=$('monthlyBody'); if(!body) return;
+    const table=body.closest('table');
+    if(table?.tHead) table.tHead.innerHTML='<tr><th>المشرف</th><th>المشروع</th><th>أسماء العمال</th><th>الساعات الفعلية</th><th>نسبة العمل</th><th>حالة الأداء</th></tr>';
+    const rows=window.monthlyRowsV141();
+    if(!rows.length){ body.innerHTML='<tr><td colspan="6">لا توجد بيانات لهذا الشهر</td></tr>'; return; }
+    let html='', last=null, groupTotal=0;
+    const flush=()=>{ if(last!==null){ html += `<tr class="monthly-total-row" style="background:#f4fbf8;font-weight:900"><td colspan="3">مجموع ${esc(supName(last))}</td><td>${esc(minsText(groupTotal))}</td><td><span class="badge green">100%</span></td><td>—</td></tr>`; }};
+    rows.forEach(r=>{
+      if(last!==null && String(last)!==String(r.s)){ flush(); groupTotal=0; }
+      last=r.s; groupTotal += num(r.a);
+      html += `<tr><td>${esc(supName(r.s))}</td><td>${esc(projName(r.p))}</td><td>${esc(r.workers||'-')}</td><td>${esc(minsText(r.a))}</td><td><span class="badge green">${esc(pctText(r.percent))}</span></td><td><span class="badge ${r.cls}">${esc(r.st)}</span></td></tr>`;
+    });
+    flush();
+    body.innerHTML=html;
+    const grand=rows.reduce((a,r)=>a+num(r.a),0);
+    const supCount=new Set(rows.map(r=>String(r.s||''))).size;
+    if($('monthlySummary')) $('monthlySummary').innerHTML=`<div class="kpi"><small>إجمالي الساعات الفعلية</small><b>${esc(minsText(grand))}</b></div><div class="kpi"><small>عدد المشرفين</small><b>${supCount}</b></div><div class="kpi"><small>عدد المشاريع</small><b>${rows.length}</b></div><div class="kpi"><small>مجموع كل مشرف</small><b>100%</b></div>`;
+  };
+  window.exportMonthlyCSV = function(){
+    const rows=[...document.querySelectorAll('#monthlyBody tr')].map(tr=>[...tr.children].map(td=>td.textContent.trim()));
+    const csv=['المشرف,المشروع,أسماء العمال,الساعات الفعلية,نسبة العمل,حالة الأداء',...rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(','))].join('\n');
+    if(typeof window.download==='function') window.download('monthly.csv',csv);
+  };
+  window.printMonthlyReportV57 = function(){
+    const rows=window.monthlyRowsV141();
+    if(!rows.length){ if(typeof window.msg==='function') msg('لا توجد بيانات في الأوقات الشهرية للطباعة','err'); return; }
+    const month=$('monthlyMonth')?.value||today().slice(0,7);
+    const groups={}; rows.forEach(r=>{ const s=String(r.s||''); (groups[s]=groups[s]||[]).push(r); });
+    const cards=Object.keys(groups).map(sid=>{
+      const arr=groups[sid]; const total=arr.reduce((a,r)=>a+num(r.a),0);
+      const projectRows=arr.map(r=>`<tr><td class="pname">${esc(projName(r.p))}</td><td>${num(r.a).toLocaleString('en-US')}</td><td>${esc(pctText(r.percent))}</td></tr>`).join('') + `<tr class="sum"><td></td><td>${num(total).toLocaleString('en-US')}</td><td>100%</td></tr>`;
+      const workers=[...new Set(arr.flatMap(r=>String(r.workers||'').split(/[،,\n]+/).map(x=>x.trim()).filter(Boolean)))].join('<br>') || '-';
+      return `<div class="sup-card"><h3>${esc(supName(sid))}</h3><table><tbody>${projectRows}</tbody></table><div class="workers"><b>أسماء العمال</b><p>${workers}</p></div></div>`;
+    }).join('');
+    const html=`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>الأوقات الشهرية</title><style>@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;color:#000;margin:0;background:#fff;font-size:12px}.sheet{border:2px solid #000;margin:auto;min-height:170mm;padding:0 0 10px}.head{text-align:center;border-bottom:2px solid #000;padding:8px 0 6px;line-height:1.6}.head b{display:block;font-weight:400}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;direction:ltr}.sup-card{direction:rtl;min-height:150mm;border-left:2px solid #000;padding:6px 7px}.sup-card:last-child{border-left:0}.sup-card h3{text-align:center;margin:0 0 5px;font-size:13px;font-weight:400}table{width:100%;border-collapse:collapse}td{padding:2px 3px;text-align:center;vertical-align:top}.pname{text-align:right}.sum td{border-top:1px solid transparent;font-weight:700}.workers{text-align:center;margin-top:42px;line-height:1.75}.workers b{font-weight:400}.workers p{margin:8px 0 0}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}.sheet{break-inside:avoid}}</style></head><body><div class="sheet"><div class="head"><b>${esc(monthLabel(month))}</b><b>مشاريع الصيانة اليومية</b></div><div class="grid">${cards}</div></div><script>window.onload=function(){setTimeout(function(){window.print()},350)}</script></body></html>`;
+    const w=window.open('','_blank'); if(w){w.document.write(html);w.document.close();}
+  };
+  window.addEventListener('load',()=>setTimeout(()=>{ try{ if($('monthlyBody')) window.renderMonthly(); }catch(e){console.warn('V141 monthly',e)} },2400));
+})();
