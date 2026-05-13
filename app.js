@@ -8362,3 +8362,80 @@ function financePrintReport(kind){
   window.addEventListener('load',()=>setTimeout(()=>{ applySmartSidebarLogo157(); try{ window.renderPremiumReports(); }catch(_){ } },500));
   document.addEventListener('DOMContentLoaded',applySmartSidebarLogo157);
 })();
+
+/* ===== V158: WhatsApp report button robust fix ===== */
+(function(){
+  function waEsc(v){ try{return (typeof esc==='function') ? esc(v) : String(v||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}catch(e){return String(v||'');} }
+  function normalizeWaV158(p){
+    p=String(p||'').trim();
+    p=p.replace(/[^0-9+]/g,'');
+    if(p.startsWith('+')) p=p.slice(1);
+    p=p.replace(/[^0-9]/g,'');
+    if(!p) return '';
+    if(p.startsWith('00')) p=p.slice(2);
+    if(p.startsWith('05')) p='966'+p.slice(1);
+    else if(p.startsWith('5') && p.length===9) p='966'+p;
+    else if(p.startsWith('0') && p.length>9) p=p.slice(1);
+    return p;
+  }
+  function buildReportWaTextV158(r){
+    const project = r.project_name || (typeof projectName==='function'?projectName(r.project_id):'') || 'المشروع';
+    const title = r.title || 'تقرير الخدمات';
+    const token = r.public_token || '';
+    const url = token && typeof clientReportUrl==='function' ? clientReportUrl(token) : '';
+    return [
+      `السيد / رئيس جمعية ${project} المحترم`,
+      '',
+      `تم نشر ${title}.`,
+      url ? `للاطلاع على التقرير:\n${url}` : '',
+      '',
+      'شركة تصنيف لإدارة المرافق',
+      '920015589'
+    ].filter(Boolean).join('\n');
+  }
+  window.sendPremiumWhatsapp = function(id){
+    try{
+      const r=(window.data?.clientReports||data?.clientReports||[]).find(x=>String(x.id)===String(id));
+      if(!r) return (typeof msg==='function'?msg('لم يتم العثور على التقرير','err'):alert('لم يتم العثور على التقرير'));
+      if(!r.public_token) return (typeof msg==='function'?msg('التقرير غير منشور بعد','err'):alert('التقرير غير منشور بعد'));
+      const text=buildReportWaTextV158(r);
+      const phone=normalizeWaV158(r.chairman_phone || r.phone || r.mobile || '');
+      const url= phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : `https://wa.me/?text=${encodeURIComponent(text)}`;
+      if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).catch(()=>{}); }
+      const w=window.open(url,'_blank','noopener,noreferrer');
+      if(!w){
+        // Fallback for popup blockers: create a direct link the user can click.
+        const box=document.createElement('div');
+        box.className='wa-fallback-v158';
+        box.innerHTML=`<div class="wa-fallback-card-v158"><b>فتح واتساب</b><p>إذا لم يفتح واتساب تلقائيًا، اضغط الزر التالي.</p><a target="_blank" rel="noopener" href="${url}">فتح واتساب الآن</a><button type="button" onclick="this.closest('.wa-fallback-v158').remove()">إغلاق</button></div>`;
+        document.body.appendChild(box);
+      }
+      if(typeof msg==='function') msg(phone?'تم فتح واتساب للتقرير':'تم فتح واتساب بدون رقم محدد، اختر جهة الإرسال');
+    }catch(e){
+      console.error('sendPremiumWhatsapp V158 failed',e);
+      if(typeof msg==='function') msg('تعذر فتح واتساب: '+(e.message||e),'err');
+    }
+  };
+  // Make report WhatsApp buttons reliably clickable even if older render markup exists.
+  const oldRender = window.renderPremiumReports;
+  if(typeof oldRender==='function'){
+    window.renderPremiumReports=function(){
+      oldRender.apply(this,arguments);
+      setTimeout(()=>{
+        document.querySelectorAll('button[onclick^="sendPremiumWhatsapp("]').forEach(b=>{
+          b.type='button';
+          b.classList.add('wa-report-btn-v158');
+        });
+      },30);
+    };
+  }
+  const css=document.createElement('style');
+  css.textContent=`
+    .wa-report-btn-v158{background:#128C7E!important;color:#fff!important;border:0!important;border-radius:10px!important;font-weight:800!important}
+    .wa-fallback-v158{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999999;display:flex;align-items:center;justify-content:center;direction:rtl}
+    .wa-fallback-card-v158{background:#fff;border-radius:18px;padding:22px;max-width:360px;box-shadow:0 18px 50px rgba(0,0,0,.25);text-align:center;color:#063f32}
+    .wa-fallback-card-v158 a{display:inline-block;background:#128C7E;color:#fff;text-decoration:none;border-radius:12px;padding:10px 18px;margin:8px;font-weight:800}
+    .wa-fallback-card-v158 button{background:#edf7f2;color:#063f32;border:1px solid #cfe4db;border-radius:12px;padding:10px 18px;margin:8px;font-weight:800;cursor:pointer}
+  `;
+  document.head.appendChild(css);
+})();
