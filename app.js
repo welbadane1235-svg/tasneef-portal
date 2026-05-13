@@ -5671,8 +5671,9 @@ function financePrintReport(kind){
   };
   window.supClientReportProjectChanged = function(){
     const p=v133ProjectName($v133('supClientReportProject')?.value);
-    if($v133('supClientReportTitle') && !$v133('supClientReportTitle').value) $v133('supClientReportTitle').value='تقرير يومي - '+p;
-    if($v133('supClientReportSummary') && !$v133('supClientReportSummary').value) $v133('supClientReportSummary').value=v133DefaultSummary();
+    // V156: عنوان تقرير المشرف يتغير تلقائيًا دائمًا حسب المشروع المختار
+    if($v133('supClientReportTitle')) $v133('supClientReportTitle').value = p && p !== '-' ? ('تقرير يومي - ' + p) : 'تقرير يومي للعميل';
+    if($v133('supClientReportSummary')) $v133('supClientReportSummary').value = v133DefaultSummary();
   };
   window.supClientReportReset = function(){
     supClientServicesState=[v133ServiceTemplate('النظافة اليومية')];
@@ -5759,7 +5760,7 @@ function financePrintReport(kind){
       const valid=supClientServicesState.filter(s=>v133CountImages(s)>0);
       if(!valid.length) throw new Error('أضف صورًا لخدمة واحدة على الأقل');
       const u=session()||{}; const p=v133ProjectName(pid); const reportDate=$v133('supClientReportDate')?.value||today();
-      const reportRow={report_no:genReportNo(), project_id:Number(pid), project_name:p, chairman_name:'', chairman_phone:'', title:$v133('supClientReportTitle')?.value||('تقرير يومي - '+p), report_type:'تقرير يومي من المشرف', report_date:reportDate, executive_summary:$v133('supClientReportSummary')?.value||v133DefaultSummary(), status:'draft', public_token:null};
+      const reportRow={report_no:genReportNo(), project_id:Number(pid), project_name:p, chairman_name:'', chairman_phone:'', title:('تقرير يومي - '+p), report_type:'تقرير يومي من المشرف', report_date:reportDate, executive_summary:$v133('supClientReportSummary')?.value||v133DefaultSummary(), status:'draft', public_token:null};
       const {data:rep,error}=await sb.from('client_reports').insert(reportRow).select('id').single(); if(error) throw error;
       const rows=valid.map((s,i)=>({report_id:rep.id,sort_order:i+1,service_type:s.service_type,title:s.title||s.service_type,service_description:'',scope_work:'',notes:`المشرف: ${u.full_name||u.username||''}`,before_images:s.before_images||[],during_images:s.during_images||[],after_images:s.after_images||[]}));
       const {error:se}=await sb.from('client_report_services').insert(rows); if(se) throw se;
