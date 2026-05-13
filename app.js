@@ -7998,3 +7998,95 @@ function financePrintReport(kind){
   }
   window.addEventListener('load',()=>setTimeout(()=>{ injectCostReductionUi(); enhanceBatchCards(); if(window.renderStockBatchCardsV149) renderStockBatchCardsV149(); },1200));
 })();
+
+// ================= V153 Product Consumption Summary Fix =================
+// Fix product detail summary: consumed must be calculated as issued/out minus returns,
+// not only movements explicitly marked as consume. This keeps all product cards and
+// product detail modals logically aligned with request returns.
+(function(){
+  const byId = id => document.getElementById(id);
+  const esc2 = s => String(s ?? '').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
+  const n2 = v => (typeof num === 'function' ? num(v) : Number(String(v ?? 0).replace(/,/g,''))) || 0;
+  const q2 = v => n2(v).toLocaleString('en-US',{maximumFractionDigits:2});
+  const money2 = v => (typeof money === 'function' ? money(v) : `${n2(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} ر.س`);
+  const project2 = id => (typeof financeProjectName === 'function' ? financeProjectName(id) : ((window.data?.projects||[]).find(p=>String(p.id)===String(id))?.name || '-'));
+  const itemCode2 = it => (typeof v118ProductCode === 'function' ? v118ProductCode(it) : '') || it?.product_code || it?.serial_number || it?.code || '';
+  const itemBarcode2 = it => (typeof v118Barcode === 'function' ? v118Barcode(it) : '') || it?.barcode || it?.supplier_barcode || '';
+  const itemImg2 = it => it?.image_url || it?.image || it?.photo_url || it?.product_image || '';
+
+  function metricsForItem(itemId){
+    const movements = (window.data?.inventoryMovements || []).filter(m => String(m.item_id) === String(itemId));
+    const issued = movements.filter(m => m.movement_type === 'out').reduce((a,m)=>a+n2(m.quantity),0);
+    const returned = movements.filter(m => m.movement_type === 'return').reduce((a,m)=>a+n2(m.quantity),0);
+    const directConsumed = movements.filter(m => m.movement_type === 'consume').reduce((a,m)=>a+n2(m.quantity),0);
+    const consumed = Math.max(0, issued - returned) + directConsumed;
+    return {movements, issued, returned, directConsumed, consumed};
+  }
+  window.inventoryProductMetricsV153 = metricsForItem;
+
+  window.inventoryOpenItemSmart = function(id){
+    const it = (window.data?.inventoryItems || []).find(x => String(x.id) === String(id));
+    if(!it) return (typeof msg === 'function' ? msg('الصنف غير موجود','err') : alert('الصنف غير موجود'));
+    const m = metricsForItem(id);
+    const rows = m.movements.slice(0,40).map(x=>{
+      const label = x.movement_type === 'out' ? 'صرف' : (x.movement_type === 'return' ? 'مرتجع' : (x.movement_type === 'consume' ? 'استهلاك مباشر' : (x.movement_type === 'in' ? 'إدخال' : 'تعديل')));
+      return `<tr><td>${esc2(x.movement_date || String(x.created_at||'').slice(0,10) || '-')}</td><td>${esc2(label)}</td><td>${q2(x.quantity)}</td><td>${esc2(x.project_name || project2(x.project_id))}</td><td>${esc2(x.receiver || '-')}</td><td>${esc2(x.reason || x.notes || '-')}</td></tr>`;
+    }).join('') || '<tr><td colspan="6">لا توجد حركات مسجلة</td></tr>';
+    const img = itemImg2(it);
+    const html = `<div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap">
+      ${img ? `<img class="smart-img-v129" style="width:150px;height:150px;object-fit:contain" src="${esc2(img)}">` : ''}
+      <div style="flex:1;min-width:260px"><h2>${esc2(it.name || '-')}</h2>
+        <div class="smart-meta-v129">
+          <div class="m"><small>كود المنتج</small><b>${esc2(itemCode2(it) || '-')}</b></div>
+          <div class="m"><small>كود / باركود المورد</small><b>${esc2(itemBarcode2(it) || '-')}</b></div>
+          <div class="m"><small>المورد</small><b>${esc2(it.supplier || '-')}</b></div>
+          <div class="m"><small>التصنيف</small><b>${esc2(it.category || '-')}</b></div>
+          <div class="m"><small>المتبقي</small><b>${q2(it.quantity)} ${esc2(it.unit || '')}</b></div>
+          <div class="m"><small>حد إعادة الطلب</small><b>${q2(it.min_quantity || it.reorder_level || 0)}</b></div>
+          <div class="m"><small>سعر الحبة</small><b>${money2(it.unit_cost)}</b></div>
+          <div class="m"><small>سعر شامل الضريبة</small><b>${money2(n2(it.unit_cost) * 1.15)}</b></div>
+        </div>
+      </div>
+    </div>
+    <h3>ملخص الحركة</h3>
+    <div class="smart-meta-v129">
+      <div class="m"><small>الصادر</small><b>${q2(m.issued)}</b></div>
+      <div class="m"><small>المرتجع</small><b>${q2(m.returned)}</b></div>
+      <div class="m"><small>المستهلك</small><b>${q2(m.consumed)}</b></div>
+      <div class="m"><small>المتبقي</small><b>${q2(it.quantity)}</b></div>
+      <div class="m"><small>عدد الحركات</small><b>${m.movements.length}</b></div>
+    </div>
+    <h3>آخر الحركات</h3>
+    <table><thead><tr><th>التاريخ</th><th>الحركة</th><th>الكمية</th><th>المشروع</th><th>المستلم</th><th>السبب</th></tr></thead><tbody>${rows}</tbody></table>`;
+    if(typeof window.smartOpenV129 === 'function'){
+      window.smartOpenV129('تفاصيل المنتج', html, `<button onclick="financePrintReport && financePrintReport('productDetail')">طباعة</button>`);
+    } else {
+      const box = byId('inventoryProductDetailBox'); if(box) box.innerHTML = html;
+    }
+  };
+
+  // Patch report product detail box after any report render, so the visible report also uses the correct consumed formula.
+  const oldFinanceRenderReportsV153 = window.financeRenderReports;
+  window.financeRenderReports = function(){
+    if(typeof oldFinanceRenderReportsV153 === 'function') oldFinanceRenderReportsV153.apply(this, arguments);
+    try{
+      const select = byId('inventoryReportProduct');
+      const box = byId('inventoryProductDetailBox');
+      if(!select || !box || !select.value) return;
+      const it = (window.data?.inventoryItems || []).find(x => String(x.id) === String(select.value));
+      if(!it) return;
+      const met = metricsForItem(it.id);
+      // Replace only summary labels/values when old content exists; keep detailed rows from existing render.
+      const summary = `<div class="kpis small">
+        <div class="kpi"><small>الصادر</small><b>${q2(met.issued)}</b></div>
+        <div class="kpi"><small>المرتجع</small><b>${q2(met.returned)}</b></div>
+        <div class="kpi"><small>المستهلك</small><b>${q2(met.consumed)}</b></div>
+        <div class="kpi"><small>المتبقي</small><b>${q2(it.quantity)}</b></div>
+      </div>`;
+      const existing = box.innerHTML || '';
+      if(existing.includes('class="kpis small"')){
+        box.innerHTML = existing.replace(/<div class="kpis small">[\s\S]*?<\/div>\s*<div class="table-wrap">/, summary + '<div class="table-wrap">');
+      }
+    }catch(e){}
+  };
+})();
