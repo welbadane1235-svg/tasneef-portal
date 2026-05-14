@@ -9922,3 +9922,191 @@ function financePrintReport(kind){
   injectCssV166();
   console.log('V167 client reports edit database connection fix loaded');
 })();
+
+/* ===== V168: Finance inventory tabs, report filters, and stale-data cleanup fix ===== */
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const S = v => String(v ?? '').trim();
+  const L = v => S(v).toLowerCase();
+  const N = v => { const x = parseFloat(String(v ?? 0).replace(/,/g,'')); return Number.isFinite(x) ? x : 0; };
+  const E = v => S(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const Q = v => N(v).toLocaleString('en-US',{maximumFractionDigits:2});
+  const M = v => N(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const dateOnly = v => S(v).slice(0,10);
+  const today = () => new Date().toISOString().slice(0,10);
+  const role = () => { try { return (typeof session === 'function' ? (session()||{}).role : '') || ''; } catch(_) { return ''; } };
+  const isWarehouse = () => role() === 'warehouse_manager';
+  const itemById = id => (window.data?.inventoryItems||[]).find(i=>String(i.id)===String(id)) || {};
+  const projectNameSafe = id => (typeof financeProjectName==='function' ? financeProjectName(id) : '') || (typeof projectName==='function' ? projectName(id) : '') || (window.data?.projects||[]).find(p=>String(p.id)===String(id))?.name || '';
+  const supervisorNameSafe = id => (typeof supervisorName==='function' ? supervisorName(id) : '') || (window.data?.users||[]).find(u=>String(u.id)===String(id))?.full_name || '';
+  const productCode = it => S(it?.product_code || it?.barcode || it?.supplier_barcode || it?.serial_number || it?.company_code || it?.id || '');
+  const productBarcode = it => S(it?.barcode || it?.supplier_barcode || '');
+  const vatMode = it => S(it?.vat_mode || it?.tax_mode || it?.vat_status || 'exclusive');
+  const unitBefore = (it, raw) => { raw = N(raw ?? it?.unit_cost ?? it?.unit_price); return vatMode(it)==='inclusive' ? raw/1.15 : raw; };
+  const unitVat = (it, raw) => vatMode(it)==='exempt' ? 0 : unitBefore(it, raw)*0.15;
+  const unitGross = (it, raw) => unitBefore(it, raw) + unitVat(it, raw);
+  const amountVat = (it, before) => vatMode(it)==='exempt' ? 0 : N(before)*0.15;
+  const amountGross = (it, before) => N(before)+amountVat(it,before);
+
+  function hiddenInvoices(){
+    const keys=['deleted_stock_invoices_v163','deleted_stock_invoices_v164'];
+    const out=[];
+    keys.forEach(k=>{ try{ const a=JSON.parse(localStorage.getItem(k)||'[]'); if(Array.isArray(a)) out.push(...a.map(S)); }catch(_){} });
+    return [...new Set(out.filter(Boolean))];
+  }
+  function rowRef(row){ return [row?.invoice_no,row?.batch_no,row?.reference,row?.ref,row?.notes,row?.reason,row?.id].map(S).join(' '); }
+  function notDeleted(row){ const hidden=hiddenInvoices(); if(!hidden.length) return true; const txt=rowRef(row); return !hidden.some(h=>txt.includes(h)); }
+  function datePass(d){
+    d=dateOnly(d || today());
+    const mode=$('inventoryReportDateMode')?.value || 'all';
+    if(mode==='day') return d === ($('inventoryReportDay')?.value || today());
+    if(mode==='month') return d.startsWith($('inventoryReportMonth')?.value || today().slice(0,7));
+    const fm=$('financeMonthFilter')?.value; if(fm) return d.startsWith(fm);
+    return true;
+  }
+  function getCostCode(row){
+    const direct=S(row?.cost_code).toUpperCase(); if(direct==='FM'||direct==='CN') return direct;
+    const centers=window.data?.costCenters||[];
+    let c=null;
+    if(row?.cost_center_id) c=centers.find(x=>String(x.id)===String(row.cost_center_id));
+    if(!c){ const nm=S(row?.cost_center_name||row?.cost_center||''); if(nm) c=centers.find(x=>S(x.name)===nm); }
+    if(c){
+      const t=[c.type,c.cost_type,c.code,c.name].map(S).join(' ');
+      if(/CN|إداري|اداري|قسم|عام|شركة|كلين|clean|admin/i.test(t)) return 'CN';
+      if(c.project_id || /FM|مشروع|project/i.test(t)) return 'FM';
+      return 'CN';
+    }
+    const type=[row?.cost_center_type,row?.cost_type,row?.cost_center_name].map(S).join(' ');
+    if(/CN|إداري|اداري|قسم|عام|شركة|كلين|clean|admin/i.test(type)) return 'CN';
+    return row?.project_id ? 'FM' : 'CN';
+  }
+  function lineItems(r){
+    let arr=r?.request_items || r?.request_lines || r?.items || [];
+    if(typeof arr==='string'){ try{ arr=JSON.parse(arr); }catch(_){ arr=[]; } }
+    if(!Array.isArray(arr)) arr=[];
+    if(!arr.length && r?.item_id) arr=[{item_id:r.item_id,item_name:r.item_name,quantity:r.quantity,product_code:r.product_code,unit_cost:r.unit_cost}];
+    return arr;
+  }
+  function returnQty(reqId,itemId,code){
+    return (window.data?.inventoryMovements||[]).filter(m=>notDeleted(m) && S(m.movement_type)==='return' && String(m.request_id)===String(reqId) && (String(m.item_id)===String(itemId)|| (code && S(m.product_code)===S(code)))).reduce((a,m)=>a+N(m.quantity),0);
+  }
+  function usageRows(){
+    const rows=[];
+    (window.data?.inventoryRequests||[]).filter(r=>notDeleted(r) && ['approved','issued','closed'].includes(S(r.status))).forEach(r=>{
+      const date=dateOnly(r.request_date||r.created_at||today());
+      const project=r.project_name || projectNameSafe(r.project_id) || 'بدون مشروع';
+      const person=r.supervisor_name || supervisorNameSafe(r.supervisor_id) || 'بدون مستلم';
+      lineItems(r).forEach(l=>{
+        const it=itemById(l.item_id); const out=N(l.quantity); const ret=returnQty(r.id,l.item_id,l.product_code); const consumed=Math.max(0,out-ret);
+        const unit=unitBefore(it,l.unit_cost); const val=consumed*unit;
+        const row={date, project, project_id:r.project_id, person, person_id:r.supervisor_id, item:l.item_name||it.name||'', item_id:l.item_id, product_code:S(l.product_code||productCode(it)), barcode:S(l.barcode||productBarcode(it)), supplier:S(it.supplier||l.supplier||''), category:S(it.category||l.category||''), item_type:S(it.item_type||it.type||l.item_type||''), unit_name:S(it.unit||l.unit||''), out, returned:ret, consumed, current:N(it.quantity), unit_before:unit, unit_vat:unitVat(it,l.unit_cost), unit_gross:unitGross(it,l.unit_cost), value_before:val, vat:amountVat(it,val), gross:amountGross(it,val), reason:r.reason||r.notes||'-', movement_type:'أمر صرف معتمد', ref:'REQ-'+r.id, cost_center_id:r.cost_center_id||null, cost_center_name:r.cost_center_name||project, cost_center_type:r.cost_center_type||''};
+        row.cost_code=getCostCode(row); rows.push(row);
+      });
+    });
+    (window.data?.inventoryMovements||[]).filter(m=>notDeleted(m) && ['out','consume'].includes(S(m.movement_type)) && !m.request_id).forEach(m=>{
+      const it=itemById(m.item_id); const q=N(m.quantity); const unit=unitBefore(it,m.unit_cost); const val=q*unit; const project=m.project_name || projectNameSafe(m.project_id) || 'بدون مشروع';
+      const row={date:dateOnly(m.movement_date||m.created_at||today()), project, project_id:m.project_id, person:m.receiver||'بدون مستلم', person_id:m.receiver_id||'', item:m.item_name||it.name||'', item_id:m.item_id, product_code:S(m.product_code||productCode(it)), barcode:S(m.barcode||productBarcode(it)), supplier:S(it.supplier||m.supplier||''), category:S(it.category||''), item_type:S(it.item_type||it.type||''), unit_name:S(it.unit||''), out:q, returned:0, consumed:q, current:N(it.quantity), unit_before:unit, unit_vat:unitVat(it,m.unit_cost), unit_gross:unitGross(it,m.unit_cost), value_before:val, vat:amountVat(it,val), gross:amountGross(it,val), reason:m.reason||m.notes||'-', movement_type:m.movement_type==='consume'?'استهلاك مباشر':'صرف مباشر', ref:'MOV-'+m.id, cost_center_id:m.cost_center_id||null, cost_center_name:m.cost_center_name||project, cost_center_type:m.cost_center_type||''};
+      row.cost_code=getCostCode(row); rows.push(row);
+    });
+    return rows;
+  }
+  function reportQuick(row){
+    const q=L($('financeReportQuickSearch')?.value || $('financeSearch')?.value || '');
+    if(!q) return true;
+    return L(Object.values(row).join(' ')).includes(q);
+  }
+  function filteredUsage(){
+    const prod=S($('inventoryReportProduct')?.value); const supplier=S($('inventoryReportSupplier')?.value); const person=S($('inventoryReportPerson')?.value); const cc=S($('financeReportCostCodeFilter')?.value);
+    return usageRows().filter(r=>datePass(r.date) && (!prod || String(r.item_id)===String(prod)) && (!supplier || S(r.supplier)===supplier) && (!person || String(r.person_id)===String(person)||S(r.person)===person) && (!cc || r.cost_code===cc) && reportQuick(r));
+  }
+  function filteredExpenses(){
+    const cc=S($('financeReportCostCodeFilter')?.value); const pid=S($('financeProjectFilter')?.value); const q=L($('financeReportQuickSearch')?.value || $('financeSearch')?.value || '');
+    return (window.data?.financeExpenses||[]).filter(e=>notDeleted(e) && datePass(e.expense_date||e.created_at) && (!pid||String(e.project_id)===pid) && (!cc||getCostCode(e)===cc) && (!q || L([e.project_name,projectNameSafe(e.project_id),e.cost_center_name,e.supplier,e.category,e.expense_type,e.notes,e.payment_method].join(' ')).includes(q)) );
+  }
+  function filteredItems(){
+    const q=L($('financeReportQuickSearch')?.value || $('inventorySearch')?.value || $('financeSearch')?.value || '');
+    const sup=S($('inventoryReportSupplier')?.value || $('inventorySupplierFilter')?.value || '');
+    return (window.data?.inventoryItems||[]).filter(i=>(!sup||S(i.supplier)===sup) && (!q||L([i.name,productCode(i),productBarcode(i),i.supplier,i.category,i.unit,i.notes].join(' ')).includes(q)) );
+  }
+  function tableRows(el, rows, colspan){ if(el) el.innerHTML=rows || `<tr><td colspan="${colspan}">لا توجد بيانات حسب الفلاتر الحالية</td></tr>`; }
+  function renderProductDetail(rows){
+    const box=$('inventoryProductDetailBox'); if(!box) return;
+    const prod=S($('inventoryReportProduct')?.value);
+    if(!prod){ box.innerHTML='<div class="footer-note">اختر المنتج لعرض التفاصيل.</div>'; return; }
+    const item=itemById(prod); const productRows=rows.filter(r=>String(r.item_id)===prod);
+    const out=productRows.reduce((a,r)=>a+N(r.out),0), ret=productRows.reduce((a,r)=>a+N(r.returned),0), cons=productRows.reduce((a,r)=>a+N(r.consumed),0), val=productRows.reduce((a,r)=>a+N(r.value_before),0), vat=productRows.reduce((a,r)=>a+N(r.vat),0), gross=productRows.reduce((a,r)=>a+N(r.gross),0);
+    box.innerHTML=`<div class="product-detail-summary"><div><b>كود المنتج</b><span>${E(productCode(item)||'-')}</span></div><div><b>اسم المنتج</b><span>${E(item.name||'-')}</span></div><div><b>المورد</b><span>${E(item.supplier||'-')}</span></div><div><b>المتبقي</b><span>${Q(item.quantity)} ${E(item.unit||'')}</span></div><div><b>الصادر</b><span>${Q(out)}</span></div><div><b>المرتجع</b><span>${Q(ret)}</span></div><div><b>المستهلك</b><span>${Q(cons)}</span></div><div><b>القيمة شامل</b><span>${M(gross)} ر.س</span></div></div><div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المشروع</th><th>المستلم</th><th>الصادر</th><th>المرتجع</th><th>المستهلك</th><th>قيمة قبل الضريبة</th><th>VAT</th><th>الإجمالي شامل</th><th>المرجع</th></tr></thead><tbody>${productRows.map(r=>`<tr><td>${E(r.date)}</td><td>${E(r.project)}</td><td>${E(r.person)}</td><td>${Q(r.out)}</td><td>${Q(r.returned)}</td><td>${Q(r.consumed)}</td><td>${M(r.value_before)}</td><td>${M(r.vat)}</td><td>${M(r.gross)}</td><td>${E(r.ref)}</td></tr>`).join('')||'<tr><td colspan="10">لا توجد حركات لهذا المنتج حسب الفلاتر الحالية</td></tr>'}</tbody></table></div>`;
+  }
+  window.financeRenderReports = function(){
+    try{
+      const uRows=filteredUsage(); const eRows=filteredExpenses(); const iRows=filteredItems();
+      const expMap={}; eRows.forEach(e=>{ const k=e.project_name||projectNameSafe(e.project_id)||e.cost_center_name||'بدون مشروع'; expMap[k]=expMap[k]||{total:0,count:0}; expMap[k].total+=N(e.total||e.amount||e.subtotal); expMap[k].count++; });
+      tableRows($('expenseByProjectBody'), Object.entries(expMap).map(([k,v])=>`<tr><td>${E(k)}</td><td>${M(v.total)} ر.س</td><td>${v.count}</td></tr>`).join(''), 3);
+      const pMap={}; uRows.forEach(r=>{ const k=r.project||'بدون مشروع'; pMap[k]=pMap[k]||{count:0,qty:0}; pMap[k].count++; pMap[k].qty+=N(r.out); });
+      tableRows($('stockOutByProjectBody'), Object.entries(pMap).map(([k,v])=>`<tr><td>${E(k)}</td><td>${v.count}</td><td>${Q(v.qty)}</td></tr>`).join(''),3);
+      const sMap={}; uRows.forEach(r=>{ const k=(r.person||'بدون مستلم')+'||'+(r.project||'بدون مشروع'); sMap[k]=sMap[k]||{count:0,qty:0,person:r.person,project:r.project}; sMap[k].count++; sMap[k].qty+=N(r.out); });
+      tableRows($('stockOutBySupervisorBody'), Object.values(sMap).map(v=>`<tr><td>${E(v.person)}</td><td>${E(v.project)}</td><td>${v.count}</td><td>${Q(v.qty)}</td></tr>`).join(''),4);
+      tableRows($('inventoryUsageDetailBody'), uRows.map(r=>`<tr><td>${E(r.date)}</td><td>${E(r.project)}</td><td>${E(r.person)}</td><td>${E(r.item)}</td><td>${Q(r.consumed||r.out)}</td><td>${E(r.reason)}</td><td>${E(r.movement_type)}</td><td>${Math.max(0,Math.ceil((new Date()-new Date(r.date))/(86400000)))} يوم</td><td>${E(r.ref)}</td></tr>`).join(''),9);
+      const ccMap={}; uRows.forEach(r=>{ const k=r.cost_center_name||r.project||'غير محدد'; ccMap[k]=ccMap[k]||{code:r.cost_code,count:0,out:0,ret:0,cons:0,val:0,vat:0,gross:0}; const v=ccMap[k]; v.count++; v.out+=N(r.out); v.ret+=N(r.returned); v.cons+=N(r.consumed); v.val+=N(r.value_before); v.vat+=N(r.vat); v.gross+=N(r.gross); });
+      tableRows($('costCenterReportBody'), Object.entries(ccMap).map(([k,v])=>`<tr><td>${E(k)}</td><td>${E(v.code)}</td><td>${v.count}</td><td>${Q(v.out)}</td><td>${Q(v.ret)}</td><td>${Q(v.cons)}</td><td>${M(v.val)} ر.س</td><td>${M(v.vat)} ر.س</td><td>${M(v.gross)} ر.س</td></tr>`).join(''),9);
+      tableRows($('stockReportBody'), iRows.map(i=>{ const unit=unitBefore(i,i.unit_cost); const val=N(i.quantity)*unit; return `<tr><td>${E(productCode(i))}</td><td>${E(i.name||'-')}</td><td>${Q(i.quantity)}</td><td>${Q(i.min_quantity||i.reorder_level||0)}</td><td>${M(amountGross(i,val))} ر.س</td></tr>`; }).join(''),5);
+      const totals=$('stockReportTotals'); if(totals){ const net=iRows.reduce((a,i)=>a+(N(i.quantity)*unitBefore(i,i.unit_cost)),0); const vat=iRows.reduce((a,i)=>a+amountVat(i,N(i.quantity)*unitBefore(i,i.unit_cost)),0); totals.innerHTML=`Total amount before 15% VAT: <b>${M(net)} SAR</b> &nbsp; | &nbsp; Total VAT 15%: <b>${M(vat)} SAR</b> &nbsp; | &nbsp; Total Value with 15% VAT: <b>${M(net+vat)} SAR</b>`; }
+      renderProductDetail(uRows);
+    }catch(e){ console.error('V168 financeRenderReports',e); if(typeof msg==='function') msg('تعذر تحديث التقارير: '+(e.message||e),'err'); }
+  };
+  window.renderCostReductionV152 = function(){
+    try{
+      const rows=filteredUsage(); const exps=filteredExpenses();
+      const total=rows.reduce((a,r)=>a+N(r.gross),0)+exps.reduce((a,e)=>a+N(e.total||e.amount||e.subtotal),0);
+      const kpis=$('costReductionKpisV152'); if(kpis) kpis.innerHTML=`<div><small>إجمالي تكلفة مفلترة</small><b>${M(total)} ر.س</b></div><div><small>عمليات استهلاك</small><b>${rows.length}</b></div><div><small>مصروفات</small><b>${exps.length}</b></div><div><small>فرص مراجعة</small><b>${rows.length?Math.min(5,rows.length):0}</b></div>`;
+      const group=(keyFn)=>{ const m={}; rows.forEach(r=>{ const k=keyFn(r)||'غير محدد'; m[k]=m[k]||{key:k,qty:0,value:0,count:0}; m[k].qty+=N(r.consumed); m[k].value+=N(r.gross); m[k].count++; }); return Object.values(m).sort((a,b)=>b.value-a.value).slice(0,10); };
+      const table=(heads,trs)=>`<div class="table-wrap"><table><thead><tr>${heads.map(h=>`<th>${E(h)}</th>`).join('')}</tr></thead><tbody>${trs||`<tr><td colspan="${heads.length}">لا توجد بيانات حسب الفلاتر الحالية</td></tr>`}</tbody></table></div>`;
+      const items=group(r=>r.item), projects=group(r=>r.project), supervisors=group(r=>r.person);
+      if($('costTopItemsV152')) $('costTopItemsV152').innerHTML=table(['الصنف','الكمية','القيمة'],items.map(g=>`<tr><td>${E(g.key)}</td><td>${Q(g.qty)}</td><td>${M(g.value)} ر.س</td></tr>`).join(''));
+      if($('costTopProjectsV152')) $('costTopProjectsV152').innerHTML=table(['المشروع','الكمية','القيمة'],projects.map(g=>`<tr><td>${E(g.key)}</td><td>${Q(g.qty)}</td><td>${M(g.value)} ر.س</td></tr>`).join(''));
+      if($('costTopSupervisorsV152')) $('costTopSupervisorsV152').innerHTML=table(['المشرف','العمليات','الكمية','القيمة'],supervisors.map(g=>`<tr><td>${E(g.key)}</td><td>${g.count}</td><td>${Q(g.qty)}</td><td>${M(g.value)} ر.س</td></tr>`).join(''));
+      if($('costSupplierCompareV152')) $('costSupplierCompareV152').innerHTML=table(['الصنف','المورد','متوسط السعر'], group(r=>r.item+' - '+(r.supplier||'بدون مورد')).map(g=>`<tr><td>${E(g.key.split(' - ')[0])}</td><td>${E(g.key.split(' - ')[1])}</td><td>${M(g.value/Math.max(g.qty,1))} ر.س</td></tr>`).join(''));
+      if($('costRecommendationsV152')) $('costRecommendationsV152').innerHTML = rows.length ? `<div class="v152-recs"><div><b>توصية 1</b><p>راجع أعلى الأصناف والمشاريع تكلفة حسب الفلاتر الحالية، وابدأ بالأعلى قيمة.</p></div></div>` : '<div class="footer-note">لا توجد بيانات كافية لإظهار توصيات حسب الفلاتر الحالية.</div>';
+    }catch(e){ console.error('V168 cost reduction',e); }
+  };
+  function reconcileFinanceTabs(tab){
+    const tabs=[...document.querySelectorAll('#financeDashboard .finance-tab')];
+    document.body.classList.toggle('warehouse-manager-view-v164', isWarehouse());
+    if(!isWarehouse()){
+      document.body.classList.remove('warehouse-manager-view-v162','warehouse-manager-view-v163');
+      tabs.forEach(b=>{ b.style.display=''; });
+    }else{
+      tabs.forEach(b=>{ const t=S(b.textContent); b.style.display=(t==='طلبات الصرف'||t==='الأصناف')?'':'none'; });
+      if(!['requests','catalog'].includes(tab)) tab='requests';
+    }
+    document.querySelectorAll('#financeDashboard .finance-tab-page').forEach(x=>x.classList.add('hidden'));
+    const id='financeTab'+tab.charAt(0).toUpperCase()+tab.slice(1);
+    const page=$(id); if(page) page.classList.remove('hidden');
+    tabs.forEach(b=>b.classList.remove('active'));
+    const active=tabs.find(b=>String(b.getAttribute('onclick')||'').includes("'"+tab+"'") || String(b.getAttribute('onclick')||'').includes('"'+tab+'"'));
+    if(active) active.classList.add('active');
+    window.financeCurrentTab=tab;
+  }
+  window.financeShowTab = function(tab, btn){
+    tab = tab || 'overview';
+    if(btn){ document.querySelectorAll('#financeDashboard .finance-tab').forEach(x=>x.classList.remove('active')); btn.classList.add('active'); }
+    reconcileFinanceTabs(tab);
+    if(!window.financeLoaded && typeof financeLoadAll==='function') financeLoadAll();
+    if(typeof financeRenderAll==='function') financeRenderAll();
+    if(tab==='costReduction') setTimeout(()=>window.renderCostReductionV152&&window.renderCostReductionV152(),50);
+    setTimeout(()=>reconcileFinanceTabs(tab),120);
+  };
+  const oldAll=window.financeRenderAll;
+  if(oldAll && !oldAll.v168Wrapped){
+    window.financeRenderAll=function(){ const out=oldAll.apply(this,arguments); try{ window.financeRenderReports(); if($('financeTabCostReduction') && !$('financeTabCostReduction').classList.contains('hidden')) window.renderCostReductionV152(); reconcileFinanceTabs(window.financeCurrentTab||'overview'); }catch(e){console.warn(e);} return out; };
+    window.financeRenderAll.v168Wrapped=true;
+  }
+  function bump(){
+    document.querySelectorAll('script[src*="app.js"]').forEach(s=>{ if(!s.src.includes('v=168')) s.src=s.src.split('?')[0]+'?v=168'; });
+    reconcileFinanceTabs(window.financeCurrentTab||'overview');
+    try{ window.financeRenderReports(); }catch(_){}
+  }
+  window.addEventListener('load',()=>setTimeout(bump,1600));
+  setTimeout(bump,2500);
+})();
