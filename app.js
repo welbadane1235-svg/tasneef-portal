@@ -9294,3 +9294,231 @@ function financePrintReport(kind){
   if(oldRender && !oldRender.v162Wrapped){ window.financeRenderAll=function(){ const out=oldRender.apply(this,arguments); setTimeout(()=>{injectCssV162(); applyWarehouseRestrictions(); cleanupDuplicateInvoiceActions();},120); return out; }; window.financeRenderAll.v162Wrapped=true; }
   window.addEventListener('load',()=>setTimeout(()=>{injectCssV162(); applyWarehouseRestrictions(); cleanupDuplicateInvoiceActions(); if(typeof renderStockBatchCardsV149==='function') renderStockBatchCardsV149();},1400));
 })();
+
+/* ===== V163: Warehouse catalog visibility + real stock invoice delete persistence ===== */
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const s = v => String(v ?? '').trim();
+  const n = v => { const x = parseFloat(String(v ?? '').replace(/,/g,'')); return Number.isFinite(x) ? x : 0; };
+  const q = v => n(v).toLocaleString('en-US',{maximumFractionDigits:2});
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const role = () => { try { return (typeof session === 'function' ? (session()||{}).role : '') || (JSON.parse(localStorage.getItem('tasneef_session')||'{}').role||''); } catch(_) { return ''; } };
+  const isWarehouse = () => role() === 'warehouse_manager';
+  const codeOf = it => s(it?.product_code || it?.barcode || it?.supplier_barcode || it?.serial_number || it?.company_code || '');
+  const companyCodeOf = it => s(it?.company_code || it?.internal_code || it?.serial_number || codeOf(it));
+  const itemName = id => ((window.data?.inventoryItems||[]).find(i=>String(i.id)===String(id))||{}).name || '';
+
+  function itemStats(it){
+    const id=s(it?.id), code=codeOf(it), name=s(it?.name);
+    let inQty=0,outQty=0,retQty=0,consumeDirect=0;
+    (window.data?.inventoryMovements||[]).forEach(m=>{
+      const match = s(m.item_id)===id || (code && [m.product_code,m.barcode,m.supplier_barcode].map(s).includes(code)) || (name && s(m.item_name)===name);
+      if(!match) return;
+      const qty=n(m.quantity), type=s(m.movement_type);
+      if(type==='in') inQty+=qty;
+      else if(type==='out') outQty+=qty;
+      else if(type==='return') retQty+=qty;
+      else if(type==='consume') consumeDirect+=qty;
+    });
+    (window.data?.inventoryRequests||[]).filter(r=>['approved','issued','closed'].includes(s(r.status))).forEach(r=>{
+      const lines=Array.isArray(r.request_items)?r.request_items:(Array.isArray(r.items)?r.items:[]);
+      if(lines.length){
+        lines.forEach(l=>{ if(s(l.item_id)===id || (code && s(l.product_code)===code) || (name && s(l.item_name)===name)) outQty+=n(l.quantity); });
+      }else if(s(r.item_id)===id || (name && s(r.item_name)===name)) outQty+=n(r.quantity);
+    });
+    const consumed = Math.max(0, (outQty - retQty)) + consumeDirect;
+    return {inQty,outQty,retQty,consumed,remaining:n(it?.quantity)};
+  }
+
+  function renderWarehouseCatalogV163(){
+    if(!isWarehouse()) return false;
+    const body=$('inventoryItemsBody');
+    if(!body) return false;
+    const search=s($('inventorySearch')?.value || $('financeSearch')?.value).toLowerCase();
+    const supplier=s($('inventorySupplierFilter')?.value || $('inventoryReportSupplier')?.value);
+    const cat=s($('inventoryCategoryFilter')?.value);
+    let rows=[...(window.data?.inventoryItems||[])];
+    if(search) rows=rows.filter(it=>[it.name,codeOf(it),companyCodeOf(it),it.supplier,it.category,it.unit].join(' ').toLowerCase().includes(search));
+    if(supplier) rows=rows.filter(it=>s(it.supplier)===supplier);
+    if(cat) rows=rows.filter(it=>s(it.category)===cat);
+    body.innerHTML = `<tr><td colspan="20"><div class="v163-warehouse-catalog-grid">${rows.map(it=>{
+      const st=itemStats(it);
+      const img=it.image_url ? `<img src="${esc(it.image_url)}" onerror="this.style.display='none'">` : '<span>لا صورة</span>';
+      const low=n(it.quantity)<=n(it.min_quantity||it.reorder_level||0);
+      return `<article class="v163-warehouse-item-card">
+        <div class="v163-item-head"><div class="v163-img">${img}</div><div><h3>${esc(it.name||'-')}</h3><small>كود المنتج: ${esc(codeOf(it)||'-')}</small><br><small>كود الشركة: ${esc(companyCodeOf(it)||'-')}</small></div><span class="${low?'v163-low':'v163-ok'}">${low?'منخفض':'متوفر'}</span></div>
+        <div class="v163-stats"><div><small>الكمية</small><b>${q(st.remaining)} ${esc(it.unit||'')}</b></div><div><small>دخل</small><b>${q(st.inQty)}</b></div><div><small>خرج</small><b>${q(st.outQty)}</b></div><div><small>مرتجع</small><b>${q(st.retQty)}</b></div><div><small>مستهلك</small><b>${q(st.consumed)}</b></div><div><small>حد الطلب</small><b>${q(it.min_quantity||it.reorder_level||0)}</b></div></div>
+        <div class="row-actions"><button type="button" onclick="inventoryOpenItemSmart&&inventoryOpenItemSmart('${esc(it.id)}')">عرض</button></div>
+      </article>`;
+    }).join('') || '<div class="muted">لا توجد أصناف</div>'}</div></td></tr>`;
+    return true;
+  }
+
+  function ensureWarehouseViewV163(){
+    if(!isWarehouse()) return;
+    document.body.classList.add('warehouse-manager-view-v163');
+    // Show only requests + catalog tabs; do not remove catalog contents.
+    document.querySelectorAll('#financeDashboard .finance-tab').forEach(btn=>{
+      const t=s(btn.textContent);
+      btn.style.display = (t==='طلبات الصرف' || t==='الأصناف') ? '' : 'none';
+    });
+    ['financeTabOverview','financeTabExpenses','financeTabInventory','financeTabMovements','financeTabReports','financeTabCostCenters'].forEach(id=>$(id)?.classList.add('hidden'));
+    $('financeTabCatalog')?.classList.remove('hidden');
+    renderWarehouseCatalogV163();
+  }
+
+  function movementBelongsToInvoice(m,batch){
+    const inv=s(batch.invoice_no||batch.id||'');
+    if(!inv) return false;
+    return s(m.notes).includes('batch:'+inv) || s(m.reason).includes(inv) || s(m.reference).includes(inv) || s(m.batch_no).includes(inv) || s(m.invoice_no).includes(inv);
+  }
+
+  async function deleteByInvoiceNo(table, invoiceNo){
+    if(!window.sb || !invoiceNo) return;
+    // Try common columns; ignore missing-column errors.
+    for(const col of ['invoice_no','reference','batch_no','notes']){
+      try{
+        let qy=sb.from(table).delete();
+        if(col==='notes') qy=qy.ilike(col, `%${invoiceNo}%`); else qy=qy.eq(col, invoiceNo);
+        const r=await qy;
+        if(r.error && !/column|schema cache|does not exist|relation/i.test(r.error.message||'')) throw r.error;
+      }catch(e){ if(!/column|schema cache|does not exist|relation/i.test(e.message||'')) throw e; }
+    }
+  }
+
+  async function reverseBatchQuantitiesV163(batch){
+    for(const line of (batch.lines||[])){
+      const qty=n(line.quantity);
+      if(!qty) continue;
+      const code=s(line.product_code||line.barcode||line.supplier_barcode||'');
+      let item=(window.data?.inventoryItems||[]).find(i=>String(i.id)===String(line.item_id||line.inventory_item_id));
+      if(!item && code) item=(window.data?.inventoryItems||[]).find(i=>[i.product_code,i.barcode,i.supplier_barcode,i.serial_number,i.company_code].map(s).includes(code));
+      if(!item?.id) continue;
+      const next=Math.max(0,n(item.quantity)-qty);
+      if(window.sb){
+        const r=await sb.from('inventory_items').update({quantity:next}).eq('id',item.id);
+        if(r.error) throw r.error;
+      }
+      item.quantity=next;
+    }
+  }
+
+  window.stockBatchDeleteV163 = async function(idx){
+    const list=window.stockBatchesV148||[];
+    const batch=list[Number(idx)];
+    if(!batch) return (typeof msg==='function'?msg('لم يتم العثور على الفاتورة','err'):alert('لم يتم العثور على الفاتورة'));
+    const inv=s(batch.invoice_no||batch.id||idx);
+    if(!confirm('تأكيد حذف فاتورة المخزون رقم '+inv+'؟\nسيتم عكس الكميات وحذف الفاتورة من قاعدة البيانات.')) return;
+    try{
+      document.querySelectorAll(`button[onclick*="stockBatchDeleteV"],button[onclick*="stockBatchDeleteV163"]`).forEach(b=>{ if((b.getAttribute('onclick')||'').includes(String(idx))) b.disabled=true; });
+      await reverseBatchQuantitiesV163(batch);
+      if(window.sb){
+        // Delete batch item rows by batch id and invoice no.
+        if(batch.id){
+          try{ const r=await sb.from('inventory_batch_items').delete().eq('batch_id',batch.id); if(r.error && !/does not exist|relation/i.test(r.error.message||'')) throw r.error; }catch(e){ if(!/does not exist|relation/i.test(e.message||'')) throw e; }
+        }
+        await deleteByInvoiceNo('inventory_batch_items', inv);
+        // Delete movements first and also by IDs known in lines.
+        const movementIds=(batch.lines||[]).map(l=>l.movement_id).filter(Boolean);
+        if(movementIds.length){ try{ const r=await sb.from('inventory_movements').delete().in('id',movementIds); if(r.error) throw r.error; }catch(e){ console.warn(e); } }
+        await deleteByInvoiceNo('inventory_movements', inv);
+        // Delete direct batch row by id and invoice number.
+        if(batch.id){ try{ const r=await sb.from('inventory_batches').delete().eq('id',batch.id); if(r.error && !/does not exist|relation/i.test(r.error.message||'')) throw r.error; }catch(e){ if(!/does not exist|relation/i.test(e.message||'')) throw e; } }
+        await deleteByInvoiceNo('inventory_batches', inv);
+      }
+      // Local delete immediately and persist hidden invoice fallback so it will not reappear from old movement fallback.
+      const hidden=JSON.parse(localStorage.getItem('deleted_stock_invoices_v163')||'[]');
+      if(!hidden.includes(inv)){ hidden.push(inv); localStorage.setItem('deleted_stock_invoices_v163', JSON.stringify(hidden)); }
+      window.stockBatchesV148=list.filter((_,i)=>i!==Number(idx)).filter(b=>!hidden.includes(s(b.invoice_no||b.id||'')));
+      if(typeof msg==='function') msg('تم حذف الفاتورة وعكس الكميات');
+      if(typeof financeLoadAll==='function') await financeLoadAll();
+      if(typeof stockBatchLoadV148==='function') await stockBatchLoadV148(true);
+      window.stockBatchesV148=(window.stockBatchesV148||[]).filter(b=>!hidden.includes(s(b.invoice_no||b.id||'')));
+      if(typeof renderStockBatchCardsV149==='function') renderStockBatchCardsV149();
+      if(typeof inventoryRenderItems==='function') inventoryRenderItems();
+    }catch(e){ console.error(e); if(typeof msg==='function') msg(e.message||String(e),'err'); else alert(e.message||String(e)); }
+  };
+  window.stockBatchDeleteV162=window.stockBatchDeleteV163;
+  window.stockBatchDeleteV161=window.stockBatchDeleteV163;
+  window.stockBatchDeleteV152=window.stockBatchDeleteV163;
+
+  // Wrap batch loader to filter any locally deleted invoices that were built from older movement fallback.
+  const oldLoad=window.stockBatchLoadV148;
+  if(oldLoad && !oldLoad.v163Wrapped){
+    window.stockBatchLoadV148=async function(){
+      const out=await oldLoad.apply(this,arguments);
+      const hidden=JSON.parse(localStorage.getItem('deleted_stock_invoices_v163')||'[]');
+      if(hidden.length) window.stockBatchesV148=(window.stockBatchesV148||[]).filter(b=>!hidden.includes(s(b.invoice_no||b.id||'')));
+      if(typeof renderStockBatchCardsV149==='function') renderStockBatchCardsV149();
+      return out;
+    };
+    window.stockBatchLoadV148.v163Wrapped=true;
+  }
+
+  // Override invoice cards once more so delete buttons use V163 and warehouse manager never sees invoice prices.
+  const oldRenderCards=window.renderStockBatchCardsV149;
+  window.renderStockBatchCardsV149=function(){
+    const grid=$('stockBatchCardsGridV149');
+    if(!grid){ if(oldRenderCards) return oldRenderCards.apply(this,arguments); return; }
+    const all=window.stockBatchesV148||[];
+    const hidden=JSON.parse(localStorage.getItem('deleted_stock_invoices_v163')||'[]');
+    const qf=s($('batchSearchV149')?.value).toLowerCase(), df=s($('batchDateFilterV149')?.value), mf=s($('batchMonthFilterV149')?.value);
+    const rows=all.filter(r=>{
+      if(hidden.includes(s(r.invoice_no||r.id||''))) return false;
+      const d=s(r.batch_date||'');
+      if(df && d!==df) return false;
+      if(mf && !d.startsWith(mf)) return false;
+      if(qf && ![r.invoice_no,r.id,r.supplier,r.batch_date].join(' ').toLowerCase().includes(qf)) return false;
+      return true;
+    });
+    grid.innerHTML=rows.map(r=>{
+      const idx=all.indexOf(r), count=(r.lines||[]).length;
+      if(isWarehouse()) return '';
+      return `<div class="v149-invoice-card"><div class="v149-invoice-top"><div><div class="v149-invoice-no">${esc(r.invoice_no||r.id||'-')}</div><span class="v149-pill">${count} صنف</span></div><div class="v149-invoice-date">${esc(r.batch_date||'-')}</div></div><div class="muted">المورد: <b>${esc(r.supplier||'-')}</b></div><div class="v149-invoice-meta"><div class="v149-mini"><small>قبل الضريبة</small><b>${n(r.total_before_vat).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} ر.س</b></div><div class="v149-mini"><small>VAT 15%</small><b>${n(r.total_vat).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} ر.س</b></div><div class="v149-mini"><small>الإجمالي شامل</small><b>${n(r.total_with_vat).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} ر.س</b></div><div class="v149-mini"><small>المرجع</small><b>${esc(r.invoice_no||r.id||'-')}</b></div></div><div class="row-actions v163-invoice-actions"><button type="button" onclick="viewStockBatchV149(${idx})">عرض الفاتورة</button><button type="button" class="light" onclick="stockBatchPrintSavedV148('${idx}')">طباعة</button><button type="button" class="light" onclick="stockBatchEditV152&&stockBatchEditV152('${idx}')">تعديل</button><button type="button" class="danger" onclick="stockBatchDeleteV163('${idx}')">حذف</button></div></div>`;
+    }).join('') || '<div class="v149-empty">لا توجد فواتير حسب الفلتر الحالي</div>';
+  };
+
+  // Wrap inventory renderer last: warehouse manager must see catalog items, not blank catalog.
+  const oldItems=window.inventoryRenderItems;
+  if(oldItems && !oldItems.v163Wrapped){
+    window.inventoryRenderItems=function(){
+      if(isWarehouse()) return renderWarehouseCatalogV163();
+      return oldItems.apply(this,arguments);
+    };
+    window.inventoryRenderItems.v163Wrapped=true;
+  }
+
+  function injectCss(){
+    if($('v163Css')) return;
+    const st=document.createElement('style'); st.id='v163Css'; st.textContent=`
+      .warehouse-manager-view-v162 .v162-price-hidden{display:revert!important}
+      .warehouse-manager-view-v163 #financeTabCatalog{display:block!important}
+      .warehouse-manager-view-v163 #smartStockInvoicesV149,.warehouse-manager-view-v163 #stockBatchCardV148,.warehouse-manager-view-v163 #stockBatchCardsGridV149{display:none!important}
+      .v163-warehouse-catalog-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;padding:8px;direction:rtl}
+      .v163-warehouse-item-card{border:1px solid #cfe3dd;border-radius:18px;padding:14px;background:#fff;box-shadow:0 10px 22px rgba(0,45,31,.06)}
+      .v163-item-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.v163-item-head h3{margin:0;color:#003f31}.v163-img{width:66px;height:66px;border:1px solid #dbeee8;border-radius:14px;background:#f7fbf9;display:grid;place-items:center;overflow:hidden;flex:0 0 66px}.v163-img img{max-width:100%;max-height:100%;object-fit:contain}.v163-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.v163-stats div{background:#f1faf6;border:1px solid #d9eee6;border-radius:12px;padding:8px;text-align:center}.v163-stats small{display:block;color:#5b756d}.v163-stats b{color:#004c3a}.v163-ok,.v163-low{border-radius:999px;padding:5px 8px;font-size:12px}.v163-ok{background:#e5f8ee;color:#067647}.v163-low{background:#ffe6e6;color:#b42318}.v163-invoice-actions{display:flex!important;gap:8px!important;flex-wrap:wrap!important}.v163-invoice-actions button{min-width:78px!important}
+      @media(max-width:700px){.v163-stats{grid-template-columns:repeat(2,1fr)}}
+    `; document.head.appendChild(st);
+  }
+
+  const oldShow=window.financeShowTab;
+  if(oldShow && !oldShow.v163Wrapped){
+    window.financeShowTab=function(tab,btn){
+      const out=oldShow.apply(this,arguments);
+      setTimeout(()=>{ injectCss(); ensureWarehouseViewV163(); if(tab==='catalog'&&isWarehouse()) renderWarehouseCatalogV163(); },120);
+      return out;
+    };
+    window.financeShowTab.v163Wrapped=true;
+  }
+  const oldRenderAll=window.financeRenderAll;
+  if(oldRenderAll && !oldRenderAll.v163Wrapped){
+    window.financeRenderAll=function(){
+      const out=oldRenderAll.apply(this,arguments);
+      setTimeout(()=>{ injectCss(); ensureWarehouseViewV163(); },180);
+      return out;
+    };
+    window.financeRenderAll.v163Wrapped=true;
+  }
+  window.addEventListener('load',()=>setTimeout(()=>{ injectCss(); ensureWarehouseViewV163(); if(typeof renderStockBatchCardsV149==='function') renderStockBatchCardsV149(); },1800));
+})();
