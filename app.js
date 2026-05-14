@@ -9522,3 +9522,156 @@ function financePrintReport(kind){
   }
   window.addEventListener('load',()=>setTimeout(()=>{ injectCss(); ensureWarehouseViewV163(); if(typeof renderStockBatchCardsV149==='function') renderStockBatchCardsV149(); },1800));
 })();
+
+/* ===== V164: final cache bump + warehouse catalog visible + persistent invoice delete ===== */
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const S = v => String(v ?? '').trim();
+  const N = v => { const x = parseFloat(String(v ?? '').replace(/,/g,'')); return Number.isFinite(x) ? x : 0; };
+  const E = v => S(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const Q = v => N(v).toLocaleString('en-US',{maximumFractionDigits:2});
+  const role = () => { try { return (typeof session==='function' ? (session()||{}).role : '') || JSON.parse(localStorage.getItem('tasneef_session')||'{}').role || ''; } catch(_) { return ''; } };
+  const isWarehouse = () => role()==='warehouse_manager';
+  const codeOf = it => S(it?.product_code || it?.barcode || it?.supplier_barcode || it?.serial_number || it?.company_code || '');
+  const companyCodeOf = it => S(it?.company_code || it?.internal_code || it?.serial_number || codeOf(it));
+  const hiddenKey = 'deleted_stock_invoices_v164';
+  function hiddenList(){ try{return JSON.parse(localStorage.getItem(hiddenKey)||'[]').map(S);}catch(_){return [];} }
+  function addHiddenInvoice(batch){
+    const hidden = new Set(hiddenList());
+    [batch?.id,batch?.invoice_no,batch?.reference].map(S).filter(Boolean).forEach(x=>hidden.add(x));
+    localStorage.setItem(hiddenKey, JSON.stringify([...hidden]));
+  }
+  function isHiddenBatch(batch){
+    const h = hiddenList();
+    return [batch?.id,batch?.invoice_no,batch?.reference].map(S).some(x=>x && h.includes(x));
+  }
+  function itemStats(it){
+    const id=S(it?.id), code=codeOf(it), name=S(it?.name);
+    let inQty=0,outQty=0,retQty=0,consumeQty=0;
+    (window.data?.inventoryMovements||[]).forEach(m=>{
+      const match = S(m.item_id)===id || (code && [m.product_code,m.barcode,m.supplier_barcode,m.serial_number].map(S).includes(code)) || (name && S(m.item_name)===name);
+      if(!match) return;
+      const qty=N(m.quantity); const t=S(m.movement_type);
+      if(t==='in') inQty+=qty;
+      else if(t==='out') outQty+=qty;
+      else if(t==='return') retQty+=qty;
+      else if(t==='consume') consumeQty+=qty;
+    });
+    (window.data?.inventoryRequests||[]).filter(r=>['approved','issued','closed'].includes(S(r.status))).forEach(r=>{
+      const lines = Array.isArray(r.request_items)?r.request_items:(Array.isArray(r.items)?r.items:[]);
+      if(lines.length){
+        lines.forEach(l=>{ if(S(l.item_id)===id || (code && S(l.product_code)===code) || (name && S(l.item_name)===name)) outQty+=N(l.quantity); });
+      } else if(S(r.item_id)===id || (name && S(r.item_name)===name)) outQty+=N(r.quantity);
+    });
+    return {inQty,outQty,retQty,consumed:Math.max(0,outQty-retQty)+consumeQty,remaining:N(it?.quantity)};
+  }
+  function ensureCatalogTab(){
+    const tabsBox = document.querySelector('#financeDashboard .finance-tabs') || document.querySelector('.finance-tabs');
+    const invTab = $('financeTabInventory');
+    if(!tabsBox || !invTab) return;
+    if(!document.querySelector('.finance-tab[data-v164-catalog="1"]') && ![...tabsBox.querySelectorAll('.finance-tab')].some(b=>S(b.textContent)==='الأصناف')){
+      const btn=document.createElement('button'); btn.type='button'; btn.className='light finance-tab'; btn.dataset.v164Catalog='1'; btn.textContent='الأصناف'; btn.onclick=function(){ financeShowTab('catalog',this); };
+      const inventoryBtn=[...tabsBox.querySelectorAll('.finance-tab')].find(b=>S(b.textContent)==='المخزون');
+      if(inventoryBtn && inventoryBtn.nextSibling) tabsBox.insertBefore(btn, inventoryBtn.nextSibling); else tabsBox.appendChild(btn);
+    }
+    let catPage=$('financeTabCatalog');
+    if(!catPage){ catPage=document.createElement('div'); catPage.id='financeTabCatalog'; catPage.className='finance-tab-page hidden'; invTab.parentNode.insertBefore(catPage,invTab.nextSibling); }
+    const itemCard=document.querySelector('#financeTabInventory .card:has(#inventoryItemsBody)') || document.querySelector('.card:has(#inventoryItemsBody)');
+    if(itemCard && itemCard.parentElement!==catPage){ catPage.appendChild(itemCard); const h=itemCard.querySelector('h2'); if(h) h.textContent='قائمة الأصناف'; }
+  }
+  function renderWarehouseCatalog(){
+    const body=$('inventoryItemsBody'); if(!body) return false;
+    const search=S($('inventorySearch')?.value || $('financeSearch')?.value).toLowerCase();
+    const supplier=S($('inventorySupplierFilter')?.value || $('inventoryReportSupplier')?.value);
+    const cat=S($('inventoryCategoryFilter')?.value);
+    let rows=[...(window.data?.inventoryItems||[])];
+    if(search) rows=rows.filter(it=>[it.name,codeOf(it),companyCodeOf(it),it.supplier,it.category,it.unit].join(' ').toLowerCase().includes(search));
+    if(supplier) rows=rows.filter(it=>S(it.supplier)===supplier);
+    if(cat) rows=rows.filter(it=>S(it.category)===cat);
+    body.innerHTML=`<tr><td colspan="20"><div class="v164-warehouse-catalog-grid">${rows.map(it=>{
+      const st=itemStats(it); const img=it.image_url?`<img src="${E(it.image_url)}" onerror="this.style.display='none'">`:'<span>لا صورة</span>'; const low=N(it.quantity)<=N(it.min_quantity||it.reorder_level||0);
+      return `<article class="v164-warehouse-item-card"><div class="v164-item-head"><div class="v164-img">${img}</div><div><h3>${E(it.name||'-')}</h3><small>كود المنتج: ${E(codeOf(it)||'-')}</small><br><small>كود الشركة: ${E(companyCodeOf(it)||'-')}</small></div><span class="${low?'v164-low':'v164-ok'}">${low?'منخفض':'متوفر'}</span></div><div class="v164-stats"><div><small>الكمية</small><b>${Q(st.remaining)} ${E(it.unit||'')}</b></div><div><small>دخل</small><b>${Q(st.inQty)}</b></div><div><small>خرج</small><b>${Q(st.outQty)}</b></div><div><small>مرتجع</small><b>${Q(st.retQty)}</b></div><div><small>مستهلك</small><b>${Q(st.consumed)}</b></div><div><small>حد الطلب</small><b>${Q(it.min_quantity||it.reorder_level||0)}</b></div></div><div class="row-actions"><button type="button" onclick="inventoryOpenItemSmart&&inventoryOpenItemSmart('${E(it.id)}')">عرض</button></div></article>`;
+    }).join('') || '<div class="muted">لا توجد أصناف</div>'}</div></td></tr>`;
+    return true;
+  }
+  function applyWarehouseView(){
+    if(!isWarehouse()) return;
+    ensureCatalogTab();
+    document.body.classList.add('warehouse-manager-view-v164');
+    document.querySelectorAll('#financeDashboard .finance-tab').forEach(btn=>{ const t=S(btn.textContent); btn.style.display=(t==='طلبات الصرف'||t==='الأصناف')?'':'none'; });
+    ['financeTabOverview','financeTabExpenses','financeTabInventory','financeTabMovements','financeTabReports','financeTabCostCenters'].forEach(id=>$(id)?.classList.add('hidden'));
+    $('financeTabCatalog')?.classList.remove('hidden');
+    renderWarehouseCatalog();
+  }
+  async function updateItemQty(item, delta){
+    if(!item?.id || !window.sb) return;
+    const next=Math.max(0,N(item.quantity)+N(delta));
+    const r=await sb.from('inventory_items').update({quantity:next}).eq('id',item.id);
+    if(r.error) throw r.error;
+    item.quantity=next;
+  }
+  async function reverseBatch(batch){
+    for(const line of (batch?.lines||[])){
+      const code=S(line.product_code||line.barcode||line.supplier_barcode||'');
+      let item=(window.data?.inventoryItems||[]).find(i=>String(i.id)===String(line.item_id||line.inventory_item_id));
+      if(!item && code) item=(window.data?.inventoryItems||[]).find(i=>[i.product_code,i.barcode,i.supplier_barcode,i.serial_number,i.company_code].map(S).includes(code));
+      if(item) await updateItemQty(item, -N(line.quantity));
+    }
+  }
+  async function tryDelete(table, fn){ try{ const r=await fn(sb.from(table).delete()); if(r.error && !/schema cache|column|relation|does not exist/i.test(r.error.message||'')) throw r.error; }catch(e){ if(!/schema cache|column|relation|does not exist/i.test(e.message||'')) throw e; } }
+  async function deleteRowsForBatch(batch){
+    if(!window.sb) return;
+    const inv=S(batch.invoice_no||batch.reference||'');
+    if(batch.id){ await tryDelete('inventory_batch_items', q=>q.eq('batch_id',batch.id)); }
+    if(inv){
+      await tryDelete('inventory_batch_items', q=>q.eq('invoice_no',inv));
+      await tryDelete('inventory_batch_items', q=>q.eq('reference',inv));
+      await tryDelete('inventory_movements', q=>q.eq('invoice_no',inv));
+      await tryDelete('inventory_movements', q=>q.eq('reference',inv));
+      await tryDelete('inventory_movements', q=>q.ilike('notes',`%${inv}%`));
+    }
+    const movementIds=(batch.lines||[]).map(l=>l.movement_id).filter(Boolean);
+    if(movementIds.length) await tryDelete('inventory_movements', q=>q.in('id',movementIds));
+    if(batch.id) await tryDelete('inventory_batches', q=>q.eq('id',batch.id));
+    if(inv) await tryDelete('inventory_batches', q=>q.eq('invoice_no',inv));
+  }
+  window.stockBatchDeleteV164 = async function(idx){
+    const all=window.stockBatchesV148||[]; const batch=all[Number(idx)];
+    if(!batch) return (typeof msg==='function'?msg('لم يتم العثور على الفاتورة','err'):alert('لم يتم العثور على الفاتورة'));
+    const inv=S(batch.invoice_no||batch.id||idx);
+    if(!confirm('تأكيد حذف فاتورة المخزون رقم '+inv+'؟')) return;
+    try{
+      await reverseBatch(batch);
+      await deleteRowsForBatch(batch);
+      addHiddenInvoice(batch);
+      window.stockBatchesV148=(window.stockBatchesV148||[]).filter((b,i)=>i!==Number(idx) && !isHiddenBatch(b));
+      if(typeof msg==='function') msg('تم حذف الفاتورة وعكس الكميات');
+      if(typeof financeLoadAll==='function') await financeLoadAll();
+      if(typeof stockBatchLoadV148==='function') await stockBatchLoadV148(true);
+      window.stockBatchesV148=(window.stockBatchesV148||[]).filter(b=>!isHiddenBatch(b));
+      if(typeof renderStockBatchCardsV149==='function') renderStockBatchCardsV149();
+      if(typeof inventoryRenderItems==='function') inventoryRenderItems();
+    }catch(e){ console.error(e); if(typeof msg==='function') msg(e.message||String(e),'err'); else alert(e.message||String(e)); }
+  };
+  window.stockBatchDeleteV163=window.stockBatchDeleteV164; window.stockBatchDeleteV162=window.stockBatchDeleteV164; window.stockBatchDeleteV161=window.stockBatchDeleteV164; window.stockBatchDeleteV152=window.stockBatchDeleteV164;
+  function renderInvoices(){
+    const grid=$('stockBatchCardsGridV149'); if(!grid) return;
+    if(isWarehouse()){ grid.innerHTML=''; return; }
+    const all=(window.stockBatchesV148||[]).filter(b=>!isHiddenBatch(b));
+    const qf=S($('batchSearchV149')?.value).toLowerCase(), df=S($('batchDateFilterV149')?.value), mf=S($('batchMonthFilterV149')?.value);
+    const rows=all.filter(r=>{ const d=S(r.batch_date||''); if(df && d!==df) return false; if(mf && !d.startsWith(mf)) return false; if(qf && ![r.invoice_no,r.id,r.supplier,r.batch_date].join(' ').toLowerCase().includes(qf)) return false; return true; });
+    grid.innerHTML=rows.map(r=>{ const idx=(window.stockBatchesV148||[]).indexOf(r), count=(r.lines||[]).length; return `<div class="v149-invoice-card"><div class="v149-invoice-top"><div><div class="v149-invoice-no">${E(r.invoice_no||r.id||'-')}</div><span class="v149-pill">${count} صنف</span></div><div class="v149-invoice-date">${E(r.batch_date||'-')}</div></div><div class="muted">المورد: <b>${E(r.supplier||'-')}</b></div><div class="v149-invoice-meta"><div class="v149-mini"><small>قبل الضريبة</small><b>${N(r.total_before_vat).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} ر.س</b></div><div class="v149-mini"><small>VAT 15%</small><b>${N(r.total_vat).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} ر.س</b></div><div class="v149-mini"><small>الإجمالي شامل</small><b>${N(r.total_with_vat).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} ر.س</b></div><div class="v149-mini"><small>المرجع</small><b>${E(r.invoice_no||r.id||'-')}</b></div></div><div class="row-actions v164-invoice-actions"><button type="button" onclick="viewStockBatchV149(${idx})">عرض الفاتورة</button><button type="button" class="light" onclick="stockBatchPrintSavedV148('${idx}')">طباعة</button><button type="button" class="light" onclick="stockBatchEditV152&&stockBatchEditV152('${idx}')">تعديل</button><button type="button" class="danger" onclick="stockBatchDeleteV164('${idx}')">حذف</button></div></div>`; }).join('') || '<div class="v149-empty">لا توجد فواتير حسب الفلتر الحالي</div>';
+  }
+  window.renderStockBatchCardsV149 = renderInvoices;
+  const oldLoad=window.stockBatchLoadV148;
+  if(oldLoad && !oldLoad.v164Wrapped){ window.stockBatchLoadV148=async function(){ const out=await oldLoad.apply(this,arguments); window.stockBatchesV148=(window.stockBatchesV148||[]).filter(b=>!isHiddenBatch(b)); renderInvoices(); return out; }; window.stockBatchLoadV148.v164Wrapped=true; }
+  const oldItems=window.inventoryRenderItems;
+  if(oldItems && !oldItems.v164Wrapped){ window.inventoryRenderItems=function(){ if(isWarehouse()) return renderWarehouseCatalog(); return oldItems.apply(this,arguments); }; window.inventoryRenderItems.v164Wrapped=true; }
+  function injectCss(){ if($('v164Css')) return; const st=document.createElement('style'); st.id='v164Css'; st.textContent=`.warehouse-manager-view-v164 #smartStockInvoicesV149,.warehouse-manager-view-v164 #stockBatchCardV148,.warehouse-manager-view-v164 #stockBatchCardsGridV149{display:none!important}.warehouse-manager-view-v164 #financeTabCatalog{display:block!important}.v164-warehouse-catalog-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;padding:8px;direction:rtl}.v164-warehouse-item-card{border:1px solid #cfe3dd;border-radius:18px;padding:14px;background:#fff;box-shadow:0 10px 22px rgba(0,45,31,.06)}.v164-item-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.v164-item-head h3{margin:0;color:#003f31}.v164-img{width:66px;height:66px;border:1px solid #dbeee8;border-radius:14px;background:#f7fbf9;display:grid;place-items:center;overflow:hidden;flex:0 0 66px}.v164-img img{max-width:100%;max-height:100%;object-fit:contain}.v164-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.v164-stats div{background:#f1faf6;border:1px solid #d9eee6;border-radius:12px;padding:8px;text-align:center}.v164-stats small{display:block;color:#5b756d}.v164-stats b{color:#004c3a}.v164-ok,.v164-low{border-radius:999px;padding:5px 8px;font-size:12px}.v164-ok{background:#e5f8ee;color:#067647}.v164-low{background:#ffe6e6;color:#b42318}.v164-invoice-actions{display:flex!important;gap:8px!important;flex-wrap:wrap!important}.v164-invoice-actions button{min-width:78px!important}@media(max-width:700px){.v164-stats{grid-template-columns:repeat(2,1fr)}}`; document.head.appendChild(st); }
+  const oldShow=window.financeShowTab;
+  if(oldShow && !oldShow.v164Wrapped){ window.financeShowTab=function(tab,btn){ const out=oldShow.apply(this,arguments); setTimeout(()=>{ injectCss(); ensureCatalogTab(); if(tab==='catalog' && typeof inventoryRenderItems==='function') inventoryRenderItems(); applyWarehouseView(); renderInvoices(); },120); return out; }; window.financeShowTab.v164Wrapped=true; }
+  const oldRender=window.financeRenderAll;
+  if(oldRender && !oldRender.v164Wrapped){ window.financeRenderAll=function(){ const out=oldRender.apply(this,arguments); setTimeout(()=>{ injectCss(); ensureCatalogTab(); applyWarehouseView(); renderInvoices(); },180); return out; }; window.financeRenderAll.v164Wrapped=true; }
+  window.addEventListener('load',()=>setTimeout(()=>{ injectCss(); ensureCatalogTab(); applyWarehouseView(); if(typeof renderStockBatchCardsV149==='function') renderStockBatchCardsV149(); },1800));
+})();
