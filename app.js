@@ -9760,3 +9760,162 @@ function financePrintReport(kind){
   window.addEventListener('load',()=>setTimeout(()=>{ injectCss(); cleanupInvoiceCardsV165(); },1500));
   setTimeout(()=>{ injectCss(); cleanupInvoiceCardsV165(); },2500);
 })();
+
+/* ===================== V166 Client Reports Edit/Save Hard Stability Fix ===================== */
+(function(){
+  'use strict';
+  const V='166';
+  const $id = (id)=>document.getElementById(id);
+  const escV166 = (v)=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  function parseImagesV166(v){
+    if(!v) return [];
+    if(Array.isArray(v)) return v.filter(Boolean);
+    if(typeof v === 'string'){
+      const t=v.trim();
+      if(!t) return [];
+      try{
+        const parsed = JSON.parse(t);
+        if(Array.isArray(parsed)) return parsed.filter(Boolean);
+        if(parsed && typeof parsed === 'object') return [parsed];
+      }catch(_){
+        // Sometimes the field stores a single URL/data-url string.
+        if(/^data:image\//i.test(t) || /^https?:\/\//i.test(t)) return [{url:t}];
+      }
+    }
+    if(typeof v === 'object') return [v];
+    return [];
+  }
+  function normalizeServiceV166(s){
+    const serviceType = s?.service_type || s?.title || s?.name || 'خدمة';
+    return {
+      service_type: serviceType,
+      title: s?.title || serviceType,
+      service_description: s?.service_description || s?.description || '',
+      scope_work: s?.scope_work || s?.scope || '',
+      notes: s?.notes || '',
+      before_images: parseImagesV166(s?.before_images),
+      during_images: parseImagesV166(s?.during_images),
+      after_images: parseImagesV166(s?.after_images),
+      source: s?.source || 'admin'
+    };
+  }
+  function fillReportFormV166(r, services){
+    if(!r) throw new Error('لم يتم العثور على التقرير');
+    const set=(k,v)=>{ const el=$id(k); if(el) el.value = v ?? ''; };
+    set('premiumReportId', r.id);
+    set('premiumReportProject', r.project_id || '');
+    set('premiumReportDate', r.report_date || (typeof today==='function' ? today() : new Date().toISOString().slice(0,10)));
+    set('premiumReportTitle', r.title || '');
+    set('premiumReportType', r.report_type || 'تقرير خدمات');
+    set('premiumChairmanName', r.chairman_name || '');
+    set('premiumChairmanPhone', r.chairman_phone || '');
+    set('premiumSummary', r.executive_summary || (typeof defaultReportSummary==='function' ? defaultReportSummary() : ''));
+
+    const rows = (services||[]).map(normalizeServiceV166);
+    // Important: premiumServicesState is a lexical variable in the original app.js.
+    // Assigning window.premiumServicesState does not update the editor. Assign the real variable.
+    try{
+      premiumServicesState = rows.length ? rows : (typeof makeService==='function' ? [makeService(r.report_type || 'خدمة')] : []);
+    }catch(e){
+      window.premiumServicesState = rows;
+    }
+    if(typeof renderPremiumServicesEditor === 'function') renderPremiumServicesEditor();
+    const title=$id('premiumReportFormTitle'); if(title) title.textContent='تعديل تقرير';
+    const card=$id('premiumReportFormCard');
+    if(card){ card.classList.remove('hidden'); card.style.display='block'; card.scrollIntoView({behavior:'smooth', block:'start'}); }
+  }
+
+  // Fresh, deterministic edit: always fetch current report and services, never rely on stale cache.
+  window.editPremiumReport = async function(id){
+    const btn = document.querySelector(`[data-action="edit"][data-id="${CSS && CSS.escape ? CSS.escape(String(id)) : String(id)}"]`) || event?.target;
+    let old='';
+    try{
+      if(btn){ old=btn.innerHTML; btn.disabled=true; btn.innerHTML='جاري الفتح...'; }
+      if(typeof msg==='function') msg('جاري تحميل بيانات التقرير...');
+      let rr, ss;
+      if(!window.sb) throw new Error('اتصال قاعدة البيانات غير جاهز');
+      [rr, ss] = await Promise.all([
+        sb.from('client_reports').select('*').eq('id', id).maybeSingle(),
+        sb.from('client_report_services').select('*').eq('report_id', id).order('sort_order', {ascending:true})
+      ]);
+      if(rr.error) throw rr.error;
+      if(ss.error) throw ss.error;
+      fillReportFormV166(rr.data, ss.data || []);
+
+      // Refresh local cache for this report so table actions stay stable.
+      try{
+        window.data = window.data || {};
+        const reports = window.data.clientReports || [];
+        const idx = reports.findIndex(x=>String(x.id)===String(id));
+        if(idx >= 0) reports[idx] = rr.data; else reports.unshift(rr.data);
+        window.data.clientReports = reports;
+        window.data.clientReportServices = (window.data.clientReportServices||[]).filter(x=>String(x.report_id)!==String(id)).concat(ss.data||[]);
+      }catch(_){ }
+      if(typeof msg==='function') msg('تم فتح التقرير للتعديل','ok');
+    }catch(e){
+      console.error('V166 editPremiumReport failed', e);
+      if(typeof msg==='function') msg(e.message || String(e),'err');
+    }finally{
+      if(btn){ btn.disabled=false; if(old) btn.innerHTML=old; }
+    }
+  };
+
+  // Make the report list lighter: table only needs services names, not full image blobs.
+  window.loadPremiumReportsOnly = async function(showMessage=false){
+    try{
+      const body=$id('premiumReportsBody');
+      if(body) body.classList.add('loading-soft-v166');
+      const [reports, services, ratings] = await Promise.all([
+        sb.from('client_reports').select('*').order('created_at',{ascending:false}),
+        sb.from('client_report_services').select('id,report_id,sort_order,service_type,title,source').order('sort_order',{ascending:true}),
+        sb.from('client_service_ratings').select('id,report_id,service_id,rating,created_at').order('created_at',{ascending:false})
+      ]);
+      data.clientReports = reports.data || [];
+      data.clientReportServices = services.data || [];
+      data.clientServiceRatings = ratings.data || [];
+      data.clientReportsError = reports.error?.message || services.error?.message || ratings.error?.message || '';
+      if(typeof renderPremiumReports==='function') renderPremiumReports();
+      try{ if(typeof renderClientRatings==='function') renderClientRatings(); }catch(_){ }
+      if(showMessage && typeof msg==='function') msg(data.clientReportsError ? 'تأكد من تشغيل ملف SQL الخاص بالتقارير في Supabase' : 'تم تحديث التقارير', data.clientReportsError?'err':'ok');
+    }catch(e){
+      console.error('V166 loadPremiumReportsOnly failed', e);
+      if(showMessage && typeof msg==='function') msg(e.message||String(e),'err');
+    }finally{
+      const body=$id('premiumReportsBody'); if(body) body.classList.remove('loading-soft-v166');
+    }
+  };
+
+  // Faster post-save refresh: update the table without loading image blobs.
+  const originalSaveV166 = window.savePremiumReport;
+  window.savePremiumReport = async function(status='draft'){
+    const btn = event?.target;
+    const old = btn?.innerHTML;
+    try{
+      if(btn){ btn.disabled=true; btn.innerHTML = status==='published' ? 'جاري النشر...' : 'جاري الحفظ...'; }
+      // The original savePremiumReport already performs the required DB insert/update.
+      // We keep it, then override the heavy reload with our lighter loader below.
+      const out = await originalSaveV166(status);
+      setTimeout(()=>{ try{ window.loadPremiumReportsOnly(false); }catch(_){ } }, 80);
+      return out;
+    }catch(e){
+      console.error('V166 save wrapper failed', e);
+      if(typeof msg==='function') msg(e.message||String(e),'err');
+    }finally{
+      if(btn){ btn.disabled=false; if(old) btn.innerHTML=old; }
+    }
+  };
+
+  function injectCssV166(){
+    if($id('v166ClientReportCss')) return;
+    const st=document.createElement('style'); st.id='v166ClientReportCss';
+    st.textContent=`
+      #premiumReportsBody.loading-soft-v166{opacity:.65;pointer-events:auto!important;transition:.18s}
+      #premiumReportFormCard{scroll-margin-top:18px}
+      .client-action-btn-v159[disabled]{opacity:.65;cursor:wait}
+    `;
+    document.head.appendChild(st);
+  }
+  window.addEventListener('load', injectCssV166);
+  injectCssV166();
+  console.log('V166 client reports hard stability fix loaded');
+})();
