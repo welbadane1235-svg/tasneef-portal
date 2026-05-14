@@ -117,6 +117,8 @@
 const SUPABASE_URL = "https://zmjdqiswytxlbfgnfjfv.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// V167: expose Supabase client for late-loaded fixes and feature wrappers.
+window.sb = sb;
 const $ = id => document.getElementById(id);
 const today = () => new Date().toISOString().slice(0,10);
 const nowTime = () => new Date().toTimeString().slice(0,5);
@@ -9833,7 +9835,8 @@ function financePrintReport(kind){
       if(btn){ old=btn.innerHTML; btn.disabled=true; btn.innerHTML='جاري الفتح...'; }
       if(typeof msg==='function') msg('جاري تحميل بيانات التقرير...');
       let rr, ss;
-      if(!window.sb) throw new Error('اتصال قاعدة البيانات غير جاهز');
+      if(!window.sb && typeof sb !== 'undefined') window.sb = sb;
+      if(!window.sb && typeof sb === 'undefined') throw new Error('اتصال قاعدة البيانات غير جاهز');
       [rr, ss] = await Promise.all([
         sb.from('client_reports').select('*').eq('id', id).maybeSingle(),
         sb.from('client_report_services').select('*').eq('report_id', id).order('sort_order', {ascending:true})
@@ -9917,5 +9920,5 @@ function financePrintReport(kind){
   }
   window.addEventListener('load', injectCssV166);
   injectCssV166();
-  console.log('V166 client reports hard stability fix loaded');
+  console.log('V167 client reports edit database connection fix loaded');
 })();
