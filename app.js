@@ -9675,3 +9675,88 @@ function financePrintReport(kind){
   if(oldRender && !oldRender.v164Wrapped){ window.financeRenderAll=function(){ const out=oldRender.apply(this,arguments); setTimeout(()=>{ injectCss(); ensureCatalogTab(); applyWarehouseView(); renderInvoices(); },180); return out; }; window.financeRenderAll.v164Wrapped=true; }
   window.addEventListener('load',()=>setTimeout(()=>{ injectCss(); ensureCatalogTab(); applyWarehouseView(); if(typeof renderStockBatchCardsV149==='function') renderStockBatchCardsV149(); },1800));
 })();
+
+/* ===== V165: Warehouse price hiding in product details + single active invoice delete button ===== */
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const S = v => String(v ?? '').trim();
+  const N = v => { const x=parseFloat(String(v ?? '').replace(/,/g,'')); return Number.isFinite(x)?x:0; };
+  const E = v => S(v).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const Q = v => N(v).toLocaleString('en-US',{maximumFractionDigits:2});
+  const role = () => { try { return (typeof session==='function' ? (session()||{}).role : '') || JSON.parse(localStorage.getItem('tasneef_session')||'{}').role || ''; } catch(_) { return ''; } };
+  const isWarehouse = () => role()==='warehouse_manager';
+  const codeOf = it => S(it?.product_code || it?.barcode || it?.supplier_barcode || it?.serial_number || it?.company_code || '');
+  const companyCodeOf = it => S(it?.company_code || it?.internal_code || it?.serial_number || codeOf(it));
+  const imgOf = it => S(it?.image_url || it?.image || it?.photo_url || '');
+
+  function itemStats(it){
+    const id=S(it?.id), code=codeOf(it), name=S(it?.name);
+    let inQty=0,outQty=0,retQty=0,consumeQty=0;
+    (window.data?.inventoryMovements||[]).forEach(m=>{
+      const match = S(m.item_id)===id || (code && [m.product_code,m.barcode,m.supplier_barcode,m.serial_number].map(S).includes(code)) || (name && S(m.item_name)===name);
+      if(!match) return;
+      const qty=N(m.quantity), t=S(m.movement_type);
+      if(t==='in') inQty+=qty; else if(t==='out') outQty+=qty; else if(t==='return') retQty+=qty; else if(t==='consume') consumeQty+=qty;
+    });
+    return {inQty,outQty,retQty,consumed:Math.max(0,outQty-retQty)+consumeQty,remaining:N(it?.quantity)};
+  }
+
+  const oldOpenItem = window.inventoryOpenItemSmart;
+  window.inventoryOpenItemSmart = function(id){
+    if(!isWarehouse()) return oldOpenItem ? oldOpenItem.apply(this,arguments) : undefined;
+    const it=(window.data?.inventoryItems||[]).find(x=>String(x.id)===String(id));
+    if(!it) return (typeof msg==='function'?msg('الصنف غير موجود','err'):alert('الصنف غير موجود'));
+    const st=itemStats(it);
+    const rows=(window.data?.inventoryMovements||[]).filter(m=>{
+      const c=codeOf(it), nm=S(it.name);
+      return S(m.item_id)===S(it.id) || (c && [m.product_code,m.barcode,m.supplier_barcode,m.serial_number].map(S).includes(c)) || (nm && S(m.item_name)===nm);
+    }).slice(0,40).map(m=>{
+      const label = S(m.movement_type)==='in'?'إدخال':(S(m.movement_type)==='out'?'صرف':(S(m.movement_type)==='return'?'مرتجع':(S(m.movement_type)==='consume'?'استهلاك':'تعديل')));
+      return `<tr><td>${E(m.movement_date || String(m.created_at||'').slice(0,10) || '-')}</td><td>${E(label)}</td><td>${Q(m.quantity)}</td><td>${E(m.project_name || (typeof projectName==='function'?projectName(m.project_id):'') || '-')}</td><td>${E(m.receiver||'-')}</td><td>${E(m.reason||m.notes||'-')}</td></tr>`;
+    }).join('') || '<tr><td colspan="6">لا توجد حركات مسجلة</td></tr>';
+    const img=imgOf(it);
+    const html=`<div class="v165-warehouse-detail">
+      <div class="v165-prod-head">${img?`<img src="${E(img)}" onerror="this.style.display='none'">`:''}<div><h2>${E(it.name||'-')}</h2><p>كود المنتج: <b>${E(codeOf(it)||'-')}</b></p><p>كود الشركة: <b>${E(companyCodeOf(it)||'-')}</b></p></div></div>
+      <div class="v165-meta"><div><small>الكمية</small><b>${Q(st.remaining)} ${E(it.unit||'')}</b></div><div><small>دخل</small><b>${Q(st.inQty)}</b></div><div><small>خرج</small><b>${Q(st.outQty)}</b></div><div><small>مرتجع</small><b>${Q(st.retQty)}</b></div><div><small>مستهلك</small><b>${Q(st.consumed)}</b></div><div><small>حد الطلب</small><b>${Q(it.min_quantity||it.reorder_level||0)}</b></div><div><small>المورد</small><b>${E(it.supplier||'-')}</b></div><div><small>التصنيف</small><b>${E(it.category||'-')}</b></div></div>
+      <h3>آخر الحركات</h3><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>الكمية</th><th>المشروع</th><th>المستلم</th><th>السبب</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
+    if(typeof window.smartOpenV129==='function') window.smartOpenV129('تفاصيل المنتج', html, '');
+    else alert(`${it.name}\nالكمية: ${Q(st.remaining)}`);
+  };
+
+  function cleanupInvoiceCardsV165(){
+    document.querySelectorAll('#stockBatchCardsGridV149 .v149-invoice-card').forEach(card=>{
+      const allButtons=[...card.querySelectorAll('button')];
+      const pick = (re)=> allButtons.find(b=>re.test(S(b.textContent)));
+      const view=pick(/عرض/), print=pick(/طباعة/), edit=pick(/تعديل/), del=pick(/^حذف$/);
+      card.querySelectorAll('.row-actions').forEach(a=>a.remove());
+      const invText = S(card.querySelector('.v149-invoice-no')?.textContent || '');
+      let idx = -1;
+      try{ idx=(window.stockBatchesV148||[]).findIndex(b=>S(b.invoice_no||b.id||'')===invText); }catch(_){ idx=-1; }
+      if(idx<0) idx=[...document.querySelectorAll('#stockBatchCardsGridV149 .v149-invoice-card')].indexOf(card);
+      const actions=document.createElement('div'); actions.className='row-actions v165-invoice-actions';
+      actions.innerHTML=`<button type="button" onclick="viewStockBatchV149(${idx})">عرض الفاتورة</button><button type="button" class="light" onclick="stockBatchPrintSavedV148('${idx}')">طباعة</button><button type="button" class="light" onclick="stockBatchEditV152&&stockBatchEditV152('${idx}')">تعديل</button><button type="button" class="danger" onclick="stockBatchDeleteV164('${idx}')">حذف</button>`;
+      card.appendChild(actions);
+    });
+  }
+  const oldRender = window.renderStockBatchCardsV149;
+  if(oldRender && !oldRender.v165Wrapped){
+    window.renderStockBatchCardsV149=function(){ const out=oldRender.apply(this,arguments); setTimeout(cleanupInvoiceCardsV165,0); return out; };
+    window.renderStockBatchCardsV149.v165Wrapped=true;
+  }
+  const oldShow=window.financeShowTab;
+  if(oldShow && !oldShow.v165Wrapped){
+    window.financeShowTab=function(){ const out=oldShow.apply(this,arguments); setTimeout(cleanupInvoiceCardsV165,160); return out; };
+    window.financeShowTab.v165Wrapped=true;
+  }
+  function injectCss(){
+    if($('v165Css')) return;
+    const st=document.createElement('style'); st.id='v165Css'; st.textContent=`
+      .v165-invoice-actions{display:flex!important;gap:8px!important;flex-wrap:wrap!important;margin-top:12px!important}.v165-invoice-actions button{min-width:78px!important}
+      .v165-prod-head{display:flex;align-items:flex-start;gap:18px;margin-bottom:16px}.v165-prod-head img{width:130px;height:130px;object-fit:contain;border:1px solid #d6e9e2;border-radius:16px;background:#f8fcfa}.v165-prod-head h2{margin:0 0 8px;color:#073f31}.v165-prod-head p{margin:4px 0;color:#526b63}.v165-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin:12px 0 20px}.v165-meta div{background:#eef8f4;border:1px solid #d5ebe3;border-radius:14px;padding:10px}.v165-meta small{display:block;color:#658078;margin-bottom:5px}.v165-meta b{color:#004c3a}.warehouse-manager-view-v164 .v149-mini:has(small),.warehouse-manager-view-v164 .v149-invoice-meta{display:none!important}
+    `; document.head.appendChild(st);
+  }
+  window.addEventListener('load',()=>setTimeout(()=>{ injectCss(); cleanupInvoiceCardsV165(); },1500));
+  setTimeout(()=>{ injectCss(); cleanupInvoiceCardsV165(); },2500);
+})();
