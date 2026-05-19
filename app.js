@@ -11968,3 +11968,212 @@ function financePrintReport(kind){
   setTimeout(boot,1200);
   console.log('V188 request, operations approval, actual consumption cost flow loaded');
 })();
+
+
+/* ================= V189 Save Consumption Button Real Fix =================
+   إصلاح زر: حفظ الاستهلاك وإرجاع المتبقي
+   - يلتقط الأخطاء ويعرضها بدل أن يتوقف الزر بصمت.
+   - يسمح بإرجاع كل المتبقي حتى لو لم يتم إدخال استهلاك.
+   - يتعامل مع مركز التكلفة المختار بأمان حتى لو كان مركزًا افتراضيًا لمشروع.
+   - لا يعيد خصم الاستهلاك من المخزون، ويرجع المتبقي فقط إلى المخزون.
+======================================================================= */
+(function(){
+  'use strict';
+  const S = v => String(v ?? '');
+  const N = v => { const x = parseFloat(S(v).replace(/,/g,'')); return Number.isFinite(x) ? x : 0; };
+  const E = v => S(v).replace(/[&<>\"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[m]));
+  const arr = v => Array.isArray(v) ? v : [];
+  const $ = id => document.getElementById(id);
+  const getData = () => window.data || {};
+  const todayV189 = () => (typeof today === 'function' ? today() : new Date().toISOString().slice(0,10));
+  const notify = (text,type) => { if(typeof msg === 'function') msg(text,type); else alert(text); };
+  function itemById(id){ return arr(getData().inventoryItems).find(x => S(x.id) === S(id)) || {}; }
+  function projectNameSafe(id){ try { return typeof projectName === 'function' ? projectName(id) : ''; } catch(_) { return ''; } }
+  function supervisorNameSafe(id){ try { return typeof supervisorName === 'function' ? supervisorName(id) : ''; } catch(_) { return ''; } }
+  function productCode(it){ try { if(typeof v118ProductCode === 'function') return v118ProductCode(it); } catch(_){} return it.product_code || it.barcode || it.serial_number || ''; }
+  function unitBefore(it, fallback){
+    const v = N(fallback || it.unit_cost || it.unit_price || it.price_before_vat || 0);
+    return v > 0 ? v : 0;
+  }
+  function lineItems(r){
+    try { if(typeof v118LineItems === 'function') return v118LineItems(r) || []; } catch(_){}
+    let raw = r?.request_items || r?.items || r?.request_lines || [];
+    if(typeof raw === 'string' && raw.trim()){ try { raw = JSON.parse(raw); } catch(_){ raw = []; } }
+    if(Array.isArray(raw)) return raw.map(x => ({
+      item_id:x.item_id || x.id,
+      item_name:x.item_name || x.name || '',
+      product_code:x.product_code || x.serial_number || '',
+      barcode:x.barcode || '',
+      quantity:N(x.quantity),
+      unit:x.unit || '',
+      unit_cost:N(x.unit_cost || x.price_before_vat || x.unit_price || 0)
+    })).filter(x => x.item_id && x.quantity > 0);
+    return [];
+  }
+  function movementsFor(requestId,itemId,type){
+    return arr(getData().inventoryMovements).filter(m => S(m.request_id || '') === S(requestId) && S(m.item_id || '') === S(itemId) && (!type || S(m.movement_type) === S(type)));
+  }
+  function returnedQty(reqId,itemId){ return movementsFor(reqId,itemId,'return').reduce((a,m)=>a+N(m.quantity),0); }
+  function consumedQty(reqId,itemId){ return movementsFor(reqId,itemId,'consume').reduce((a,m)=>a+N(m.quantity),0); }
+  function availableToConsume(reqId,line){ return Math.max(0, N(line.quantity) - returnedQty(reqId,line.item_id) - consumedQty(reqId,line.item_id)); }
+  function costCenterFromSelect(selectEl, projectId){
+    const opt = selectEl?.selectedOptions?.[0];
+    const rawId = S(selectEl?.value || '');
+    const idNum = /^\d+$/.test(rawId) ? Number(rawId) : null;
+    const nameFromOpt = opt?.dataset?.name || opt?.textContent?.replace(/^\s*(FM|CN)\s*-\s*/i,'').trim() || '';
+    const typeFromOpt = opt?.dataset?.type || (/^CN/i.test(opt?.textContent || '') ? 'CN' : 'FM');
+    return {
+      cost_center_id: idNum,
+      cost_center_name: nameFromOpt || projectNameSafe(projectId) || '',
+      cost_center_type: typeFromOpt || 'FM'
+    };
+  }
+  function findSupervisor(uid){
+    return [...arr(getData().supervisors), ...arr(getData().users)].find(u => S(u.id || u.user_id || u.full_name || u.username || u.name) === S(uid)) || {};
+  }
+  async function insertMovementsRobust(rows){
+    if(!rows.length) return {error:null};
+    let res = await sb.from('inventory_movements').insert(rows);
+    if(!res.error) return res;
+    // Fallback للنسخ التي لم تُشغل SQL كاملًا: إزالة الأعمدة الإضافية فقط إذا كانت قاعدة البيانات ترفضها.
+    const msg = S(res.error.message || res.error.details || '');
+    if(/column|schema|cache|does not exist/i.test(msg)){
+      const safe = rows.map(r => {
+        const x = {...r};
+        ['cost_center_id','cost_center_name','cost_center_type','receiver_id','unit','barcode'].forEach(k => delete x[k]);
+        return x;
+      });
+      res = await sb.from('inventory_movements').insert(safe);
+    }
+    return res;
+  }
+  async function updateItemQuantity(itemId, addQty){
+    const it = itemById(itemId);
+    const newQty = Math.max(0, N(it.quantity) + N(addQty));
+    const upd = await sb.from('inventory_items').update({quantity:newQty}).eq('id', itemId);
+    if(upd.error) throw upd.error;
+    it.quantity = newQty;
+  }
+
+  window.saveRequestConsumptionV178 = async function(id){
+    const btn = document.activeElement && document.activeElement.tagName === 'BUTTON' ? document.activeElement : null;
+    try{
+      if(btn) btn.disabled = true;
+      const req = window._v188ConsumptionRequest || window._v182ConsumptionRequest;
+      const r = req?.r || arr(getData().inventoryRequests).find(x => S(x.id) === S(id));
+      const lines = req?.lines || lineItems(r);
+      if(!r || !lines.length) throw new Error('لم يتم العثور على الطلب أو الأصناف');
+
+      const modal = document.getElementById('consumptionModalV178');
+      if(!modal) throw new Error('نافذة الاستهلاك غير مفتوحة');
+      const rows = [...modal.querySelectorAll('.v188-cons-row, .v182-cons-row')];
+      const byItem = {};
+      const consumeRows = [];
+
+      for(const row of rows){
+        const idx = Number(row.dataset.lineIndex || 0);
+        const line = lines[idx];
+        if(!line) continue;
+        const qtyEl = row.querySelector('.v188-qty, .v182-cons-qty');
+        const qty = N(qtyEl?.value);
+        if(qty <= 0) continue;
+
+        const projectEl = row.querySelector('.v188-project, .v182-cons-project');
+        const costEl = row.querySelector('.v188-cost-center, .v182-cons-cost-center');
+        const userEl = row.querySelector('.v188-user, .v182-cons-user');
+        const notesEl = row.querySelector('.v188-notes, .v182-cons-notes');
+        const pid = projectEl?.value;
+        if(!pid) throw new Error('اختر المشروع لكل سطر استهلاك');
+        const uid = userEl?.value;
+        if(!uid) throw new Error('اختر المستخدم الفعلي لكل سطر استهلاك');
+
+        const it = itemById(line.item_id);
+        const cc = costEl?.value ? costCenterFromSelect(costEl, pid) : {cost_center_id:null, cost_center_name:projectNameSafe(pid), cost_center_type:'FM'};
+        const sup = findSupervisor(uid);
+        const unitCost = unitBefore(it, line.unit_cost || it.unit_cost);
+        byItem[line.item_id] = (byItem[line.item_id] || 0) + qty;
+        consumeRows.push({
+          item_id:Number(line.item_id),
+          item_name:line.item_name || it.name || '',
+          movement_type:'consume',
+          quantity:qty,
+          movement_date:todayV189(),
+          project_id:Number(pid),
+          project_name:projectNameSafe(pid),
+          cost_center_id:cc.cost_center_id,
+          cost_center_name:cc.cost_center_name,
+          cost_center_type:cc.cost_center_type,
+          receiver_id:/^\d+$/.test(S(uid)) ? Number(uid) : null,
+          receiver:sup.full_name || sup.name || sup.username || S(uid),
+          reason:'تسجيل استهلاك فعلي لأمر صرف REQ-' + r.id,
+          notes:notesEl?.value || '',
+          request_id:Number(r.id),
+          product_code:line.product_code || productCode(it),
+          barcode:line.barcode || it.barcode || it.supplier_barcode || '',
+          unit_cost:unitCost,
+          unit:line.unit || it.unit || 'حبة'
+        });
+      }
+
+      const returnRows = [];
+      const itemQtyUpdates = [];
+      for(const line of lines){
+        const usedNow = N(byItem[line.item_id] || 0);
+        const available = availableToConsume(r.id, line);
+        if(usedNow > available + 0.0001) throw new Error('مجموع الاستهلاك أكبر من المتاح للصنف: ' + (line.item_name || itemById(line.item_id).name || line.item_id));
+        const remaining = Math.max(0, available - usedNow);
+        if(remaining > 0){
+          const it = itemById(line.item_id);
+          const unitCost = unitBefore(it, line.unit_cost || it.unit_cost);
+          returnRows.push({
+            item_id:Number(line.item_id),
+            item_name:line.item_name || it.name || '',
+            movement_type:'return',
+            quantity:remaining,
+            movement_date:todayV189(),
+            project_id:r.project_id || null,
+            project_name:r.project_name || projectNameSafe(r.project_id),
+            cost_center_id:r.cost_center_id || null,
+            cost_center_name:r.cost_center_name || r.project_name || projectNameSafe(r.project_id) || '',
+            cost_center_type:r.cost_center_type || 'FM',
+            receiver:r.supervisor_name || supervisorNameSafe(r.supervisor_id),
+            reason:'مرتجع تلقائي لغير المستهلك في نفس اليوم من أمر REQ-' + r.id,
+            notes:'auto_return_unconsumed',
+            request_id:Number(r.id),
+            product_code:line.product_code || productCode(it),
+            barcode:line.barcode || it.barcode || it.supplier_barcode || '',
+            unit_cost:unitCost,
+            unit:line.unit || it.unit || 'حبة'
+          });
+          itemQtyUpdates.push({itemId:line.item_id, qty:remaining});
+        }
+      }
+
+      if(!consumeRows.length && !returnRows.length) throw new Error('لا توجد كمية متاحة للاستهلاك أو الإرجاع');
+      const ins = await insertMovementsRobust([...consumeRows, ...returnRows]);
+      if(ins.error) throw ins.error;
+      for(const u of itemQtyUpdates) await updateItemQuantity(u.itemId, u.qty);
+
+      try{
+        await sb.from('inventory_requests').update({
+          has_consumption:consumeRows.length > 0,
+          has_return:returnRows.length > 0,
+          consumption_updated_at:consumeRows.length ? new Date().toISOString() : null,
+          return_updated_at:returnRows.length ? new Date().toISOString() : null
+        }).eq('id', r.id);
+      }catch(_){ }
+
+      modal.remove();
+      notify(returnRows.length ? 'تم حفظ الاستهلاك وإرجاع المتبقي تلقائيًا' : 'تم حفظ الاستهلاك', 'ok');
+      if(typeof financeLoadAll === 'function') await financeLoadAll();
+      else if(typeof inventoryRenderRequests === 'function') inventoryRenderRequests();
+    }catch(err){
+      console.error('V189 save consumption failed:', err);
+      notify(err.message || String(err), 'err');
+    }finally{
+      if(btn) btn.disabled = false;
+    }
+  };
+
+  console.log('V189 save consumption and auto return fix loaded');
+})();
