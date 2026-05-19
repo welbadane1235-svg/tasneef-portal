@@ -11311,3 +11311,217 @@ function financePrintReport(kind){
   setTimeout(bootV183, 1200);
   console.log('V183 inventory invoice row final fix loaded');
 })();
+
+/* ================= V184 Invoice Unit Visible + Invoice Values Final Fix =================
+   Fixes:
+   - Shows the unit field clearly in the stock invoice item form.
+   - Adds a separate Unit column in the draft invoice table.
+   - Keeps VAT/unit prices consistent in invoice preview and print, even for old saved invoices.
+============================================================================ */
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const N = v => { const x = parseFloat(String(v ?? '').replace(/,/g,'')); return Number.isFinite(x) ? x : 0; };
+  const S = v => String(v ?? '');
+  const E = v => S(v).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const M = v => N(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const Q = v => N(v).toLocaleString('en-US',{maximumFractionDigits:2});
+  const VAT = 0.15;
+
+  function unitOptions(){ return ['حبة','لتر','كرتون','علبة','متر','كيس','رول','جالون','عبوة','طقم','زوج','درزن','كيلو','ملي','أخرى']; }
+  function calc(price, mode){
+    price = N(price); mode = mode || 'exclusive';
+    if(price <= 0) return {net:0, vat:0, gross:0};
+    if(mode === 'inclusive'){ const net = price / (1 + VAT); return {net, vat:price-net, gross:price}; }
+    if(mode === 'exempt') return {net:price, vat:0, gross:price};
+    return {net:price, vat:price*VAT, gross:price*(1+VAT)};
+  }
+  function lines(){ return Array.isArray(window.batchLinesV148) ? window.batchLinesV148 : []; }
+  function currentMode(){ return $('batchVatModeV148')?.value || 'exclusive'; }
+
+  function ensureUnitDatalistV184(){
+    let dl = $('unitOptionsV184');
+    if(!dl){ dl = document.createElement('datalist'); dl.id = 'unitOptionsV184'; document.body.appendChild(dl); }
+    dl.innerHTML = unitOptions().map(u => `<option value="${E(u)}"></option>`).join('');
+  }
+
+  function ensureInvoiceUnitFieldV184(){
+    ensureUnitDatalistV184();
+    const qty = $('batchQtyV148');
+    const price = $('batchUnitPriceV148');
+    if(!qty) return;
+
+    let unit = $('batchUnitV148');
+    if(!unit){
+      const holder = document.createElement('div');
+      holder.id = 'batchUnitHolderV184';
+      holder.innerHTML = `<label>نوع الكمية / الوحدة</label><input id="batchUnitV148" list="unitOptionsV184" placeholder="حبة / لتر / كرتون / علبة" value="حبة">`;
+      const split = qty.closest('.split') || qty.parentElement?.parentElement;
+      const qtyBox = qty.closest('div');
+      if(split && qtyBox) split.insertBefore(holder, qtyBox);
+      else qty.parentElement?.insertAdjacentElement('beforebegin', holder);
+      unit = $('batchUnitV148');
+    }
+    const box = unit.closest('div');
+    if(box){
+      box.hidden = false;
+      box.style.display = '';
+      box.classList.remove('hidden','v161-hide-advanced-field','v180-hidden');
+      const lab = box.querySelector('label');
+      if(lab) lab.textContent = 'نوع الكمية / الوحدة';
+    }
+    unit.hidden = false;
+    unit.style.display = '';
+    unit.disabled = false;
+    unit.setAttribute('list','unitOptionsV184');
+    unit.placeholder = 'حبة / لتر / كرتون / علبة';
+    if(!unit.value) unit.value = 'حبة';
+
+    // Make sure the row visually contains unit, quantity, and price in an obvious order.
+    if(price){
+      const pl = price.closest('div')?.querySelector('label');
+      if(pl) pl.textContent = 'سعر الوحدة';
+      price.placeholder = 'اكتب السعر حسب حالة الضريبة المختارة';
+    }
+  }
+
+  function ensureDraftHeaderV184(){
+    const body = $('batchLinesBodyV148');
+    if(!body) return;
+    const table = body.closest('table');
+    const tr = table?.querySelector('thead tr');
+    if(!tr) return;
+    const wanted = ['كود المنتج','الصنف','الكمية','الوحدة','سعر قبل الضريبة','VAT 15%','سعر شامل','الإجمالي شامل','حذف'];
+    tr.innerHTML = wanted.map(h => `<th>${h}</th>`).join('');
+  }
+
+  function renderDraftRowsV184(){
+    const body = $('batchLinesBodyV148');
+    if(!body) return;
+    ensureDraftHeaderV184();
+    const mode = currentMode();
+    let totalNet=0, totalVat=0, totalGross=0;
+    body.innerHTML = lines().map(l => {
+      const c = calc(l.unit_price, mode);
+      const q = N(l.quantity);
+      const lineNet = c.net*q, lineVat = c.vat*q, lineGross = c.gross*q;
+      totalNet += lineNet; totalVat += lineVat; totalGross += lineGross;
+      return `<tr>
+        <td>${E(l.product_code)}</td>
+        <td><b>${E(l.item_name)}</b><br><small>${E(l.category||'')} / ${E(l.item_type||'')}</small></td>
+        <td>${Q(q)}</td>
+        <td>${E(l.unit || 'حبة')}</td>
+        <td>${M(c.net)} ر.س</td>
+        <td>${M(c.vat)} ر.س</td>
+        <td>${M(c.gross)} ر.س</td>
+        <td>${M(lineGross)} ر.س</td>
+        <td><button class="danger" type="button" onclick="stockBatchRemoveLineV148('${E(l.product_code)}')">حذف</button></td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="9">لم تتم إضافة أصناف بعد</td></tr>';
+    const totals = $('batchTotalsV148');
+    if(totals) totals.innerHTML = `<b>Total amount before 15% VAT:</b> ${M(totalNet)} SAR &nbsp; | &nbsp; <b>Total VAT 15%:</b> ${M(totalVat)} SAR &nbsp; | &nbsp; <b>Total Value with 15% VAT:</b> ${M(totalGross)} SAR`;
+  }
+
+  function patchAddLineV184(){
+    const old = window.stockBatchAddLineV148;
+    if(!old || old.v184Wrapped) return;
+    window.stockBatchAddLineV148 = function(){
+      ensureInvoiceUnitFieldV184();
+      const unit = $('batchUnitV148');
+      if(unit && !unit.value) unit.value = 'حبة';
+      const beforeLen = lines().length;
+      const codeBefore = S($('batchProductCodeV148')?.value).trim();
+      const out = old.apply(this, arguments);
+      const arr = lines();
+      const target = arr.find(l => S(l.product_code).trim() === codeBefore) || arr[arr.length-1];
+      if(target && !target.unit) target.unit = unit?.value || 'حبة';
+      window.batchLinesV148 = arr;
+      ensureInvoiceUnitFieldV184();
+      renderDraftRowsV184();
+      return out;
+    };
+    window.stockBatchAddLineV148.v184Wrapped = true;
+  }
+
+  function patchRenderV184(){
+    window.stockBatchRenderLinesV148 = renderDraftRowsV184;
+    const oldRemove = window.stockBatchRemoveLineV148;
+    window.stockBatchRemoveLineV148 = function(code){
+      if(typeof oldRemove === 'function') oldRemove.apply(this, arguments);
+      else window.batchLinesV148 = lines().filter(l => S(l.product_code) !== S(code));
+      renderDraftRowsV184();
+    };
+  }
+
+  function normalizeLineValues(l, batch){
+    const q = N(l.quantity);
+    let unitNet = N(l.unit_cost || l.unit_price_before_vat || l.unit_price);
+    let unitVat = N(l.unit_vat);
+    let unitGross = N(l.unit_gross || l.unit_price_with_vat);
+    let lineNet = N(l.line_net || l.total_before_vat);
+    let lineVat = N(l.line_vat || l.total_vat);
+    let lineGross = N(l.line_gross || l.total_with_vat);
+
+    // Repair old saved lines that have only invoice totals but missing line prices.
+    if(q > 0 && unitNet <= 0 && lineNet > 0) unitNet = lineNet / q;
+    if(q > 0 && unitNet <= 0 && (batch?.lines||[]).length === 1 && N(batch.total_before_vat) > 0) unitNet = N(batch.total_before_vat) / q;
+
+    if(unitNet > 0 && unitVat <= 0) unitVat = unitNet * VAT;
+    if(unitNet > 0 && unitGross <= 0) unitGross = unitNet + unitVat;
+    if(q > 0 && lineNet <= 0) lineNet = unitNet * q;
+    if(q > 0 && lineVat <= 0) lineVat = unitVat * q;
+    if(q > 0 && lineGross <= 0) lineGross = unitGross * q;
+
+    // If exempt/inclusive totals indicate zero VAT, respect it only when batch total VAT is zero.
+    if(N(batch?.total_vat) === 0 && N(batch?.total_before_vat) > 0){
+      unitVat = 0; lineVat = 0; unitGross = unitNet; lineGross = lineNet;
+    }
+    return {q, unitNet, unitVat, unitGross, lineNet, lineVat, lineGross};
+  }
+
+  function patchInvoiceViewV184(){
+    window.viewStockBatchV149 = function(idx){
+      const r = (window.stockBatchesV148 || [])[Number(idx)];
+      if(!r) return;
+      let modal = $('invoiceViewModalV149');
+      if(!modal){ modal = document.createElement('div'); modal.id = 'invoiceViewModalV149'; modal.className = 'v149-modal-card'; document.body.appendChild(modal); }
+      const rows = (r.lines || []).map(l => {
+        const v = normalizeLineValues(l, r);
+        return `<tr><td>${E(l.product_code)}</td><td>${E(l.item_name)}</td><td>${E(l.category||'')}</td><td>${E(l.item_type||'')}</td><td>${E(l.unit||'حبة')}</td><td>${Q(v.q)}</td><td>${M(v.unitNet)} ر.س</td><td>${M(v.unitVat)} ر.س</td><td>${M(v.unitGross)} ر.س</td><td>${M(v.lineGross)} ر.س</td></tr>`;
+      }).join('');
+      const idxReal = (window.stockBatchesV148 || []).indexOf(r);
+      modal.innerHTML = `<button type="button" class="v149-close" onclick="closeInvoiceViewV149()">إغلاق</button><h2>فاتورة إدخال مخزون</h2><div class="v149-invoice-meta"><div class="v149-mini"><small>رقم الفاتورة</small><b>${E(r.invoice_no||r.id||'-')}</b></div><div class="v149-mini"><small>التاريخ</small><b>${E(r.batch_date||'-')}</b></div><div class="v149-mini"><small>المورد</small><b>${E(r.supplier||'-')}</b></div><div class="v149-mini"><small>عدد الأصناف</small><b>${(r.lines||[]).length}</b></div></div><div class="table-wrap"><table><thead><tr><th>كود المنتج</th><th>الصنف</th><th>التصنيف</th><th>النوع</th><th>الوحدة</th><th>الكمية</th><th>سعر قبل الضريبة</th><th>VAT 15%</th><th>سعر شامل</th><th>الإجمالي شامل</th></tr></thead><tbody>${rows || '<tr><td colspan="10">لا توجد أصناف</td></tr>'}</tbody></table></div><div class="footer-note"><b>Total amount before 15% VAT:</b> ${M(r.total_before_vat)} SAR<br><b>Total VAT 15%:</b> ${M(r.total_vat)} SAR<br><b>Total Value with 15% VAT:</b> ${M(r.total_with_vat)} SAR</div><div class="actions"><button type="button" onclick="stockBatchPrintSavedV148('${idxReal}')">طباعة</button></div>`;
+      modal.classList.add('show'); const bd = $('v149Backdrop'); if(bd) bd.classList.add('show');
+    };
+  }
+
+  function patchPrintV184(){
+    window.stockBatchPrintV148 = function(batch){
+      const rows = (batch.lines || []).map(l => {
+        const v = normalizeLineValues(l, batch);
+        return `<tr><td>${E(l.product_code)}</td><td>${E(l.item_name)}</td><td>${E(l.category||'')}</td><td>${E(l.item_type||'')}</td><td>${E(l.unit||'حبة')}</td><td>${Q(v.q)}</td><td>${M(v.unitNet)} SAR</td><td>${M(v.unitVat)} SAR</td><td>${M(v.unitGross)} SAR</td><td>${M(v.lineGross)} SAR</td></tr>`;
+      }).join('');
+      const body = `<div class="grid"><div class="box"><b>ID</b><br>${E(batch.invoice_no)}</div><div class="box"><b>Date</b><br>${E(batch.batch_date)}</div><div class="box"><b>Warehouse / Supplier</b><br>${E(batch.supplier)}</div></div><h2>Products</h2><table><thead><tr><th>Product Code</th><th>Product Name</th><th>Category</th><th>Type</th><th>Unit</th><th>Quantity Added</th><th>Unit Price</th><th>VAT 15%</th><th>Unit Price with VAT</th><th>Value</th></tr></thead><tbody>${rows || '<tr><td colspan="10">لا توجد أصناف</td></tr>'}</tbody></table><div style="margin-top:22px;font-size:16px;line-height:2"><b>Total amount before 15% VAT:</b> ${M(batch.total_before_vat)} SAR<br><b>Total VAT 15%:</b> ${M(batch.total_vat)} SAR<br><b>Total Value with 15% VAT:</b> ${M(batch.total_with_vat)} SAR</div>`;
+      if(typeof window.financePrintWindow === 'function') financePrintWindow('Added Product', body);
+      else { const w=window.open('', '_blank'); w.document.write(body); w.print(); }
+    };
+  }
+
+  function bootV184(){
+    ensureInvoiceUnitFieldV184();
+    ensureDraftHeaderV184();
+    patchAddLineV184();
+    patchRenderV184();
+    patchInvoiceViewV184();
+    patchPrintV184();
+    renderDraftRowsV184();
+  }
+
+  // Run when modal is opened or tabs are changed.
+  window.addEventListener('load', () => setTimeout(bootV184, 600));
+  document.addEventListener('click', () => setTimeout(bootV184, 60), true);
+  document.addEventListener('input', (e) => { if(e.target && ['batchQtyV148','batchUnitPriceV148','batchUnitV148'].includes(e.target.id)) setTimeout(renderDraftRowsV184, 30); }, true);
+  setInterval(() => { if($('stockBatchCardV148')?.classList.contains('v149-open')) bootV184(); }, 800);
+  setTimeout(bootV184, 1200);
+  console.log('V184 invoice unit visible and values fix loaded');
+})();
