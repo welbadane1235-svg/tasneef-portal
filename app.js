@@ -12177,3 +12177,194 @@ function financePrintReport(kind){
 
   console.log('V189 save consumption and auto return fix loaded');
 })();
+
+/* ================= V190 Request Clear + Consumption Auto Fill =================
+   - بعد إرسال طلب الصرف: تفريغ النموذج مباشرة.
+   - عند تسجيل الاستهلاك: اختيار المشروع يعبئ المشرف ومركز التكلفة تلقائيًا.
+*/
+(function(){
+  const $ = id => document.getElementById(id);
+  const S = v => String(v ?? '').trim();
+  const N = v => { const n = Number(String(v ?? 0).replace(/,/g,'').trim()); return Number.isFinite(n) ? n : 0; };
+  const arr = v => Array.isArray(v) ? v : [];
+  const getData = () => window.data || {};
+  const E = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const todayX = () => (typeof today === 'function' ? today() : new Date().toISOString().slice(0,10));
+  const notify = (text,type) => { if(typeof msg === 'function') msg(text,type); else alert(text); };
+  function projectNameSafe(id){ try { return typeof projectName === 'function' ? projectName(id) : ''; } catch(_) { return ''; } }
+  function supervisorNameSafe(id){ try { return typeof supervisorName === 'function' ? supervisorName(id) : ''; } catch(_) { return ''; } }
+  function itemById(id){ return arr(getData().inventoryItems).find(x => S(x.id) === S(id)) || {}; }
+  function unitBefore(it, fallback){ const v = N(fallback || it.unit_cost || it.unit_price || it.price_before_vat || 0); return v > 0 ? v : 0; }
+  function productCode(it){ try { if(typeof v118ProductCode === 'function') return v118ProductCode(it); } catch(_){} return it.product_code || it.barcode || it.serial_number || ''; }
+  function ccList(){ return arr(getData().costCenters || getData().cost_centers); }
+  function ccForProjectLocal(projectId){
+    const pname = projectNameSafe(projectId);
+    const list = ccList();
+    const c = list.find(x => S(x.project_id) === S(projectId)) || list.find(x => S(x.name || x.cost_center_name || '').trim() === S(pname).trim());
+    if(c) return { id:c.id || c.code || c.name, name:c.name || c.cost_center_name || pname, type:c.type || c.cost_center_type || 'FM' };
+    return { id:list.length ? '' : ('project:' + projectId), name:pname, type:'FM' };
+  }
+  function costCenterOptionsLocal(selected, projectId){
+    let list = ccList();
+    const auto = ccForProjectLocal(projectId);
+    if(!list.length && projectId) list = [{id:auto.id, name:auto.name, type:'FM'}];
+    return '<option value="">اختر مركز التكلفة</option>' + list.map(c => {
+      const id = c.id || c.code || c.name;
+      const name = c.name || c.cost_center_name || c.project_name || '';
+      const type = c.type || c.cost_center_type || (/cn/i.test(S(c.code))?'CN':'FM');
+      return `<option value="${E(id)}" data-name="${E(name)}" data-type="${E(type)}" ${S(selected)===S(id)?'selected':''}>${E(type)} - ${E(name)}</option>`;
+    }).join('');
+  }
+  function supervisorOptionsLocal(selected){
+    const sources = [arr(getData().supervisors), arr(getData().users)].flat();
+    const map = new Map();
+    sources.forEach(u => {
+      const role = S(u.role || '').toLowerCase();
+      const ok = !role || ['supervisor','operations_manager','manager','admin','general_manager'].includes(role) || /مشرف/.test(S(u.role_label || u.job_title || ''));
+      if(!ok) return;
+      const id = S(u.id || u.user_id || u.full_name || u.username || u.name);
+      if(!id || map.has(id)) return;
+      map.set(id,u);
+    });
+    return '<option value="">اختر المشرف / المستخدم الفعلي</option>' + [...map.values()].map(u => {
+      const id = u.id || u.user_id || u.full_name || u.username || u.name;
+      const name = u.full_name || u.name || u.username || '';
+      return `<option value="${E(id)}" ${S(selected)===S(id)?'selected':''}>${E(name)}</option>`;
+    }).join('');
+  }
+  function projectOptionsLocal(selected){
+    return '<option value="">اختر المشروع</option>' + arr(getData().projects).filter(p => S(p.status || 'active') !== 'inactive').map(p => `<option value="${E(p.id)}" ${S(selected)===S(p.id)?'selected':''}>${E(p.name || p.project_name || '')}</option>`).join('');
+  }
+  function supervisorIdForProject(pid){
+    const p = arr(getData().projects).find(x => S(x.id) === S(pid));
+    return p?.supervisor_id || p?.app_supervisor_id || '';
+  }
+  function applyProjectAutoFill(row, projectId){
+    if(!row || !projectId) return;
+    const ccSelect = row.querySelector('.v188-cost-center, .v182-cons-cost-center');
+    const userSelect = row.querySelector('.v188-user, .v182-cons-user');
+    if(ccSelect){
+      const auto = ccForProjectLocal(projectId);
+      ccSelect.innerHTML = costCenterOptionsLocal(auto.id, projectId);
+      ccSelect.value = S(auto.id);
+      if(!ccSelect.value){
+        const opt = [...ccSelect.options].find(o => S(o.dataset.name) === S(auto.name) || /FM/.test(o.textContent||''));
+        if(opt) ccSelect.value = opt.value;
+      }
+    }
+    if(userSelect){
+      const sid = supervisorIdForProject(projectId);
+      if(sid){
+        userSelect.innerHTML = supervisorOptionsLocal(sid);
+        userSelect.value = S(sid);
+      }
+    }
+  }
+  function lineItems(r){
+    try { if(typeof v118LineItems === 'function') return v118LineItems(r) || []; } catch(_){}
+    let raw = r?.request_items || r?.items || r?.request_lines || [];
+    if(typeof raw === 'string' && raw.trim()){ try { raw = JSON.parse(raw); } catch(_){ raw = []; } }
+    if(Array.isArray(raw)) return raw.map(x => ({
+      item_id:x.item_id || x.id,
+      item_name:x.item_name || x.name || '',
+      product_code:x.product_code || x.serial_number || '',
+      barcode:x.barcode || '',
+      quantity:N(x.quantity),
+      unit:x.unit || '',
+      unit_cost:N(x.unit_cost || x.price_before_vat || x.unit_price || 0)
+    })).filter(x => x.item_id && x.quantity > 0);
+    return [];
+  }
+  function movementsFor(requestId,itemId,type){
+    return arr(getData().inventoryMovements).filter(m => S(m.request_id || '') === S(requestId) && S(m.item_id || '') === S(itemId) && (!type || S(m.movement_type) === S(type)));
+  }
+  function returnedQty(reqId,itemId){ return movementsFor(reqId,itemId,'return').reduce((a,m)=>a+N(m.quantity),0); }
+  function consumedQty(reqId,itemId){ return movementsFor(reqId,itemId,'consume').reduce((a,m)=>a+N(m.quantity),0); }
+  function availableToConsume(reqId,line){ return Math.max(0, N(line.quantity) - returnedQty(reqId,line.item_id) - consumedQty(reqId,line.item_id)); }
+
+  // تفريغ نموذج طلب الصرف بعد الإرسال مباشرة
+  window.inventorySaveRequest = async function(btn){
+    try{
+      if(btn) btn.disabled = true;
+      const pid = $('inventoryRequestProject')?.value;
+      const supervisorId = $('inventoryRequestSupervisor')?.value;
+      if(!pid) throw new Error('اختر المشروع');
+      if(!supervisorId) throw new Error('اختر المشرف الطالب');
+      const lines = window.inventoryRequestLines || (typeof inventoryRequestLines !== 'undefined' ? inventoryRequestLines : []);
+      if(!lines.length) throw new Error('أضف صنفًا واحدًا على الأقل إلى أمر الصرف');
+      const totalQty = lines.reduce((a,x)=>a+N(x.quantity),0);
+      const ccId = $('inventoryRequestCostCenter')?.value || '';
+      const auto = ccForProjectLocal(pid);
+      const selectedOpt = $('inventoryRequestCostCenter')?.selectedOptions?.[0];
+      const row = {
+        item_id:Number(lines[0].item_id),
+        item_name:lines.map(x=>x.item_name).join('، '),
+        quantity:totalQty,
+        request_items:lines,
+        items:lines,
+        project_id:Number(pid),
+        project_name:projectNameSafe(pid),
+        cost_center_id:/^\d+$/.test(S(ccId)) ? Number(ccId) : null,
+        cost_center_name:selectedOpt?.dataset?.name || auto.name,
+        cost_center_type:selectedOpt?.dataset?.type || auto.type || 'FM',
+        supervisor_id:Number(supervisorId),
+        supervisor_name:supervisorNameSafe(supervisorId),
+        request_date:$('inventoryRequestDate')?.value || todayX(),
+        reason:$('inventoryRequestReason')?.value || '',
+        notes:$('inventoryRequestNotes')?.value || '',
+        status:'pending_operations',
+        current_step:'operations',
+        approval_path:['operations'],
+        approval_log:[]
+      };
+      const res = await sb.from('inventory_requests').insert(row);
+      if(res.error) throw res.error;
+      notify('تم إرسال طلب الصرف إلى مدير التشغيل');
+      // تفريغ كامل وفوري للنموذج
+      try{
+        window.inventoryRequestLines = [];
+        if(typeof inventoryRequestLines !== 'undefined') inventoryRequestLines = [];
+        if(typeof inventoryRenderRequestLines === 'function') inventoryRenderRequestLines();
+      }catch(_){ }
+      ['inventoryRequestItem','inventoryRequestQty','inventoryRequestSupervisor','inventoryRequestReason','inventoryRequestNotes','inventoryRequestAvailable','inventoryRequestCostCenter'].forEach(id => { const el=$(id); if(el) el.value=''; });
+      if($('inventoryRequestProject')) $('inventoryRequestProject').value='';
+      if($('inventoryRequestDate')) $('inventoryRequestDate').value=todayX();
+      if($('inventoryRequestId')) $('inventoryRequestId').value='';
+      if(typeof financeLoadAll === 'function') await financeLoadAll();
+    }catch(e){ notify(e.message || String(e),'err'); }
+    finally{ if(btn) btn.disabled = false; }
+  };
+
+  // استبدال سطر الاستهلاك ليعبئ المشرف ومركز التكلفة تلقائيًا عند اختيار المشروع
+  window.addConsumptionRowV188 = function(lineIndex, values={}){
+    const req = window._v188ConsumptionRequest || window._v182ConsumptionRequest; if(!req) return;
+    const line = req.lines[Number(lineIndex)]; if(!line) return;
+    const tbody = $(`v188ConsumeRows_${lineIndex}`) || $(`v182ConsumeRows_${lineIndex}`); if(!tbody) return;
+    const row = document.createElement('tr');
+    row.className = 'v188-cons-row'; row.dataset.lineIndex = S(lineIndex); row.dataset.itemId = S(line.item_id);
+    row.innerHTML = `<td><select class="v188-project">${projectOptionsLocal(values.project_id)}</select></td><td><select class="v188-cost-center">${costCenterOptionsLocal(values.cost_center_id, values.project_id)}</select></td><td><input class="v188-qty" type="number" min="0" step="0.01" placeholder="الكمية" value="${E(values.qty || '')}"></td><td><select class="v188-user">${supervisorOptionsLocal(values.user_id)}</select></td><td><input class="v188-notes" placeholder="ملاحظات" value="${E(values.notes || '')}"></td><td><button type="button" class="danger" onclick="this.closest('tr').remove()">حذف</button></td>`;
+    tbody.appendChild(row);
+    const projectSel = row.querySelector('.v188-project');
+    projectSel?.addEventListener('change', ev => applyProjectAutoFill(row, ev.target.value));
+    if(values.project_id) applyProjectAutoFill(row, values.project_id);
+  };
+
+  // ضمان حفظ الاستهلاك بنفس المنطق، مع الاعتماد على القيم المعبأة تلقائيًا
+  const oldSaveConsumption = window.saveRequestConsumptionV178;
+  window.saveRequestConsumptionV178 = async function(id){
+    const modal = document.getElementById('consumptionModalV178');
+    if(modal){
+      [...modal.querySelectorAll('.v188-cons-row')].forEach(row => {
+        const pid = row.querySelector('.v188-project')?.value;
+        if(pid){
+          const cc = row.querySelector('.v188-cost-center');
+          const usr = row.querySelector('.v188-user');
+          if((cc && !cc.value) || (usr && !usr.value)) applyProjectAutoFill(row, pid);
+        }
+      });
+    }
+    return oldSaveConsumption ? oldSaveConsumption.apply(this, arguments) : undefined;
+  };
+
+  console.log('V190 request form clear and consumption project autofill loaded');
+})();
