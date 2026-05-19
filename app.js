@@ -12368,3 +12368,202 @@ function financePrintReport(kind){
 
   console.log('V190 request form clear and consumption project autofill loaded');
 })();
+
+/* ================= V191 Consumption Sync Reports Fix =================
+   - بعد حفظ الاستهلاك/المرتجع: مزامنة الأصناف والتقارير ومراكز التكلفة فورًا.
+   - التقارير تعتمد على حركات المخزون الفعلية: out / consume / return.
+   - المستهلك = حركات consume الفعلية، والمرتجع = حركات return، والصادر = حركات out.
+*/
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const S = v => String(v ?? '').trim();
+  const N = v => { const n = Number(String(v ?? 0).replace(/,/g,'').trim()); return Number.isFinite(n) ? n : 0; };
+  const A = v => Array.isArray(v) ? v : [];
+  const E = v => S(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const money = v => N(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' ر.س';
+  const qty = v => N(v).toLocaleString('en-US',{maximumFractionDigits:2});
+  const todayLocal = () => (typeof today === 'function' ? today() : new Date().toISOString().slice(0,10));
+  const dateOnly = v => S(v || todayLocal()).slice(0,10);
+  const msgLocal = (t,type) => { if(typeof msg === 'function') msg(t,type); else console.log(t); };
+  const d = () => window.data || {};
+
+  function itemById(id){ return A(d().inventoryItems).find(x => S(x.id) === S(id)) || {}; }
+  function pName(id){ try { return typeof projectName === 'function' ? projectName(id) : ''; } catch(_) { return ''; } }
+  function itemCode(it){ try { if(typeof v118ProductCode === 'function') return v118ProductCode(it); } catch(_){} return S(it.product_code || it.barcode || it.supplier_barcode || it.serial_number || it.company_code || ''); }
+  function itemBarcode(it){ try { if(typeof v118Barcode === 'function') return v118Barcode(it); } catch(_){} return S(it.barcode || it.supplier_barcode || ''); }
+  function vatMode(it){ return S(it.vat_mode || it.tax_mode || it.vat_status || 'exclusive').toLowerCase(); }
+  function unitBefore(it, fallback){
+    const raw = N(fallback || it.unit_cost || it.price_before_vat || it.unit_price || 0);
+    if(vatMode(it) === 'inclusive') return raw / 1.15;
+    return raw;
+  }
+  function vatOf(it, amount){ return vatMode(it) === 'exempt' ? 0 : N(amount) * 0.15; }
+  function grossOf(it, amount){ return N(amount) + vatOf(it, amount); }
+  function costCode(row){
+    const t = S(row.cost_center_type).toUpperCase();
+    if(t === 'CN') return 'CN';
+    if(t === 'FM') return 'FM';
+    const nm = S(row.cost_center_name || row.project || '').toLowerCase();
+    if(/اداري|إداري|عام|كلين|cn|شركة|سكن|سيارات/.test(nm)) return 'CN';
+    return row.project_id || row.project ? 'FM' : 'CN';
+  }
+  function passDate(date){
+    const mode = $('inventoryReportDateMode')?.value || 'all';
+    if(mode === 'day'){
+      const day = $('inventoryReportDay')?.value;
+      return !day || date === day;
+    }
+    if(mode === 'month'){
+      const mon = $('inventoryReportMonth')?.value;
+      return !mon || S(date).slice(0,7) === mon;
+    }
+    const mon2 = $('financeMonthFilter')?.value;
+    return !mon2 || S(date).slice(0,7) === mon2;
+  }
+  function passFilters(row){
+    const prod = $('inventoryReportProduct')?.value || '';
+    const supplier = $('inventoryReportSupplier')?.value || '';
+    const person = $('inventoryReportPerson')?.value || '';
+    const code = $('financeReportCostCodeFilter')?.value || '';
+    const q = S($('financeReportQuickSearch')?.value || $('financeSearch')?.value).toLowerCase();
+    if(!passDate(row.date)) return false;
+    if(prod && S(row.item_id) !== S(prod)) return false;
+    if(supplier && S(row.supplier) !== S(supplier)) return false;
+    if(person && S(row.person_id) !== S(person) && S(row.person) !== S(person)) return false;
+    if(code && row.cost_code !== code) return false;
+    if(q && ![row.project,row.person,row.item,row.product_code,row.barcode,row.supplier,row.reason,row.ref,row.cost_center_name,row.cost_code].join(' ').toLowerCase().includes(q)) return false;
+    return true;
+  }
+
+  function movementRowsV191(){
+    const rows = [];
+    A(d().inventoryMovements).forEach(m => {
+      const type = S(m.movement_type);
+      if(!['out','consume','return'].includes(type)) return;
+      const it = itemById(m.item_id);
+      const quantity = N(m.quantity);
+      const unit = unitBefore(it, m.unit_cost);
+      const isConsume = type === 'consume';
+      const isReturn = type === 'return';
+      const before = isConsume ? quantity * unit : 0;
+      const project = m.project_name || pName(m.project_id) || 'بدون مشروع';
+      const base = {
+        date: dateOnly(m.movement_date || m.created_at),
+        project,
+        project_id: m.project_id || null,
+        person: m.receiver || m.receiver_name || 'بدون مستخدم',
+        person_id: m.receiver_id || '',
+        item: m.item_name || it.name || '-',
+        item_id: m.item_id,
+        product_code: m.product_code || itemCode(it),
+        barcode: m.barcode || itemBarcode(it),
+        supplier: it.supplier || m.supplier || '',
+        unit_name: m.unit || it.unit || '',
+        cost_center_id: m.cost_center_id || null,
+        cost_center_name: m.cost_center_name || project,
+        cost_center_type: m.cost_center_type || '',
+        unit_before: unit,
+        out: type === 'out' ? quantity : 0,
+        returned: isReturn ? quantity : 0,
+        consumed: isConsume ? quantity : 0,
+        current: Math.max(0, N(it.quantity)),
+        value_before: before,
+        vat: vatOf(it, before),
+        gross: grossOf(it, before),
+        reason: m.reason || m.notes || '-',
+        movement_type: type === 'consume' ? 'استهلاك فعلي' : (type === 'return' ? 'مرتجع' : 'صرف للمشرف'),
+        ref: (m.request_id ? 'REQ-' + m.request_id : 'MOV-' + m.id),
+        request_id: m.request_id || null
+      };
+      base.cost_code = costCode(base);
+      rows.push(base);
+    });
+    return rows;
+  }
+
+  function inventoryItemStatsV191(itemId){
+    const it = itemById(itemId);
+    const rows = movementRowsV191().filter(r => S(r.item_id) === S(itemId));
+    const inQty = A(d().inventoryMovements).filter(m => S(m.item_id)===S(itemId) && S(m.movement_type)==='in').reduce((a,m)=>a+N(m.quantity),0);
+    const outQty = rows.reduce((a,r)=>a+N(r.out),0);
+    const retQty = rows.reduce((a,r)=>a+N(r.returned),0);
+    const consQty = rows.reduce((a,r)=>a+N(r.consumed),0);
+    return {inQty, outQty, retQty, consumed: consQty, remaining: Math.max(0,N(it.quantity)), movements: rows};
+  }
+  window.inventoryItemStatsV151 = function(itOrId){ const id = typeof itOrId === 'object' ? itOrId.id : itOrId; return inventoryItemStatsV191(id); };
+  window.inventoryItemStatsV191 = inventoryItemStatsV191;
+  window.inventoryUsageRowsV191 = () => movementRowsV191().filter(passFilters);
+
+  function fillReportsV191(){
+    const rows = movementRowsV191().filter(passFilters);
+    const byProject = {};
+    const byPerson = {};
+    const byCost = {};
+    rows.forEach(r => {
+      const pk = r.project || 'بدون مشروع';
+      byProject[pk] = byProject[pk] || {count:0,out:0,ret:0,cons:0,val:0,vat:0,gross:0};
+      byProject[pk].count++; byProject[pk].out += N(r.out); byProject[pk].ret += N(r.returned); byProject[pk].cons += N(r.consumed); byProject[pk].val += N(r.value_before); byProject[pk].vat += N(r.vat); byProject[pk].gross += N(r.gross);
+      const sk = (r.person || 'بدون مستخدم') + '|||' + pk;
+      byPerson[sk] = byPerson[sk] || {person:r.person||'بدون مستخدم',project:pk,count:0,out:0,ret:0,cons:0,gross:0};
+      byPerson[sk].count++; byPerson[sk].out += N(r.out); byPerson[sk].ret += N(r.returned); byPerson[sk].cons += N(r.consumed); byPerson[sk].gross += N(r.gross);
+      const ck = r.cost_center_name || pk || 'غير محدد';
+      byCost[ck] = byCost[ck] || {code:r.cost_code,count:0,out:0,ret:0,cons:0,val:0,vat:0,gross:0};
+      byCost[ck].count++; byCost[ck].out += N(r.out); byCost[ck].ret += N(r.returned); byCost[ck].cons += N(r.consumed); byCost[ck].val += N(r.value_before); byCost[ck].vat += N(r.vat); byCost[ck].gross += N(r.gross);
+    });
+    const pb=$('stockOutByProjectBody');
+    if(pb) pb.innerHTML = Object.entries(byProject).map(([k,v]) => `<tr><td>${E(k)}</td><td>${qty(v.count)}</td><td>${qty(v.out)}</td><td>${qty(v.ret)}</td><td>${qty(v.cons)}</td><td>${money(v.val)}</td><td>${money(v.vat)}</td><td>${money(v.gross)}</td></tr>`).join('') || '<tr><td colspan="8">لا توجد بيانات</td></tr>';
+    const sb=$('stockOutBySupervisorBody');
+    if(sb) sb.innerHTML = Object.values(byPerson).map(v => `<tr><td>${E(v.person)}</td><td>${E(v.project)}</td><td>${qty(v.count)}</td><td>${qty(v.out)}</td><td>${qty(v.ret)}</td><td>${qty(v.cons)}</td><td>${money(v.gross)}</td></tr>`).join('') || '<tr><td colspan="7">لا توجد بيانات</td></tr>';
+    const ub=$('inventoryUsageDetailBody');
+    if(ub) ub.innerHTML = rows.sort((a,b)=>S(b.date).localeCompare(S(a.date))).map(r => `<tr><td>${E(r.date)}</td><td>${E(r.project)}</td><td>${E(r.person)}</td><td>${E(r.product_code)} - ${E(r.item)}</td><td>${qty(r.out || r.returned || r.consumed)} ${E(r.unit_name)}</td><td>${E(r.reason)}</td><td>${E(r.movement_type)}</td><td>${E(r.cost_code)} / ${E(r.cost_center_name||'-')}</td><td>${money(r.gross)}</td><td>${E(r.ref)}</td></tr>`).join('') || '<tr><td colspan="10">لا توجد بيانات استهلاك أو مرتجع</td></tr>';
+    const cb=$('costCenterReportBody');
+    if(cb) cb.innerHTML = Object.entries(byCost).map(([k,v]) => `<tr><td>${E(k)}</td><td><span class="badge ${v.code==='FM'?'green':'neutral'}">${E(v.code)}</span></td><td>${qty(v.count)}</td><td>${qty(v.out)}</td><td>${qty(v.ret)}</td><td>${qty(v.cons)}</td><td>${money(v.val)}</td><td>${money(v.vat)}</td><td>${money(v.gross)}</td></tr>`).join('') || '<tr><td colspan="9">لا توجد بيانات مراكز تكلفة</td></tr>';
+  }
+
+  const oldReports = window.financeRenderReports;
+  window.financeRenderReports = function(){
+    if(typeof oldReports === 'function') oldReports.apply(this, arguments);
+    try{ fillReportsV191(); }catch(e){ console.warn('V191 reports sync warning', e); }
+  };
+
+  const oldItems = window.inventoryRenderItems;
+  window.inventoryRenderItems = function(){
+    const out = typeof oldItems === 'function' ? oldItems.apply(this, arguments) : undefined;
+    setTimeout(() => {
+      try{
+        document.querySelectorAll('[data-item-id]').forEach(card => {
+          const id = card.getAttribute('data-item-id');
+          const st = inventoryItemStatsV191(id);
+          card.querySelector('[data-stock-in]') && (card.querySelector('[data-stock-in]').textContent = qty(st.inQty));
+          card.querySelector('[data-stock-out]') && (card.querySelector('[data-stock-out]').textContent = qty(st.outQty));
+          card.querySelector('[data-stock-return]') && (card.querySelector('[data-stock-return]').textContent = qty(st.retQty));
+          card.querySelector('[data-stock-consume]') && (card.querySelector('[data-stock-consume]').textContent = qty(st.consumed));
+          card.querySelector('[data-stock-current]') && (card.querySelector('[data-stock-current]').textContent = qty(st.remaining));
+        });
+      }catch(_){ }
+    },50);
+    return out;
+  };
+
+  const oldSave = window.saveRequestConsumptionV178;
+  window.saveRequestConsumptionV178 = async function(){
+    const result = oldSave ? await oldSave.apply(this, arguments) : undefined;
+    try{
+      // إعادة تحميل حقيقية بعد الحفظ، حتى تظهر الاستهلاك والمرتجع في كل الأقسام فورًا.
+      if(typeof financeLoadAll === 'function'){
+        financeLoaded = false;
+        await financeLoadAll(false);
+      }
+      if(typeof window.financeRenderReports === 'function') window.financeRenderReports();
+      if(typeof window.inventoryRenderItems === 'function') window.inventoryRenderItems();
+      if(typeof window.inventoryRenderMovements === 'function') window.inventoryRenderMovements();
+      if(typeof window.inventoryRenderRequests === 'function') window.inventoryRenderRequests();
+      msgLocal('تم تحديث التقارير والأصناف بعد تسجيل الاستهلاك والمرتجع');
+    }catch(e){ console.warn('V191 post consumption refresh warning', e); }
+    return result;
+  };
+
+  window.addEventListener('load', () => setTimeout(() => { try{ fillReportsV191(); }catch(_){} }, 1800));
+  console.log('V191 Consumption Sync Reports Fix loaded');
+})();
