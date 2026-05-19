@@ -10952,3 +10952,168 @@ function financePrintReport(kind){
   setTimeout(boot, 1000);
   console.log('V181 invoice unit and VAT display fix loaded');
 })();
+
+/* V182 Inventory Invoice Unit + Consumption Distribution
+   - keeps invoice unit/VAT logic stable
+   - allows multiple actual consumption rows per issued item
+   - actual user list uses supervisors
+   - total consumed cannot exceed issued minus returns and previous consumption
+*/
+(function(){
+  const V='182';
+  const $ = id => document.getElementById(id);
+  const n = v => { const x=parseFloat(String(v??'').replace(/,/g,'')); return Number.isFinite(x)?x:0; };
+  const s = v => String(v??'');
+  const e = v => s(v).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+  const q = v => { const x=n(v); return Number.isInteger(x)?String(x):x.toFixed(2).replace(/\.00$/,''); };
+  const todayLocal = () => (typeof today==='function'?today():new Date().toISOString().slice(0,10));
+  const arr = v => Array.isArray(v)?v:[];
+  const lineItems = r => {
+    try { if(typeof v118LineItems==='function') return v118LineItems(r) || []; } catch(_){ }
+    const raw = r?.request_items || r?.items || r?.request_lines || [];
+    if(Array.isArray(raw)) return raw;
+    try { const x=JSON.parse(raw); return Array.isArray(x)?x:[]; } catch(_){ return []; }
+  };
+  const itemById = id => (window.data?.inventoryItems||[]).find(x=>String(x.id)===String(id)) || {};
+  const projectList = () => arr(window.data?.projects).filter(p=>String(p.status||'active')!=='inactive');
+  const supervisorList = () => {
+    const users = arr(window.data?.users).filter(u => ['supervisor','operations_manager','admin','manager'].includes(String(u.role||'').toLowerCase()) && u.is_active!==false);
+    const sups = arr(window.data?.supervisors).filter(u=>u.is_active!==false);
+    const map=new Map();
+    [...sups,...users].forEach(u=>{ const id=s(u.id||u.user_id||u.full_name||u.username); if(id && !map.has(id)) map.set(id,u); });
+    return [...map.values()];
+  };
+  const pName = id => { try { return typeof projectName==='function'?projectName(id):''; } catch(_){ return ''; } };
+  const supName = id => { try { return typeof supervisorName==='function'?supervisorName(id):''; } catch(_){ return ''; } };
+  const movementsFor = (requestId,itemId,type) => arr(window.data?.inventoryMovements).filter(m =>
+    String(m.request_id||'')===String(requestId) && String(m.item_id||'')===String(itemId) && (!type || String(m.movement_type)===type)
+  );
+  const returnedQty = (requestId,itemId) => movementsFor(requestId,itemId,'return').reduce((a,m)=>a+n(m.quantity),0);
+  const consumedQty = (requestId,itemId) => movementsFor(requestId,itemId,'consume').reduce((a,m)=>a+n(m.quantity),0);
+  const availableToConsume = (requestId,line) => Math.max(0, n(line.quantity) - returnedQty(requestId,line.item_id) - consumedQty(requestId,line.item_id));
+
+  function ensureUnitOptions(){
+    let dl=$('unitOptionsV182') || $('unitOptionsV181') || $('unitOptionsV180');
+    if(!dl){ dl=document.createElement('datalist'); document.body.appendChild(dl); }
+    dl.id='unitOptionsV182';
+    dl.innerHTML=['حبة','لتر','كرتون','علبة','متر','كيس','رول','جالون','عبوة','طقم','كيلو','درزن','باكيت','أخرى'].map(x=>`<option value="${e(x)}"></option>`).join('');
+    const unit=$('batchUnitV148');
+    if(unit){ unit.setAttribute('list','unitOptionsV182'); unit.placeholder='حبة / لتر / كرتون'; if(!unit.value) unit.value='حبة'; const lab=unit.closest('div')?.querySelector('label'); if(lab) lab.textContent='نوع الكمية / الوحدة'; }
+  }
+
+  function patchVatLineRender(){
+    if(!window.stockBatchRenderLinesV148 || window.stockBatchRenderLinesV148.v182Wrapped) return;
+    window.stockBatchRenderLinesV148 = function(){
+      const body=$('batchLinesBodyV148'); if(!body) return;
+      const mode=$('batchVatModeV148')?.value || 'exclusive';
+      const lines = window.batchLinesV148 || (typeof batchLinesV148!=='undefined'?batchLinesV148:[]);
+      let netTotal=0, vatTotal=0, grossTotal=0;
+      const calc=(price)=>{
+        const p=n(price);
+        if(p<=0) return {net:0,vat:0,gross:0};
+        if(mode==='exempt') return {net:p,vat:0,gross:p};
+        if(mode==='inclusive'){ const net=p/1.15; return {net,vat:p-net,gross:p}; }
+        return {net:p,vat:p*0.15,gross:p*1.15};
+      };
+      body.innerHTML = arr(lines).map(l=>{
+        const c=calc(l.unit_price ?? l.unit_cost ?? 0); const qty=n(l.quantity);
+        const net=c.net*qty, vat=c.vat*qty, gross=c.gross*qty;
+        netTotal+=net; vatTotal+=vat; grossTotal+=gross;
+        return `<tr><td>${e(l.product_code||'')}</td><td><b>${e(l.item_name||'')}</b><br><small>${e(l.category||'')} / ${e(l.item_type||'')}</small></td><td>${q(qty)} ${e(l.unit||'حبة')}</td><td>${c.net.toFixed(2)} ر.س</td><td>${c.vat.toFixed(2)} ر.س</td><td>${c.gross.toFixed(2)} ر.س</td><td>${gross.toFixed(2)} ر.س</td><td><button class="danger" type="button" onclick="stockBatchRemoveLineV148('${e(l.product_code||'')}')">حذف</button></td></tr>`;
+      }).join('') || '<tr><td colspan="8">لم تتم إضافة أصناف بعد</td></tr>';
+      const totals=$('batchTotalsV148');
+      if(totals) totals.innerHTML = `<b>Total amount before 15% VAT:</b> ${netTotal.toFixed(2)} SAR &nbsp; | &nbsp; <b>Total VAT 15%:</b> ${vatTotal.toFixed(2)} SAR &nbsp; | &nbsp; <b>Total Value with 15% VAT:</b> ${grossTotal.toFixed(2)} SAR`;
+    };
+    window.stockBatchRenderLinesV148.v182Wrapped=true;
+  }
+
+  window.addConsumptionRowV182 = function(lineIndex, values={}){
+    const req=window._v182ConsumptionRequest; if(!req) return;
+    const line=req.lines[Number(lineIndex)]; if(!line) return;
+    const tbody=$(`v182ConsumeRows_${lineIndex}`); if(!tbody) return;
+    const projects=projectList().map(p=>`<option value="${e(p.id)}" ${String(values.project_id||'')===String(p.id)?'selected':''}>${e(p.name||p.project_name||'')}</option>`).join('');
+    const supervisors=supervisorList().map(u=>`<option value="${e(u.id)}" ${String(values.user_id||'')===String(u.id)?'selected':''}>${e(u.full_name||u.name||u.username||'')}</option>`).join('');
+    const row=document.createElement('tr');
+    row.className='v182-cons-row'; row.dataset.itemId=s(line.item_id); row.dataset.lineIndex=s(lineIndex);
+    row.innerHTML=`<td><select class="v182-cons-project"><option value="">اختر المشروع</option>${projects}</select></td><td><input class="v182-cons-qty" type="number" step="0.01" min="0" placeholder="الكمية" value="${e(values.qty||'')}"></td><td><select class="v182-cons-user"><option value="">اختر المشرف</option>${supervisors}</select></td><td><input class="v182-cons-notes" placeholder="ملاحظات" value="${e(values.notes||'')}"></td><td><button type="button" class="danger" onclick="this.closest('tr').remove()">حذف</button></td>`;
+    tbody.appendChild(row);
+  };
+
+  window.openRequestConsumptionV178 = function(id){
+    const r=arr(window.data?.inventoryRequests).find(x=>String(x.id)===String(id));
+    if(!r) return (typeof msg==='function'?msg('لم يتم العثور على أمر الصرف','err'):alert('لم يتم العثور على أمر الصرف'));
+    const lines=lineItems(r);
+    if(!lines.length) return (typeof msg==='function'?msg('لا توجد أصناف داخل أمر الصرف','err'):alert('لا توجد أصناف'));
+    window._v182ConsumptionRequest={r,lines};
+    document.getElementById('consumptionModalV178')?.remove();
+    const cards=lines.map((l,i)=>{
+      const item=itemById(l.item_id); const unit=l.unit||item.unit||'حبة';
+      const ret=returnedQty(r.id,l.item_id); const cons=consumedQty(r.id,l.item_id); const avail=Math.max(0,n(l.quantity)-ret-cons);
+      const prev=movementsFor(r.id,l.item_id,'consume').map(m=>`<tr><td>${e(m.movement_date||'')}</td><td>${e(m.project_name||pName(m.project_id)||'-')}</td><td>${q(m.quantity)} ${e(unit)}</td><td>${e(m.receiver||'-')}</td><td>${e(m.notes||'-')}</td></tr>`).join('') || '<tr><td colspan="5">لا يوجد استهلاك مسجل سابقًا</td></tr>';
+      return `<section class="v182-cons-card"><div class="v182-cons-head"><div><h3>${e(l.item_name||item.name||'-')}</h3><small>الكود: ${e(l.product_code||item.product_code||item.barcode||'-')} | الوحدة: ${e(unit)}</small></div><div class="v182-cons-stats"><span>مصروف: <b>${q(l.quantity)}</b></span><span>مرتجع: <b>${q(ret)}</b></span><span>مستهلك سابق: <b>${q(cons)}</b></span><span>متاح: <b>${q(avail)}</b></span></div></div><div class="table-wrap"><table><thead><tr><th>المشروع</th><th>كمية الاستهلاك</th><th>المستخدم الفعلي</th><th>ملاحظات</th><th>إجراء</th></tr></thead><tbody id="v182ConsumeRows_${i}" data-available="${avail}"></tbody></table></div><button type="button" class="light" onclick="addConsumptionRowV182(${i})">+ إضافة استهلاك لهذا الصنف</button><details><summary>الاستهلاك المسجل سابقًا</summary><table><thead><tr><th>التاريخ</th><th>المشروع</th><th>الكمية</th><th>المستخدم الفعلي</th><th>ملاحظات</th></tr></thead><tbody>${prev}</tbody></table></details></section>`;
+    }).join('');
+    const modal=document.createElement('div'); modal.id='consumptionModalV178'; modal.className='v182-backdrop';
+    modal.innerHTML=`<div class="v182-modal"><div class="v182-top"><div><h2>توزيع الاستهلاك الفعلي</h2><p>أمر الصرف: REQ-${e(r.id)} — المستلم: ${e(r.supervisor_name||supName(r.supervisor_id)||'-')}</p></div><button type="button" onclick="document.getElementById('consumptionModalV178')?.remove()">إغلاق</button></div><div class="v182-body">${cards}</div><div class="v182-actions"><button type="button" onclick="saveRequestConsumptionV178('${e(id)}')">حفظ الاستهلاك</button><button type="button" class="light" onclick="document.getElementById('consumptionModalV178')?.remove()">إلغاء</button></div></div>`;
+    document.body.appendChild(modal);
+    lines.forEach((_,i)=>window.addConsumptionRowV182(i));
+  };
+
+  window.saveRequestConsumptionV178 = async function(id){
+    const req=window._v182ConsumptionRequest;
+    const r=req?.r || arr(window.data?.inventoryRequests).find(x=>String(x.id)===String(id));
+    const lines=req?.lines || lineItems(r);
+    if(!r || !lines?.length) return (typeof msg==='function'?msg('لم يتم العثور على الطلب','err'):alert('لم يتم العثور على الطلب'));
+    const rows=[...document.querySelectorAll('#consumptionModalV178 .v182-cons-row')];
+    const byItem={}; const payload=[];
+    for(const row of rows){
+      const idx=Number(row.dataset.lineIndex); const line=lines[idx]; if(!line) continue;
+      const qty=n(row.querySelector('.v182-cons-qty')?.value); if(qty<=0) continue;
+      const pid=row.querySelector('.v182-cons-project')?.value; if(!pid) throw new Error('اختر المشروع لكل سطر استهلاك');
+      const uid=row.querySelector('.v182-cons-user')?.value; if(!uid) throw new Error('اختر المستخدم الفعلي من قائمة المشرفين');
+      byItem[line.item_id]=(byItem[line.item_id]||0)+qty;
+      const item=itemById(line.item_id); const sup=supervisorList().find(u=>String(u.id)===String(uid))||{};
+      payload.push({
+        item_id:Number(line.item_id), item_name:line.item_name||item.name||'', movement_type:'consume', quantity:qty,
+        movement_date:todayLocal(), project_id:Number(pid), project_name:pName(pid), receiver_id:Number(uid)||null,
+        receiver:sup.full_name||sup.name||sup.username||'', reason:'تسجيل استهلاك فعلي لأمر صرف REQ-'+r.id,
+        notes:row.querySelector('.v182-cons-notes')?.value||'', request_id:Number(r.id),
+        product_code:line.product_code||item.product_code||item.barcode||'', barcode:line.barcode||item.barcode||'',
+        unit_cost:n(line.unit_cost||item.unit_cost||item.unit_price||0), unit:line.unit||item.unit||'حبة'
+      });
+    }
+    if(!payload.length) throw new Error('أدخل كمية استهلاك واحدة على الأقل');
+    for(const [itemId,total] of Object.entries(byItem)){
+      const line=lines.find(l=>String(l.item_id)===String(itemId));
+      const avail=availableToConsume(r.id,line);
+      if(total>avail+0.0001) throw new Error('مجموع الاستهلاك أكبر من المتاح للصنف: '+(line.item_name||itemById(itemId).name||itemId));
+    }
+    const res=await sb.from('inventory_movements').insert(payload);
+    if(res.error) throw res.error;
+    try{ await sb.from('inventory_requests').update({consumption_updated_at:new Date().toISOString(), has_consumption:true}).eq('id',r.id); }catch(_){ }
+    document.getElementById('consumptionModalV178')?.remove();
+    if(typeof msg==='function') msg('تم حفظ توزيع الاستهلاك الفعلي');
+    if(typeof financeLoadAll==='function') await financeLoadAll();
+  };
+
+  function injectCss(){
+    if($('v182ConsumptionCss')) return;
+    const st=document.createElement('style'); st.id='v182ConsumptionCss';
+    st.textContent=`
+      .v182-backdrop{position:fixed;inset:0;background:rgba(0,20,14,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:18px;direction:rtl}
+      .v182-modal{background:#fff;border-radius:24px;box-shadow:0 30px 100px rgba(0,0,0,.25);width:min(1120px,96vw);max-height:92vh;overflow:auto;border:1px solid #d6ebe3}
+      .v182-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:18px 22px;border-bottom:1px solid #e5f1ed;background:linear-gradient(135deg,#f7fffb,#eefaf5)}
+      .v182-top h2{margin:0;color:#07563d}.v182-top p{margin:6px 0 0;color:#557067}.v182-body{padding:18px}.v182-actions{padding:16px 22px;border-top:1px solid #e5f1ed;display:flex;gap:10px;justify-content:flex-start}
+      .v182-cons-card{border:1px solid #dceee7;border-radius:20px;margin-bottom:16px;padding:14px;background:#fbfffd}.v182-cons-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}.v182-cons-head h3{margin:0;color:#093f31}.v182-cons-stats{display:flex;flex-wrap:wrap;gap:8px}.v182-cons-stats span{background:#eefaf5;border:1px solid #cfe8dd;border-radius:999px;padding:6px 10px;color:#194b3b}
+      #consumptionModalV178 select,#consumptionModalV178 input{width:100%;min-height:38px;border:1px solid #cfded8;border-radius:10px;padding:7px;background:#fff}
+      #consumptionModalV178 details{margin-top:10px}#consumptionModalV178 summary{cursor:pointer;color:#07563d;font-weight:700}
+      @media(max-width:800px){.v182-cons-head{display:block}.v182-modal{width:98vw}.v182-body{padding:10px}.v182-top{padding:14px}}
+    `;
+    document.head.appendChild(st);
+  }
+
+  function boot(){ ensureUnitOptions(); patchVatLineRender(); injectCss(); try{ window.stockBatchRenderLinesV148 && window.stockBatchRenderLinesV148(); }catch(_){ } }
+  window.addEventListener('load',()=>setTimeout(boot,500));
+  document.addEventListener('click',()=>setTimeout(boot,80),true);
+  setTimeout(boot,900);
+  console.log('V182 consumption distribution and invoice unit fix loaded');
+})();
