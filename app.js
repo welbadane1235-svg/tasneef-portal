@@ -10415,3 +10415,154 @@ function financePrintReport(kind){
   window.addEventListener('load',()=>setTimeout(()=>{ ensureCssV178(); ensureSuppliersTabV178(); hydrateSupplierInputsV178(); ensureFinanceTabsVisibleV178(); localStorage.setItem('tasneef_inventory_approval_path',JSON.stringify(['ops'])); if(typeof inventoryLoadApprovalSettings==='function') inventoryLoadApprovalSettings(); },900));
   console.log('V178 Inventory Suppliers Consumption Flow loaded');
 })();
+
+/* ===== V179: Real admin finance tabs restore after Requests tab ===== */
+(function(){
+  'use strict';
+  const $ = (id)=>document.getElementById(id);
+  const clean = (s)=>String(s||'').replace(/\s+/g,' ').trim();
+  function sessionRoleV179(){
+    try{
+      const raw = localStorage.getItem('tasneef_session') || sessionStorage.getItem('tasneef_session') || '{}';
+      return (JSON.parse(raw).role || '').trim();
+    }catch(_){ return ''; }
+  }
+  function isWarehouseV179(){ return sessionRoleV179() === 'warehouse_manager'; }
+  function removeWrongWarehouseClasses(){
+    if(isWarehouseV179()) return;
+    document.body.classList.remove(
+      'warehouse-manager-view-v151',
+      'warehouse-manager-view-v162',
+      'warehouse-manager-view-v163',
+      'warehouse-manager-view-v164',
+      'warehouse-manager-view-v178'
+    );
+  }
+  function financePages(){ return [...document.querySelectorAll('#financeDashboard .finance-tab-page, .finance-tab-page')]; }
+  function financeButtons(){ return [...document.querySelectorAll('#financeDashboard .finance-tabs .finance-tab, #financeDashboard .finance-tabs button, .finance-tabs .finance-tab')]; }
+  function tabKeyFromButton(btn){
+    const oc = btn.getAttribute('onclick') || '';
+    const text = clean(btn.textContent);
+    const m = oc.match(/financeShowTab\(['"]([^'"]+)['"]/);
+    if(m) return m[1];
+    const map = {
+      'الملخص':'overview',
+      'المصروفات':'expenses',
+      'المخزون':'inventory',
+      'الأصناف':'catalog',
+      'حركة المخزون':'movements',
+      'طلبات الصرف':'requests',
+      'الموردين':'suppliers',
+      'التقارير':'reports',
+      'مراكز التكلفة':'costCenters',
+      'تقليل التكلفة':'costReduction'
+    };
+    return map[text] || '';
+  }
+  function tabPageId(tab){
+    if(tab === 'catalog' || tab === 'items') return 'financeTabCatalog';
+    if(tab === 'suppliers') return 'financeTabSuppliers';
+    return 'financeTab' + String(tab||'').charAt(0).toUpperCase() + String(tab||'').slice(1);
+  }
+  function showAllowedTabsV179(){
+    const wh = isWarehouseV179();
+    removeWrongWarehouseClasses();
+    const allowedForWh = new Set(['requests','catalog','items']);
+    financeButtons().forEach(btn=>{
+      const key = tabKeyFromButton(btn);
+      if(wh){
+        const allow = allowedForWh.has(key) || /طلبات الصرف|الأصناف/.test(clean(btn.textContent));
+        btn.style.setProperty('display', allow ? 'inline-flex' : 'none', 'important');
+        btn.hidden = !allow;
+      }else{
+        btn.style.setProperty('display','inline-flex','important');
+        btn.hidden = false;
+      }
+    });
+  }
+  function activateFinanceTabV179(tab, btn){
+    if(isWarehouseV179() && !['requests','catalog','items'].includes(tab)) tab = 'requests';
+    if(tab === 'items') tab = 'catalog';
+    if(!tab) tab = 'overview';
+    window.financeCurrentTab = tab;
+    financePages().forEach(page=>page.classList.add('hidden'));
+    const page = $(tabPageId(tab));
+    if(page) page.classList.remove('hidden');
+    financeButtons().forEach(x=>x.classList.remove('active'));
+    if(btn) btn.classList.add('active');
+    else {
+      const target = financeButtons().find(b=>tabKeyFromButton(b)===tab || (tab==='catalog' && ['items','catalog'].includes(tabKeyFromButton(b))));
+      target && target.classList.add('active');
+    }
+    showAllowedTabsV179();
+  }
+  function renderFinanceSectionV179(tab){
+    try{
+      if(!window.financeLoaded && typeof window.financeLoadAll === 'function') window.financeLoadAll();
+      if(tab === 'requests' && typeof window.inventoryRenderRequests === 'function') window.inventoryRenderRequests();
+      else if((tab === 'catalog' || tab === 'items') && typeof window.inventoryRenderItems === 'function') window.inventoryRenderItems();
+      else if(tab === 'inventory'){
+        if(typeof window.renderStockBatchCardsV149 === 'function') window.renderStockBatchCardsV149();
+        else if(typeof window.inventoryRenderItems === 'function') window.inventoryRenderItems();
+      }
+      else if(tab === 'movements' && typeof window.inventoryRenderMovements === 'function') window.inventoryRenderMovements();
+      else if(tab === 'reports' && typeof window.financeRenderReports === 'function') window.financeRenderReports();
+      else if(tab === 'costCenters' && typeof window.costCenterRender === 'function') window.costCenterRender();
+      else if(tab === 'costReduction' && typeof window.renderCostReductionV152 === 'function') window.renderCostReductionV152();
+      else if(tab === 'suppliers' && typeof window.renderSuppliersV178 === 'function') window.renderSuppliersV178();
+      else if(typeof window.financeRenderAll === 'function') window.financeRenderAll();
+    }catch(e){ console.warn('V179 finance render warning', e); }
+    showAllowedTabsV179();
+    setTimeout(showAllowedTabsV179, 80);
+    setTimeout(showAllowedTabsV179, 250);
+  }
+  window.financeShowTab = function(tab, btn){
+    activateFinanceTabV179(tab, btn);
+    renderFinanceSectionV179(tab);
+  };
+  window.financeRestoreTabsV179 = showAllowedTabsV179;
+  const oldRenderAll = window.financeRenderAll;
+  if(oldRenderAll && !oldRenderAll.v179Wrapped){
+    window.financeRenderAll = function(){
+      const out = oldRenderAll.apply(this, arguments);
+      showAllowedTabsV179();
+      setTimeout(showAllowedTabsV179, 80);
+      return out;
+    };
+    window.financeRenderAll.v179Wrapped = true;
+  }
+  function installObserver(){
+    const wrap = document.querySelector('#financeDashboard .finance-tabs') || document.querySelector('.finance-tabs');
+    if(!wrap || wrap.v179Observed) return;
+    wrap.v179Observed = true;
+    new MutationObserver(()=>showAllowedTabsV179()).observe(wrap,{childList:true,subtree:true,attributes:true,attributeFilter:['style','hidden','class']});
+  }
+  function injectCssV179(){
+    if($('v179TabsCss')) return;
+    const st = document.createElement('style');
+    st.id = 'v179TabsCss';
+    st.textContent = `
+      body:not(.warehouse-manager-view-v179) #financeDashboard .finance-tabs .finance-tab,
+      body:not(.warehouse-manager-view-v179) #financeDashboard .finance-tabs button{display:inline-flex!important;visibility:visible!important;}
+      body:not(.warehouse-manager-view-v179) #financeSuppliersTabV178{display:inline-flex!important;}
+    `;
+    document.head.appendChild(st);
+  }
+  window.addEventListener('load',()=>{
+    injectCssV179();
+    setTimeout(()=>{ showAllowedTabsV179(); installObserver(); },300);
+    setTimeout(()=>{ showAllowedTabsV179(); installObserver(); },1000);
+  });
+  document.addEventListener('click',(ev)=>{
+    const btn = ev.target.closest && ev.target.closest('#financeDashboard .finance-tabs button, .finance-tabs .finance-tab');
+    if(!btn) return;
+    const key = tabKeyFromButton(btn);
+    if(!key) return;
+    // Use our stable controller and stop old inline handlers from rebuilding/hiding tabs.
+    ev.preventDefault();
+    ev.stopPropagation();
+    ev.stopImmediatePropagation();
+    window.financeShowTab(key, btn);
+  }, true);
+  console.log('V179 finance tabs real admin fix loaded');
+})();
