@@ -7172,7 +7172,8 @@ function financePrintReport(kind){
 (function(){
   'use strict';
   const VAT_RATE_V148 = 0.15;
-  let batchLinesV148 = [];
+  let batchLinesV148 = window.batchLinesV148 || [];
+  window.batchLinesV148 = batchLinesV148;
   let pendingLineImageV148 = '';
   let batchDataLoadedV148 = false;
 
@@ -7254,11 +7255,11 @@ function financePrintReport(kind){
     const code=s($v('batchProductCodeV148')?.value).trim(); const name=s($v('batchProductNameV148')?.value).trim(); const q=n($v('batchQtyV148')?.value); const price=n($v('batchUnitPriceV148')?.value);
     if(!code) return msg('كود المنتج مطلوب','err'); if(!name) return msg('اسم الصنف مطلوب','err'); if(q<=0) return msg('الكمية مطلوبة','err'); if(price<0) return msg('سعر الوحدة غير صحيح','err');
     const existingLine = batchLinesV148.find(l=>String(l.product_code).trim()===code);
-    if(existingLine){ existingLine.quantity += q; existingLine.unit_price = price; existingLine.image_url = existingLine.image_url || pendingLineImageV148; }
+    if(existingLine){ existingLine.quantity += q; existingLine.unit_price = price; existingLine.unit = s($v('batchUnitV148')?.value)||existingLine.unit||'حبة'; existingLine.image_url = existingLine.image_url || pendingLineImageV148; }
     else batchLinesV148.push({ product_code:code, item_name:name, category:s($v('batchCategoryV148')?.value)||'أخرى', item_type:s($v('batchItemTypeV148')?.value)||'مادة', unit:s($v('batchUnitV148')?.value)||'حبة', quantity:q, unit_price:price, image_url:pendingLineImageV148 });
     stockBatchClearLineV148(); stockBatchRenderLinesV148();
   };
-  window.stockBatchRemoveLineV148 = function(code){ batchLinesV148=batchLinesV148.filter(l=>String(l.product_code)!==String(code)); stockBatchRenderLinesV148(); };
+  window.stockBatchRemoveLineV148 = function(code){ batchLinesV148=batchLinesV148.filter(l=>String(l.product_code)!==String(code)); window.batchLinesV148=batchLinesV148; stockBatchRenderLinesV148(); };
   window.stockBatchRenderLinesV148 = function(){
     const b=$v('batchLinesBodyV148'); if(!b) return;
     const mode=$v('batchVatModeV148')?.value||'exclusive';
@@ -7315,7 +7316,7 @@ function financePrintReport(kind){
     }catch(e){ msg(e.message||String(e),'err'); }
     finally{ if(btn) btn.disabled=false; }
   };
-  window.stockBatchClearV148 = function(){ batchLinesV148=[]; ['batchSupplierV148','batchInvoiceV148'].forEach(id=>{ if($v(id)) $v(id).value=''; }); if($v('batchDateV148')) $v('batchDateV148').value=todayV(); stockBatchClearLineV148(); stockBatchRenderLinesV148(); };
+  window.stockBatchClearV148 = function(){ batchLinesV148=[]; window.batchLinesV148=batchLinesV148; ['batchSupplierV148','batchInvoiceV148'].forEach(id=>{ if($v(id)) $v(id).value=''; }); if($v('batchDateV148')) $v('batchDateV148').value=todayV(); stockBatchClearLineV148(); stockBatchRenderLinesV148(); };
   window.stockBatchPrintDraftV148 = function(){ const mode=$v('batchVatModeV148')?.value||'exclusive'; let net=0,vat=0,gross=0; const lines=batchLinesV148.map(l=>{ const c=vatCalc(l.unit_price,mode); const line_net=c.net*n(l.quantity), line_vat=c.vat*n(l.quantity), line_gross=c.gross*n(l.quantity); net+=line_net; vat+=line_vat; gross+=line_gross; return {...l,unit_cost:c.net,unit_vat:c.vat,unit_gross:c.gross,line_net,line_vat,line_gross}; }); stockBatchPrintV148({invoice_no:s($v('batchInvoiceV148')?.value)||'مسودة',batch_date:s($v('batchDateV148')?.value)||todayV(),supplier:s($v('batchSupplierV148')?.value)||'-',lines,total_before_vat:net,total_vat:vat,total_with_vat:gross}); };
 
   window.stockBatchPrintV148 = function(batch){
@@ -11116,4 +11117,197 @@ function financePrintReport(kind){
   document.addEventListener('click',()=>setTimeout(boot,80),true);
   setTimeout(boot,900);
   console.log('V182 consumption distribution and invoice unit fix loaded');
+})();
+
+
+/* ================= V183 Inventory Invoice Row Final Fix =================
+   - يثبت حقل الوحدة في فاتورة إدخال المخزون.
+   - يعرض ويحفظ سعر قبل الضريبة / VAT / سعر شامل بشكل موحد.
+   - يمنع ظهور VAT إذا كان السعر صفر.
+   - يجعل مصدر الحساب الوحيد هو سعر الوحدة المدخل حسب حالة الضريبة.
+======================================================================= */
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const N = v => { const x = parseFloat(String(v ?? '').replace(/,/g,'')); return Number.isFinite(x) ? x : 0; };
+  const S = v => String(v ?? '');
+  const E = v => S(v).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const money = v => N(v).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2});
+  const qty = v => N(v).toLocaleString('en-US',{maximumFractionDigits:2});
+  const VAT = 0.15;
+
+  function calcUnit(price, mode){
+    price = N(price); mode = mode || 'exclusive';
+    if(price <= 0) return { net:0, vat:0, gross:0 };
+    if(mode === 'inclusive'){
+      const net = price / (1 + VAT);
+      return { net, vat: price - net, gross: price };
+    }
+    if(mode === 'exempt') return { net:price, vat:0, gross:price };
+    return { net:price, vat:price * VAT, gross:price * (1 + VAT) };
+  }
+
+  function getLines(){
+    if(Array.isArray(window.batchLinesV148)) return window.batchLinesV148;
+    return [];
+  }
+
+  function units(){ return ['حبة','لتر','كرتون','علبة','متر','كيس','رول','جالون','عبوة','طقم','زوج','درزن','كيلو','ملي','أخرى']; }
+
+  function ensureUnitFieldV183(){
+    const qtyInput = $('batchQtyV148');
+    if(!qtyInput) return;
+    let unit = $('batchUnitV148');
+    if(unit){
+      const box = unit.closest('div');
+      if(box){ box.hidden = false; box.style.display = ''; box.classList.remove('v161-hide-advanced-field'); }
+      unit.hidden = false; unit.style.display = ''; unit.setAttribute('list','unitOptionsV183');
+      unit.placeholder = 'حبة / لتر / كرتون / علبة';
+      const lab = box?.querySelector('label'); if(lab) lab.textContent = 'نوع الكمية / الوحدة';
+    } else {
+      const qtyBox = qtyInput.closest('div');
+      const holder = document.createElement('div');
+      holder.innerHTML = '<label>نوع الكمية / الوحدة</label><input id="batchUnitV148" list="unitOptionsV183" placeholder="حبة / لتر / كرتون / علبة" value="حبة">';
+      qtyBox?.parentElement?.insertBefore(holder, qtyBox);
+      unit = $('batchUnitV148');
+    }
+    let dl = $('unitOptionsV183');
+    if(!dl){ dl = document.createElement('datalist'); dl.id = 'unitOptionsV183'; document.body.appendChild(dl); }
+    dl.innerHTML = units().map(u => `<option value="${E(u)}"></option>`).join('');
+    if(unit && !unit.value) unit.value = 'حبة';
+  }
+
+  function enhancePriceLabelsV183(){
+    const price = $('batchUnitPriceV148');
+    if(price){
+      const lab = price.closest('div')?.querySelector('label');
+      if(lab) lab.textContent = 'سعر الوحدة';
+      price.placeholder = 'اكتب السعر حسب حالة الضريبة المختارة';
+      if(!price.dataset.v183){
+        ['input','change','keyup','blur'].forEach(ev => price.addEventListener(ev, () => window.stockBatchRenderLinesV148 && window.stockBatchRenderLinesV148()));
+        price.dataset.v183 = '1';
+      }
+    }
+    const mode = $('batchVatModeV148');
+    if(mode && !mode.dataset.v183){
+      mode.addEventListener('change', () => window.stockBatchRenderLinesV148 && window.stockBatchRenderLinesV148());
+      mode.dataset.v183 = '1';
+    }
+  }
+
+  function patchAddLineV183(){
+    const old = window.stockBatchAddLineV148;
+    if(!old || old.v183Wrapped) return;
+    window.stockBatchAddLineV148 = function(){
+      ensureUnitFieldV183();
+      const unit = $('batchUnitV148');
+      if(unit && !unit.value) unit.value = 'حبة';
+      const price = N($('batchUnitPriceV148')?.value);
+      if(price < 0){ if(window.msg) msg('سعر الوحدة غير صحيح','err'); else alert('سعر الوحدة غير صحيح'); return; }
+      const before = getLines().length;
+      const out = old.apply(this, arguments);
+      // ضمان حفظ الوحدة حتى لو دالة قديمة لم تلتقطها.
+      const lines = getLines();
+      const last = lines[lines.length - 1];
+      if(lines.length >= before && last && !last.unit) last.unit = unit?.value || 'حبة';
+      window.stockBatchRenderLinesV148 && window.stockBatchRenderLinesV148();
+      return out;
+    };
+    window.stockBatchAddLineV148.v183Wrapped = true;
+  }
+
+  window.stockBatchRenderLinesV148 = function(){
+    const body = $('batchLinesBodyV148');
+    if(!body) return;
+    const mode = $('batchVatModeV148')?.value || 'exclusive';
+    const lines = getLines();
+    let totalNet = 0, totalVat = 0, totalGross = 0;
+    body.innerHTML = lines.map(l => {
+      const q = N(l.quantity);
+      const c = calcUnit(l.unit_price, mode);
+      const lineNet = c.net * q;
+      const lineVat = c.vat * q;
+      const lineGross = c.gross * q;
+      totalNet += lineNet; totalVat += lineVat; totalGross += lineGross;
+      return `<tr>
+        <td>${E(l.product_code)}</td>
+        <td><b>${E(l.item_name)}</b><br><small>${E(l.category || '')} / ${E(l.item_type || '')}</small></td>
+        <td>${qty(q)} ${E(l.unit || 'حبة')}</td>
+        <td>${money(c.net)} ر.س</td>
+        <td>${money(c.vat)} ر.س</td>
+        <td>${money(c.gross)} ر.س</td>
+        <td>${money(lineGross)} ر.س</td>
+        <td><button class="danger" type="button" onclick="stockBatchRemoveLineV148('${E(l.product_code)}')">حذف</button></td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="8">لم تتم إضافة أصناف بعد</td></tr>';
+    const totals = $('batchTotalsV148');
+    if(totals){
+      totals.innerHTML = `<b>Total amount before 15% VAT:</b> ${money(totalNet)} SAR &nbsp; | &nbsp; <b>Total VAT 15%:</b> ${money(totalVat)} SAR &nbsp; | &nbsp; <b>Total Value with 15% VAT:</b> ${money(totalGross)} SAR`;
+    }
+  };
+
+  function patchRemoveClearV183(){
+    window.stockBatchRemoveLineV148 = function(code){
+      window.batchLinesV148 = getLines().filter(l => String(l.product_code) !== String(code));
+      window.stockBatchRenderLinesV148();
+    };
+    const oldClear = window.stockBatchClearV148;
+    if(oldClear && !oldClear.v183Wrapped){
+      window.stockBatchClearV148 = function(){
+        const out = oldClear.apply(this, arguments);
+        window.batchLinesV148 = [];
+        ensureUnitFieldV183();
+        window.stockBatchRenderLinesV148();
+        return out;
+      };
+      window.stockBatchClearV148.v183Wrapped = true;
+    }
+  }
+
+  function patchPrintV183(){
+    window.stockBatchPrintV148 = function(batch){
+      const rows = (batch.lines || []).map(l => {
+        const unitNet = N(l.unit_cost || l.unit_price_before_vat);
+        const unitVat = N(l.unit_vat || (unitNet > 0 ? unitNet * VAT : 0));
+        const unitGross = N(l.unit_gross || unitNet + unitVat);
+        const lineGross = N(l.line_gross || unitGross * N(l.quantity));
+        return `<tr><td>${E(l.product_code)}</td><td>${E(l.item_name)}</td><td>${E(l.category || '')}</td><td>${E(l.item_type || '')}</td><td>${E(l.unit || 'حبة')}</td><td>${qty(l.quantity)}</td><td>${money(unitNet)} SAR</td><td>${money(unitVat)} SAR</td><td>${money(unitGross)} SAR</td><td>${money(lineGross)} SAR</td></tr>`;
+      }).join('');
+      const body = `<div class="grid"><div class="box"><b>ID</b><br>${E(batch.invoice_no)}</div><div class="box"><b>Date</b><br>${E(batch.batch_date)}</div><div class="box"><b>Warehouse / Supplier</b><br>${E(batch.supplier)}</div></div><h2>Products</h2><table><thead><tr><th>Product Code</th><th>Product Name</th><th>Category</th><th>Type</th><th>Unit</th><th>Quantity Added</th><th>Unit Price</th><th>VAT 15%</th><th>Unit Price with VAT</th><th>Value</th></tr></thead><tbody>${rows || '<tr><td colspan="10">لا توجد أصناف</td></tr>'}</tbody></table><div style="margin-top:22px;font-size:16px;line-height:2"><b>Total amount before 15% VAT:</b> ${money(batch.total_before_vat)} SAR<br><b>Total VAT 15%:</b> ${money(batch.total_vat)} SAR<br><b>Total Value with 15% VAT:</b> ${money(batch.total_with_vat)} SAR</div>`;
+      if(typeof window.financePrintWindow === 'function') financePrintWindow('Added Product', body);
+      else { const w = window.open('', '_blank'); w.document.write(body); w.print(); }
+    };
+  }
+
+  function patchInvoiceViewV183(){
+    const oldView = window.viewStockBatchV149;
+    if(oldView && !oldView.v183Wrapped){
+      window.viewStockBatchV149 = function(idx){
+        const r = (window.stockBatchesV148 || [])[Number(idx)];
+        if(!r) return oldView.apply(this, arguments);
+        oldView.apply(this, arguments);
+        setTimeout(() => {
+          document.querySelectorAll('#invoiceViewModalV149 table tbody tr').forEach(tr => {
+            // مجرد ضمان عدم ترك خلايا VAT قديمة إذا كان السعر صفر.
+            const cells = [...tr.children];
+            if(cells.length >= 10 && N(cells[6]?.textContent) <= 0){
+              cells[7].textContent = '0.00'; cells[8].textContent = '0.00'; cells[9].textContent = '0.00';
+            }
+          });
+        }, 50);
+      };
+      window.viewStockBatchV149.v183Wrapped = true;
+    }
+  }
+
+  function bootV183(){
+    ensureUnitFieldV183(); enhancePriceLabelsV183(); patchAddLineV183(); patchRemoveClearV183(); patchPrintV183(); patchInvoiceViewV183();
+    try{ window.stockBatchRenderLinesV148 && window.stockBatchRenderLinesV148(); }catch(e){ console.warn(e); }
+  }
+
+  window.addEventListener('load', () => setTimeout(bootV183, 700));
+  document.addEventListener('click', () => setTimeout(bootV183, 80), true);
+  document.addEventListener('input', (e) => { if(e.target && ['batchQtyV148','batchUnitPriceV148','batchUnitV148'].includes(e.target.id)) setTimeout(() => window.stockBatchRenderLinesV148 && window.stockBatchRenderLinesV148(), 20); }, true);
+  setTimeout(bootV183, 1200);
+  console.log('V183 inventory invoice row final fix loaded');
 })();
