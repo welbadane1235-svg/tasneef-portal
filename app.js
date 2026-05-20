@@ -11631,939 +11631,254 @@ function financePrintReport(kind){
   console.log('V185 invoice unit dropdown final visible fix loaded');
 })();
 
-/* ================= V188 Request -> Operations -> Consumption Cost Flow =================
-   - طلب الصرف يذهب إلى مدير التشغيل فقط.
-   - الصرف لا يُحسب تكلفة نهائية.
-   - التكلفة تُحسب عند تسجيل الاستهلاك الفعلي فقط.
-   - الاستهلاك يمكن توزيعه على أكثر من مشروع ومركز تكلفة ومشرف.
-   - المتبقي غير المستهلك في نفس التسجيل يرجع تلقائيًا كمرتجع لنفس أمر الصرف.
-============================================================================ */
+/* =========================
+   V192 Request = Custody Only Flow
+   - Hide project and cost center from inventory request forms
+   - Request carries requester + items + reason only
+   - Project/cost center are selected later during consumption
+   - Applies to admin, warehouse manager, supervisors/technicians pages
+   ========================= */
 (function(){
-  'use strict';
-  const $ = id => document.getElementById(id);
-  const N = v => { const x = parseFloat(String(v ?? '').replace(/,/g,'').trim()); return Number.isFinite(x) ? x : 0; };
-  const S = v => String(v ?? '');
-  const E = v => S(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const todayV188 = () => (typeof today === 'function' ? today() : new Date().toISOString().slice(0,10));
-  const arr = v => Array.isArray(v) ? v : [];
-  const getData = () => window.data || {};
-  const itemById = id => arr(getData().inventoryItems).find(x => S(x.id) === S(id)) || {};
-  const projectNameSafe = id => { try { return typeof projectName === 'function' ? projectName(id) : ''; } catch(_){ return ''; } };
-  const supervisorNameSafe = id => { try { return typeof supervisorName === 'function' ? supervisorName(id) : ''; } catch(_){ return ''; } };
-  const productCode = it => it?.serial_number || it?.product_code || it?.barcode || it?.supplier_barcode || ('INV-' + (it?.id || ''));
-  const vatModeOf = it => S(it?.vat_mode || it?.tax_mode || 'exclusive');
-  const unitBefore = (it, raw) => {
-    const v = N(raw ?? it?.unit_cost ?? it?.unit_price ?? it?.price_before_vat);
-    if(v <= 0) return 0;
-    return vatModeOf(it) === 'inclusive' ? v / 1.15 : v;
-  };
-  const lineItems = r => {
-    try { if(typeof v118LineItems === 'function') return v118LineItems(r) || []; } catch(_){ }
-    let raw = r?.request_items || r?.items || r?.request_lines || [];
-    if(typeof raw === 'string' && raw.trim()) { try { raw = JSON.parse(raw); } catch(_){ raw = []; } }
-    if(Array.isArray(raw) && raw.length) return raw.map(x => ({
-      item_id: x.item_id || x.id,
-      item_name: x.item_name || x.name || '',
-      product_code: x.product_code || x.serial_number || '',
-      quantity: N(x.quantity),
-      unit: x.unit || '',
-      unit_cost: N(x.unit_cost || x.price_before_vat || x.unit_price)
-    })).filter(x => x.item_id && x.quantity > 0);
-    return r?.item_id ? [{ item_id:r.item_id, item_name:r.item_name || '', product_code:r.product_code || '', quantity:N(r.quantity), unit:'', unit_cost:0 }] : [];
-  };
-  const movementsFor = (requestId,itemId,type) => arr(getData().inventoryMovements).filter(m =>
-    S(m.request_id || '') === S(requestId) && S(m.item_id || '') === S(itemId) && (!type || S(m.movement_type) === S(type))
-  );
-  const returnedQty = (reqId,itemId) => movementsFor(reqId,itemId,'return').reduce((a,m)=>a+N(m.quantity),0);
-  const consumedQty = (reqId,itemId) => movementsFor(reqId,itemId,'consume').reduce((a,m)=>a+N(m.quantity),0);
-  const availableToConsume = (reqId,line) => Math.max(0, N(line.quantity) - returnedQty(reqId,line.item_id) - consumedQty(reqId,line.item_id));
-
-  function currentSession(){
-    try { return (typeof session === 'function' ? session() : JSON.parse(localStorage.getItem('tasneef_session') || '{}')) || {}; } catch(_){ return {}; }
-  }
-  function isOperationsManager(){
-    const u = currentSession();
-    return ['operations_manager','manager','admin','general_manager'].includes(S(u.role).toLowerCase());
-  }
-  function ccList(){ return arr(getData().costCenters || getData().cost_centers); }
-  function ccName(id){ const c = ccList().find(x => S(x.id) === S(id)); return c?.name || c?.cost_center_name || ''; }
-  function ccForProject(projectId){
-    const pname = projectNameSafe(projectId);
-    const c = ccList().find(x => S(x.project_id) === S(projectId)) || ccList().find(x => S(x.name || '').trim() === S(pname).trim());
-    return c ? { id:c.id, name:c.name || c.cost_center_name || pname, type:c.type || c.cost_center_type || 'FM' } : { id:null, name:pname, type:'FM' };
-  }
-  function costCenterOptions(selected, projectId){
-    const list = ccList();
-    const auto = ccForProject(projectId);
-    const rows = list.length ? list : (projectId ? [{id:'project:'+projectId,name:auto.name,type:'FM'}] : []);
-    return '<option value="">اختر مركز التكلفة</option>' + rows.map(c => {
-      const id = c.id || c.code || c.name;
-      const name = c.name || c.cost_center_name || c.project_name || '';
-      const type = c.type || c.cost_center_type || (/cn/i.test(S(c.code))?'CN':'FM');
-      return `<option value="${E(id)}" data-name="${E(name)}" data-type="${E(type)}" ${S(selected)===S(id)?'selected':''}>${E(type)} - ${E(name)}</option>`;
-    }).join('');
-  }
-  function supervisorOptions(selected){
-    const sources = [arr(getData().supervisors), arr(getData().users)].flat();
-    const map = new Map();
-    sources.forEach(u => {
-      const role = S(u.role || '').toLowerCase();
-      const ok = !role || ['supervisor','operations_manager','manager','admin','general_manager'].includes(role) || /مشرف/.test(S(u.role_label || u.job_title || ''));
-      if(!ok) return;
-      const id = S(u.id || u.user_id || u.full_name || u.username || u.name);
-      if(!id || map.has(id)) return;
-      map.set(id,u);
+  const VERSION='192';
+  const $id = id => document.getElementById(id);
+  const N = v => { const n=Number(String(v??0).replace(/,/g,'').trim()); return Number.isFinite(n)?n:0; };
+  const E = v => String(v??'').replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[m]));
+  const T = () => (typeof today==='function'?today():new Date().toISOString().slice(0,10));
+  const userRoleText = role => ({admin:'مدير عام',general_manager:'مدير عام',operations_manager:'مدير تشغيلي',financial_manager:'مدير مالي',warehouse_manager:'مدير مخزون',supervisor:'مشرف',technician:'فني',worker:'عامل',employee:'إداري',accountant:'إداري'}[String(role||'')]||'إداري');
+  function allRequesters(){
+    const map=new Map();
+    (window.data?.supervisors||[]).forEach(s=>{
+      const id=String(s.id||''); if(!id) return;
+      map.set('sup_'+id,{id, name:s.full_name||s.name||s.username||('مشرف '+id), role:'مشرف', source:'supervisors'});
     });
-    return '<option value="">اختر المشرف / المستخدم الفعلي</option>' + [...map.values()].map(u => {
-      const id = u.id || u.user_id || u.full_name || u.username || u.name;
-      const name = u.full_name || u.name || u.username || '';
-      return `<option value="${E(id)}" ${S(selected)===S(id)?'selected':''}>${E(name)}</option>`;
-    }).join('');
+    (window.data?.users||[]).forEach(u=>{
+      const role=String(u.role||'');
+      if(u.is_active===false) return;
+      if(!['supervisor','technician','operations_manager','warehouse_manager','admin','general_manager','financial_manager','employee','accountant'].includes(role)) return;
+      const id=String(u.id||''); if(!id) return;
+      const key='user_'+id;
+      const labelRole=userRoleText(role);
+      map.set(key,{id, name:u.full_name||u.name||u.username||('مستخدم '+id), role:labelRole, source:'users'});
+    });
+    return [...map.values()].sort((a,b)=>String(a.name).localeCompare(String(b.name),'ar'));
   }
-  function projectOptions(selected){
-    return '<option value="">اختر المشروع</option>' + arr(getData().projects).filter(p => S(p.status || 'active') !== 'inactive').map(p => `<option value="${E(p.id)}" ${S(selected)===S(p.id)?'selected':''}>${E(p.name || p.project_name || '')}</option>`).join('');
+  function requesterNameById(id){
+    const idStr=String(id||'');
+    const r=allRequesters().find(x=>String(x.id)===idStr);
+    if(r) return r.name;
+    try{ if(typeof supervisorName==='function') return supervisorName(id); }catch(_){ }
+    const u=(window.data?.users||[]).find(x=>String(x.id)===idStr);
+    return u?.full_name||u?.username||'';
   }
-  function getLineArray(){
-    return window.inventoryRequestLines || (typeof inventoryRequestLines !== 'undefined' ? inventoryRequestLines : []);
+  function fillRequesterSelect(){
+    const rows=allRequesters();
+    ['inventoryRequestSupervisor'].forEach(id=>{
+      const el=$id(id); if(!el) return;
+      const old=el.value;
+      el.innerHTML='<option value="">اختر الطالب</option>'+rows.map(r=>`<option value="${E(r.id)}">${E(r.name)} — ${E(r.role)}</option>`).join('');
+      if(old) el.value=old;
+      const label=el.closest('label') || el.previousElementSibling;
+      if(label && label.tagName==='LABEL') label.textContent='اسم الطالب (مشرف / فني / إداري)';
+    });
+  }
+  function hideRequestProjectCostFields(){
+    // Admin request form: hide project half inside split, keep date visible.
+    const adminProject=$id('inventoryRequestProject');
+    if(adminProject){
+      const box=adminProject.closest('div');
+      if(box){ box.style.display='none'; box.classList.add('v192-hidden-request-project'); }
+      adminProject.value=''; adminProject.removeAttribute('required');
+    }
+    const adminCost=$id('inventoryRequestCostCenter');
+    if(adminCost){
+      const lab=adminCost.previousElementSibling;
+      if(lab && lab.tagName==='LABEL') lab.style.display='none';
+      adminCost.style.display='none'; adminCost.value=''; adminCost.removeAttribute('required');
+      adminCost.classList.add('v192-hidden-request-cost');
+    }
+    const adminSup=$id('inventoryRequestSupervisor');
+    if(adminSup){ const lab=adminSup.previousElementSibling; if(lab && lab.tagName==='LABEL') lab.textContent='اسم الطالب (مشرف / فني / إداري)'; }
+
+    // Supervisor/technician request form: hide project and cost; requestor is session user.
+    const supProject=$id('supInventoryRequestProject');
+    if(supProject){
+      const box=supProject.closest('div');
+      if(box){ box.style.display='none'; box.classList.add('v192-hidden-request-project'); }
+      supProject.value=''; supProject.removeAttribute('required');
+    }
+    const supCost=$id('supInventoryRequestCostCenter');
+    if(supCost){
+      const lab=supCost.previousElementSibling;
+      if(lab && lab.tagName==='LABEL') lab.style.display='none';
+      supCost.style.display='none'; supCost.value=''; supCost.removeAttribute('required');
+      supCost.classList.add('v192-hidden-request-cost');
+    }
+    const help=document.querySelector('.sup-help');
+    if(help) help.textContent='طلب الصرف هنا عهدة على الطالب فقط. المشروع ومركز التكلفة يتم تحديدهما لاحقًا عند تسجيل الاستهلاك.';
+  }
+  function forceOpsApproval(){
+    window.inventoryDefaultApprovalPath=function(){ return ['ops']; };
+    window.inventoryGetApprovalPath=function(){ return ['ops']; };
+    try{ localStorage.setItem('tasneef_inventory_approval_path', JSON.stringify(['ops'])); }catch(_){ }
+  }
+  function readAdminRequestLines(){
+    if(typeof inventoryRequestLines!=='undefined' && Array.isArray(inventoryRequestLines)) return inventoryRequestLines;
+    if(Array.isArray(window.inventoryRequestLines)) return window.inventoryRequestLines;
+    return [];
+  }
+  function setAdminRequestLines(v){
+    try{ if(typeof inventoryRequestLines!=='undefined') inventoryRequestLines=v; }catch(_){ }
+    window.inventoryRequestLines=v;
+  }
+  function readSupRequestLines(){
+    if(typeof supInventoryRequestLines!=='undefined' && Array.isArray(supInventoryRequestLines)) return supInventoryRequestLines;
+    if(Array.isArray(window.supInventoryRequestLines)) return window.supInventoryRequestLines;
+    return [];
+  }
+  function setSupRequestLines(v){
+    try{ if(typeof supInventoryRequestLines!=='undefined') supInventoryRequestLines=v; }catch(_){ }
+    window.supInventoryRequestLines=v;
+  }
+  function normalizeLines(lines){
+    return (lines||[]).map(l=>{
+      const item=(window.data?.inventoryItems||[]).find(i=>String(i.id)===String(l.item_id))||{};
+      return {
+        item_id:Number(l.item_id),
+        item_name:l.item_name||item.name||'',
+        product_code:l.product_code||item.serial_number||item.product_code||item.barcode||'',
+        barcode:l.barcode||item.supplier_barcode||item.barcode||'',
+        quantity:N(l.quantity),
+        available:N(l.available ?? item.quantity),
+        unit:l.unit||item.unit||'حبة',
+        unit_cost:N(l.unit_cost||item.unit_cost||item.unit_price||0)
+      };
+    }).filter(l=>l.item_id && l.quantity>0);
   }
 
-  // 1) مسار طلب الصرف: مدير التشغيل فقط.
-  function forceOperationsPath(){
-    window.inventoryGetApprovalPath = function(){ return ['operations']; };
-    window.inventoryRequestPath = function(){ return ['operations']; };
-    window.inventoryRequestNextRole = function(status){
-      if(S(status) === 'approved') return 'تم الصرف';
-      if(S(status).startsWith('pending_operations')) return 'بانتظار مدير التشغيل';
-      if(S(status).startsWith('rejected')) return 'مرفوض';
-      return 'بانتظار مدير التشغيل';
-    };
-    window.inventoryRequestStatusText = function(status){
-      if(S(status) === 'approved') return 'تم الصرف';
-      if(S(status).startsWith('pending_operations')) return 'بانتظار مدير التشغيل';
-      if(S(status).startsWith('rejected')) return 'مرفوض';
-      return S(status || '-');
-    };
-    window.inventoryCurrentUserCanApprove = function(step){ return S(step) === 'operations' && isOperationsManager(); };
-  }
-
-  // 2) حفظ طلب الصرف دائمًا كطلب بانتظار مدير التشغيل.
   window.inventorySaveRequest = async function(btn){
     try{
-      if(btn) btn.disabled = true;
-      const pid = $('inventoryRequestProject')?.value;
-      const supervisorId = $('inventoryRequestSupervisor')?.value;
-      if(!pid) throw new Error('اختر المشروع');
-      if(!supervisorId) throw new Error('اختر المشرف الطالب');
-      const lines = getLineArray();
-      if(!lines.length) throw new Error('أضف صنفًا واحدًا على الأقل إلى أمر الصرف');
-      const totalQty = lines.reduce((a,x)=>a+N(x.quantity),0);
-      const ccId = $('inventoryRequestCostCenter')?.value || '';
-      const ccSelected = ccList().find(c => S(c.id) === S(ccId));
-      const ccAuto = ccForProject(pid);
-      const row = {
-        item_id: Number(lines[0].item_id),
-        item_name: lines.map(x=>x.item_name).join('، '),
-        quantity: totalQty,
-        request_items: lines,
-        items: lines,
-        project_id: Number(pid),
-        project_name: projectNameSafe(pid),
-        cost_center_id: ccSelected ? Number(ccSelected.id) : ccAuto.id,
-        cost_center_name: ccSelected ? (ccSelected.name || ccSelected.cost_center_name) : ccAuto.name,
-        cost_center_type: ccSelected ? (ccSelected.type || ccSelected.cost_center_type || 'FM') : ccAuto.type,
-        supervisor_id: Number(supervisorId),
-        supervisor_name: supervisorNameSafe(supervisorId),
-        request_date: $('inventoryRequestDate')?.value || todayV188(),
-        reason: $('inventoryRequestReason')?.value || '',
-        notes: $('inventoryRequestNotes')?.value || '',
-        status: 'pending_operations',
-        current_step: 'operations',
-        approval_path: ['operations'],
-        approval_log: []
+      if(btn) btn.disabled=true;
+      forceOpsApproval();
+      const requesterId=$id('inventoryRequestSupervisor')?.value;
+      if(!requesterId) throw new Error('اختر اسم الطالب: مشرف / فني / إداري');
+      const lines=normalizeLines(readAdminRequestLines());
+      if(!lines.length) throw new Error('أضف صنفًا واحدًا على الأقل إلى طلب الصرف');
+      const totalQty=lines.reduce((a,l)=>a+N(l.quantity),0);
+      const row={
+        item_id:Number(lines[0].item_id), item_name:lines.map(x=>x.item_name).join('، '), quantity:totalQty,
+        request_items:lines, items:lines,
+        project_id:null, project_name:'', cost_center_id:null, cost_center_name:'', cost_code:'',
+        supervisor_id:Number(requesterId)||null, supervisor_name:requesterNameById(requesterId), requester_role:'custody',
+        request_date:$id('inventoryRequestDate')?.value||T(), reason:$id('inventoryRequestReason')?.value||'', notes:$id('inventoryRequestNotes')?.value||'',
+        status:'pending_ops', current_step:'ops', approval_path:['ops'], approval_log:[]
       };
-      const res = await sb.from('inventory_requests').insert(row);
-      if(res.error) throw res.error;
-      if(typeof msg === 'function') msg('تم إرسال طلب الصرف إلى مدير التشغيل');
-      try { window.inventoryRequestLines = []; if(typeof inventoryRenderRequestLines === 'function') inventoryRenderRequestLines(); } catch(_){ }
-      if(typeof financeLoadAll === 'function') await financeLoadAll();
-    } catch(e){ if(typeof msg === 'function') msg(e.message || String(e),'err'); else alert(e.message || String(e)); }
-    finally{ if(btn) btn.disabled = false; }
+      const {error}=await sb.from('inventory_requests').insert(row); if(error) throw error;
+      if(typeof msg==='function') msg('تم إرسال طلب الصرف إلى مدير التشغيل');
+      setAdminRequestLines([]); if(typeof inventoryRenderRequestLines==='function') inventoryRenderRequestLines();
+      ['inventoryRequestItem','inventoryRequestQty','inventoryRequestAvailable','inventoryRequestSupervisor','inventoryRequestReason','inventoryRequestNotes'].forEach(id=>{ const el=$id(id); if(el) el.value=''; });
+      if($id('inventoryRequestDate')) $id('inventoryRequestDate').value=T();
+      if(typeof financeLoadAll==='function') await financeLoadAll();
+    }catch(e){ if(typeof msg==='function') msg(e.message||String(e),'err'); else alert(e.message||String(e)); }
+    finally{ if(btn) btn.disabled=false; }
   };
 
-  // 3) اعتماد مدير التشغيل = صرف من المخزون فقط، وليس استهلاكًا.
-  async function approveAndIssue(r){
-    const lines = lineItems(r);
-    if(!lines.length) throw new Error('لا توجد أصناف داخل الطلب');
-    const missing = [];
-    lines.forEach(l => { const it = itemById(l.item_id); if(!it || N(it.quantity) < N(l.quantity)) missing.push(`${l.item_name}: المتوفر ${N(it.quantity)} والمطلوب ${N(l.quantity)}`); });
-    if(missing.length) throw new Error('لا يمكن الصرف لعدم توفر الكمية: ' + missing.join(' / '));
-    const movementIds = [];
-    for(const l of lines){
-      const it = itemById(l.item_id);
-      const before = unitBefore(it, l.unit_cost || it.unit_cost);
-      const outRow = {
-        item_id: Number(l.item_id), item_name: l.item_name || it.name || '', movement_type:'out', quantity:N(l.quantity), movement_date:todayV188(),
-        project_id: r.project_id || null, project_name: r.project_name || projectNameSafe(r.project_id),
-        cost_center_id: r.cost_center_id || null, cost_center_name: r.cost_center_name || r.project_name || '', cost_center_type: r.cost_center_type || 'FM',
-        receiver: r.supervisor_name || supervisorNameSafe(r.supervisor_id), receiver_id: r.supervisor_id || null,
-        reason: 'صرف من المخزون بناءً على اعتماد مدير التشغيل REQ-' + r.id,
-        notes: r.reason || '', request_id: Number(r.id), product_code: l.product_code || productCode(it), barcode: l.barcode || it.barcode || it.supplier_barcode || '',
-        unit_cost: before, unit: l.unit || it.unit || 'حبة'
-      };
-      const mv = await sb.from('inventory_movements').insert(outRow).select('*').single();
-      if(mv.error) throw mv.error;
-      movementIds.push(mv.data?.id);
-      const upd = await sb.from('inventory_items').update({ quantity: Math.max(0, N(it.quantity) - N(l.quantity)) }).eq('id', l.item_id);
-      if(upd.error) throw upd.error;
-      it.quantity = Math.max(0, N(it.quantity) - N(l.quantity));
-    }
-    const u = currentSession();
-    const now = new Date().toISOString();
-    const log = Array.isArray(r.approval_log) ? r.approval_log : [];
-    log.push({ step:'operations', role:'مدير التشغيل', by:u.full_name || u.username || 'مدير التشغيل', at:now });
-    const res = await sb.from('inventory_requests').update({ status:'approved', current_step:'done', approval_log:log, operations_approved_by:u.full_name || u.username || '', operations_approved_at:now, movement_id:movementIds[0] || null, movement_ids:movementIds }).eq('id', r.id);
-    if(res.error) throw res.error;
-  }
-  window.inventoryApproveRequest = async function(id, step, btn){
+  window.supervisorSaveInventoryRequest = async function(btn){
     try{
-      if(btn) btn.disabled = true;
-      const r = arr(getData().inventoryRequests).find(x => S(x.id) === S(id));
-      if(!r) throw new Error('الطلب غير موجود');
-      if(S(r.status) !== 'pending_operations') throw new Error('هذا الطلب ليس بانتظار مدير التشغيل');
-      if(!isOperationsManager()) throw new Error('الاعتماد متاح لمدير التشغيل فقط');
-      await approveAndIssue(r);
-      if(typeof msg === 'function') msg('تم اعتماد الطلب وصرفه للمشرف. التكلفة ستُحسب عند تسجيل الاستهلاك.');
-      if(typeof financeLoadAll === 'function') await financeLoadAll();
-    } catch(e){ if(typeof msg === 'function') msg(e.message || String(e),'err'); else alert(e.message || String(e)); }
-    finally{ if(btn) btn.disabled = false; }
+      if(btn) btn.disabled=true;
+      forceOpsApproval();
+      const u=(typeof session==='function'?session():{})||{};
+      const requesterId=u.id;
+      const requesterName=u.full_name||u.name||u.username||'طالب الصرف';
+      const lines=normalizeLines(readSupRequestLines());
+      if(!lines.length) throw new Error('أضف صنفًا واحدًا على الأقل إلى طلب الصرف');
+      const totalQty=lines.reduce((a,l)=>a+N(l.quantity),0);
+      const row={
+        item_id:Number(lines[0].item_id), item_name:lines.map(x=>x.item_name).join('، '), quantity:totalQty,
+        request_items:lines, items:lines,
+        project_id:null, project_name:'', cost_center_id:null, cost_center_name:'', cost_code:'',
+        supervisor_id:Number(requesterId)||null, supervisor_name:requesterName, requester_role:userRoleText(u.role),
+        request_date:$id('supInventoryRequestDate')?.value||T(), reason:$id('supInventoryRequestReason')?.value||'', notes:$id('supInventoryRequestNotes')?.value||'',
+        status:'pending_ops', current_step:'ops', approval_path:['ops'], approval_log:[]
+      };
+      const {error}=await sb.from('inventory_requests').insert(row); if(error) throw error;
+      if(typeof msg==='function') msg('تم إرسال طلب الصرف إلى مدير التشغيل');
+      setSupRequestLines([]); if(typeof renderSupInventoryRequestLines==='function') renderSupInventoryRequestLines();
+      ['supInventoryRequestItem','supInventoryRequestQty','supInventoryRequestReason','supInventoryRequestNotes'].forEach(id=>{ const el=$id(id); if(el) el.value=''; });
+      if($id('supInventoryRequestDate')) $id('supInventoryRequestDate').value=T();
+      if(typeof supervisorInventoryLoad==='function') await supervisorInventoryLoad();
+    }catch(e){ if(typeof msg==='function') msg(e.message||String(e),'err'); else alert(e.message||String(e)); }
+    finally{ if(btn) btn.disabled=false; }
   };
 
-  // 4) نافذة توزيع الاستهلاك مع مركز تكلفة لكل سطر، ومرتجع تلقائي للباقي.
-  window.addConsumptionRowV188 = function(lineIndex, values={}){
-    const req = window._v188ConsumptionRequest; if(!req) return;
-    const line = req.lines[Number(lineIndex)]; if(!line) return;
-    const tbody = $(`v188ConsumeRows_${lineIndex}`); if(!tbody) return;
-    const row = document.createElement('tr');
-    row.className = 'v188-cons-row'; row.dataset.lineIndex = S(lineIndex); row.dataset.itemId = S(line.item_id);
-    row.innerHTML = `<td><select class="v188-project">${projectOptions(values.project_id)}</select></td><td><select class="v188-cost-center">${costCenterOptions(values.cost_center_id, values.project_id)}</select></td><td><input class="v188-qty" type="number" min="0" step="0.01" placeholder="الكمية" value="${E(values.qty || '')}"></td><td><select class="v188-user">${supervisorOptions(values.user_id)}</select></td><td><input class="v188-notes" placeholder="ملاحظات" value="${E(values.notes || '')}"></td><td><button type="button" class="danger" onclick="this.closest('tr').remove()">حذف</button></td>`;
-    tbody.appendChild(row);
-    row.querySelector('.v188-project')?.addEventListener('change', ev => {
-      const cc = row.querySelector('.v188-cost-center');
-      if(cc) cc.innerHTML = costCenterOptions('', ev.target.value);
-    });
-  };
-
-  window.openRequestConsumptionV178 = function(id){
-    const r = arr(getData().inventoryRequests).find(x => S(x.id) === S(id));
-    if(!r) return typeof msg === 'function' ? msg('لم يتم العثور على أمر الصرف','err') : alert('لم يتم العثور على أمر الصرف');
-    if(S(r.status) !== 'approved') return typeof msg === 'function' ? msg('لا يمكن تسجيل الاستهلاك إلا بعد اعتماد الطلب وصرفه','err') : alert('لا يمكن تسجيل الاستهلاك إلا بعد اعتماد الطلب');
-    const lines = lineItems(r);
-    if(!lines.length) return typeof msg === 'function' ? msg('لا توجد أصناف داخل أمر الصرف','err') : alert('لا توجد أصناف');
-    window._v188ConsumptionRequest = { r, lines };
-    document.getElementById('consumptionModalV178')?.remove();
-    const cards = lines.map((l,i) => {
-      const it = itemById(l.item_id); const unit = l.unit || it.unit || 'حبة';
-      const ret = returnedQty(r.id,l.item_id); const cons = consumedQty(r.id,l.item_id); const avail = availableToConsume(r.id,l);
-      const prev = movementsFor(r.id,l.item_id,'consume').map(m => `<tr><td>${E(m.movement_date || '')}</td><td>${E(m.project_name || projectNameSafe(m.project_id) || '-')}</td><td>${E(m.cost_center_name || '-')}</td><td>${N(m.quantity)} ${E(unit)}</td><td>${E(m.receiver || '-')}</td></tr>`).join('') || '<tr><td colspan="5">لا يوجد استهلاك سابق</td></tr>';
-      return `<section class="v188-card"><div class="v188-head"><div><h3>${E(l.item_name || it.name || '-')}</h3><small>الكود: ${E(l.product_code || productCode(it))} | الوحدة: ${E(unit)}</small></div><div class="v188-stats"><span>مصروف: <b>${N(l.quantity)}</b></span><span>مرتجع: <b>${N(ret)}</b></span><span>مستهلك سابق: <b>${N(cons)}</b></span><span>متاح: <b>${N(avail)}</b></span></div></div><div class="table-wrap"><table><thead><tr><th>المشروع</th><th>مركز التكلفة</th><th>الكمية المستهلكة</th><th>المستخدم الفعلي</th><th>ملاحظات</th><th>إجراء</th></tr></thead><tbody id="v188ConsumeRows_${i}" data-available="${avail}"></tbody></table></div><button type="button" class="light" onclick="addConsumptionRowV188(${i})">+ إضافة استهلاك لهذا الصنف</button><details><summary>الاستهلاك السابق</summary><table><thead><tr><th>التاريخ</th><th>المشروع</th><th>مركز التكلفة</th><th>الكمية</th><th>المستخدم الفعلي</th></tr></thead><tbody>${prev}</tbody></table></details></section>`;
-    }).join('');
-    const modal = document.createElement('div'); modal.id='consumptionModalV178'; modal.className='v188-backdrop';
-    modal.innerHTML = `<div class="v188-modal"><div class="v188-top"><div><h2>تسجيل الاستهلاك وتحديد التكلفة</h2><p>أمر الصرف: REQ-${E(r.id)} — المستلم: ${E(r.supervisor_name || supervisorNameSafe(r.supervisor_id) || '-')}</p><small>أي كمية لا يتم تسجيل استهلاكها الآن ستعود تلقائيًا كمرتجع لنفس اليوم.</small></div><button type="button" onclick="document.getElementById('consumptionModalV178')?.remove()">إغلاق</button></div><div class="v188-body">${cards}</div><div class="v188-actions"><button type="button" onclick="saveRequestConsumptionV178('${E(id)}')">حفظ الاستهلاك وإرجاع المتبقي</button><button class="light" type="button" onclick="document.getElementById('consumptionModalV178')?.remove()">إلغاء</button></div></div>`;
-    document.body.appendChild(modal);
-    lines.forEach((_,i)=>window.addConsumptionRowV188(i));
-  };
-
-  window.saveRequestConsumptionV178 = async function(id){
-    const req = window._v188ConsumptionRequest;
-    const r = req?.r || arr(getData().inventoryRequests).find(x => S(x.id) === S(id));
-    const lines = req?.lines || lineItems(r);
-    if(!r || !lines?.length) throw new Error('لم يتم العثور على الطلب');
-    const rows = [...document.querySelectorAll('#consumptionModalV178 .v188-cons-row')];
-    const byItem = {}; const payload = [];
-    for(const row of rows){
-      const idx = Number(row.dataset.lineIndex); const line = lines[idx]; if(!line) continue;
-      const qty = N(row.querySelector('.v188-qty')?.value); if(qty <= 0) continue;
-      const pid = row.querySelector('.v188-project')?.value; if(!pid) throw new Error('اختر المشروع لكل سطر استهلاك');
-      const ccId = row.querySelector('.v188-cost-center')?.value; if(!ccId) throw new Error('اختر مركز التكلفة لكل سطر استهلاك');
-      const uid = row.querySelector('.v188-user')?.value; if(!uid) throw new Error('اختر المستخدم الفعلي لكل سطر استهلاك');
-      byItem[line.item_id] = (byItem[line.item_id] || 0) + qty;
-      const it = itemById(line.item_id); const before = unitBefore(it, line.unit_cost || it.unit_cost); const cc = ccList().find(c => S(c.id) === S(ccId)); const sup = [...arr(getData().supervisors),...arr(getData().users)].find(u => S(u.id || u.user_id || u.full_name || u.username || u.name) === S(uid)) || {};
-      payload.push({ item_id:Number(line.item_id), item_name:line.item_name || it.name || '', movement_type:'consume', quantity:qty, movement_date:todayV188(), project_id:Number(pid), project_name:projectNameSafe(pid), cost_center_id:cc ? Number(cc.id) : null, cost_center_name:cc ? (cc.name || cc.cost_center_name) : ccName(ccId), cost_center_type:cc ? (cc.type || cc.cost_center_type || 'FM') : 'FM', receiver_id:Number(uid) || null, receiver:sup.full_name || sup.name || sup.username || S(uid), reason:'تسجيل استهلاك فعلي لأمر صرف REQ-' + r.id, notes:row.querySelector('.v188-notes')?.value || '', request_id:Number(r.id), product_code:line.product_code || productCode(it), barcode:line.barcode || it.barcode || it.supplier_barcode || '', unit_cost:before, unit:line.unit || it.unit || 'حبة' });
-    }
-    if(!payload.length) throw new Error('أدخل كمية استهلاك واحدة على الأقل');
-    const returnPayload = [];
-    const itemQtyUpdates = [];
-    for(const line of lines){
-      const itemId = line.item_id;
-      const usedNow = N(byItem[itemId] || 0);
-      const avail = availableToConsume(r.id,line);
-      if(usedNow > avail + 0.0001) throw new Error('مجموع الاستهلاك أكبر من المتاح للصنف: ' + (line.item_name || itemById(itemId).name || itemId));
-      const remaining = Math.max(0, avail - usedNow);
-      if(remaining > 0){
-        const it = itemById(itemId); const before = unitBefore(it, line.unit_cost || it.unit_cost);
-        returnPayload.push({ item_id:Number(itemId), item_name:line.item_name || it.name || '', movement_type:'return', quantity:remaining, movement_date:todayV188(), project_id:r.project_id || null, project_name:r.project_name || projectNameSafe(r.project_id), cost_center_id:r.cost_center_id || null, cost_center_name:r.cost_center_name || r.project_name || '', cost_center_type:r.cost_center_type || 'FM', receiver:r.supervisor_name || supervisorNameSafe(r.supervisor_id), reason:'مرتجع تلقائي لغير المستهلك في نفس اليوم من أمر REQ-' + r.id, notes:'auto_return_unconsumed', request_id:Number(r.id), product_code:line.product_code || productCode(it), barcode:line.barcode || it.barcode || it.supplier_barcode || '', unit_cost:before, unit:line.unit || it.unit || 'حبة' });
-        itemQtyUpdates.push({ itemId, qty:remaining });
-      }
-    }
-    const allMovements = payload.concat(returnPayload);
-    const ins = await sb.from('inventory_movements').insert(allMovements);
-    if(ins.error) throw ins.error;
-    for(const u of itemQtyUpdates){ const it = itemById(u.itemId); const upd = await sb.from('inventory_items').update({ quantity:N(it.quantity)+N(u.qty) }).eq('id', u.itemId); if(upd.error) throw upd.error; it.quantity = N(it.quantity)+N(u.qty); }
-    try { await sb.from('inventory_requests').update({ has_consumption:true, has_return:returnPayload.length>0, consumption_updated_at:new Date().toISOString(), return_updated_at:returnPayload.length?new Date().toISOString():null }).eq('id', r.id); } catch(_){ }
-    document.getElementById('consumptionModalV178')?.remove();
-    if(typeof msg === 'function') msg(returnPayload.length ? 'تم حفظ الاستهلاك وإرجاع الكمية غير المستهلكة تلقائيًا' : 'تم حفظ الاستهلاك');
-    if(typeof financeLoadAll === 'function') await financeLoadAll();
-  };
-
-  // 5) التقارير والتكلفة تعتمد على الاستهلاك الحقيقي فقط.
-  window.v118AllUsageRows = function(){
-    const rows = [];
-    arr(getData().inventoryMovements).filter(m => S(m.movement_type) === 'consume').forEach(m => {
-      const it = itemById(m.item_id); const cost = unitBefore(it, m.unit_cost || it.unit_cost); const qty = N(m.quantity); const val = qty * cost;
-      rows.push({ date:S(m.movement_date || m.created_at || todayV188()).slice(0,10), project:m.project_name || projectNameSafe(m.project_id) || 'بدون مشروع', project_id:m.project_id, cost_center_id:m.cost_center_id || null, cost_center_name:m.cost_center_name || m.project_name || '', cost_center_type:m.cost_center_type || '', person:m.receiver || 'بدون مستخدم', item:m.item_name || it.name || '', item_id:m.item_id, product_code:m.product_code || productCode(it), qty, consumed:qty, out:0, returned:0, current:N(it.quantity), reason:m.reason || m.notes || '-', type:'استهلاك فعلي', ref:'REQ-' + (m.request_id || '-'), unit_cost:cost, val, vat:val*0.15, gross:val*1.15, itemObj:it });
-    });
-    return rows;
-  };
-
-  // 6) عرض الطلبات: زر تسجيل استهلاك بعد الاعتماد فقط.
   window.inventoryRenderRequests = function(){
-    const b = $('inventoryRequestsBody'); if(!b) return;
-    let rows = typeof financeFilterRows === 'function' ? financeFilterRows(arr(getData().inventoryRequests),'request_date') : arr(getData().inventoryRequests);
-    const st = $('inventoryRequestStatusFilter')?.value; if(st) rows = rows.filter(r => S(r.status) === S(st));
-    b.innerHTML = rows.map(r => {
-      const lines = lineItems(r);
-      const itemsHtml = lines.map(l => {
-        const ret = returnedQty(r.id,l.item_id), cons = consumedQty(r.id,l.item_id);
-        return `${E(l.product_code || '')} <b>${E(l.item_name || '')}</b><br><small>مصروف ${N(l.quantity)} | مستهلك ${N(cons)} | مرتجع ${N(ret)}</small>`;
-      }).join('<hr style="border:none;border-top:1px solid #e6eeee;margin:4px 0">') || E(r.item_name || '');
-      const actions = [];
-      if(S(r.status) === 'pending_operations'){
-        if(isOperationsManager()) actions.push(`<button onclick="inventoryApproveRequest('${E(r.id)}','operations',this)">اعتماد مدير التشغيل وصرف</button>`);
-        else actions.push('<span class="badge neutral">بانتظار مدير التشغيل</span>');
+    const b=$id('inventoryRequestsBody'); if(!b) return;
+    const table=b.closest('table');
+    if(table && table.tHead){
+      table.tHead.innerHTML='<tr><th>التاريخ</th><th>اسم الطالب</th><th>الأصناف</th><th>الكمية</th><th>سبب الصرف</th><th>الحالة</th><th>إجراء</th></tr>';
+    }
+    let rows=[...(window.data?.inventoryRequests||[])];
+    const st=$id('inventoryRequestStatusFilter')?.value; if(st) rows=rows.filter(r=>String(r.status)===String(st));
+    rows.sort((a,b)=>String(b.created_at||b.request_date||'').localeCompare(String(a.created_at||a.request_date||'')));
+    b.innerHTML=rows.map(r=>{
+      let lines=[]; try{ lines=typeof v118LineItems==='function'?v118LineItems(r):(Array.isArray(r.request_items)?r.request_items:[]); }catch(_){ lines=[]; }
+      const itemsHtml=(lines||[]).map(l=>`<div><b>${E(l.product_code||'')}</b> ${E(l.item_name||'')} × ${N(l.quantity)} ${E(l.unit||'')}</div>`).join('') || E(r.item_name||'-');
+      const total=(lines||[]).reduce((a,l)=>a+N(l.quantity),0)||N(r.quantity);
+      const actions=[];
+      if(String(r.status||'').startsWith('pending_')){
+        const step=String(r.status).replace('pending_','');
+        try{
+          if(typeof inventoryCurrentUserCanApprove==='function' && inventoryCurrentUserCanApprove(step)){
+            actions.push(`<button onclick="inventoryApproveRequest('${E(r.id)}','${E(step)}',this)">اعتماد مدير التشغيل</button>`);
+            if(typeof inventoryRejectRequest==='function') actions.push(`<button class="danger" onclick="inventoryRejectRequest('${E(r.id)}',this)">رفض</button>`);
+          }else{ actions.push(`<span class="badge neutral">بانتظار مدير التشغيل</span>`); }
+        }catch(_){ actions.push(`<span class="badge neutral">بانتظار مدير التشغيل</span>`); }
       }
-      if(S(r.status) === 'approved') actions.push(`<button class="light" onclick="openRequestConsumptionV178('${E(r.id)}')">تسجيل استهلاك</button>`);
-      actions.unshift(`<button class="light" onclick="inventoryPrintRequest('${E(r.id)}')">طباعة</button>`);
-      const total = lines.reduce((a,l)=>a+N(l.quantity),0);
-      return `<tr><td>${E(r.request_date || '')}</td><td><b>${E(r.supervisor_name || supervisorNameSafe(r.supervisor_id))}</b></td><td>${E(r.project_name || projectNameSafe(r.project_id))}</td><td>${E(r.cost_center_name || '-')}</td><td>${itemsHtml}</td><td>مصروف ${total}<br>مستهلك ${lines.reduce((a,l)=>a+consumedQty(r.id,l.item_id),0)}<br>مرتجع ${lines.reduce((a,l)=>a+returnedQty(r.id,l.item_id),0)}</td><td>${E(r.reason || '-')}</td><td><span class="badge ${typeof inventoryRequestStatusClass==='function'?inventoryRequestStatusClass(r.status):''}">${E(typeof inventoryRequestStatusText==='function'?inventoryRequestStatusText(r.status):r.status)}</span><br><small>${E(typeof inventoryRequestNextRole==='function'?inventoryRequestNextRole(r.status):'')}</small></td><td class="row-actions">${actions.join(' ')}</td></tr>`;
-    }).join('') || '<tr><td colspan="9">لا توجد طلبات صرف</td></tr>';
+      if(String(r.status||'')==='approved') actions.push(`<button class="light" onclick="openRequestConsumptionV178('${E(r.id)}')">تسجيل استهلاك</button>`);
+      if(typeof inventoryPrintRequest==='function') actions.unshift(`<button class="light" onclick="inventoryPrintRequest('${E(r.id)}')">طباعة</button>`);
+      const statusText=typeof inventoryRequestStatusText==='function'?inventoryRequestStatusText(r.status):E(r.status||'-');
+      const statusClass=typeof inventoryRequestStatusClass==='function'?inventoryRequestStatusClass(r.status):'';
+      return `<tr><td>${E(r.request_date||String(r.created_at||'').slice(0,10)||'')}</td><td><b>${E(r.supervisor_name||requesterNameById(r.supervisor_id)||'-')}</b><br><small>${E(r.requester_role||'طالب صرف')}</small></td><td>${itemsHtml}</td><td>${N(total)}</td><td>${E(r.reason||'-')}<br><small>${E(r.notes||'')}</small></td><td><span class="badge ${statusClass}">${statusText}</span><br><small>المشروع ومركز التكلفة عند الاستهلاك</small></td><td class="row-actions">${actions.join(' ')||'-'}</td></tr>`;
+    }).join('') || '<tr><td colspan="7">لا توجد طلبات صرف</td></tr>';
   };
 
-  function injectCss(){
-    if($('v188ConsumptionCss')) return;
-    const st = document.createElement('style'); st.id='v188ConsumptionCss';
-    st.textContent = `
-      .v188-backdrop{position:fixed;inset:0;background:rgba(0,25,17,.48);z-index:99999;display:flex;align-items:center;justify-content:center;padding:18px;direction:rtl}
-      .v188-modal{background:#fff;border-radius:24px;box-shadow:0 30px 100px rgba(0,0,0,.25);width:min(1180px,96vw);max-height:92vh;overflow:auto;border:1px solid #d7eee5}
-      .v188-top{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;padding:18px 22px;border-bottom:1px solid #e4f1ec;background:linear-gradient(135deg,#f8fffc,#edf9f4)}
-      .v188-top h2{margin:0;color:#07563d}.v188-top p{margin:6px 0;color:#557067}.v188-top small{color:#9b5c00;font-weight:700}.v188-body{padding:18px}.v188-actions{padding:16px 22px;border-top:1px solid #e4f1ec;display:flex;gap:10px;justify-content:flex-start}
-      .v188-card{border:1px solid #dceee7;border-radius:20px;margin-bottom:16px;padding:14px;background:#fbfffd}.v188-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}.v188-head h3{margin:0;color:#093f31}.v188-stats{display:flex;flex-wrap:wrap;gap:8px}.v188-stats span{background:#eefaf5;border:1px solid #cfe8dd;border-radius:999px;padding:6px 10px;color:#194b3b}
-      #consumptionModalV178 select,#consumptionModalV178 input{width:100%;min-height:38px;border:1px solid #cfded8;border-radius:10px;padding:7px;background:#fff}#consumptionModalV178 details{margin-top:10px}#consumptionModalV178 summary{cursor:pointer;color:#07563d;font-weight:700}
-      @media(max-width:800px){.v188-head{display:block}.v188-modal{width:98vw}.v188-body{padding:10px}.v188-top{padding:14px}}
-    `;
-    document.head.appendChild(st);
-  }
-  function boot(){ forceOperationsPath(); injectCss(); try { if($('inventoryRequestsBody')) window.inventoryRenderRequests(); } catch(_){ } }
-  window.addEventListener('load',()=>setTimeout(boot,700));
-  document.addEventListener('click',()=>setTimeout(boot,70),true);
-  setTimeout(boot,1200);
-  console.log('V188 request, operations approval, actual consumption cost flow loaded');
-})();
-
-
-/* ================= V189 Save Consumption Button Real Fix =================
-   إصلاح زر: حفظ الاستهلاك وإرجاع المتبقي
-   - يلتقط الأخطاء ويعرضها بدل أن يتوقف الزر بصمت.
-   - يسمح بإرجاع كل المتبقي حتى لو لم يتم إدخال استهلاك.
-   - يتعامل مع مركز التكلفة المختار بأمان حتى لو كان مركزًا افتراضيًا لمشروع.
-   - لا يعيد خصم الاستهلاك من المخزون، ويرجع المتبقي فقط إلى المخزون.
-======================================================================= */
-(function(){
-  'use strict';
-  const S = v => String(v ?? '');
-  const N = v => { const x = parseFloat(S(v).replace(/,/g,'')); return Number.isFinite(x) ? x : 0; };
-  const E = v => S(v).replace(/[&<>\"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[m]));
-  const arr = v => Array.isArray(v) ? v : [];
-  const $ = id => document.getElementById(id);
-  const getData = () => window.data || {};
-  const todayV189 = () => (typeof today === 'function' ? today() : new Date().toISOString().slice(0,10));
-  const notify = (text,type) => { if(typeof msg === 'function') msg(text,type); else alert(text); };
-  function itemById(id){ return arr(getData().inventoryItems).find(x => S(x.id) === S(id)) || {}; }
-  function projectNameSafe(id){ try { return typeof projectName === 'function' ? projectName(id) : ''; } catch(_) { return ''; } }
-  function supervisorNameSafe(id){ try { return typeof supervisorName === 'function' ? supervisorName(id) : ''; } catch(_) { return ''; } }
-  function productCode(it){ try { if(typeof v118ProductCode === 'function') return v118ProductCode(it); } catch(_){} return it.product_code || it.barcode || it.serial_number || ''; }
-  function unitBefore(it, fallback){
-    const v = N(fallback || it.unit_cost || it.unit_price || it.price_before_vat || 0);
-    return v > 0 ? v : 0;
-  }
-  function lineItems(r){
-    try { if(typeof v118LineItems === 'function') return v118LineItems(r) || []; } catch(_){}
-    let raw = r?.request_items || r?.items || r?.request_lines || [];
-    if(typeof raw === 'string' && raw.trim()){ try { raw = JSON.parse(raw); } catch(_){ raw = []; } }
-    if(Array.isArray(raw)) return raw.map(x => ({
-      item_id:x.item_id || x.id,
-      item_name:x.item_name || x.name || '',
-      product_code:x.product_code || x.serial_number || '',
-      barcode:x.barcode || '',
-      quantity:N(x.quantity),
-      unit:x.unit || '',
-      unit_cost:N(x.unit_cost || x.price_before_vat || x.unit_price || 0)
-    })).filter(x => x.item_id && x.quantity > 0);
-    return [];
-  }
-  function movementsFor(requestId,itemId,type){
-    return arr(getData().inventoryMovements).filter(m => S(m.request_id || '') === S(requestId) && S(m.item_id || '') === S(itemId) && (!type || S(m.movement_type) === S(type)));
-  }
-  function returnedQty(reqId,itemId){ return movementsFor(reqId,itemId,'return').reduce((a,m)=>a+N(m.quantity),0); }
-  function consumedQty(reqId,itemId){ return movementsFor(reqId,itemId,'consume').reduce((a,m)=>a+N(m.quantity),0); }
-  function availableToConsume(reqId,line){ return Math.max(0, N(line.quantity) - returnedQty(reqId,line.item_id) - consumedQty(reqId,line.item_id)); }
-  function costCenterFromSelect(selectEl, projectId){
-    const opt = selectEl?.selectedOptions?.[0];
-    const rawId = S(selectEl?.value || '');
-    const idNum = /^\d+$/.test(rawId) ? Number(rawId) : null;
-    const nameFromOpt = opt?.dataset?.name || opt?.textContent?.replace(/^\s*(FM|CN)\s*-\s*/i,'').trim() || '';
-    const typeFromOpt = opt?.dataset?.type || (/^CN/i.test(opt?.textContent || '') ? 'CN' : 'FM');
-    return {
-      cost_center_id: idNum,
-      cost_center_name: nameFromOpt || projectNameSafe(projectId) || '',
-      cost_center_type: typeFromOpt || 'FM'
-    };
-  }
-  function findSupervisor(uid){
-    return [...arr(getData().supervisors), ...arr(getData().users)].find(u => S(u.id || u.user_id || u.full_name || u.username || u.name) === S(uid)) || {};
-  }
-  async function insertMovementsRobust(rows){
-    if(!rows.length) return {error:null};
-    let res = await sb.from('inventory_movements').insert(rows);
-    if(!res.error) return res;
-    // Fallback للنسخ التي لم تُشغل SQL كاملًا: إزالة الأعمدة الإضافية فقط إذا كانت قاعدة البيانات ترفضها.
-    const msg = S(res.error.message || res.error.details || '');
-    if(/column|schema|cache|does not exist/i.test(msg)){
-      const safe = rows.map(r => {
-        const x = {...r};
-        ['cost_center_id','cost_center_name','cost_center_type','receiver_id','unit','barcode'].forEach(k => delete x[k]);
-        return x;
-      });
-      res = await sb.from('inventory_movements').insert(safe);
-    }
-    return res;
-  }
-  async function updateItemQuantity(itemId, addQty){
-    const it = itemById(itemId);
-    const newQty = Math.max(0, N(it.quantity) + N(addQty));
-    const upd = await sb.from('inventory_items').update({quantity:newQty}).eq('id', itemId);
-    if(upd.error) throw upd.error;
-    it.quantity = newQty;
-  }
-
-  window.saveRequestConsumptionV178 = async function(id){
-    const btn = document.activeElement && document.activeElement.tagName === 'BUTTON' ? document.activeElement : null;
-    try{
-      if(btn) btn.disabled = true;
-      const req = window._v188ConsumptionRequest || window._v182ConsumptionRequest;
-      const r = req?.r || arr(getData().inventoryRequests).find(x => S(x.id) === S(id));
-      const lines = req?.lines || lineItems(r);
-      if(!r || !lines.length) throw new Error('لم يتم العثور على الطلب أو الأصناف');
-
-      const modal = document.getElementById('consumptionModalV178');
-      if(!modal) throw new Error('نافذة الاستهلاك غير مفتوحة');
-      const rows = [...modal.querySelectorAll('.v188-cons-row, .v182-cons-row')];
-      const byItem = {};
-      const consumeRows = [];
-
-      for(const row of rows){
-        const idx = Number(row.dataset.lineIndex || 0);
-        const line = lines[idx];
-        if(!line) continue;
-        const qtyEl = row.querySelector('.v188-qty, .v182-cons-qty');
-        const qty = N(qtyEl?.value);
-        if(qty <= 0) continue;
-
-        const projectEl = row.querySelector('.v188-project, .v182-cons-project');
-        const costEl = row.querySelector('.v188-cost-center, .v182-cons-cost-center');
-        const userEl = row.querySelector('.v188-user, .v182-cons-user');
-        const notesEl = row.querySelector('.v188-notes, .v182-cons-notes');
-        const pid = projectEl?.value;
-        if(!pid) throw new Error('اختر المشروع لكل سطر استهلاك');
-        const uid = userEl?.value;
-        if(!uid) throw new Error('اختر المستخدم الفعلي لكل سطر استهلاك');
-
-        const it = itemById(line.item_id);
-        const cc = costEl?.value ? costCenterFromSelect(costEl, pid) : {cost_center_id:null, cost_center_name:projectNameSafe(pid), cost_center_type:'FM'};
-        const sup = findSupervisor(uid);
-        const unitCost = unitBefore(it, line.unit_cost || it.unit_cost);
-        byItem[line.item_id] = (byItem[line.item_id] || 0) + qty;
-        consumeRows.push({
-          item_id:Number(line.item_id),
-          item_name:line.item_name || it.name || '',
-          movement_type:'consume',
-          quantity:qty,
-          movement_date:todayV189(),
-          project_id:Number(pid),
-          project_name:projectNameSafe(pid),
-          cost_center_id:cc.cost_center_id,
-          cost_center_name:cc.cost_center_name,
-          cost_center_type:cc.cost_center_type,
-          receiver_id:/^\d+$/.test(S(uid)) ? Number(uid) : null,
-          receiver:sup.full_name || sup.name || sup.username || S(uid),
-          reason:'تسجيل استهلاك فعلي لأمر صرف REQ-' + r.id,
-          notes:notesEl?.value || '',
-          request_id:Number(r.id),
-          product_code:line.product_code || productCode(it),
-          barcode:line.barcode || it.barcode || it.supplier_barcode || '',
-          unit_cost:unitCost,
-          unit:line.unit || it.unit || 'حبة'
-        });
-      }
-
-      const returnRows = [];
-      const itemQtyUpdates = [];
-      for(const line of lines){
-        const usedNow = N(byItem[line.item_id] || 0);
-        const available = availableToConsume(r.id, line);
-        if(usedNow > available + 0.0001) throw new Error('مجموع الاستهلاك أكبر من المتاح للصنف: ' + (line.item_name || itemById(line.item_id).name || line.item_id));
-        const remaining = Math.max(0, available - usedNow);
-        if(remaining > 0){
-          const it = itemById(line.item_id);
-          const unitCost = unitBefore(it, line.unit_cost || it.unit_cost);
-          returnRows.push({
-            item_id:Number(line.item_id),
-            item_name:line.item_name || it.name || '',
-            movement_type:'return',
-            quantity:remaining,
-            movement_date:todayV189(),
-            project_id:r.project_id || null,
-            project_name:r.project_name || projectNameSafe(r.project_id),
-            cost_center_id:r.cost_center_id || null,
-            cost_center_name:r.cost_center_name || r.project_name || projectNameSafe(r.project_id) || '',
-            cost_center_type:r.cost_center_type || 'FM',
-            receiver:r.supervisor_name || supervisorNameSafe(r.supervisor_id),
-            reason:'مرتجع تلقائي لغير المستهلك في نفس اليوم من أمر REQ-' + r.id,
-            notes:'auto_return_unconsumed',
-            request_id:Number(r.id),
-            product_code:line.product_code || productCode(it),
-            barcode:line.barcode || it.barcode || it.supplier_barcode || '',
-            unit_cost:unitCost,
-            unit:line.unit || it.unit || 'حبة'
-          });
-          itemQtyUpdates.push({itemId:line.item_id, qty:remaining});
-        }
-      }
-
-      if(!consumeRows.length && !returnRows.length) throw new Error('لا توجد كمية متاحة للاستهلاك أو الإرجاع');
-      const ins = await insertMovementsRobust([...consumeRows, ...returnRows]);
-      if(ins.error) throw ins.error;
-      for(const u of itemQtyUpdates) await updateItemQuantity(u.itemId, u.qty);
-
-      try{
-        await sb.from('inventory_requests').update({
-          has_consumption:consumeRows.length > 0,
-          has_return:returnRows.length > 0,
-          consumption_updated_at:consumeRows.length ? new Date().toISOString() : null,
-          return_updated_at:returnRows.length ? new Date().toISOString() : null
-        }).eq('id', r.id);
-      }catch(_){ }
-
-      modal.remove();
-      notify(returnRows.length ? 'تم حفظ الاستهلاك وإرجاع المتبقي تلقائيًا' : 'تم حفظ الاستهلاك', 'ok');
-      if(typeof financeLoadAll === 'function') await financeLoadAll();
-      else if(typeof inventoryRenderRequests === 'function') inventoryRenderRequests();
-    }catch(err){
-      console.error('V189 save consumption failed:', err);
-      notify(err.message || String(err), 'err');
-    }finally{
-      if(btn) btn.disabled = false;
-    }
+  // Supervisor request list: remove project column and show custody request only.
+  window.renderSupInventoryRequests = function(){
+    const b=$id('supInventoryRequestsBody'); if(!b) return;
+    const table=b.closest('table'); if(table && table.tHead) table.tHead.innerHTML='<tr><th>التاريخ</th><th>الأصناف</th><th>الكمية</th><th>السبب</th><th>الحالة</th></tr>';
+    const rows=window.data?.inventoryRequests||[];
+    b.innerHTML=rows.map(r=>{
+      let lines=[]; try{ lines=typeof v118LineItems==='function'?v118LineItems(r):[]; }catch(_){ }
+      const items=(lines||[]).map(l=>`${E(l.product_code||'')} ${E(l.item_name||'')} × ${N(l.quantity)} ${E(l.unit||'')}`).join('<br>')||E(r.item_name||'-');
+      const total=(lines||[]).reduce((a,l)=>a+N(l.quantity),0)||N(r.quantity);
+      const statusText=typeof inventoryRequestStatusText==='function'?inventoryRequestStatusText(r.status):E(r.status||'-');
+      const statusClass=typeof inventoryRequestStatusClass==='function'?inventoryRequestStatusClass(r.status):'';
+      return `<tr><td>${E(r.request_date||'')}</td><td><b>${items}</b></td><td>${N(total)}</td><td>${E(r.reason||'-')}</td><td><span class="badge ${statusClass}">${statusText}</span><br><small>${String(r.status||'').startsWith('pending_')?'بانتظار مدير التشغيل':'-'}</small></td></tr>`;
+    }).join('') || '<tr><td colspan="5">لا توجد طلبات صرف</td></tr>';
   };
 
-  console.log('V189 save consumption and auto return fix loaded');
-})();
-
-/* ================= V190 Request Clear + Consumption Auto Fill =================
-   - بعد إرسال طلب الصرف: تفريغ النموذج مباشرة.
-   - عند تسجيل الاستهلاك: اختيار المشروع يعبئ المشرف ومركز التكلفة تلقائيًا.
-*/
-(function(){
-  const $ = id => document.getElementById(id);
-  const S = v => String(v ?? '').trim();
-  const N = v => { const n = Number(String(v ?? 0).replace(/,/g,'').trim()); return Number.isFinite(n) ? n : 0; };
-  const arr = v => Array.isArray(v) ? v : [];
-  const getData = () => window.data || {};
-  const E = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const todayX = () => (typeof today === 'function' ? today() : new Date().toISOString().slice(0,10));
-  const notify = (text,type) => { if(typeof msg === 'function') msg(text,type); else alert(text); };
-  function projectNameSafe(id){ try { return typeof projectName === 'function' ? projectName(id) : ''; } catch(_) { return ''; } }
-  function supervisorNameSafe(id){ try { return typeof supervisorName === 'function' ? supervisorName(id) : ''; } catch(_) { return ''; } }
-  function itemById(id){ return arr(getData().inventoryItems).find(x => S(x.id) === S(id)) || {}; }
-  function unitBefore(it, fallback){ const v = N(fallback || it.unit_cost || it.unit_price || it.price_before_vat || 0); return v > 0 ? v : 0; }
-  function productCode(it){ try { if(typeof v118ProductCode === 'function') return v118ProductCode(it); } catch(_){} return it.product_code || it.barcode || it.serial_number || ''; }
-  function ccList(){ return arr(getData().costCenters || getData().cost_centers); }
-  function ccForProjectLocal(projectId){
-    const pname = projectNameSafe(projectId);
-    const list = ccList();
-    const c = list.find(x => S(x.project_id) === S(projectId)) || list.find(x => S(x.name || x.cost_center_name || '').trim() === S(pname).trim());
-    if(c) return { id:c.id || c.code || c.name, name:c.name || c.cost_center_name || pname, type:c.type || c.cost_center_type || 'FM' };
-    return { id:list.length ? '' : ('project:' + projectId), name:pname, type:'FM' };
-  }
-  function costCenterOptionsLocal(selected, projectId){
-    let list = ccList();
-    const auto = ccForProjectLocal(projectId);
-    if(!list.length && projectId) list = [{id:auto.id, name:auto.name, type:'FM'}];
-    return '<option value="">اختر مركز التكلفة</option>' + list.map(c => {
-      const id = c.id || c.code || c.name;
-      const name = c.name || c.cost_center_name || c.project_name || '';
-      const type = c.type || c.cost_center_type || (/cn/i.test(S(c.code))?'CN':'FM');
-      return `<option value="${E(id)}" data-name="${E(name)}" data-type="${E(type)}" ${S(selected)===S(id)?'selected':''}>${E(type)} - ${E(name)}</option>`;
-    }).join('');
-  }
-  function supervisorOptionsLocal(selected){
-    const sources = [arr(getData().supervisors), arr(getData().users)].flat();
-    const map = new Map();
-    sources.forEach(u => {
-      const role = S(u.role || '').toLowerCase();
-      const ok = !role || ['supervisor','operations_manager','manager','admin','general_manager'].includes(role) || /مشرف/.test(S(u.role_label || u.job_title || ''));
-      if(!ok) return;
-      const id = S(u.id || u.user_id || u.full_name || u.username || u.name);
-      if(!id || map.has(id)) return;
-      map.set(id,u);
-    });
-    return '<option value="">اختر المشرف / المستخدم الفعلي</option>' + [...map.values()].map(u => {
-      const id = u.id || u.user_id || u.full_name || u.username || u.name;
-      const name = u.full_name || u.name || u.username || '';
-      return `<option value="${E(id)}" ${S(selected)===S(id)?'selected':''}>${E(name)}</option>`;
-    }).join('');
-  }
-  function projectOptionsLocal(selected){
-    return '<option value="">اختر المشروع</option>' + arr(getData().projects).filter(p => S(p.status || 'active') !== 'inactive').map(p => `<option value="${E(p.id)}" ${S(selected)===S(p.id)?'selected':''}>${E(p.name || p.project_name || '')}</option>`).join('');
-  }
-  function supervisorIdForProject(pid){
-    const p = arr(getData().projects).find(x => S(x.id) === S(pid));
-    return p?.supervisor_id || p?.app_supervisor_id || '';
-  }
-  function applyProjectAutoFill(row, projectId){
-    if(!row || !projectId) return;
-    const ccSelect = row.querySelector('.v188-cost-center, .v182-cons-cost-center');
-    const userSelect = row.querySelector('.v188-user, .v182-cons-user');
-    if(ccSelect){
-      const auto = ccForProjectLocal(projectId);
-      ccSelect.innerHTML = costCenterOptionsLocal(auto.id, projectId);
-      ccSelect.value = S(auto.id);
-      if(!ccSelect.value){
-        const opt = [...ccSelect.options].find(o => S(o.dataset.name) === S(auto.name) || /FM/.test(o.textContent||''));
-        if(opt) ccSelect.value = opt.value;
-      }
-    }
-    if(userSelect){
-      const sid = supervisorIdForProject(projectId);
-      if(sid){
-        userSelect.innerHTML = supervisorOptionsLocal(sid);
-        userSelect.value = S(sid);
-      }
-    }
-  }
-  function lineItems(r){
-    try { if(typeof v118LineItems === 'function') return v118LineItems(r) || []; } catch(_){}
-    let raw = r?.request_items || r?.items || r?.request_lines || [];
-    if(typeof raw === 'string' && raw.trim()){ try { raw = JSON.parse(raw); } catch(_){ raw = []; } }
-    if(Array.isArray(raw)) return raw.map(x => ({
-      item_id:x.item_id || x.id,
-      item_name:x.item_name || x.name || '',
-      product_code:x.product_code || x.serial_number || '',
-      barcode:x.barcode || '',
-      quantity:N(x.quantity),
-      unit:x.unit || '',
-      unit_cost:N(x.unit_cost || x.price_before_vat || x.unit_price || 0)
-    })).filter(x => x.item_id && x.quantity > 0);
-    return [];
-  }
-  function movementsFor(requestId,itemId,type){
-    return arr(getData().inventoryMovements).filter(m => S(m.request_id || '') === S(requestId) && S(m.item_id || '') === S(itemId) && (!type || S(m.movement_type) === S(type)));
-  }
-  function returnedQty(reqId,itemId){ return movementsFor(reqId,itemId,'return').reduce((a,m)=>a+N(m.quantity),0); }
-  function consumedQty(reqId,itemId){ return movementsFor(reqId,itemId,'consume').reduce((a,m)=>a+N(m.quantity),0); }
-  function availableToConsume(reqId,line){ return Math.max(0, N(line.quantity) - returnedQty(reqId,line.item_id) - consumedQty(reqId,line.item_id)); }
-
-  // تفريغ نموذج طلب الصرف بعد الإرسال مباشرة
-  window.inventorySaveRequest = async function(btn){
-    try{
-      if(btn) btn.disabled = true;
-      const pid = $('inventoryRequestProject')?.value;
-      const supervisorId = $('inventoryRequestSupervisor')?.value;
-      if(!pid) throw new Error('اختر المشروع');
-      if(!supervisorId) throw new Error('اختر المشرف الطالب');
-      const lines = window.inventoryRequestLines || (typeof inventoryRequestLines !== 'undefined' ? inventoryRequestLines : []);
-      if(!lines.length) throw new Error('أضف صنفًا واحدًا على الأقل إلى أمر الصرف');
-      const totalQty = lines.reduce((a,x)=>a+N(x.quantity),0);
-      const ccId = $('inventoryRequestCostCenter')?.value || '';
-      const auto = ccForProjectLocal(pid);
-      const selectedOpt = $('inventoryRequestCostCenter')?.selectedOptions?.[0];
-      const row = {
-        item_id:Number(lines[0].item_id),
-        item_name:lines.map(x=>x.item_name).join('، '),
-        quantity:totalQty,
-        request_items:lines,
-        items:lines,
-        project_id:Number(pid),
-        project_name:projectNameSafe(pid),
-        cost_center_id:/^\d+$/.test(S(ccId)) ? Number(ccId) : null,
-        cost_center_name:selectedOpt?.dataset?.name || auto.name,
-        cost_center_type:selectedOpt?.dataset?.type || auto.type || 'FM',
-        supervisor_id:Number(supervisorId),
-        supervisor_name:supervisorNameSafe(supervisorId),
-        request_date:$('inventoryRequestDate')?.value || todayX(),
-        reason:$('inventoryRequestReason')?.value || '',
-        notes:$('inventoryRequestNotes')?.value || '',
-        status:'pending_operations',
-        current_step:'operations',
-        approval_path:['operations'],
-        approval_log:[]
-      };
-      const res = await sb.from('inventory_requests').insert(row);
-      if(res.error) throw res.error;
-      notify('تم إرسال طلب الصرف إلى مدير التشغيل');
-      // تفريغ كامل وفوري للنموذج
-      try{
-        window.inventoryRequestLines = [];
-        if(typeof inventoryRequestLines !== 'undefined') inventoryRequestLines = [];
-        if(typeof inventoryRenderRequestLines === 'function') inventoryRenderRequestLines();
-      }catch(_){ }
-      ['inventoryRequestItem','inventoryRequestQty','inventoryRequestSupervisor','inventoryRequestReason','inventoryRequestNotes','inventoryRequestAvailable','inventoryRequestCostCenter'].forEach(id => { const el=$(id); if(el) el.value=''; });
-      if($('inventoryRequestProject')) $('inventoryRequestProject').value='';
-      if($('inventoryRequestDate')) $('inventoryRequestDate').value=todayX();
-      if($('inventoryRequestId')) $('inventoryRequestId').value='';
-      if(typeof financeLoadAll === 'function') await financeLoadAll();
-    }catch(e){ notify(e.message || String(e),'err'); }
-    finally{ if(btn) btn.disabled = false; }
+  // Print request should not show project/cost center.
+  window.inventoryPrintRequest = function(id){
+    const r=(window.data?.inventoryRequests||[]).find(x=>String(x.id)===String(id)); if(!r){ if(typeof msg==='function') msg('الطلب غير موجود','err'); return; }
+    let lines=[]; try{ lines=typeof v118LineItems==='function'?v118LineItems(r):[]; }catch(_){ }
+    const lineRows=(lines||[]).map(l=>`<tr><td>${E(l.product_code||'')}</td><td>${E(l.item_name||'')}</td><td>${N(l.available)}</td><td>${N(l.quantity)} ${E(l.unit||'')}</td></tr>`).join('')||'<tr><td colspan="4">لا توجد أصناف</td></tr>';
+    const log=Array.isArray(r.approval_log)?r.approval_log:[];
+    const logRows=log.map(l=>`<tr><td>${E(l.role||l.step||'')}</td><td>${E(l.by||'-')}</td><td>${E(l.at?new Date(l.at).toLocaleString('ar-SA'):'-')}</td></tr>`).join('')||'<tr><td colspan="3">لا يوجد سجل اعتماد</td></tr>';
+    const body=`<div class="grid"><div class="box"><b>رقم الطلب</b><br>OUT-${E(r.id)}</div><div class="box"><b>الحالة</b><br>${E(typeof inventoryRequestStatusText==='function'?inventoryRequestStatusText(r.status):r.status)}</div><div class="box"><b>التاريخ</b><br>${E(r.request_date||'')}</div></div><table><tr><th>اسم الطالب</th><td>${E(r.supervisor_name||requesterNameById(r.supervisor_id)||'-')}</td><th>نوع الطلب</th><td>عهدة مخزون</td></tr><tr><th>سبب الصرف</th><td colspan="3">${E(r.reason||'-')}</td></tr><tr><th>ملاحظات</th><td colspan="3">${E(r.notes||'-')}</td></tr></table><h3>الأصناف المطلوبة</h3><table><thead><tr><th>كود المنتج</th><th>الصنف</th><th>المتوفر</th><th>الكمية</th></tr></thead><tbody>${lineRows}</tbody></table><p style="margin-top:14px"><b>تنبيه:</b> المشروع ومركز التكلفة يتم تحديدهما عند تسجيل الاستهلاك الفعلي، وليس عند طلب الصرف.</p><h3>سجل الاعتماد</h3><table><thead><tr><th>المرحلة</th><th>المعتمد</th><th>الوقت</th></tr></thead><tbody>${logRows}</tbody></table>`;
+    if(typeof financePrintWindow==='function') financePrintWindow('أمر صرف مخزون', body); else { const w=window.open('','_blank'); w.document.write(body); w.print(); }
   };
 
-  // استبدال سطر الاستهلاك ليعبئ المشرف ومركز التكلفة تلقائيًا عند اختيار المشروع
-  window.addConsumptionRowV188 = function(lineIndex, values={}){
-    const req = window._v188ConsumptionRequest || window._v182ConsumptionRequest; if(!req) return;
-    const line = req.lines[Number(lineIndex)]; if(!line) return;
-    const tbody = $(`v188ConsumeRows_${lineIndex}`) || $(`v182ConsumeRows_${lineIndex}`); if(!tbody) return;
-    const row = document.createElement('tr');
-    row.className = 'v188-cons-row'; row.dataset.lineIndex = S(lineIndex); row.dataset.itemId = S(line.item_id);
-    row.innerHTML = `<td><select class="v188-project">${projectOptionsLocal(values.project_id)}</select></td><td><select class="v188-cost-center">${costCenterOptionsLocal(values.cost_center_id, values.project_id)}</select></td><td><input class="v188-qty" type="number" min="0" step="0.01" placeholder="الكمية" value="${E(values.qty || '')}"></td><td><select class="v188-user">${supervisorOptionsLocal(values.user_id)}</select></td><td><input class="v188-notes" placeholder="ملاحظات" value="${E(values.notes || '')}"></td><td><button type="button" class="danger" onclick="this.closest('tr').remove()">حذف</button></td>`;
-    tbody.appendChild(row);
-    const projectSel = row.querySelector('.v188-project');
-    projectSel?.addEventListener('change', ev => applyProjectAutoFill(row, ev.target.value));
-    if(values.project_id) applyProjectAutoFill(row, values.project_id);
+  // Keep approval to operations only.
+  window.inventoryDefaultApprovalPath=function(){ return ['ops']; };
+  window.inventoryGetApprovalPath=function(){ return ['ops']; };
+  window.inventoryCurrentUserCanApprove=function(step){
+    let r=''; try{ r=(JSON.parse(localStorage.getItem('tasneef_session')||'{}').role)||''; }catch(_){ }
+    return String(step)==='ops' && ['admin','general_manager','operations_manager'].includes(String(r));
   };
 
-  // ضمان حفظ الاستهلاك بنفس المنطق، مع الاعتماد على القيم المعبأة تلقائيًا
-  const oldSaveConsumption = window.saveRequestConsumptionV178;
-  window.saveRequestConsumptionV178 = async function(id){
-    const modal = document.getElementById('consumptionModalV178');
-    if(modal){
-      [...modal.querySelectorAll('.v188-cons-row')].forEach(row => {
-        const pid = row.querySelector('.v188-project')?.value;
-        if(pid){
-          const cc = row.querySelector('.v188-cost-center');
-          const usr = row.querySelector('.v188-user');
-          if((cc && !cc.value) || (usr && !usr.value)) applyProjectAutoFill(row, pid);
-        }
-      });
-    }
-    return oldSaveConsumption ? oldSaveConsumption.apply(this, arguments) : undefined;
-  };
-
-  console.log('V190 request form clear and consumption project autofill loaded');
-})();
-
-/* ================= V191 Consumption Sync Reports Fix =================
-   - بعد حفظ الاستهلاك/المرتجع: مزامنة الأصناف والتقارير ومراكز التكلفة فورًا.
-   - التقارير تعتمد على حركات المخزون الفعلية: out / consume / return.
-   - المستهلك = حركات consume الفعلية، والمرتجع = حركات return، والصادر = حركات out.
-*/
-(function(){
-  'use strict';
-  const $ = id => document.getElementById(id);
-  const S = v => String(v ?? '').trim();
-  const N = v => { const n = Number(String(v ?? 0).replace(/,/g,'').trim()); return Number.isFinite(n) ? n : 0; };
-  const A = v => Array.isArray(v) ? v : [];
-  const E = v => S(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const money = v => N(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' ر.س';
-  const qty = v => N(v).toLocaleString('en-US',{maximumFractionDigits:2});
-  const todayLocal = () => (typeof today === 'function' ? today() : new Date().toISOString().slice(0,10));
-  const dateOnly = v => S(v || todayLocal()).slice(0,10);
-  const msgLocal = (t,type) => { if(typeof msg === 'function') msg(t,type); else console.log(t); };
-  const d = () => window.data || {};
-
-  function itemById(id){ return A(d().inventoryItems).find(x => S(x.id) === S(id)) || {}; }
-  function pName(id){ try { return typeof projectName === 'function' ? projectName(id) : ''; } catch(_) { return ''; } }
-  function itemCode(it){ try { if(typeof v118ProductCode === 'function') return v118ProductCode(it); } catch(_){} return S(it.product_code || it.barcode || it.supplier_barcode || it.serial_number || it.company_code || ''); }
-  function itemBarcode(it){ try { if(typeof v118Barcode === 'function') return v118Barcode(it); } catch(_){} return S(it.barcode || it.supplier_barcode || ''); }
-  function vatMode(it){ return S(it.vat_mode || it.tax_mode || it.vat_status || 'exclusive').toLowerCase(); }
-  function unitBefore(it, fallback){
-    const raw = N(fallback || it.unit_cost || it.price_before_vat || it.unit_price || 0);
-    if(vatMode(it) === 'inclusive') return raw / 1.15;
-    return raw;
-  }
-  function vatOf(it, amount){ return vatMode(it) === 'exempt' ? 0 : N(amount) * 0.15; }
-  function grossOf(it, amount){ return N(amount) + vatOf(it, amount); }
-  function costCode(row){
-    const t = S(row.cost_center_type).toUpperCase();
-    if(t === 'CN') return 'CN';
-    if(t === 'FM') return 'FM';
-    const nm = S(row.cost_center_name || row.project || '').toLowerCase();
-    if(/اداري|إداري|عام|كلين|cn|شركة|سكن|سيارات/.test(nm)) return 'CN';
-    return row.project_id || row.project ? 'FM' : 'CN';
-  }
-  function passDate(date){
-    const mode = $('inventoryReportDateMode')?.value || 'all';
-    if(mode === 'day'){
-      const day = $('inventoryReportDay')?.value;
-      return !day || date === day;
-    }
-    if(mode === 'month'){
-      const mon = $('inventoryReportMonth')?.value;
-      return !mon || S(date).slice(0,7) === mon;
-    }
-    const mon2 = $('financeMonthFilter')?.value;
-    return !mon2 || S(date).slice(0,7) === mon2;
-  }
-  function passFilters(row){
-    const prod = $('inventoryReportProduct')?.value || '';
-    const supplier = $('inventoryReportSupplier')?.value || '';
-    const person = $('inventoryReportPerson')?.value || '';
-    const code = $('financeReportCostCodeFilter')?.value || '';
-    const q = S($('financeReportQuickSearch')?.value || $('financeSearch')?.value).toLowerCase();
-    if(!passDate(row.date)) return false;
-    if(prod && S(row.item_id) !== S(prod)) return false;
-    if(supplier && S(row.supplier) !== S(supplier)) return false;
-    if(person && S(row.person_id) !== S(person) && S(row.person) !== S(person)) return false;
-    if(code && row.cost_code !== code) return false;
-    if(q && ![row.project,row.person,row.item,row.product_code,row.barcode,row.supplier,row.reason,row.ref,row.cost_center_name,row.cost_code].join(' ').toLowerCase().includes(q)) return false;
-    return true;
-  }
-
-  function movementRowsV191(){
-    const rows = [];
-    A(d().inventoryMovements).forEach(m => {
-      const type = S(m.movement_type);
-      if(!['out','consume','return'].includes(type)) return;
-      const it = itemById(m.item_id);
-      const quantity = N(m.quantity);
-      const unit = unitBefore(it, m.unit_cost);
-      const isConsume = type === 'consume';
-      const isReturn = type === 'return';
-      const before = isConsume ? quantity * unit : 0;
-      const project = m.project_name || pName(m.project_id) || 'بدون مشروع';
-      const base = {
-        date: dateOnly(m.movement_date || m.created_at),
-        project,
-        project_id: m.project_id || null,
-        person: m.receiver || m.receiver_name || 'بدون مستخدم',
-        person_id: m.receiver_id || '',
-        item: m.item_name || it.name || '-',
-        item_id: m.item_id,
-        product_code: m.product_code || itemCode(it),
-        barcode: m.barcode || itemBarcode(it),
-        supplier: it.supplier || m.supplier || '',
-        unit_name: m.unit || it.unit || '',
-        cost_center_id: m.cost_center_id || null,
-        cost_center_name: m.cost_center_name || project,
-        cost_center_type: m.cost_center_type || '',
-        unit_before: unit,
-        out: type === 'out' ? quantity : 0,
-        returned: isReturn ? quantity : 0,
-        consumed: isConsume ? quantity : 0,
-        current: Math.max(0, N(it.quantity)),
-        value_before: before,
-        vat: vatOf(it, before),
-        gross: grossOf(it, before),
-        reason: m.reason || m.notes || '-',
-        movement_type: type === 'consume' ? 'استهلاك فعلي' : (type === 'return' ? 'مرتجع' : 'صرف للمشرف'),
-        ref: (m.request_id ? 'REQ-' + m.request_id : 'MOV-' + m.id),
-        request_id: m.request_id || null
-      };
-      base.cost_code = costCode(base);
-      rows.push(base);
-    });
-    return rows;
-  }
-
-  function inventoryItemStatsV191(itemId){
-    const it = itemById(itemId);
-    const rows = movementRowsV191().filter(r => S(r.item_id) === S(itemId));
-    const inQty = A(d().inventoryMovements).filter(m => S(m.item_id)===S(itemId) && S(m.movement_type)==='in').reduce((a,m)=>a+N(m.quantity),0);
-    const outQty = rows.reduce((a,r)=>a+N(r.out),0);
-    const retQty = rows.reduce((a,r)=>a+N(r.returned),0);
-    const consQty = rows.reduce((a,r)=>a+N(r.consumed),0);
-    return {inQty, outQty, retQty, consumed: consQty, remaining: Math.max(0,N(it.quantity)), movements: rows};
-  }
-  window.inventoryItemStatsV151 = function(itOrId){ const id = typeof itOrId === 'object' ? itOrId.id : itOrId; return inventoryItemStatsV191(id); };
-  window.inventoryItemStatsV191 = inventoryItemStatsV191;
-  window.inventoryUsageRowsV191 = () => movementRowsV191().filter(passFilters);
-
-  function fillReportsV191(){
-    const rows = movementRowsV191().filter(passFilters);
-    const byProject = {};
-    const byPerson = {};
-    const byCost = {};
-    rows.forEach(r => {
-      const pk = r.project || 'بدون مشروع';
-      byProject[pk] = byProject[pk] || {count:0,out:0,ret:0,cons:0,val:0,vat:0,gross:0};
-      byProject[pk].count++; byProject[pk].out += N(r.out); byProject[pk].ret += N(r.returned); byProject[pk].cons += N(r.consumed); byProject[pk].val += N(r.value_before); byProject[pk].vat += N(r.vat); byProject[pk].gross += N(r.gross);
-      const sk = (r.person || 'بدون مستخدم') + '|||' + pk;
-      byPerson[sk] = byPerson[sk] || {person:r.person||'بدون مستخدم',project:pk,count:0,out:0,ret:0,cons:0,gross:0};
-      byPerson[sk].count++; byPerson[sk].out += N(r.out); byPerson[sk].ret += N(r.returned); byPerson[sk].cons += N(r.consumed); byPerson[sk].gross += N(r.gross);
-      const ck = r.cost_center_name || pk || 'غير محدد';
-      byCost[ck] = byCost[ck] || {code:r.cost_code,count:0,out:0,ret:0,cons:0,val:0,vat:0,gross:0};
-      byCost[ck].count++; byCost[ck].out += N(r.out); byCost[ck].ret += N(r.returned); byCost[ck].cons += N(r.consumed); byCost[ck].val += N(r.value_before); byCost[ck].vat += N(r.vat); byCost[ck].gross += N(r.gross);
-    });
-    const pb=$('stockOutByProjectBody');
-    if(pb) pb.innerHTML = Object.entries(byProject).map(([k,v]) => `<tr><td>${E(k)}</td><td>${qty(v.count)}</td><td>${qty(v.out)}</td><td>${qty(v.ret)}</td><td>${qty(v.cons)}</td><td>${money(v.val)}</td><td>${money(v.vat)}</td><td>${money(v.gross)}</td></tr>`).join('') || '<tr><td colspan="8">لا توجد بيانات</td></tr>';
-    const sb=$('stockOutBySupervisorBody');
-    if(sb) sb.innerHTML = Object.values(byPerson).map(v => `<tr><td>${E(v.person)}</td><td>${E(v.project)}</td><td>${qty(v.count)}</td><td>${qty(v.out)}</td><td>${qty(v.ret)}</td><td>${qty(v.cons)}</td><td>${money(v.gross)}</td></tr>`).join('') || '<tr><td colspan="7">لا توجد بيانات</td></tr>';
-    const ub=$('inventoryUsageDetailBody');
-    if(ub) ub.innerHTML = rows.sort((a,b)=>S(b.date).localeCompare(S(a.date))).map(r => `<tr><td>${E(r.date)}</td><td>${E(r.project)}</td><td>${E(r.person)}</td><td>${E(r.product_code)} - ${E(r.item)}</td><td>${qty(r.out || r.returned || r.consumed)} ${E(r.unit_name)}</td><td>${E(r.reason)}</td><td>${E(r.movement_type)}</td><td>${E(r.cost_code)} / ${E(r.cost_center_name||'-')}</td><td>${money(r.gross)}</td><td>${E(r.ref)}</td></tr>`).join('') || '<tr><td colspan="10">لا توجد بيانات استهلاك أو مرتجع</td></tr>';
-    const cb=$('costCenterReportBody');
-    if(cb) cb.innerHTML = Object.entries(byCost).map(([k,v]) => `<tr><td>${E(k)}</td><td><span class="badge ${v.code==='FM'?'green':'neutral'}">${E(v.code)}</span></td><td>${qty(v.count)}</td><td>${qty(v.out)}</td><td>${qty(v.ret)}</td><td>${qty(v.cons)}</td><td>${money(v.val)}</td><td>${money(v.vat)}</td><td>${money(v.gross)}</td></tr>`).join('') || '<tr><td colspan="9">لا توجد بيانات مراكز تكلفة</td></tr>';
-  }
-
-  const oldReports = window.financeRenderReports;
-  window.financeRenderReports = function(){
-    if(typeof oldReports === 'function') oldReports.apply(this, arguments);
-    try{ fillReportsV191(); }catch(e){ console.warn('V191 reports sync warning', e); }
-  };
-
-  const oldItems = window.inventoryRenderItems;
-  window.inventoryRenderItems = function(){
-    const out = typeof oldItems === 'function' ? oldItems.apply(this, arguments) : undefined;
-    setTimeout(() => {
-      try{
-        document.querySelectorAll('[data-item-id]').forEach(card => {
-          const id = card.getAttribute('data-item-id');
-          const st = inventoryItemStatsV191(id);
-          card.querySelector('[data-stock-in]') && (card.querySelector('[data-stock-in]').textContent = qty(st.inQty));
-          card.querySelector('[data-stock-out]') && (card.querySelector('[data-stock-out]').textContent = qty(st.outQty));
-          card.querySelector('[data-stock-return]') && (card.querySelector('[data-stock-return]').textContent = qty(st.retQty));
-          card.querySelector('[data-stock-consume]') && (card.querySelector('[data-stock-consume]').textContent = qty(st.consumed));
-          card.querySelector('[data-stock-current]') && (card.querySelector('[data-stock-current]').textContent = qty(st.remaining));
-        });
-      }catch(_){ }
-    },50);
-    return out;
-  };
-
-  const oldSave = window.saveRequestConsumptionV178;
-  window.saveRequestConsumptionV178 = async function(){
-    const result = oldSave ? await oldSave.apply(this, arguments) : undefined;
-    try{
-      // إعادة تحميل حقيقية بعد الحفظ، حتى تظهر الاستهلاك والمرتجع في كل الأقسام فورًا.
-      if(typeof financeLoadAll === 'function'){
-        financeLoaded = false;
-        await financeLoadAll(false);
-      }
-      if(typeof window.financeRenderReports === 'function') window.financeRenderReports();
-      if(typeof window.inventoryRenderItems === 'function') window.inventoryRenderItems();
-      if(typeof window.inventoryRenderMovements === 'function') window.inventoryRenderMovements();
-      if(typeof window.inventoryRenderRequests === 'function') window.inventoryRenderRequests();
-      msgLocal('تم تحديث التقارير والأصناف بعد تسجيل الاستهلاك والمرتجع');
-    }catch(e){ console.warn('V191 post consumption refresh warning', e); }
-    return result;
-  };
-
-  window.addEventListener('load', () => setTimeout(() => { try{ fillReportsV191(); }catch(_){} }, 1800));
-  console.log('V191 Consumption Sync Reports Fix loaded');
+  function boot(){ forceOpsApproval(); fillRequesterSelect(); hideRequestProjectCostFields(); if(typeof inventoryRenderRequests==='function') inventoryRenderRequests(); try{ window.renderSupInventoryRequests&&window.renderSupInventoryRequests(); }catch(_){ } }
+  window.addEventListener('load',()=>setTimeout(boot,500));
+  document.addEventListener('click',()=>setTimeout(boot,80),true);
+  document.addEventListener('change',()=>setTimeout(boot,80),true);
+  setTimeout(boot,1000); setTimeout(boot,2200);
+  console.log('V192 custody-only inventory request flow loaded');
 })();
