@@ -12382,3 +12382,143 @@ function financePrintReport(kind){
   window.addEventListener('load',()=>setTimeout(ensureRoleOptions,900));
   console.log('Tasneef V204 role/permissions hard fix loaded');
 })();
+
+
+/* ===================== V205 SAFE FIX: RESTORE FINANCE TABS + REPORTS VISIBILITY =====================
+   إصلاح محافظ: يمنع اختفاء تبويبات المصروفات/المخزون والتقارير بسبب الصلاحيات أو كاش العرض.
+   لا يغير طريقة العمل ولا يحذف الدوال القديمة؛ فقط يفرض عرض التبويبات ويعيد التحكم الآمن بها.
+=============================================================================================== */
+(function(){
+  'use strict';
+  window.TASNEEF_BUILD = 'V205_SAFE_TABS_REPORTS_FIX_2026_05_20';
+  const $ = id => document.getElementById(id);
+  const S = v => String(v ?? '').trim();
+  const byText = {
+    'الملخص':'overview',
+    'المصروفات':'expenses',
+    'المخزون':'inventory',
+    'الأصناف':'catalog',
+    'حركة المخزون':'movements',
+    'طلبات الصرف':'requests',
+    'الموردين':'suppliers',
+    'التقارير':'reports',
+    'مراكز التكلفة':'costCenters',
+    'تقليل التكلفة':'costReduction'
+  };
+  const label = {
+    overview:'الملخص', expenses:'المصروفات', inventory:'المخزون', catalog:'الأصناف',
+    movements:'حركة المخزون', requests:'طلبات الصرف', suppliers:'الموردين', reports:'التقارير',
+    costCenters:'مراكز التكلفة', costReduction:'تقليل التكلفة'
+  };
+  const order = ['overview','expenses','inventory','catalog','movements','requests','suppliers','reports','costCenters','costReduction'];
+  function sessionUser(){
+    try{ if(typeof session==='function') return session() || {}; }catch(_){ }
+    try{ return JSON.parse(localStorage.getItem('tasneef_session')||'{}') || {}; }catch(_){ return {}; }
+  }
+  function isAdminLike(){
+    const r=S(sessionUser().role);
+    return !r || ['admin','general_manager','financial_manager','operations_manager','warehouse_manager'].includes(r);
+  }
+  function perms(){
+    const u=sessionUser();
+    const p=u.permissions || u.extra_permissions || {};
+    if(typeof p === 'string'){ try{return JSON.parse(p)||{};}catch(_){return {}; } }
+    return p || {};
+  }
+  function hasExplicitTabPerms(){ return Object.keys(perms()).some(k=>/^tab_/.test(k)); }
+  function canViewTab(key){
+    if(isAdminLike()) return true;
+    const p=perms();
+    if(!hasExplicitTabPerms()) return true; // مهم: إذا لم تُحفظ الصلاحيات التفصيلية لا نخفي التبويبات بالغلط
+    return p['tab_'+key+'_view'] !== false && p['tab_'+key+'_view'] !== undefined;
+  }
+  function keyFromBtn(btn){
+    const oc=S(btn?.getAttribute?.('onclick'));
+    const m=oc.match(/financeShowTab\(['"]([^'"]+)['"]/);
+    if(m) return m[1] === 'items' ? 'catalog' : m[1];
+    return byText[S(btn?.textContent).replace(/\s+/g,' ').trim()] || '';
+  }
+  function pageId(key){ return 'financeTab'+key.charAt(0).toUpperCase()+key.slice(1); }
+  function ensureCss(){
+    if($('v205SafeTabsCss')) return;
+    const st=document.createElement('style'); st.id='v205SafeTabsCss';
+    st.textContent=`
+      #financeDashboard .finance-tabs{display:flex!important;gap:8px!important;flex-wrap:wrap!important;visibility:visible!important;min-height:42px!important;}
+      #financeDashboard .finance-tabs button,#financeDashboard .finance-tabs .finance-tab{visibility:visible!important;opacity:1!important;}
+      #financeDashboard .finance-tabs button.v205-hidden-perm{display:none!important;}
+      #financeDashboard .finance-tab-page.hidden{display:none!important;}
+      #financeDashboard .finance-tab-page:not(.hidden){display:block!important;visibility:visible!important;}
+    `;
+    document.head.appendChild(st);
+  }
+  function ensureTabs(){
+    ensureCss();
+    const dash=$('financeDashboard'); if(!dash) return;
+    let wrap=dash.querySelector('.finance-tabs');
+    if(!wrap){
+      wrap=document.createElement('div'); wrap.className='finance-tabs actions';
+      const firstCard=dash.querySelector('.card, .wide-card');
+      dash.insertBefore(wrap, firstCard || dash.firstChild);
+    }
+    order.forEach(key=>{
+      const page=$(pageId(key));
+      if(!page && !['suppliers','catalog','costReduction'].includes(key)) return;
+      let btn=[...wrap.querySelectorAll('button,.finance-tab')].find(b=>keyFromBtn(b)===key || S(b.dataset?.tab)===key);
+      if(!btn){
+        btn=document.createElement('button');
+        btn.type='button'; btn.className='light finance-tab'; btn.dataset.tab=key; btn.textContent=label[key]||key;
+        btn.onclick=function(){ window.financeShowTab(key,this); };
+        wrap.appendChild(btn);
+      }
+      btn.classList.add('finance-tab'); btn.hidden=false;
+      if(canViewTab(key)){ btn.classList.remove('v205-hidden-perm'); btn.style.display='inline-flex'; }
+      else { btn.classList.add('v205-hidden-perm'); }
+    });
+    // تحديث عنوان التقارير حتى نعرف أن النسخة الجديدة وصلت
+    [...dash.querySelectorAll('h2')].forEach(h=>{ if(/V118 Advanced Inventory Reports/i.test(h.textContent||'')) h.textContent='V205 Advanced Inventory Reports'; });
+  }
+  function showTabPage(key, btn){
+    ensureTabs();
+    if(!canViewTab(key)){
+      try{ if(typeof msg==='function') msg('لا تملك صلاحية مشاهدة هذا التبويب','err'); else alert('لا تملك صلاحية مشاهدة هذا التبويب'); }catch(_){ }
+      return;
+    }
+    const dash=$('financeDashboard'); if(!dash) return;
+    dash.querySelectorAll('.finance-tab-page').forEach(p=>{ p.classList.add('hidden'); p.style.display='none'; });
+    const page=$(pageId(key));
+    if(page){ page.classList.remove('hidden'); page.style.display='block'; }
+    dash.querySelectorAll('.finance-tabs button,.finance-tabs .finance-tab').forEach(b=>b.classList.remove('active'));
+    if(btn) btn.classList.add('active');
+    else {
+      const b=[...dash.querySelectorAll('.finance-tabs button,.finance-tabs .finance-tab')].find(x=>keyFromBtn(x)===key || S(x.dataset?.tab)===key);
+      b?.classList.add('active');
+    }
+    window.financeCurrentTab=key;
+    try{ if(!window.financeLoaded && typeof financeLoadAll==='function') financeLoadAll(); }catch(_){ }
+    setTimeout(()=>{
+      try{
+        if(key==='reports' && typeof window.financeRenderReports==='function') window.financeRenderReports();
+        if(key==='inventory' && typeof window.inventoryRenderItems==='function') window.inventoryRenderItems();
+        if(key==='movements' && typeof window.inventoryRenderMovements==='function') window.inventoryRenderMovements();
+        if(key==='requests' && typeof window.inventoryRenderRequests==='function') window.inventoryRenderRequests();
+        if(key==='overview' && typeof window.financeRenderAll==='function') window.financeRenderAll();
+      }catch(e){ console.warn('V205 tab render warning',e); }
+      ensureTabs();
+    },80);
+  }
+  window.financeShowTab=function(tab,btn){ showTabPage(tab==='items'?'catalog':tab,btn); };
+  window.inventoryClearReportDateFilter=function(){
+    ['financeReportQuickSearch','financeReportCostCodeFilter','inventoryReportDay','inventoryReportMonth'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
+    const mode=$('inventoryReportDateMode'); if(mode) mode.value='all';
+    try{ if(typeof window.financeRenderReports==='function') window.financeRenderReports(); }catch(_){ }
+  };
+  function init(){
+    ensureTabs();
+    const active=document.querySelector('#financeDashboard .finance-tabs .active');
+    const activeKey=keyFromBtn(active) || S(window.financeCurrentTab) || 'overview';
+    if($('financeDashboard') && !document.querySelector('#financeDashboard .finance-tab-page:not(.hidden)')) showTabPage(activeKey || 'overview', active);
+  }
+  ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(init, ev==='load'?900:200)));
+  setInterval(()=>{ if($('financeDashboard')) ensureTabs(); }, 2500);
+  console.log('Tasneef V205 safe tabs/reports fix loaded');
+})();
