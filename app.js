@@ -3956,7 +3956,7 @@ function financeResetFilters(){ ['financeSearch','financeProjectFilter','finance
 })();
 
 /* =========================
-   V210 Advanced Inventory Reports Overrides
+   V211 Advanced Inventory Reports Overrides
    ========================= */
 let inventoryRequestLines = [];
 if(typeof inventoryItemImageData === 'undefined') var inventoryItemImageData = '';
@@ -12475,7 +12475,7 @@ function financePrintReport(kind){
       else { btn.classList.add('v205-hidden-perm'); }
     });
     // تحديث عنوان التقارير حتى نعرف أن النسخة الجديدة وصلت
-    [...dash.querySelectorAll('h2')].forEach(h=>{ if(/V210 Advanced Inventory Reports/i.test(h.textContent||'')) h.textContent='V210 Advanced Inventory Reports'; });
+    [...dash.querySelectorAll('h2')].forEach(h=>{ if(/V211 Advanced Inventory Reports/i.test(h.textContent||'')) h.textContent='V211 Advanced Inventory Reports'; });
   }
   function showTabPage(key, btn){
     ensureTabs();
@@ -13669,4 +13669,246 @@ function financePrintReport(kind){
   ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(bootV210,ev==='load'?1400:400)));
   setTimeout(bootV210,700); setTimeout(bootV210,2500); setInterval(bootV210,2500);
   console.log('Tasneef V210 clean PDF + weighted cost loaded');
+})();
+
+/* ===================== V211: SMART TICKET PDF WINDOW =====================
+   - زر تنزيل PDF يفتح نافذة ذكية داخل النظام.
+   - النافذة تعرض التقرير قبل التنفيذ.
+   - يوجد زر طباعة / حفظ PDF وزر تنزيل PDF مباشر إن أمكن.
+============================================================================ */
+(function(){
+  'use strict';
+  window.TASNEEF_BUILD = 'V211_SMART_TICKET_PDF_WINDOW_2026_05_20';
+  const S = v => String(v ?? '').trim();
+  const A = v => Array.isArray(v) ? v : [];
+  const E = v => S(v).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const $ = id => document.getElementById(id);
+  const say = (t,type) => { try{ if(typeof msg === 'function') msg(t,type); else alert(t); }catch(_){ alert(t); } };
+  const todayIso = () => new Date().toISOString().slice(0,10);
+  const dateOnly = v => S(v).slice(0,10) || '-';
+  const userName = id => {
+    const u = A(window.data?.users || window.data?.appUsers).find(x => S(x.id)===S(id) || S(x.username)===S(id));
+    return u ? S(u.full_name || u.name || u.username) : (S(id) || '-');
+  };
+  const projectText = id => { try{ return typeof projectName === 'function' ? projectName(id) : '-'; }catch(_){ return '-'; } };
+  const supervisorText = id => { try{ return typeof supervisorName === 'function' ? supervisorName(id) : '-'; }catch(_){ return '-'; } };
+  const ticketNo = t => S(t?.ticket_number) || ('T-' + S(t?.id || 0).padStart(4,'0'));
+  const statusText = s => S(s)==='closed'?'مغلق':(S(s)==='processing'?'تحت المعالجة':'مفتوح');
+  const priorityText = p => S(p)==='urgent'?'عاجل':(S(p)==='high'?'مهم':(S(p)==='low'?'منخفض':'عادي'));
+  const raisedBy = t => S(t?.created_by_name || t?.created_by_full_name || t?.raised_by_name || t?.created_user_name || t?.creator_name || t?.created_by_username) || userName(t?.created_by || t?.raised_by || t?.user_id || t?.created_user_id || t?.created_by_id);
+
+  function listByCurrentFiltersV211(){
+    let list = A(window.data?.tickets).slice();
+    const ids = name => S($(name)?.value || '');
+    const status = ids('ticketFilterStatus') || ids('supTicketFilterStatus') || ids('ticketStatusFilter') || ids('ticketsStatusFilter');
+    const project = ids('ticketFilterProject') || ids('supTicketFilterProject') || ids('ticketsProjectFilter');
+    const supervisor = ids('ticketFilterSupervisor') || ids('supTicketFilterSupervisor') || ids('ticketsSupervisorFilter');
+    const search = S($('ticketSearch')?.value || $('supTicketSearch')?.value || $('ticketsSearch')?.value || '').toLowerCase();
+    const from = ids('ticketFilterFrom') || ids('supTicketFilterFrom') || ids('ticketsFromFilter');
+    const to = ids('ticketFilterTo') || ids('supTicketFilterTo') || ids('ticketsToFilter');
+    if(status) list = list.filter(t => S(t.status || 'open') === status);
+    if(project) list = list.filter(t => S(t.project_id) === project);
+    if(supervisor) list = list.filter(t => S(t.supervisor_id) === supervisor);
+    if(from) list = list.filter(t => dateOnly(t.created_at) >= from);
+    if(to) list = list.filter(t => dateOnly(t.created_at) <= to);
+    if(search){
+      list = list.filter(t => [ticketNo(t), t.title, t.description, projectText(t.project_id), supervisorText(t.supervisor_id), raisedBy(t), statusText(t.status), priorityText(t.priority)].join(' ').toLowerCase().includes(search));
+    }
+    return list.sort((a,b)=> S(supervisorText(a.supervisor_id)).localeCompare(S(supervisorText(b.supervisor_id)),'ar') || new Date(b.created_at||0) - new Date(a.created_at||0));
+  }
+
+  function filtersLabelV211(){
+    const parts=[];
+    const val = id => S($(id)?.value || '');
+    const status = val('ticketFilterStatus') || val('supTicketFilterStatus') || val('ticketStatusFilter') || val('ticketsStatusFilter');
+    const project = val('ticketFilterProject') || val('supTicketFilterProject') || val('ticketsProjectFilter');
+    const supervisor = val('ticketFilterSupervisor') || val('supTicketFilterSupervisor') || val('ticketsSupervisorFilter');
+    const from = val('ticketFilterFrom') || val('supTicketFilterFrom') || val('ticketsFromFilter');
+    const to = val('ticketFilterTo') || val('supTicketFilterTo') || val('ticketsToFilter');
+    if(status) parts.push('الحالة: '+statusText(status));
+    if(project) parts.push('المشروع: '+projectText(project));
+    if(supervisor) parts.push('المشرف: '+supervisorText(supervisor));
+    if(from) parts.push('من: '+from);
+    if(to) parts.push('إلى: '+to);
+    return parts.length ? parts.join(' | ') : 'جميع التكتات حسب الفلاتر الحالية';
+  }
+
+  function reportBodyHtmlV211(list, title){
+    const groups = new Map();
+    list.forEach(t => {
+      const key = S(t.supervisor_id) || 'none';
+      if(!groups.has(key)) groups.set(key,{name:S(supervisorText(t.supervisor_id)) || 'بدون مشرف', rows:[]});
+      groups.get(key).rows.push(t);
+    });
+    const sections = [...groups.values()].map(g => `
+      <section class="v211-section">
+        <div class="v211-section-title"><span>المشرف: ${E(g.name)}</span><span>${g.rows.length} تكت</span></div>
+        <table class="v211-table">
+          <thead><tr><th>#</th><th>رقم التكت</th><th>المشروع</th><th>العنوان / الوصف</th><th>الحالة</th><th>الأولوية</th><th>رفع بواسطة</th><th>استلام / إغلاق</th><th>التاريخ</th></tr></thead>
+          <tbody>${g.rows.map((t,i)=>`
+            <tr>
+              <td>${i+1}</td>
+              <td><b>${E(ticketNo(t))}</b></td>
+              <td>${E(projectText(t.project_id))}</td>
+              <td class="v211-desc"><b>${E(t.title || '-')}</b><br>${E(t.description || '-')}</td>
+              <td><span class="v211-pill">${E(statusText(t.status))}</span></td>
+              <td>${E(priorityText(t.priority))}</td>
+              <td>${E(raisedBy(t))}</td>
+              <td>استلم: ${E(t.claimed_by_name || userName(t.claimed_by) || '-')}<br>أغلق: ${E(t.closed_by_name || userName(t.closed_by) || '-')}<br>${t.closure_note ? 'الحل: '+E(t.closure_note) : ''}</td>
+              <td>${E(dateOnly(t.created_at))}</td>
+            </tr>`).join('')}</tbody>
+        </table>
+      </section>`).join('') || '<div class="v211-empty">لا توجد تكتات مطابقة للفلاتر الحالية</div>';
+    return `
+      <div class="v211-report" dir="rtl">
+        <div class="v211-head">
+          <div class="v211-brand"><img src="tasneef_logo_print.png" onerror="this.style.display='none'"><div><h1>${E(title)}</h1><p>${E(filtersLabelV211())}</p><p>تاريخ التصدير: ${E(new Date().toLocaleString('ar-SA'))}</p></div></div>
+          <div class="v211-company">شركة تصنيف لإدارة المرافق</div>
+        </div>
+        <div class="v211-kpis">
+          <div><small>إجمالي التكتات</small><b>${list.length}</b></div>
+          <div><small>مفتوح</small><b>${list.filter(t=>S(t.status||'open')==='open').length}</b></div>
+          <div><small>تحت المعالجة</small><b>${list.filter(t=>S(t.status)==='processing').length}</b></div>
+          <div><small>مغلق</small><b>${list.filter(t=>S(t.status)==='closed').length}</b></div>
+        </div>
+        ${sections}
+        <div class="v211-footer">تم إنشاء التقرير آليًا من نظام تصنيف — يعرض التكتات حسب الفلاتر المختارة</div>
+      </div>`;
+  }
+
+  function reportStyleV211(){
+    return `
+      <style>
+        @page{size:A4 landscape;margin:8mm}
+        *{box-sizing:border-box} html,body{margin:0;background:#f3f6f5;color:#153d32;font-family:Tahoma,Arial,sans-serif;direction:rtl;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        .v211-report{background:#fff;width:1320px;max-width:100%;margin:0 auto;padding:22px;color:#153d32}
+        .v211-head{display:flex;justify-content:space-between;align-items:center;border-bottom:4px solid #0b5b49;padding-bottom:14px;margin-bottom:14px}
+        .v211-brand{display:flex;align-items:center;gap:12px}.v211-brand img{width:72px;height:72px;border:1px solid #d7e6e1;border-radius:16px;object-fit:contain;padding:7px;background:#fff}.v211-brand h1{margin:0 0 5px;color:#0b5b49;font-size:28px}.v211-brand p{margin:3px 0;color:#647970;font-size:13px}.v211-company{font-weight:900;color:#0b5b49;font-size:18px;text-align:left}
+        .v211-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0 16px}.v211-kpis div{border:1px solid #cfe2da;background:#f3faf7;border-radius:14px;padding:10px}.v211-kpis small{display:block;color:#657972;margin-bottom:5px}.v211-kpis b{font-size:22px;color:#062f27}
+        .v211-section{break-inside:avoid;page-break-inside:avoid;border:1px solid #cadbd4;border-radius:13px;overflow:hidden;margin:14px 0}.v211-section-title{background:#2779b7;color:#fff;padding:10px 13px;font-weight:900;display:flex;justify-content:space-between;font-size:16px}
+        .v211-table{width:100%;border-collapse:collapse;font-size:11px}.v211-table th,.v211-table td{border:1px solid #d6e2df;padding:7px;text-align:right;vertical-align:top}.v211-table th{background:#eaf2f6;color:#143d32}.v211-table tr:nth-child(even) td{background:#f7fafb}.v211-desc{white-space:pre-wrap;line-height:1.45;max-width:330px}.v211-pill{background:#eaf7f1;border:1px solid #cbe3d7;border-radius:999px;padding:3px 8px;font-weight:800;display:inline-block}.v211-empty{border:1px dashed #cbded6;border-radius:13px;padding:26px;text-align:center;color:#647970;background:#fff}.v211-footer{text-align:center;border-top:1px solid #d6e2df;margin-top:16px;padding-top:9px;color:#73847e;font-size:12px}
+        @media print{html,body{background:#fff}.v211-report{width:auto;padding:0}.v211-section{page-break-inside:avoid}}
+      </style>`;
+  }
+
+  function fullReportHtmlV211(list, title){
+    return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${E(title)}</title>${reportStyleV211()}</head><body>${reportBodyHtmlV211(list,title)}</body></html>`;
+  }
+
+  function ensureModalV211(){
+    let modal = document.getElementById('ticketPdfSmartModalV211');
+    if(modal) return modal;
+    const style = document.createElement('style');
+    style.id='ticketPdfSmartModalCssV211';
+    style.textContent = `
+      #ticketPdfSmartModalV211{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2147483646;display:none;align-items:center;justify-content:center;padding:18px;direction:rtl}
+      #ticketPdfSmartModalV211 .v211-modal-box{background:#fff;width:min(1200px,96vw);height:min(780px,94vh);border-radius:22px;box-shadow:0 24px 70px rgba(0,0,0,.28);display:flex;flex-direction:column;overflow:hidden;border:1px solid #d6e5df}
+      #ticketPdfSmartModalV211 .v211-modal-head{background:#07563d;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+      #ticketPdfSmartModalV211 .v211-modal-head h3{margin:0;font-size:20px}#ticketPdfSmartModalV211 .v211-modal-head p{margin:4px 0 0;color:#d7eee5;font-size:12px}
+      #ticketPdfSmartModalV211 .v211-modal-actions{display:flex;gap:8px;flex-wrap:wrap}#ticketPdfSmartModalV211 button{border:0;border-radius:12px;padding:10px 14px;font-weight:900;cursor:pointer}#ticketPdfSmartModalV211 .primary{background:#fff;color:#07563d}#ticketPdfSmartModalV211 .gold{background:#c7a24d;color:#fff}#ticketPdfSmartModalV211 .danger{background:#eaf4f0;color:#07563d}
+      #ticketPdfSmartModalV211 iframe{border:0;flex:1;background:#fff;width:100%}
+    `;
+    document.head.appendChild(style);
+    modal = document.createElement('div');
+    modal.id='ticketPdfSmartModalV211';
+    modal.innerHTML = `<div class="v211-modal-box"><div class="v211-modal-head"><div><h3>تقرير التكتات PDF</h3><p>راجع التقرير ثم اختر الطباعة أو التنزيل</p></div><div class="v211-modal-actions"><button class="primary" id="v211PrintBtn">طباعة / حفظ PDF</button><button class="gold" id="v211DownloadBtn">تنزيل PDF</button><button class="danger" id="v211CloseBtn">إغلاق</button></div></div><iframe id="v211PreviewFrame"></iframe></div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('#v211CloseBtn').onclick=()=>{ modal.style.display='none'; };
+    modal.addEventListener('click',e=>{ if(e.target===modal) modal.style.display='none'; });
+    return modal;
+  }
+
+  async function loadHtml2PdfV211(){
+    if(window.html2pdf) return window.html2pdf;
+    await new Promise((resolve,reject)=>{
+      const old = document.querySelector('script[data-tasneef-html2pdf-v211="1"],script[data-tasneef-html2pdf="1"]');
+      if(old){ old.addEventListener('load',resolve,{once:true}); old.addEventListener('error',reject,{once:true}); if(window.html2pdf) resolve(); return; }
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+      s.async=true; s.dataset.tasneefHtml2pdfV211='1';
+      s.onload=resolve; s.onerror=reject; document.head.appendChild(s);
+    });
+    if(!window.html2pdf) throw new Error('تعذر تحميل مكتبة PDF');
+    return window.html2pdf;
+  }
+
+  async function downloadPdfFromHtmlV211(html, filename){
+    const html2pdf = await loadHtml2PdfV211();
+    const wrap = document.createElement('div');
+    wrap.style.cssText='position:fixed;left:0;top:0;width:1320px;background:#fff;z-index:2147483647;opacity:1;pointer-events:none;';
+    wrap.innerHTML = html.replace(/^[\s\S]*<body[^>]*>/i,'').replace(/<\/body>[\s\S]*$/i,'');
+    document.body.appendChild(wrap);
+    try{
+      const report = wrap.querySelector('.v211-report') || wrap;
+      await html2pdf().set({
+        margin: [6,6,6,6],
+        filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor:'#ffffff', logging:false, scrollX:0, scrollY:0 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+        pagebreak: { mode: ['css','legacy'], avoid: ['.v211-section'] }
+      }).from(report).save();
+    } finally {
+      setTimeout(()=>wrap.remove(), 800);
+    }
+  }
+
+  function openSmartTicketPdfWindowV211(list, title){
+    if(!list.length) return say('لا توجد تكتات مطابقة للفلاتر الحالية','err');
+    const html = fullReportHtmlV211(list,title);
+    const modal = ensureModalV211();
+    const frame = modal.querySelector('#v211PreviewFrame');
+    modal.style.display='flex';
+    frame.srcdoc = html;
+    modal.querySelector('#v211PrintBtn').onclick = () => {
+      try{ frame.contentWindow.focus(); frame.contentWindow.print(); }
+      catch(e){
+        const w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); setTimeout(()=>w.print(),600); }
+      }
+    };
+    modal.querySelector('#v211DownloadBtn').onclick = async () => {
+      try{
+        await downloadPdfFromHtmlV211(html, `تقرير-التكتات-حسب-المشرف-${todayIso()}.pdf`);
+        say('تم تنزيل ملف PDF في التنزيلات');
+      }catch(e){
+        console.warn('V211 direct download failed', e);
+        say('تعذر التنزيل المباشر. استخدم زر طباعة / حفظ PDF من نفس النافذة.', 'err');
+      }
+    };
+  }
+
+  function ticketsDownloadPdfV211(){
+    openSmartTicketPdfWindowV211(listByCurrentFiltersV211(), 'تقرير التكتات حسب المشرف');
+  }
+  function ticketDownloadPdfV211(id){
+    const t=A(window.data?.tickets).find(x=>S(x.id)===S(id));
+    if(!t) return say('التكت غير موجود','err');
+    openSmartTicketPdfWindowV211([t], `تقرير التكت ${ticketNo(t)}`);
+  }
+
+  window.ticketsDownloadPdfV211 = ticketsDownloadPdfV211;
+  window.ticketsDownloadPdfV210 = ticketsDownloadPdfV211;
+  window.ticketsDownloadPdfV209 = ticketsDownloadPdfV211;
+  window.ticketsDownloadPdfV208 = ticketsDownloadPdfV211;
+  window.ticketsDownloadPdfV207 = ticketsDownloadPdfV211;
+  window.ticketsDownloadPdfV206 = ticketsDownloadPdfV211;
+  window.ticketDownloadPdfV211 = ticketDownloadPdfV211;
+  window.ticketDownloadPdfV210 = ticketDownloadPdfV211;
+  window.ticketDownloadPdfV209 = ticketDownloadPdfV211;
+  window.ticketDownloadPdfV208 = ticketDownloadPdfV211;
+  window.ticketDownloadPdfV207 = ticketDownloadPdfV211;
+  window.ticketDownloadPdfV206 = ticketDownloadPdfV211;
+
+  function patchButtonsV211(){
+    document.querySelectorAll('#ticketPdfBtnV206,#supTicketPdfBtnV206,.ticket-pdf-v206,.ticket-pdf-v207,.ticket-pdf-v208,[data-ticket-pdf]').forEach(b=>{ b.textContent='تنزيل PDF'; b.onclick=ticketsDownloadPdfV211; });
+    document.querySelectorAll('button').forEach(b=>{
+      const txt=S(b.textContent);
+      if(/تنزيل PDF|تصدير PDF/.test(txt) && (b.closest('#ticketsPage')||b.closest('#supervisorTicketsPage')||/ticket/i.test(S(b.closest('[id]')?.id)))){
+        b.onclick=ticketsDownloadPdfV211;
+      }
+    });
+  }
+  ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(patchButtonsV211,ev==='load'?1600:500)));
+  setTimeout(patchButtonsV211,800); setTimeout(patchButtonsV211,2600); setInterval(patchButtonsV211,3000);
+  console.log('Tasneef V211 smart ticket PDF window loaded');
 })();
