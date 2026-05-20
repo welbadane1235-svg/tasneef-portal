@@ -13913,338 +13913,236 @@ function financePrintReport(kind){
   console.log('Tasneef V211 smart ticket PDF window loaded');
 })();
 
-/* ===== V212 Client Reports Monthly Merge + Smart Service Gateways + Fixed Ratings ===== */
+/* ===== V213: Clean Client Reports page + monthly merge + independent service gateways ===== */
 (function(){
-  'use strict';
-  if(window.__tasneefV212ClientReportsFix) return;
-  window.__tasneefV212ClientReportsFix = true;
-  const VERSION='V212';
-  const $id=(id)=>document.getElementById(id);
-  const esc212=(v)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const today212=()=> (typeof today==='function'?today():new Date().toISOString().slice(0,10));
-  const ym212=(d)=>String(d||today212()).slice(0,7);
-  const norm212=(s)=>String(s??'').trim();
-  const msg212=(t,kind)=>{ try{ if(typeof msg==='function') msg(t,kind); else console.log(t); }catch(_){ console.log(t); } };
-  function getData(){ if(!window.data) window.data={}; return window.data; }
-  function projectName212(id){
-    try{ if(typeof projectName==='function') return projectName(id); }catch(_){ }
-    const p=(getData().projects||[]).find(x=>String(x.id)===String(id));
-    return p?.name||'-';
-  }
-  function reportStatusText212(s){ try{ if(typeof reportStatusText==='function') return reportStatusText(s); }catch(_){} return s==='published'?'معتمد ومنشور':s==='draft'?'مسودة':'غير منشور'; }
-  function reportStatusClass212(s){ try{ if(typeof reportStatusClass==='function') return reportStatusClass(s); }catch(_){} return s==='published'?'green':s==='draft'?'amber':'red'; }
-  function ratingClass212(v){ try{ if(typeof ratingClass==='function') return ratingClass(v); }catch(_){} return v==='يحتاج تحسين'?'red':(v?'green':'amber'); }
-  function parseImgs212(v){ if(Array.isArray(v)) return v; if(!v) return []; if(typeof v==='string'){ try{ const x=JSON.parse(v); return Array.isArray(x)?x:[]; }catch(_){ return []; } } return []; }
-  function serviceRows212(reportId){
-    return (getData().clientReportServices||[]).filter(s=>String(s.report_id)===String(reportId)).sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0));
-  }
-  function serviceName212(s){ return norm212(s?.service_type || s?.title || s?.service_name || 'خدمة'); }
-  function serviceNames212(reportId, fallback=''){
-    const names=[...new Set(serviceRows212(reportId).map(serviceName212).filter(Boolean))];
-    return names.length?names:(fallback?[fallback]:[]);
-  }
-  function ratings212(reportId){ return (getData().clientServiceRatings||[]).filter(r=>String(r.report_id)===String(reportId)); }
-  function ratingLabel212(reportId){ const rs=ratings212(reportId); if(!rs.length) return 'لم يتم التقييم'; if(rs.some(r=>r.rating==='يحتاج تحسين')) return 'يحتاج تحسين'; return rs[0].rating || 'تم التقييم'; }
-  function clientReportUrl212(token){ try{ if(typeof clientReportUrl==='function') return clientReportUrl(token); }catch(_){} return 'client-report.html?token='+encodeURIComponent(token||''); }
-  function reportNo212(){ try{ if(typeof genReportNo==='function') return genReportNo(); }catch(_){} return 'REP-'+Date.now(); }
-  function reportToken212(){ try{ if(typeof genReportToken==='function') return genReportToken(); }catch(_){} return Math.random().toString(36).slice(2)+Date.now().toString(36); }
-  function defaultSummary212(){ try{ if(typeof defaultReportSummary==='function') return defaultReportSummary(); }catch(_){} return 'تم تنفيذ الأعمال حسب الخطة التشغيلية، مع توثيق الخدمة ورفع التقرير للمراجعة والاعتماد.'; }
+  if(window.__tasneefV213ClientReportsClean) return;
+  window.__tasneefV213ClientReportsClean = true;
+  const VERSION='V213';
+  const $id = (id)=>document.getElementById(id);
+  const esc = (v)=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const monthOf = (d)=>String(d||'').slice(0,7);
+  const defaults = ['النظافة اليومية','إزالة النفايات','تنظيف الممرات','تنظيف المصاعد','تنظيف البيسمنت','تنظيف الأسطح','تنظيف المناور','تنظيف المكيفات','غسيل خزانات','مكافحة الحشرات','صيانة كهرباء','صيانة سباكة','صيانة مصعد','أعمال زراعة','تنظيف واجهات','أخرى'];
+  let gateways = [];
 
-  const DEFAULT_SERVICE_TYPES_212 = ['النظافة اليومية','إزالة النفايات','تنظيف الممرات','تنظيف المصاعد','تنظيف البيسمنت','تنظيف الأسطح','مكافحة الحشرات','رش المبيدات','غسيل الخزانات','تنظيف المناور','تنظيف المكيفات','صيانة كهرباء','صيانة سباكة','صيانة مصعد','أعمال زراعة','شريحة مخصصة','أخرى'];
-  function localServices212(){ try{ return JSON.parse(localStorage.getItem('tasneef_custom_services_v212')||'[]')||[]; }catch(_){ return []; } }
-  function setLocalServices212(arr){ try{ localStorage.setItem('tasneef_custom_services_v212', JSON.stringify([...new Set(arr.filter(Boolean))])); }catch(_){} }
-  function allServiceTypes212(){
-    const fromDb=(getData().serviceGateways||[]).map(x=>x.name||x.service_name||x.title).filter(Boolean);
-    const fromReports=[]; (getData().clientReportServices||[]).forEach(s=>{ fromReports.push(serviceName212(s)); });
-    return [...new Set([...DEFAULT_SERVICE_TYPES_212, ...localServices212(), ...fromDb, ...fromReports].map(norm212).filter(Boolean))];
+  function getLocalGateways(){
+    try{return JSON.parse(localStorage.getItem('tasneef_service_gateways_v213')||'[]').filter(Boolean);}catch(_){return [];}
   }
-  async function loadServiceGateways212(){
-    const d=getData();
-    if(!window.sb || d.__serviceGatewaysLoaded212) return;
-    d.__serviceGatewaysLoaded212=true;
-    try{
-      const res=await sb.from('service_gateways').select('*').order('sort_order',{ascending:true}).order('created_at',{ascending:true});
-      if(!res.error) d.serviceGateways=res.data||[];
-    }catch(_){ }
+  function setLocalGateways(list){ try{ localStorage.setItem('tasneef_service_gateways_v213', JSON.stringify([...new Set(list.filter(Boolean))])); }catch(_){} }
+  function allTypes(){ return [...new Set([...defaults, ...getLocalGateways(), ...gateways].map(x=>String(x||'').trim()).filter(Boolean))]; }
+  async function loadGateways(){
+    gateways = [];
+    if(window.sb){
+      try{
+        const res = await sb.from('service_gateways').select('*').eq('is_active',true).order('sort_order',{ascending:true}).order('created_at',{ascending:true});
+        if(!res.error && Array.isArray(res.data)) gateways = res.data.map(x=>x.service_name||x.name).filter(Boolean);
+      }catch(_){ }
+    }
+    refreshGatewaySelects(); renderGatewayManager();
   }
-  async function saveServiceGateway212(name){
-    name=norm212(name); if(!name) return;
-    const cur=localServices212(); if(!cur.includes(name)){ cur.push(name); setLocalServices212(cur); }
-    if(window.sb){ try{ await sb.from('service_gateways').upsert({name, service_name:name, is_active:true, sort_order:(allServiceTypes212().length+1)}, {onConflict:'name'}); }catch(_){ } }
-    await loadServiceGateways212();
-    hydrateServiceTypes212();
-    msg212('تمت إضافة بوابة الخدمة: '+name,'ok');
+  window.tasneefLoadGateways213 = loadGateways;
+  function refreshGatewaySelects(){
+    ['premiumAddServiceType','supClientReportServiceType'].forEach(id=>{
+      const s=$id(id); if(!s) return;
+      const current=s.value;
+      s.innerHTML = allTypes().map(n=>`<option>${esc(n)}</option>`).join('');
+      if(current && allTypes().includes(current)) s.value=current;
+    });
   }
-  async function deleteServiceGateway212(name){
-    name=norm212(name); if(!name) return;
-    if(!confirm('حذف بوابة الخدمة من القوائم؟ لن يتم حذف التقارير القديمة.')) return;
-    setLocalServices212(localServices212().filter(x=>x!==name));
-    if(window.sb){ try{ await sb.from('service_gateways').delete().eq('name',name); }catch(_){ } }
-    const d=getData(); d.serviceGateways=(d.serviceGateways||[]).filter(x=>norm212(x.name||x.service_name)!==name);
-    hydrateServiceTypes212(); renderServiceGatewayAdmin212();
+  async function saveGateway(name){
+    name=String(name||'').trim(); if(!name) return;
+    const list=[...new Set([...getLocalGateways(), name])]; setLocalGateways(list);
+    if(window.sb){ try{ await sb.from('service_gateways').upsert({name, service_name:name, is_active:true, sort_order:allTypes().length+1},{onConflict:'name'}); }catch(_){} }
+    await loadGateways();
   }
-  window.saveServiceGateway212=saveServiceGateway212;
-  window.deleteServiceGateway212=deleteServiceGateway212;
+  async function deleteGateway(name){
+    name=String(name||'').trim();
+    setLocalGateways(getLocalGateways().filter(x=>x!==name));
+    if(window.sb){ try{ await sb.from('service_gateways').delete().eq('name',name); }catch(_){} }
+    await loadGateways();
+  }
+  window.tasneefSaveGateway213=saveGateway; window.tasneefDeleteGateway213=deleteGateway;
 
-  function fillSelectOptions212(sel, selected){
-    if(!sel) return;
-    const cur=selected ?? sel.value;
-    sel.innerHTML=allServiceTypes212().map(t=>`<option ${t===cur?'selected':''}>${esc212(t)}</option>`).join('');
-    if(cur && ![...sel.options].some(o=>o.value===cur)){ const o=document.createElement('option'); o.value=cur; o.textContent=cur; o.selected=true; sel.appendChild(o); }
-  }
-  function hydrateServiceTypes212(){
-    fillSelectOptions212($id('premiumAddServiceType'));
-    fillSelectOptions212($id('premiumReportFilterService'));
-    fillSelectOptions212($id('supClientReportServiceType'));
-    document.querySelectorAll('[data-v212-service-select="1"]').forEach(sel=>fillSelectOptions212(sel));
-    const dl=$id('premiumServiceSmartList'); if(dl){ dl.innerHTML=allServiceTypes212().map(t=>`<option value="${esc212(t)}"></option>`).join(''); }
-    renderServiceGatewayAdmin212();
+  function ensureStyles(){
+    if($id('tasneefV213Style')) return;
+    const st=document.createElement('style'); st.id='tasneefV213Style'; st.textContent=`
+      #clientReports.client-reports-clean-v213 .report-premium-wrap{display:block!important;grid-template-columns:1fr!important}
+      #clientReports.client-reports-clean-v213 #premiumReportFormCard{position:static!important;max-height:78vh;overflow:auto;margin:0!important;box-shadow:none!important;border:0!important}
+      .client-report-toolbar-v213{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:#fff;border:1px solid #dce9e3;border-radius:20px;padding:14px;margin:14px 0;box-shadow:0 10px 24px rgba(10,64,51,.05)}
+      .client-report-toolbar-v213 .title h2{margin:0;color:#0A4033}.client-report-toolbar-v213 .title p{margin:4px 0 0;color:#60706a}.client-report-toolbar-v213 .actions{display:flex;gap:8px;flex-wrap:wrap}
+      .modal-v213{position:fixed;inset:0;background:rgba(5,25,20,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:18px}.modal-v213.hidden{display:none!important}.modal-card-v213{width:min(1180px,96vw);max-height:92vh;overflow:hidden;background:#fff;border-radius:24px;box-shadow:0 30px 90px rgba(0,0,0,.25);display:flex;flex-direction:column}.modal-head-v213{display:flex;justify-content:space-between;align-items:center;gap:12px;background:linear-gradient(135deg,#063f32,#0A5A49);color:#fff;padding:14px 18px}.modal-head-v213 h2{margin:0;color:#fff}.modal-body-v213{padding:16px;overflow:auto;background:#fbfdfc}.gateway-manager-v213 .add{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:14px}.gateway-list-v213{display:flex;gap:8px;flex-wrap:wrap}.gateway-chip-v213{display:inline-flex;align-items:center;gap:8px;background:#eef8f4;border:1px solid #cfe5dc;color:#0A4033;border-radius:999px;padding:8px 10px;font-weight:800}.gateway-chip-v213 button{background:#b83232;color:#fff;border-radius:999px;padding:3px 8px;font-size:11px}.edit-banner-v213{background:#fff8e6;border:1px solid #ead28d;color:#6d5100;border-radius:14px;padding:10px;margin:0 0 12px;font-weight:800}.monthly-note-v213{background:#eef8f4;border:1px solid #cfe5dc;color:#0A4033;border-radius:14px;padding:10px;margin:10px 0;font-weight:800}
+      @media(max-width:760px){.modal-v213{align-items:flex-end;padding:0}.modal-card-v213{width:100%;max-height:94vh;border-radius:24px 24px 0 0}.client-report-toolbar-v213 .actions{width:100%}.client-report-toolbar-v213 button{flex:1}.gateway-manager-v213 .add{grid-template-columns:1fr}}
+    `; document.head.appendChild(st);
   }
 
-  function injectServiceGatewayAdmin212(){
-    const form=$id('premiumReportFormCard'); if(!form || $id('serviceGatewayAdminV212')) return;
-    const panel=document.createElement('div'); panel.className='card service-gateway-panel-v212'; panel.id='serviceGatewayAdminV212';
-    panel.innerHTML=`<div class="gateway-head-v212"><div><h2>بوابة الخدمات للمشرفين</h2><p>أضف اسم خدمة يظهر مباشرة للمشرفين عند رفع تقارير العملاء.</p></div></div><div class="gateway-add-v212"><input id="serviceGatewayNameV212" placeholder="مثال: غسيل الواجهات / فحص الدفاع المدني"><button type="button" onclick="saveServiceGateway212(document.getElementById('serviceGatewayNameV212').value); document.getElementById('serviceGatewayNameV212').value='';">+ إضافة بوابة</button></div><div id="serviceGatewayListV212" class="gateway-list-v212"></div>`;
-    form.parentNode.insertBefore(panel, form);
+  function ensureCleanUI(){
+    const sec=$id('clientReports'); if(!sec) return;
+    ensureStyles(); sec.classList.add('client-reports-clean-v213');
+    if(!$id('clientReportToolbarV213')){
+      const toolbar=document.createElement('div'); toolbar.id='clientReportToolbarV213'; toolbar.className='client-report-toolbar-v213';
+      toolbar.innerHTML=`<div class="title"><h2>تقارير العملاء</h2><p>تقرير واحد لكل مشروع في الشهر، مع تعديل وعرض مرتب بدون ازدحام الصفحة.</p></div><div class="actions"><button type="button" onclick="tasneefOpenReportModal213('new')">+ إنشاء تقرير جديد</button><button type="button" class="light" onclick="tasneefOpenGatewayModal213()">إدارة خدمات التقارير</button><button type="button" class="light" onclick="loadPremiumReportsOnly(true).then(()=>renderPremiumReports())">تحديث</button></div>`;
+      const kpis=sec.querySelector('.report-kpis') || sec.querySelector('.card') || sec.firstElementChild;
+      (kpis?.parentNode||sec).insertBefore(toolbar, kpis?.nextSibling||sec.firstChild);
+    }
+    if(!$id('clientReportModalV213')){
+      const modal=document.createElement('div'); modal.id='clientReportModalV213'; modal.className='modal-v213 hidden';
+      modal.innerHTML=`<div class="modal-card-v213"><div class="modal-head-v213"><h2 id="clientReportModalTitleV213">تقرير العملاء</h2><button type="button" class="light" onclick="tasneefCloseReportModal213()">إغلاق</button></div><div class="modal-body-v213" id="clientReportModalBodyV213"></div></div>`;
+      document.body.appendChild(modal);
+    }
+    if(!$id('gatewayModalV213')){
+      const modal=document.createElement('div'); modal.id='gatewayModalV213'; modal.className='modal-v213 hidden';
+      modal.innerHTML=`<div class="modal-card-v213" style="width:min(760px,96vw)"><div class="modal-head-v213"><h2>إدارة خدمات التقارير</h2><button type="button" class="light" onclick="tasneefCloseGatewayModal213()">إغلاق</button></div><div class="modal-body-v213 gateway-manager-v213"><div class="add"><input id="gatewayNameV213" placeholder="مثال: تنظيف الواجهات / فحص الدفاع المدني"><button type="button" onclick="tasneefSaveGateway213(document.getElementById('gatewayNameV213').value); document.getElementById('gatewayNameV213').value=''">+ إضافة الخدمة</button></div><div id="gatewayListV213" class="gateway-list-v213"></div><p style="color:#60706a;margin-top:12px">أي خدمة تضيفها هنا تظهر في قائمة الخدمات عند الإدارة والمشرفين.</p></div></div>`;
+      document.body.appendChild(modal);
+    }
+    const form=$id('premiumReportFormCard'), body=$id('clientReportModalBodyV213');
+    if(form && body && form.parentElement!==body){ body.appendChild(form); }
+    const topButtons=[...sec.querySelectorAll('button')].filter(b=>/تقرير جديد|إنشاء تقرير/.test(b.textContent||'') && !b.closest('#clientReportToolbarV213'));
+    topButtons.forEach(b=>{ b.style.display='none'; });
+    const oldPanel=$id('serviceGatewayAdminV212'); if(oldPanel) oldPanel.remove();
+    const noteId='monthlyNoteV213';
+    const tableWrap=sec.querySelector('.table-wrap');
+    if(tableWrap && !$id(noteId)){
+      const n=document.createElement('div'); n.id=noteId; n.className='monthly-note-v213'; n.textContent='تنبيه: كل مشروع له تقرير واحد فقط في الشهر. عند رفع تقرير لنفس المشروع والشهر سيتم تحديث التقرير نفسه بدل إنشاء كرت جديد.';
+      tableWrap.parentNode.insertBefore(n, tableWrap);
+    }
+    refreshGatewaySelects(); renderGatewayManager();
   }
-  function renderServiceGatewayAdmin212(){
-    const box=$id('serviceGatewayListV212'); if(!box) return;
-    const customs=[...new Set([...localServices212(), ...(getData().serviceGateways||[]).map(x=>x.name||x.service_name).filter(Boolean)])];
-    box.innerHTML = customs.length ? customs.map(n=>`<span class="gateway-chip-v212">${esc212(n)} <button type="button" onclick="deleteServiceGateway212('${esc212(n).replace(/'/g,'&#39;')}')">حذف</button></span>`).join('') : '<small class="muted-v212">لا توجد بوابات مخصصة بعد. الخدمات الافتراضية ظاهرة للمشرفين.</small>';
-  }
-
-  // Override original service option builders so new services appear inside admin and supervisor editors.
-  window.serviceTypeOptions = function(selected){ return allServiceTypes212().map(t=>`<option ${t===selected?'selected':''}>${esc212(t)}</option>`).join(''); };
-
-  function makeServiceState212(type=''){
-    const t=type||allServiceTypes212()[0]||'خدمة';
-    return {service_type:t,title:t,service_description:'',scope_work:'',notes:'',before_images:[],during_images:[],after_images:[],source:'admin'};
-  }
-  const oldAddPremiumService212=window.addPremiumService;
-  window.addPremiumService=function(type=''){
-    try{
-      if(!window.premiumServicesState && typeof premiumServicesState!=='undefined') window.premiumServicesState=premiumServicesState;
-      const arr=(typeof premiumServicesState!=='undefined'?premiumServicesState:(window.premiumServicesState=window.premiumServicesState||[]));
-      arr.push(makeServiceState212(type));
-      if(typeof renderPremiumServicesEditor==='function') renderPremiumServicesEditor();
-      setTimeout(()=>{ document.querySelectorAll('.service-editor-card')[arr.length-1]?.scrollIntoView({behavior:'smooth',block:'center'}); },50);
-    }catch(e){ if(oldAddPremiumService212) return oldAddPremiumService212(type); }
+  window.tasneefOpenReportModal213=function(mode){
+    ensureCleanUI();
+    if(mode==='new' && typeof clearPremiumReportForm==='function') clearPremiumReportForm();
+    const m=$id('clientReportModalV213'); if(m) m.classList.remove('hidden');
+    const title=$id('clientReportModalTitleV213'); if(title) title.textContent = mode==='new'?'إنشاء تقرير جديد':'تعديل تقرير العملاء';
+    const card=$id('premiumReportFormCard');
+    if(card && !$id('editBannerV213')){
+      const b=document.createElement('div'); b.id='editBannerV213'; b.className='edit-banner-v213'; card.insertBefore(b, card.firstChild.nextSibling);
+    }
+    const banner=$id('editBannerV213'); if(banner){
+      const id=($id('premiumReportId')?.value||'').trim();
+      banner.textContent = id ? 'أنت تعدل تقريرًا موجودًا. سيتم تحديث نفس التقرير ولن يتم إنشاء كرت جديد.' : 'تقرير جديد. إذا كان لنفس المشروع ونفس الشهر سيتم دمجه تلقائيًا مع التقرير الموجود.';
+    }
   };
-  window.addSelectedPremiumService=function(){ window.addPremiumService($id('premiumAddServiceType')?.value || allServiceTypes212()[0] || 'خدمة'); };
+  window.tasneefCloseReportModal213=()=>{ $id('clientReportModalV213')?.classList.add('hidden'); };
+  window.tasneefOpenGatewayModal213=function(){ ensureCleanUI(); renderGatewayManager(); $id('gatewayModalV213')?.classList.remove('hidden'); };
+  window.tasneefCloseGatewayModal213=()=>{ $id('gatewayModalV213')?.classList.add('hidden'); };
+  function renderGatewayManager(){
+    const box=$id('gatewayListV213'); if(!box) return;
+    const custom=[...new Set([...getLocalGateways(), ...gateways])].filter(n=>!defaults.includes(n));
+    box.innerHTML = custom.length ? custom.map(n=>`<span class="gateway-chip-v213">${esc(n)} <button type="button" onclick="tasneefDeleteGateway213('${String(n).replace(/'/g,"\\'")}')">حذف</button></span>`).join('') : '<small style="color:#60706a">لا توجد خدمات مخصصة بعد.</small>';
+  }
 
-  // Patch the rendered service editor selects after every render to include custom gateways.
-  const oldRenderPremiumServicesEditor212=window.renderPremiumServicesEditor;
-  window.renderPremiumServicesEditor=function(){
-    if(oldRenderPremiumServicesEditor212) oldRenderPremiumServicesEditor212.apply(this, arguments);
-    try{
-      document.querySelectorAll('#premiumServicesEditor .service-editor-card select').forEach(sel=>{ sel.dataset.v212ServiceSelect='1'; fillSelectOptions212(sel); });
-    }catch(_){ }
-  };
+  // Wrap edit button to open modal instead of scrolling and keeping page crowded.
+  const oldEdit=window.editPremiumReport;
+  if(typeof oldEdit==='function'){
+    window.editPremiumReport=function(id){ oldEdit.apply(this,arguments); setTimeout(()=>window.tasneefOpenReportModal213('edit'),80); };
+  }
 
-  function collectBase212(status){
-    const pid=Number($id('premiumReportProject')?.value)||null; if(!pid) throw new Error('اختر المشروع أولاً');
-    const p=(getData().projects||[]).find(x=>String(x.id)===String(pid));
-    const d=$id('premiumReportDate')?.value||today212();
-    return {project_id:pid, project_name:p?.name||projectName212(pid), chairman_name:norm212($id('premiumChairmanName')?.value), chairman_phone:norm212($id('premiumChairmanPhone')?.value), title:norm212($id('premiumReportTitle')?.value)||`تقرير خدمات مشروع ${p?.name||projectName212(pid)}`, report_type:$id('premiumReportType')?.value||'تقرير خدمات', report_date:d, executive_summary:norm212($id('premiumSummary')?.value)||defaultSummary212(), status, published_at: status==='published'?new Date().toISOString():null, updated_at:new Date().toISOString()};
+  async function findMonthlyReport(projectId, reportDate, excludeId){
+    const m=monthOf(reportDate || (typeof today==='function'?today():new Date().toISOString().slice(0,10)));
+    let rows=(window.data?.clientReports||[]).filter(r=>String(r.project_id)===String(projectId) && String(r.report_date||'').startsWith(m));
+    if(excludeId) rows=rows.filter(r=>String(r.id)!==String(excludeId));
+    if(rows[0]) return rows[0];
+    if(window.sb){
+      try{
+        const res=await sb.from('client_reports').select('*').eq('project_id',projectId).gte('report_date',m+'-01').lte('report_date',m+'-31').order('created_at',{ascending:true});
+        if(!res.error && Array.isArray(res.data)) return res.data.find(r=>String(r.id)!==String(excludeId))||null;
+      }catch(_){ }
+    }
+    return null;
   }
-  function currentPremiumServices212(){
-    let arr=[]; try{ arr=(typeof premiumServicesState!=='undefined'?premiumServicesState:window.premiumServicesState)||[]; }catch(_){ arr=window.premiumServicesState||[]; }
-    return (arr||[]).filter(Boolean);
-  }
-  async function findMonthlyReport212(projectId, date, excludeId=''){
-    const month=ym212(date);
-    const local=(getData().clientReports||[]).find(r=>String(r.project_id)===String(projectId) && String(r.id)!==String(excludeId) && String(r.report_date||'').startsWith(month));
-    if(local) return local;
-    if(!window.sb) return null;
-    try{
-      const from=month+'-01', to=(()=>{ const [y,m]=month.split('-').map(Number); return new Date(Date.UTC(y,m,1)).toISOString().slice(0,10); })();
-      const {data:rows,error}=await sb.from('client_reports').select('id,public_token,status,report_no').eq('project_id',projectId).gte('report_date',from).lt('report_date',to).order('created_at',{ascending:true}).limit(1);
-      if(error) return null; return rows?.[0]||null;
-    }catch(_){ return null; }
-  }
+
+  // Admin save: same project + same month updates one report, not duplicate cards.
   window.savePremiumReport = async function(status='draft'){
-    const btn=window.event?.target; const old=btn?.innerHTML;
     try{
-      if(btn){ btn.disabled=true; btn.innerHTML=status==='published'?'جاري الاعتماد...':'جاري الحفظ...'; }
-      const base=collectBase212(status);
-      const rawId=norm212($id('premiumReportId')?.value);
-      let reportId=rawId;
-      const existing=await findMonthlyReport212(base.project_id, base.report_date, rawId);
-      if(!reportId && existing?.id) reportId=existing.id;
-      let publicToken=existing?.public_token || reportToken212();
-      if(reportId){
-        const row={...base, public_token:status==='published'?publicToken:(existing?.public_token||null)};
-        const {data:updated,error}=await sb.from('client_reports').update(row).eq('id',reportId).select('id,public_token').single();
+      const btn=event?.target; if(btn){ btn.disabled=true; btn.dataset.oldText=btn.innerHTML; btn.innerHTML='جاري الحفظ...'; }
+      const rawId=($id('premiumReportId')?.value||'').trim();
+      const isUuid=v=>/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v||'');
+      let id=isUuid(rawId)?rawId:'';
+      const base=collectPremiumReportBase(status);
+      const existing=await findMonthlyReport(base.project_id, base.report_date, id);
+      if(!id && existing?.id) id=existing.id;
+      let reportId='', publicToken='';
+      if(id){
+        const current=(window.data?.clientReports||[]).find(r=>String(r.id)===String(id)) || existing || {};
+        publicToken=current.public_token || genReportToken();
+        const row={...base, public_token:status==='published'?publicToken:current.public_token, updated_at:new Date().toISOString()};
+        const {data:updated,error}=await sb.from('client_reports').update(row).eq('id',id).select('id,public_token').single();
         if(error) throw error;
         reportId=updated.id; publicToken=updated.public_token||publicToken;
       }else{
-        const row={...base, report_no:reportNo212(), public_token:status==='published'?publicToken:null};
+        publicToken=genReportToken();
+        const row={...base, report_no:genReportNo(), public_token:status==='published'?publicToken:null};
         const {data:ins,error}=await sb.from('client_reports').insert(row).select('id,public_token').single();
         if(error) throw error;
         reportId=ins.id; publicToken=ins.public_token||publicToken;
       }
       if($id('premiumReportId')) $id('premiumReportId').value=reportId;
       const {error:delErr}=await sb.from('client_report_services').delete().eq('report_id',reportId); if(delErr) throw delErr;
-      const serviceRows=currentPremiumServices212().map((s,i)=>({report_id:reportId, sort_order:i+1, service_type:s.service_type||s.title||'خدمة', title:s.title||s.service_type||'خدمة', service_description:s.service_description||'', scope_work:s.scope_work||'', notes:s.notes||'', before_images:Array.isArray(s.before_images)?s.before_images:[], during_images:Array.isArray(s.during_images)?s.during_images:[], after_images:Array.isArray(s.after_images)?s.after_images:[], source:s.source||'admin'}));
+      const serviceRows=(window.premiumServicesState||premiumServicesState||[]).map((s,i)=>({report_id:reportId,sort_order:i+1,service_type:s.service_type||s.title||'خدمة',title:s.title||s.service_type||'خدمة',service_description:s.service_description||'',scope_work:s.scope_work||'',notes:s.notes||'',before_images:Array.isArray(s.before_images)?s.before_images:[],during_images:Array.isArray(s.during_images)?s.during_images:[],after_images:Array.isArray(s.after_images)?s.after_images:[]}));
       if(serviceRows.length){ const {error:se}=await sb.from('client_report_services').insert(serviceRows); if(se) throw se; }
-      await loadPremiumReportsOnly(false);
-      msg212(existing?.id && !rawId ? 'تم تحديث التقرير الشهري الموجود بدل إنشاء تقرير مكرر' : (status==='published'?'تم اعتماد ونشر التقرير':'تم حفظ التقرير'), 'ok');
-      if(status==='published' && publicToken){
-        try{
-          const url=clientReportUrl212(publicToken); const phone=(typeof normalizePhoneForWa==='function'?normalizePhoneForWa(base.chairman_phone):base.chairman_phone);
-          const text=`السيد / رئيس جمعية ${base.project_name} المحترم\n\nتم نشر ${base.title}.\nللاطلاع على التقرير:\n${url}\n\nشركة تصنيف لإدارة المرافق\n920015589`;
-          if(phone && confirm('تم النشر. هل تريد فتح رسالة واتساب الآن؟')) window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,'_blank');
-        }catch(_){ }
+      await loadPremiumReportsOnly(false); renderPremiumReports();
+      msg(status==='published'?'تم اعتماد التقرير وتحديثه':'تم حفظ التقرير وتحديثه');
+      window.tasneefCloseReportModal213();
+      if(status==='published'){
+        const url=clientReportUrl(publicToken); const phone=normalizePhoneForWa(base.chairman_phone);
+        const text=`السيد / رئيس جمعية ${base.project_name} المحترم\n\nتم نشر ${base.title}.\nللاطلاع على التقرير:\n${url}\n\nشركة تصنيف لإدارة المرافق\n920015589`;
+        if(phone && confirm('تم النشر. هل تريد فتح رسالة واتساب الآن؟')) window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,'_blank');
       }
-    }catch(e){ console.error('V212 savePremiumReport failed',e); msg212(e.message||String(e),'err'); }
-    finally{ if(btn){ btn.disabled=false; if(old) btn.innerHTML=old; } }
+    }catch(e){ console.error('V213 savePremiumReport',e); msg(e.message||String(e),'err'); }
+    finally{ const btn=event?.target; if(btn){ btn.disabled=false; if(btn.dataset.oldText) btn.innerHTML=btn.dataset.oldText; } }
   };
 
-  // Supervisor: one monthly client report per project. New uploads update the same monthly report, not duplicate it.
+  // Supervisor save: append to the same monthly report for project instead of creating duplicate report cards.
+  const oldSupSave=window.supClientSaveDailyReport;
   window.supClientSaveDailyReport = async function(btn){
     try{
       if(btn) btn.disabled=true;
       const pid=$id('supClientReportProject')?.value; if(!pid) throw new Error('اختر المشروع');
-      let state=[]; try{ state=(typeof supClientServicesState!=='undefined'?supClientServicesState:window.supClientServicesState)||[]; }catch(_){ state=window.supClientServicesState||[]; }
-      const count=(s)=> (parseImgs212(s.before_images).length + parseImgs212(s.during_images).length + parseImgs212(s.after_images).length);
-      const valid=(state||[]).filter(s=>count(s)>0);
+      const valid=(window.supClientServicesState||supClientServicesState||[]).filter(s=>{
+        try{return (s.before_images?.length||0)+(s.during_images?.length||0)+(s.after_images?.length||0)>0;}catch(_){return false;}
+      });
       if(!valid.length) throw new Error('أضف صورًا لخدمة واحدة على الأقل');
-      const u=(typeof session==='function'?session():{})||{}; const p=projectName212(pid); const reportDate=$id('supClientReportDate')?.value||today212();
-      const existing=await findMonthlyReport212(Number(pid), reportDate, '');
-      const title='تقرير شهري - '+p;
-      const row={project_id:Number(pid), project_name:p, chairman_name:'', chairman_phone:'', title, report_type:'تقرير شهري من المشرف', report_date:reportDate, executive_summary:$id('supClientReportSummary')?.value||defaultSummary212(), status:'draft', public_token:existing?.public_token||null, updated_at:new Date().toISOString()};
-      let reportId=existing?.id||'';
-      if(reportId){ const {error}=await sb.from('client_reports').update(row).eq('id',reportId); if(error) throw error; }
-      else { const {data:rep,error}=await sb.from('client_reports').insert({...row, report_no:reportNo212()}).select('id').single(); if(error) throw error; reportId=rep.id; }
-      const {error:delErr}=await sb.from('client_report_services').delete().eq('report_id',reportId); if(delErr) throw delErr;
-      const rows=valid.map((s,i)=>({report_id:reportId, sort_order:i+1, service_type:s.service_type||s.title||'خدمة', title:s.title||s.service_type||'خدمة', service_description:'', scope_work:'', notes:`رفع بواسطة: ${u.full_name||u.username||'مشرف'} | آخر تحديث: ${new Date().toLocaleString('ar-SA')}`, before_images:s.before_images||[], during_images:s.during_images||[], after_images:s.after_images||[], source:'supervisor'}));
+      const u=session()||{}, p=(typeof projectName==='function'?projectName(Number(pid)):'')||'', reportDate=$id('supClientReportDate')?.value||(typeof today==='function'?today():new Date().toISOString().slice(0,10));
+      let existing=await findMonthlyReport(Number(pid), reportDate, null);
+      let reportId='';
+      if(existing?.id){
+        reportId=existing.id;
+        await sb.from('client_reports').update({title:`تقرير شهري - ${p}`,report_type:'تقرير شهري من المشرف',report_date:reportDate,executive_summary:$id('supClientReportSummary')?.value||'',updated_at:new Date().toISOString()}).eq('id',reportId);
+      }else{
+        const reportRow={report_no:genReportNo(),project_id:Number(pid),project_name:p,chairman_name:'',chairman_phone:'',title:`تقرير شهري - ${p}`,report_type:'تقرير شهري من المشرف',report_date:reportDate,executive_summary:$id('supClientReportSummary')?.value||'',status:'draft',public_token:null};
+        const {data:rep,error}=await sb.from('client_reports').insert(reportRow).select('id').single(); if(error) throw error; reportId=rep.id;
+      }
+      let currentCount=0; try{ currentCount=(getReportServices(reportId)||[]).length; }catch(_){}
+      const rows=valid.map((s,i)=>({report_id:reportId,sort_order:currentCount+i+1,service_type:s.service_type,title:s.title||s.service_type,service_description:'',scope_work:'',notes:`رفع بواسطة: ${u.full_name||u.username||''}`,before_images:s.before_images||[],during_images:s.during_images||[],after_images:s.after_images||[]}));
       const {error:se}=await sb.from('client_report_services').insert(rows); if(se) throw se;
-      msg212(existing?.id?'تم تحديث تقرير هذا الشهر للمشروع بدل إنشاء تقرير جديد':'تم إرسال تقرير شهري جديد للإدارة كمسودة','ok');
-      try{ if(typeof supClientReportReset==='function') supClientReportReset(); }catch(_){ }
-      await loadPremiumReportsOnly(false);
-      try{ if(typeof supClientRenderMyReports==='function') supClientRenderMyReports(); }catch(_){ }
-    }catch(e){ msg212(e.message||String(e),'err'); }
+      if(typeof v133Msg==='function') v133Msg('تم إرسال التقرير وتحديث تقرير الشهر نفسه'); else msg('تم تحديث تقرير الشهر');
+      if(typeof supClientReportReset==='function') supClientReportReset(); await loadPremiumReportsOnly(false); if(typeof supClientRenderMyReports==='function') supClientRenderMyReports();
+    }catch(e){ if(typeof v133Msg==='function') v133Msg(e.message||String(e),'err'); else msg(e.message||String(e),'err'); }
     finally{ if(btn) btn.disabled=false; }
   };
 
-  // Stronger loader: include enough fields to enrich ratings correctly.
-  window.loadPremiumReportsOnly = async function(showMessage=false){
-    try{
-      const [reports, services, ratings] = await Promise.all([
-        sb.from('client_reports').select('*').order('created_at',{ascending:false}),
-        sb.from('client_report_services').select('*').order('sort_order',{ascending:true}),
-        sb.from('client_service_ratings').select('*').order('created_at',{ascending:false})
-      ]);
-      const d=getData(); d.clientReports=reports.data||[]; d.clientReportServices=services.data||[]; d.clientServiceRatings=ratings.data||[]; d.clientReportsError=reports.error?.message||services.error?.message||ratings.error?.message||'';
-      hydrateServiceTypes212();
-      if(typeof renderPremiumReports==='function') renderPremiumReports();
-      if(typeof renderClientRatings==='function') renderClientRatings();
-      if(showMessage) msg212(d.clientReportsError?'تأكد من ملفات SQL الخاصة بالتقارير':'تم تحديث التقارير', d.clientReportsError?'err':'ok');
-    }catch(e){ console.error(e); if(showMessage) msg212(e.message||String(e),'err'); }
-  };
-
-  window.renderPremiumReports = function(){
-    const body=$id('premiumReportsBody'); if(!body) return;
-    const d=getData(); const reports=d.clientReports||[]; const month=$id('premiumReportFilterMonth')?.value || today212().slice(0,7);
-    const mReports=reports.filter(r=>String(r.report_date||'').startsWith(month));
-    if($id('reportsTotalKpi')) $id('reportsTotalKpi').textContent=reports.length;
-    if($id('reportsMonthKpi')) $id('reportsMonthKpi').textContent=mReports.length;
-    if($id('reportsDraftKpi')) $id('reportsDraftKpi').textContent=reports.filter(r=>r.status==='draft').length;
-    if($id('reportsPublishedKpi')) $id('reportsPublishedKpi').textContent=reports.filter(r=>r.status==='published').length;
-    if($id('reportsFollowKpi')) $id('reportsFollowKpi').textContent=(d.clientServiceRatings||[]).filter(r=>r.rating==='يحتاج تحسين'||r.followup_requested).length;
-    const q=norm212($id('premiumReportSearch')?.value), smart=norm212($id('premiumServiceSmartSearch')?.value), pid=$id('premiumReportFilterProject')?.value||'', st=$id('premiumReportFilterStatus')?.value||'', sv=$id('premiumReportFilterService')?.value||'', rt=$id('premiumReportFilterRating')?.value||'';
-    let rows=[...reports];
-    const text=(r)=>[r.report_no,r.project_name||projectName212(r.project_id),r.title,r.report_type,serviceNames212(r.id,r.report_type).join(' ')].join(' ');
-    if(q) rows=rows.filter(r=>text(r).includes(q));
-    if(smart) rows=rows.filter(r=>text(r).includes(smart));
-    if(pid) rows=rows.filter(r=>String(r.project_id)===String(pid));
-    if(st) rows=rows.filter(r=>(r.status||'unpublished')===st);
-    if(month) rows=rows.filter(r=>String(r.report_date||'').startsWith(month));
-    if(sv) rows=rows.filter(r=>serviceNames212(r.id,r.report_type).some(n=>n.includes(sv)));
-    if(rt) rows=rows.filter(r=>rt==='none'?!ratings212(r.id).length:ratings212(r.id).some(x=>x.rating===rt));
-    body.innerHTML=rows.map(r=>{
-      const names=serviceNames212(r.id,r.report_type); const rating=ratingLabel212(r.id); const url=r.public_token?clientReportUrl212(r.public_token):'';
-      return `<tr><td><b>${esc212(r.report_no||r.id)}</b><br><small>${esc212(r.title||'')}</small></td><td>${esc212(r.report_date||'')}</td><td>${esc212(r.project_name||projectName212(r.project_id))}</td><td>${names.map(n=>`<span class="service-chip">${esc212(n)}</span>`).join('')||'-'}</td><td><span class="badge ${reportStatusClass212(r.status)}">${reportStatusText212(r.status)}</span></td><td><span class="badge ${ratingClass212(rating)}">${esc212(rating)}</span></td><td>${url?`<div class="client-copy">${esc212(url)}</div><button type="button" class="light" onclick="copyText('${encodeURIComponent(url)}')">نسخ</button>`:'غير منشور'}</td><td class="row-actions"><button type="button" onclick="editPremiumReport('${esc212(r.id)}')">تعديل</button>${r.status==='published'?`<button type="button" class="light" onclick="openClientReport('${esc212(r.public_token)}')">عرض</button><button type="button" class="light" onclick="sendPremiumWhatsapp('${esc212(r.id)}')">واتساب</button>`:''}<button type="button" class="danger" onclick="deletePremiumReport('${esc212(r.id)}')">حذف</button></td></tr>`;
-    }).join('') || `<tr><td colspan="8">${d.clientReportsError?'شغّل ملف SQL الخاص بالتقارير في Supabase':'لا توجد تقارير'}</td></tr>`;
-    renderMonthlyDuplicatesNotice212(); renderServiceGatewayAdmin212();
-  };
-
-  function renderMonthlyDuplicatesNotice212(){
-    const wrap=$id('premiumReportsBody')?.closest('.card'); if(!wrap) return;
-    let box=$id('monthlyMergeNoticeV212'); if(!box){ box=document.createElement('div'); box.id='monthlyMergeNoticeV212'; box.className='monthly-merge-v212'; wrap.insertBefore(box, wrap.querySelector('.table-wrap')); }
-    const month=$id('premiumReportFilterMonth')?.value || today212().slice(0,7);
-    const map={}; (getData().clientReports||[]).filter(r=>String(r.report_date||'').startsWith(month)).forEach(r=>{ const k=String(r.project_id||r.project_name); map[k]=(map[k]||0)+1; });
-    const dup=Object.entries(map).filter(([,c])=>c>1).length;
-    box.innerHTML = dup ? `تنبيه: يوجد ${dup} مشروع لديه أكثر من تقرير في هذا الشهر من البيانات القديمة. الحفظ الجديد سيحدّث التقرير الشهري بدل التكرار.` : `النظام مضبوط: كل مشروع له تقرير واحد فقط لكل شهر عند الحفظ الجديد.`;
-  }
-
-  window.editPremiumReport=function(id){
-    const r=(getData().clientReports||[]).find(x=>String(x.id)===String(id)); if(!r){ msg212('لم يتم العثور على التقرير','err'); return; }
-    const set=(id,v)=>{ const el=$id(id); if(el) el.value=v??''; };
-    set('premiumReportId', r.id); set('premiumReportProject', r.project_id||''); set('premiumReportDate', r.report_date||today212()); set('premiumReportTitle', r.title||''); set('premiumReportType', r.report_type||'تقرير خدمات'); set('premiumChairmanName', r.chairman_name||''); set('premiumChairmanPhone', r.chairman_phone||''); set('premiumSummary', r.executive_summary||defaultSummary212());
-    const arr=serviceRows212(id).map(s=>({service_type:serviceName212(s),title:s.title||serviceName212(s),service_description:s.service_description||'',scope_work:s.scope_work||'',notes:s.notes||'',before_images:parseImgs212(s.before_images),during_images:parseImgs212(s.during_images),after_images:parseImgs212(s.after_images),source:s.source||'admin'}));
-    try{ premiumServicesState=arr.length?arr:[makeServiceState212(r.report_type||'خدمة')]; }catch(_){ window.premiumServicesState=arr.length?arr:[makeServiceState212(r.report_type||'خدمة')]; }
-    if(typeof renderPremiumServicesEditor==='function') renderPremiumServicesEditor();
-    const title=$id('premiumReportFormTitle'); if(title) title.textContent='تعديل التقرير الشهري';
-    const card=$id('premiumReportFormCard'); if(card){ card.classList.add('editing-smart-v212'); card.style.display='block'; card.scrollIntoView({behavior:'smooth',block:'start'}); }
-    showEditBanner212(r);
-  };
-  function showEditBanner212(r){
-    const card=$id('premiumReportFormCard'); if(!card) return;
-    let b=$id('editBannerV212'); if(!b){ b=document.createElement('div'); b.id='editBannerV212'; b.className='edit-banner-v212'; card.insertBefore(b, card.firstChild.nextSibling); }
-    b.innerHTML=`<b>وضع التعديل</b><span>أنت تعدل تقرير ${esc212(r.project_name||projectName212(r.project_id))} لشهر ${esc212(ym212(r.report_date))}. عند الحفظ سيتم تحديث نفس التقرير وليس إنشاء نسخة جديدة.</span>`;
-  }
-
+  // Ratings: fill missing project/report/service names from linked report and service rows.
+  const oldRatings=window.renderClientRatings;
   window.renderClientRatings=function(){
-    const body=$id('clientRatingsBody'); if(!body) return;
-    const d=getData(); const q=norm212($id('ratingSearch')?.value), v=$id('ratingFilterValue')?.value||'', f=$id('ratingFilterFollow')?.value||'';
-    let rows=[...(d.clientServiceRatings||[])];
-    if(v) rows=rows.filter(r=>r.rating===v);
-    if(f==='yes') rows=rows.filter(r=>r.followup_requested);
-    if(f==='low') rows=rows.filter(r=>r.rating==='يحتاج تحسين');
-    const enriched=rows.map(r=>{
-      const rep=(d.clientReports||[]).find(x=>String(x.id)===String(r.report_id))||{};
-      const svc=(d.clientReportServices||[]).find(x=>String(x.id)===String(r.service_id)) || serviceRows212(r.report_id)[0] || {};
-      return {...r, _project:r.project_name||rep.project_name||projectName212(rep.project_id), _report:r.report_title||rep.title||rep.report_no||'-', _service:r.service_title||serviceName212(svc)||'-'};
-    });
-    let out=enriched;
-    if(q) out=out.filter(r=>[r._project,r._report,r._service,r.comment,r.rating].join(' ').includes(q));
-    body.innerHTML=out.map(r=>`<tr class="${r.rating==='يحتاج تحسين'?'low-rating':''}"><td>${esc212(typeof fmt==='function'?fmt(r.created_at):(r.created_at||''))}</td><td><b>${esc212(r._project||'-')}</b></td><td>${esc212(r._report||'-')}</td><td>${esc212(r._service||'-')}</td><td><span class="badge ${ratingClass212(r.rating)}">${esc212(r.rating||'-')}</span></td><td>${esc212(r.comment||'-')}</td><td>${r.followup_requested?'نعم':'لا'}</td></tr>`).join('') || '<tr><td colspan="7">لا توجد تقييمات حتى الآن</td></tr>';
+    const body=$id('clientRatingsBody'); if(!body){ if(oldRatings) return oldRatings(); return; }
+    const q=($id('ratingSearch')?.value||'').trim(), v=$id('ratingFilterValue')?.value, f=$id('ratingFilterFollow')?.value;
+    let rows=[...(window.data?.clientServiceRatings||[])];
+    if(v) rows=rows.filter(r=>r.rating===v); if(f==='yes') rows=rows.filter(r=>r.followup_requested); if(f==='low') rows=rows.filter(r=>r.rating==='يحتاج تحسين');
+    if(q) rows=rows.filter(r=>Object.values(r).join(' ').includes(q));
+    body.innerHTML=rows.map(r=>{
+      const rep=(window.data?.clientReports||[]).find(x=>String(x.id)===String(r.report_id))||{};
+      const svc=(window.data?.clientReportServices||[]).find(x=>String(x.id)===String(r.service_id) || (String(x.report_id)===String(r.report_id) && String(x.title||x.service_type)===String(r.service_title||'')))||{};
+      const rating=r.rating||'-';
+      return `<tr class="${rating==='يحتاج تحسين'?'low-rating':''}"><td>${typeof fmt==='function'?fmt(r.created_at):esc(r.created_at||'')}</td><td>${esc(r.project_name||rep.project_name||(typeof projectName==='function'?projectName(rep.project_id):'')||'-')}</td><td>${esc(r.report_title||rep.title||'-')}</td><td>${esc(r.service_title||svc.title||svc.service_type||'-')}</td><td><span class="badge ${typeof ratingClass==='function'?ratingClass(rating):''}">${esc(rating)}</span></td><td>${esc(r.comment||'-')}</td><td>${r.followup_requested?'نعم':'لا'}</td></tr>`;
+    }).join('')||'<tr><td colspan="7">لا توجد تقييمات حتى الآن</td></tr>';
   };
 
-  // Supervisor service gateway select and cards.
-  const oldSupClientReportInit212=window.supClientReportInit;
-  window.supClientReportInit=function(){
-    if(oldSupClientReportInit212) oldSupClientReportInit212.apply(this, arguments);
-    hydrateServiceTypes212();
-  };
-  const oldSupClientRenderSlideModal212=window.supClientRenderSlideModal;
-  window.supClientRenderSlideModal=function(){
-    if(oldSupClientRenderSlideModal212) oldSupClientRenderSlideModal212.apply(this, arguments);
-    const sel=document.querySelector('#supClientSlideModalBody select'); if(sel){ sel.dataset.v212ServiceSelect='1'; fillSelectOptions212(sel); }
-  };
-
-  function injectCss212(){
-    if($id('tasneefV212Style')) return;
-    const st=document.createElement('style'); st.id='tasneefV212Style'; st.textContent=`
-      .service-gateway-panel-v212{margin-bottom:16px;background:linear-gradient(180deg,#ffffff,#f8fcfa)}
-      .gateway-head-v212 h2{margin:0 0 4px;color:var(--brand,#0A4033)}.gateway-head-v212 p{margin:0 0 10px;color:#60706a}
-      .gateway-add-v212{display:grid;grid-template-columns:1fr auto;gap:8px;margin:10px 0}.gateway-list-v212{display:flex;flex-wrap:wrap;gap:8px}
-      .gateway-chip-v212{display:inline-flex;align-items:center;gap:8px;border:1px solid #cfe5dc;background:#eef8f4;color:#0A4033;border-radius:999px;padding:7px 9px;font-weight:800}.gateway-chip-v212 button{padding:3px 7px;border-radius:999px;background:#b83232;color:#fff;font-size:11px}
-      .muted-v212{color:#60706a}.monthly-merge-v212{background:#eff8f4;border:1px solid #cde5da;color:#0A4033;border-radius:14px;padding:10px;margin:10px 0;font-weight:700}
-      .edit-banner-v212{background:#fff8e8;border:1px solid #f0d48d;border-radius:14px;padding:10px;margin:8px 0 12px;display:grid;gap:4px;color:#4a3a00}.edit-banner-v212 b{color:#8a6700;font-size:16px}
-      #premiumReportFormCard.editing-smart-v212{box-shadow:0 0 0 3px rgba(240,212,141,.45),0 12px 30px rgba(10,64,51,.08)}
-    `; document.head.appendChild(st);
+  function boot(){
+    ensureCleanUI(); loadGateways(); refreshGatewaySelects();
+    // make sure current visible title confirms new version without changing old content.
+    [...document.querySelectorAll('h2,h3')].forEach(h=>{ if(/بوابة تقارير العملاء/.test(h.textContent||'') && !/V213/.test(h.textContent)) h.textContent='تقارير العملاء - V213'; });
   }
-
-  async function boot212(){
-    injectCss212();
-    await loadServiceGateways212();
-    injectServiceGatewayAdmin212();
-    hydrateServiceTypes212();
-    try{ if(typeof renderClientRatings==='function') renderClientRatings(); }catch(_){ }
-    try{ if(typeof renderPremiumReports==='function') renderPremiumReports(); }catch(_){ }
+  const oldShow=window.showPage;
+  if(typeof oldShow==='function'){
+    window.showPage=function(page,btn){ const r=oldShow.apply(this,arguments); if(page==='clientReports') setTimeout(boot,80); return r; };
   }
-  window.addEventListener('load',()=>setTimeout(boot212,900));
-  setTimeout(boot212,1600);
+  window.addEventListener('load',()=>setTimeout(boot,900));
 })();
