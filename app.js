@@ -1,3 +1,4 @@
+/* TASNEEF BUILD V202 - inventory/report/permissions fixed - 2026-05-20 */
 /* V154 Smart Loading Branding */
 (function(){
   if(window.__tasneefLoadingV154) return;
@@ -8134,12 +8135,27 @@ function financePrintReport(kind){
   const itemImg2 = it => it?.image_url || it?.image || it?.photo_url || it?.product_image || '';
 
   function metricsForItem(itemId){
-    const movements = (window.data?.inventoryMovements || []).filter(m => String(m.item_id) === String(itemId));
-    const issued = movements.filter(m => m.movement_type === 'out').reduce((a,m)=>a+n2(m.quantity),0);
-    const returned = movements.filter(m => m.movement_type === 'return').reduce((a,m)=>a+n2(m.quantity),0);
-    const directConsumed = movements.filter(m => m.movement_type === 'consume').reduce((a,m)=>a+n2(m.quantity),0);
-    const consumed = Math.max(0, issued - returned) + directConsumed;
-    return {movements, issued, returned, directConsumed, consumed};
+    const it = (window.data?.inventoryItems || []).find(x => String(x.id) === String(itemId)) || {id:itemId};
+    const movements = (window.data?.inventoryMovements || []).filter(m => String(m.item_id) === String(itemId) || String(m.item_name||'') === String(it.name||''));
+    let movOut=0, issuedFromRequests=0, returned=0, directConsumed=0;
+    movements.forEach(m=>{
+      const t=String(m.movement_type||'').toLowerCase(); const q=n2(m.quantity);
+      if(t==='out' || t==='صرف' || t==='issue') movOut += q;
+      else if(t==='return' || t==='مرتجع' || t==='رجوع') returned += q;
+      else if(t==='consume' || t==='consumption' || t==='استهلاك') directConsumed += q;
+    });
+    (window.data?.inventoryRequests || []).forEach(r=>{
+      if(!/approved|issued|صرف|معتمد|done|completed/i.test(String(r.status||''))) return;
+      let lines = r.request_items || r.items || r.request_lines || r.lines || [];
+      if(typeof lines === 'string'){ try{ lines = JSON.parse(lines); }catch(_){ lines = []; } }
+      if(Array.isArray(lines) && lines.length){
+        lines.forEach(l=>{ if(String(l.item_id)===String(itemId) || String(l.item_name||'')===String(it.name||'')) issuedFromRequests += Math.abs(n2(l.quantity)); });
+      } else if(String(r.item_id)===String(itemId) || String(r.item_name||'')===String(it.name||'')) issuedFromRequests += Math.abs(n2(r.quantity));
+    });
+    const issued = issuedFromRequests > 0 ? issuedFromRequests : movOut;
+    const netIssued = Math.max(0, issued - returned);
+    const totalConsumed = netIssued + directConsumed;
+    return {movements, issued, returned, netIssued, directConsumed, consumed:netIssued, totalConsumed};
   }
   window.inventoryProductMetricsV153 = metricsForItem;
 
@@ -8169,9 +8185,11 @@ function financePrintReport(kind){
     </div>
     <h3>ملخص الحركة</h3>
     <div class="smart-meta-v129">
-      <div class="m"><small>الصادر</small><b>${q2(m.issued)}</b></div>
+      <div class="m"><small>الصادر لأوامر الصرف</small><b>${q2(m.issued)}</b></div>
       <div class="m"><small>المرتجع</small><b>${q2(m.returned)}</b></div>
-      <div class="m"><small>المستهلك</small><b>${q2(m.consumed)}</b></div>
+      <div class="m"><small>صافي المستهلك</small><b>${q2(m.consumed)}</b></div>
+      <div class="m"><small>استهلاك مباشر</small><b>${q2(m.directConsumed)}</b></div>
+      <div class="m"><small>إجمالي المستهلك</small><b>${q2(m.totalConsumed)}</b></div>
       <div class="m"><small>المتبقي</small><b>${q2(it.quantity)}</b></div>
       <div class="m"><small>عدد الحركات</small><b>${m.movements.length}</b></div>
     </div>
@@ -8197,9 +8215,11 @@ function financePrintReport(kind){
       const met = metricsForItem(it.id);
       // Replace only summary labels/values when old content exists; keep detailed rows from existing render.
       const summary = `<div class="kpis small">
-        <div class="kpi"><small>الصادر</small><b>${q2(met.issued)}</b></div>
+        <div class="kpi"><small>الصادر لأوامر الصرف</small><b>${q2(met.issued)}</b></div>
         <div class="kpi"><small>المرتجع</small><b>${q2(met.returned)}</b></div>
-        <div class="kpi"><small>المستهلك</small><b>${q2(met.consumed)}</b></div>
+        <div class="kpi"><small>صافي المستهلك</small><b>${q2(met.consumed)}</b></div>
+        <div class="kpi"><small>استهلاك مباشر</small><b>${q2(met.directConsumed)}</b></div>
+        <div class="kpi"><small>إجمالي المستهلك</small><b>${q2(met.totalConsumed)}</b></div>
         <div class="kpi"><small>المتبقي</small><b>${q2(it.quantity)}</b></div>
       </div>`;
       const existing = box.innerHTML || '';
@@ -10677,35 +10697,42 @@ function financePrintReport(kind){
     if(!c) return false;
     return [it.id,it.product_code,it.serial_number,it.barcode,it.supplier_barcode,it.company_code,it.internal_code].map(S).includes(c);
   }
+  function requestLinesV202(r){
+    let lines = r?.request_items || r?.items || r?.request_lines || r?.lines || [];
+    if(typeof lines === 'string'){ try{ lines = JSON.parse(lines); }catch(_){ lines = []; } }
+    if(Array.isArray(lines) && lines.length) return lines;
+    if(r?.item_id || r?.item_name) return [{item_id:r.item_id,item_name:r.item_name,quantity:r.quantity,product_code:r.product_code,barcode:r.barcode}];
+    return [];
+  }
+  function requestIssuedV202(r){ return /approved|issued|صرف|معتمد|done|completed/i.test(S(r?.status)); }
+  function itemMatchV202(it,row){
+    const id=S(it?.id), name=S(it?.name), code=productCode(it);
+    return S(row?.item_id)===id || S(row?.item_name)===name || (!!code && [row?.product_code,row?.barcode,row?.supplier_barcode,row?.company_code,row?.serial_number].map(S).includes(code));
+  }
   function itemStatsV180(it){
-    const id = S(it.id), code = productCode(it), name = S(it.name);
-    let inMov = 0, inBatch = 0, out = 0, ret = 0, consumeDirect = 0;
+    let inMov = 0, inBatch = 0, outMov = 0, outReq = 0, ret = 0, consumeDirect = 0;
     (window.data?.inventoryMovements || []).forEach(m => {
-      const match = S(m.item_id) === id || matchesItem(it, m.product_code) || matchesItem(it, m.barcode) || S(m.item_name) === name;
-      if(!match) return;
+      if(!itemMatchV202(it,m)) return;
       const q = Math.abs(N(m.quantity));
       const t = S(m.movement_type).toLowerCase();
       if(['in','إدخال','add','invoice_add','purchase'].includes(t)) inMov += q;
-      else if(['out','صرف','issue'].includes(t)) out += q;
+      else if(['out','صرف','issue'].includes(t)) outMov += q;
       else if(['return','مرتجع','رجوع'].includes(t)) ret += q;
       else if(['consume','consumption','استهلاك'].includes(t)) consumeDirect += q;
     });
     (window.stockBatchesV148 || []).forEach(b => (b.lines || []).forEach(l => {
-      const match = S(l.item_id) === id || matchesItem(it, l.product_code) || S(l.item_name) === name;
-      if(match) inBatch += Math.abs(N(l.quantity));
+      if(itemMatchV202(it,l)) inBatch += Math.abs(N(l.quantity));
     }));
-    (window.data?.inventoryRequests || []).forEach(r => {
-      if(!/approved|issued|صرف|معتمد/.test(S(r.status))) return;
-      let lines = r.request_items || r.items || r.request_lines || [];
-      if(typeof lines === 'string'){ try{ lines = JSON.parse(lines); }catch(_){ lines = []; } }
-      if(Array.isArray(lines) && lines.length){
-        lines.forEach(l => { if(S(l.item_id) === id || matchesItem(it, l.product_code) || S(l.item_name) === name) out += Math.abs(N(l.quantity)); });
-      } else if(S(r.item_id) === id || S(r.item_name) === name) out += Math.abs(N(r.quantity));
+    (window.data?.inventoryRequests || []).filter(requestIssuedV202).forEach(r => {
+      requestLinesV202(r).forEach(l => { if(itemMatchV202(it,l)) outReq += Math.abs(N(l.quantity)); });
     });
+    // مصدر الصادر الرسمي: أمر الصرف إذا موجود، وإلا حركة out. لا نجمع الاثنين حتى لا يظهر خرج مضاعف.
+    const out = outReq > 0 ? outReq : outMov;
+    const netOut = Math.max(0, out - ret);
+    const totalConsumed = netOut + consumeDirect;
     const entered = inMov > 0 ? inMov : inBatch;
-    const consumed = consumeDirect > 0 ? consumeDirect : Math.max(0, out - ret);
-    const remaining = Math.max(0, N(it.quantity));
-    return { entered, out, ret, consumed, remaining };
+    const remaining = Number.isFinite(N(it.quantity)) ? N(it.quantity) : Math.max(0, entered - totalConsumed);
+    return { entered, out, ret, netOut, consumeDirect, consumed: netOut, totalConsumed, remaining };
   }
   window.inventoryItemStatsV151 = itemStatsV180;
 
@@ -10726,7 +10753,7 @@ function financePrintReport(kind){
       const img = productImg(it) ? `<img src="${E(productImg(it))}" alt="${E(it.name)}">` : '<span>لا توجد</span>';
       const priceBlock = wh ? '' : `<div><small>سعر الوحدة</small><b>${M(it.unit_cost)} ر.س</b></div>`;
       const actions = wh ? `<button type="button" onclick="inventoryOpenItemSmart&&inventoryOpenItemSmart('${E(it.id)}')">عرض</button>` : `<button type="button" onclick="inventoryOpenItemSmart&&inventoryOpenItemSmart('${E(it.id)}')">عرض المنتج</button><button type="button" class="light" onclick="inventoryEditItem&&inventoryEditItem('${E(it.id)}')">تعديل</button><button type="button" class="danger" onclick="financeDelete&&financeDelete('inventory_items','${E(it.id)}')">حذف</button>`;
-      return `<article class="v180-catalog-card"><div class="v180-item-head"><div class="v180-img">${img}</div><div class="v180-title"><h3>${E(it.name || '-')}</h3><small>كود المنتج: ${E(productCode(it) || '-')}</small><br><small>المورد: ${E(it.supplier || '-')}</small></div><span class="${low?'v180-low':'v180-ok'}">${low?'منخفض':'متوفر'}</span></div><div class="v180-stats"><div><small>الكمية</small><b>${Q(st.remaining)} ${E(it.unit || '')}</b></div><div><small>دخل</small><b>${Q(st.entered)}</b></div><div><small>خرج</small><b>${Q(st.out)}</b></div><div><small>مرتجع</small><b>${Q(st.ret)}</b></div><div><small>مستهلك</small><b>${Q(st.consumed)}</b></div><div><small>حد الطلب</small><b>${Q(it.min_quantity || it.reorder_level || 0)}</b></div>${priceBlock}</div><div class="row-actions v180-actions">${actions}</div></article>`;
+      return `<article class="v180-catalog-card"><div class="v180-item-head"><div class="v180-img">${img}</div><div class="v180-title"><h3>${E(it.name || '-')}</h3><small>كود المنتج: ${E(productCode(it) || '-')}</small><br><small>المورد: ${E(it.supplier || '-')}</small></div><span class="${low?'v180-low':'v180-ok'}">${low?'منخفض':'متوفر'}</span></div><div class="v180-stats"><div><small>الكمية</small><b>${Q(st.remaining)} ${E(it.unit || '')}</b></div><div><small>دخل</small><b>${Q(st.entered)}</b></div><div><small>خرج</small><b>${Q(st.out)}</b></div><div><small>مرتجع</small><b>${Q(st.ret)}</b></div><div><small>صافي المستهلك</small><b>${Q(st.consumed)}</b></div><div><small>استهلاك مباشر</small><b>${Q(st.consumeDirect)}</b></div><div><small>إجمالي المستهلك</small><b>${Q(st.totalConsumed)}</b></div><div><small>حد الطلب</small><b>${Q(it.min_quantity || it.reorder_level || 0)}</b></div>${priceBlock}</div><div class="row-actions v180-actions">${actions}</div></article>`;
     }).join('') || '<div class="empty">لا توجد أصناف</div>';
     body.innerHTML = `<tr class="v180-catalog-row"><td colspan="20"><div class="v180-catalog-grid">${cards}</div></td></tr>`;
   }
@@ -12178,4 +12205,51 @@ function financePrintReport(kind){
   document.addEventListener('click',()=>setTimeout(()=>{ applyTabPermissions(); applyActionPermissions(); },120), true);
   setTimeout(boot,1200);
   console.log('V201 inventory/reports/permissions patch loaded');
+})();
+
+
+/* ===================== V202 Final Upload Patch: cache bust + visible print + permission UI ===================== */
+(function(){
+  'use strict';
+  window.TASNEEF_BUILD = 'V202_FINAL_UPLOAD_2026_05_20';
+  function $(id){return document.getElementById(id)}
+  function safe(fn){try{return fn()}catch(e){console.warn('V202 warning',e)}}
+  function clearPrintCache(){ safe(()=>Object.keys(localStorage).forEach(k=>{ if(/report|print|cache|deleted/i.test(k)) localStorage.removeItem(k); })); }
+  const oldDeleteV202 = window.financeDelete;
+  if(typeof oldDeleteV202 === 'function' && !oldDeleteV202.__v202){
+    window.financeDelete = async function(){
+      const r = await oldDeleteV202.apply(this, arguments);
+      clearPrintCache();
+      if(typeof financeLoadAll === 'function') await financeLoadAll();
+      if(typeof financeRenderAll === 'function') financeRenderAll();
+      return r;
+    };
+    window.financeDelete.__v202 = true;
+  }
+  const oldPrintV202 = window.financePrintReport;
+  if(typeof oldPrintV202 === 'function' && !oldPrintV202.__v202){
+    window.financePrintReport = function(kind){
+      clearPrintCache();
+      safe(()=>{ if(typeof financeRenderReports === 'function') financeRenderReports(); });
+      const map={expensesByProject:'expenseByProjectBody',stockOutByProject:'stockOutByProjectBody',stockOutBySupervisor:'stockOutBySupervisorBody',inventoryUsageDetail:'inventoryUsageDetailBody',costCenters:'costCenterReportBody'};
+      const bodyId=map[kind];
+      if(bodyId && typeof financePrintWindow === 'function'){
+        const table=$(bodyId)?.closest('table');
+        if(table){
+          const clone=table.cloneNode(true);
+          clone.querySelectorAll('tr').forEach(tr=>{ const cs=getComputedStyle(tr); if(tr.hidden || cs.display==='none' || cs.visibility==='hidden') tr.remove(); });
+          financePrintWindow('تقرير', '<table>'+clone.innerHTML+'</table>');
+          return;
+        }
+      }
+      return oldPrintV202.apply(this, arguments);
+    };
+    window.financePrintReport.__v202=true;
+  }
+  function repaint(){
+    safe(()=>{ if(typeof inventoryRenderItems==='function') inventoryRenderItems(); });
+    safe(()=>{ if(typeof financeRenderReports==='function') financeRenderReports(); });
+  }
+  window.addEventListener('load',()=>setTimeout(repaint,1800));
+  console.log('Tasneef V202 Final Upload Patch loaded');
 })();
