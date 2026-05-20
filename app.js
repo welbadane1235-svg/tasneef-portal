@@ -12522,3 +12522,191 @@ function financePrintReport(kind){
   setInterval(()=>{ if($('financeDashboard')) ensureTabs(); }, 2500);
   console.log('Tasneef V205 safe tabs/reports fix loaded');
 })();
+
+/* ===================== V206: REMOVE TOTAL CONSUMED + TICKETS PDF EXPORT =====================
+   المطلوب:
+   1) حذف خانة "إجمالي المستهلك" من كرت/تفاصيل المنتج.
+   2) إضافة تنزيل/تصدير PDF للتكتات من الإدارة والمشرف.
+============================================================================================ */
+(function(){
+  'use strict';
+  window.TASNEEF_BUILD = 'V206_REMOVE_TOTAL_CONSUMED_TICKETS_PDF_2026_05_20';
+  const $ = id => document.getElementById(id);
+  const arr = v => Array.isArray(v) ? v : [];
+  const S = v => String(v ?? '').trim();
+  const N = v => { const x = parseFloat(String(v ?? '').replace(/,/g,'')); return Number.isFinite(x) ? x : 0; };
+  const E = v => S(v).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const Q = v => N(v).toLocaleString('en-US',{maximumFractionDigits:2});
+  const M = v => N(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' ر.س';
+  const fmt = v => { try{ return v ? new Date(v).toLocaleString('ar-SA') : '-'; }catch(_){ return S(v)||'-'; } };
+  const pName = id => { try{ return typeof projectName==='function' ? projectName(id) : '-'; }catch(_){ return '-'; } };
+  const sName = id => { try{ return typeof supervisorName==='function' ? supervisorName(id) : '-'; }catch(_){ return '-'; } };
+  const say = (t,type) => { try{ if(typeof msg==='function') msg(t,type); else alert(t); }catch(_){ alert(t); } };
+  const no = t => t?.ticket_number || ('T-' + String(t?.id || 0).padStart(4,'0'));
+  const stLabel = st => st==='closed'?'مغلق':(st==='processing'?'تحت المعالجة':'مفتوح');
+  const prLabel = p => p==='urgent'?'عاجل':(p==='high'?'مهم':(p==='low'?'منخفض':'عادي'));
+  const stClass = st => st==='closed'?'done':(st==='processing'?'doing':'open');
+  const prClass = p => p==='urgent'?'urgent':(p==='high'?'high':(p==='low'?'low':'normal'));
+  const dur = t => {
+    try{
+      if(typeof durationLabel==='function' && typeof minutesBetween==='function'){
+        const m = (t.status==='closed' && t.open_duration_minutes != null) ? Number(t.open_duration_minutes||0) : minutesBetween(t.created_at, new Date().toISOString());
+        return durationLabel(m);
+      }
+      const m = Math.max(0, Math.round((new Date(t.status==='closed'?(t.closed_at||t.updated_at||Date.now()):Date.now()) - new Date(t.created_at||Date.now()))/60000));
+      return Math.floor(m/60)+'س '+(m%60)+'د';
+    }catch(_){ return '-'; }
+  };
+
+  function itemCode(it){ return S(it?.product_code || it?.serial_number || it?.barcode || it?.supplier_barcode || it?.company_code || it?.id); }
+  function matchItem(it,row){
+    const id=S(it?.id), code=itemCode(it), name=S(it?.name);
+    return S(row?.item_id)===id || S(row?.inventory_item_id)===id || S(row?.item_name)===name || (!!code && [row?.product_code,row?.barcode,row?.supplier_barcode,row?.company_code].map(S).includes(code));
+  }
+  function lineItems(r){
+    let lines = r?.request_items || r?.items || r?.request_lines || r?.lines || [];
+    if(typeof lines==='string'){ try{ lines=JSON.parse(lines); }catch(_){ lines=[]; } }
+    if(Array.isArray(lines) && lines.length) return lines;
+    if(r?.item_id || r?.item_name) return [{item_id:r.item_id,item_name:r.item_name,quantity:r.quantity,product_code:r.product_code,unit_cost:r.unit_cost}];
+    return [];
+  }
+  function requestIsIssued(r){ return /approved|issued|صرف|معتمد|done|completed/i.test(S(r?.status)); }
+  function stats(it){
+    const moves = arr(window.data?.inventoryMovements).filter(m=>matchItem(it,m));
+    let enteredMov=0, enteredBatch=0, issuedReq=0, issuedMov=0, returned=0, direct=0;
+    moves.forEach(m=>{
+      const t=S(m.movement_type).toLowerCase(); const q=Math.abs(N(m.quantity));
+      if(['in','إدخال','add','invoice_add','purchase'].includes(t)) enteredMov+=q;
+      else if(['out','صرف','issue'].includes(t)) issuedMov+=q;
+      else if(['return','مرتجع','رجوع'].includes(t)) returned+=q;
+      else if(['consume','consumption','استهلاك','استهلاك مباشر'].includes(t)) direct+=q;
+    });
+    arr(window.stockBatchesV148).forEach(b=>arr(b.lines).forEach(l=>{ if(matchItem(it,l)) enteredBatch+=Math.abs(N(l.quantity)); }));
+    arr(window.data?.inventoryRequests).filter(requestIsIssued).forEach(r=> lineItems(r).forEach(l=>{ if(matchItem(it,l)) issuedReq+=Math.abs(N(l.quantity)); }));
+    const issued = issuedReq > 0 ? issuedReq : issuedMov;
+    const netIssued = Math.max(0, issued - returned);
+    const consumed = netIssued + direct;
+    const entered = enteredMov > 0 ? enteredMov : enteredBatch;
+    const remaining = Number.isFinite(N(it?.quantity)) ? N(it.quantity) : Math.max(0, entered-consumed);
+    return {entered, issued, returned, netIssued, direct, consumed, remaining, moves};
+  }
+
+  // حذف إجمالي المستهلك من كروت الأصناف؛ نبقي صافي الصادر والاستهلاك المباشر فقط حتى لا يتكرر المعنى.
+  function renderCatalogV206(){
+    const body=$('inventoryItemsBody'); if(!body) return;
+    const search=S($('financeSearch')?.value || $('inventorySearch')?.value).toLowerCase();
+    let rows=arr(window.data?.inventoryItems).slice();
+    if(search) rows=rows.filter(it=>[it.name,itemCode(it),it.supplier,it.category,it.unit,it.notes].map(S).join(' ').toLowerCase().includes(search));
+    if(!rows.length){ body.innerHTML='<tr><td colspan="20">لا توجد أصناف</td></tr>'; return; }
+    const canEdit = () => true, canDel = () => true;
+    body.innerHTML = `<tr class="v180-catalog-row"><td colspan="20"><div class="v180-catalog-grid">${rows.map(it=>{
+      const st=stats(it), low = st.remaining <= N(it.min_quantity || it.reorder_level || 0);
+      const imgSrc=S(it.image_url || it.product_image || it.image);
+      const img=imgSrc?`<img src="${E(imgSrc)}" alt="${E(it.name)}">`:'<span>لا توجد</span>';
+      const priceBlock = `<div><small>سعر الوحدة</small><b>${M(it.unit_cost)}</b></div>`;
+      return `<article class="v180-catalog-card"><div class="v180-item-head"><div class="v180-img">${img}</div><div class="v180-title"><h3>${E(it.name||'-')}</h3><small>كود المنتج: ${E(itemCode(it)||'-')}</small><br><small>المورد: ${E(it.supplier||'-')}</small></div><span class="${low?'v180-low':'v180-ok'}">${low?'منخفض':'متوفر'}</span></div><div class="v180-stats"><div><small>الكمية</small><b>${Q(st.remaining)} ${E(it.unit||'')}</b></div><div><small>دخل</small><b>${Q(st.entered)}</b></div><div><small>خرج</small><b>${Q(st.issued)}</b></div><div><small>مرتجع</small><b>${Q(st.returned)}</b></div><div><small>صافي الصادر</small><b>${Q(st.netIssued)}</b></div><div><small>استهلاك مباشر</small><b>${Q(st.direct)}</b></div><div><small>حد الطلب</small><b>${Q(it.min_quantity||it.reorder_level||0)}</b></div>${priceBlock}</div><div class="row-actions v180-actions"><button type="button" onclick="inventoryOpenItemSmart&&inventoryOpenItemSmart('${E(it.id)}')">عرض المنتج</button>${canEdit()?`<button type="button" class="light" onclick="inventoryEditItem&&inventoryEditItem('${E(it.id)}')">تعديل</button>`:''}${canDel()?`<button type="button" class="danger" onclick="financeDelete&&financeDelete('inventory_items','${E(it.id)}')">حذف</button>`:''}</div></article>`;
+    }).join('')}</div></td></tr>`;
+  }
+
+  window.inventoryOpenItemSmart = function(id){
+    const it=arr(window.data?.inventoryItems).find(x=>S(x.id)===S(id));
+    if(!it) return say('الصنف غير موجود','err');
+    const st=stats(it);
+    const rows=st.moves.slice(0,60).map(x=>{
+      const t=S(x.movement_type).toLowerCase();
+      const label = t==='out'?'صرف':(t==='return'?'مرتجع':(t==='consume'||t==='consumption'?'استهلاك مباشر':(t==='in'?'إدخال':'تعديل')));
+      return `<tr><td>${E(x.movement_date || S(x.created_at).slice(0,10) || '-')}</td><td>${E(label)}</td><td>${Q(x.quantity)}</td><td>${E(x.project_name || pName(x.project_id))}</td><td>${E(x.receiver || x.receiver_name || '-')}</td><td>${E(x.reason || x.notes || '-')}</td></tr>`;
+    }).join('') || '<tr><td colspan="6">لا توجد حركات مسجلة</td></tr>';
+    const img=S(it.image_url || it.product_image || it.image);
+    const html=`<div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap">${img?`<img class="smart-img-v129" style="width:150px;height:150px;object-fit:contain" src="${E(img)}">`:''}<div style="flex:1;min-width:260px"><h2>${E(it.name||'-')}</h2><div class="smart-meta-v129"><div class="m"><small>كود المنتج</small><b>${E(itemCode(it)||'-')}</b></div><div class="m"><small>المورد</small><b>${E(it.supplier||'-')}</b></div><div class="m"><small>التصنيف</small><b>${E(it.category||'-')}</b></div><div class="m"><small>المتبقي</small><b>${Q(st.remaining)} ${E(it.unit||'')}</b></div><div class="m"><small>سعر الحبة</small><b>${M(it.unit_cost)}</b></div></div></div></div><h3>ملخص الحركة</h3><div class="smart-meta-v129"><div class="m"><small>الصادر لأوامر الصرف</small><b>${Q(st.issued)}</b></div><div class="m"><small>المرتجع</small><b>${Q(st.returned)}</b></div><div class="m"><small>صافي الصادر</small><b>${Q(st.netIssued)}</b></div><div class="m"><small>الاستهلاك المباشر</small><b>${Q(st.direct)}</b></div><div class="m"><small>المتبقي</small><b>${Q(st.remaining)}</b></div></div><h3>آخر الحركات</h3><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>الكمية</th><th>المشروع</th><th>المستلم</th><th>السبب</th></tr></thead><tbody>${rows}</tbody></table>`;
+    if(typeof window.smartOpenV129==='function') window.smartOpenV129('تفاصيل المنتج', html, `<button onclick="window.print()">طباعة</button>`);
+    else { const box=$('inventoryProductDetailBox'); if(box) box.innerHTML=html; }
+  };
+  window.inventoryRenderItems = renderCatalogV206;
+
+  function ticketHtml(t){
+    return `<div class="ticket-pdf-card"><h2>تقرير تكت</h2><table><tr><th>رقم التكت</th><td>${E(no(t))}</td><th>الحالة</th><td>${E(stLabel(t.status))}</td></tr><tr><th>المشروع</th><td>${E(pName(t.project_id))}</td><th>المشرف</th><td>${E(sName(t.supervisor_id))}</td></tr><tr><th>الأولوية</th><td>${E(prLabel(t.priority))}</td><th>مدة الفتح</th><td>${E(dur(t))}</td></tr><tr><th>تاريخ الإنشاء</th><td>${E(fmt(t.created_at))}</td><th>تاريخ الإغلاق</th><td>${E(t.closed_at?fmt(t.closed_at):'-')}</td></tr><tr><th>استلم التكت</th><td>${E(t.claimed_by_name||'-')}</td><th>أغلق التكت</th><td>${E(t.closed_by_name||'-')}</td></tr><tr><th>العنوان</th><td colspan="3">${E(t.title||'-')}</td></tr><tr><th>الوصف</th><td colspan="3">${E(t.description||'-')}</td></tr><tr><th>طريقة الإغلاق</th><td colspan="3">${E(t.closure_note||'-')}</td></tr></table></div>`;
+  }
+  function openPdfWindow(title, body){
+    const w=window.open('', '_blank');
+    if(!w) return say('المتصفح منع فتح نافذة PDF. اسمح بالنوافذ المنبثقة ثم حاول مرة أخرى.','err');
+    w.document.open();
+    w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${E(title)}</title><style>@page{size:A4;margin:12mm}body{font-family:Arial,Tahoma,sans-serif;color:#143c2b;direction:rtl}h1,h2{margin:0 0 12px;color:#07563d}.top{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #07563d;padding-bottom:10px;margin-bottom:18px}.brand{font-weight:700}.hint{font-size:12px;color:#60726a;margin-top:6px}table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}th,td{border:1px solid #cfded7;padding:8px;text-align:right;vertical-align:top}th{background:#eef7f3;color:#07563d}.ticket-pdf-card{page-break-inside:avoid;margin-bottom:18px}.actions{position:fixed;top:10px;left:10px}@media print{.actions{display:none}.hint{display:none}}</style></head><body><div class="actions"><button onclick="window.print()">حفظ / طباعة PDF</button></div><div class="top"><div><h1>${E(title)}</h1><div class="hint">اضغط زر حفظ / طباعة PDF ثم اختر Save as PDF من نافذة الطباعة</div></div><div class="brand">شركة تصنيف لإدارة المرافق</div></div>${body}<script>setTimeout(()=>window.print(),500)<\/script></body></html>`);
+    w.document.close();
+  }
+  function filteredTickets(){
+    let list=arr(window.data?.tickets).slice();
+    const admin=$('ticketsBody'), sup=$('supTicketsBody');
+    if(admin){
+      const st=$('ticketFilterStatus')?.value||'', q=S($('ticketSearch')?.value).toLowerCase();
+      if(st) list=list.filter(t=>S(t.status||'open')===st);
+      if(q) list=list.filter(t=>[no(t),t.title,t.description,pName(t.project_id),sName(t.supervisor_id),stLabel(t.status),prLabel(t.priority),t.claimed_by_name,t.closed_by_name,t.closure_note].join(' ').toLowerCase().includes(q));
+    }else if(sup){
+      const st=$('supTicketFilterStatus')?.value||'', pid=$('supTicketFilterProject')?.value||'', q=S($('supTicketSearch')?.value).toLowerCase();
+      if(pid) list=list.filter(t=>S(t.project_id)===pid);
+      if(st) list=list.filter(t=>S(t.status||'open')===st);
+      if(q) list=list.filter(t=>[no(t),t.title,t.description,pName(t.project_id),stLabel(t.status),prLabel(t.priority),t.claimed_by_name,t.closed_by_name,t.closure_note].join(' ').toLowerCase().includes(q));
+    }
+    return list;
+  }
+  window.ticketDownloadPdfV206 = function(id){
+    const t=arr(window.data?.tickets).find(x=>S(x.id)===S(id));
+    if(!t) return say('التكت غير موجود','err');
+    openPdfWindow('تقرير التكت ' + no(t), ticketHtml(t));
+  };
+  window.ticketsDownloadPdfV206 = function(){
+    const list=filteredTickets();
+    if(!list.length) return say('لا توجد تكتات للتصدير','err');
+    openPdfWindow('تقرير التكتات', list.map(ticketHtml).join(''));
+  };
+  function addPdfButtons(){
+    [['ticketPdfBtnV206','ticketsBody'],['supTicketPdfBtnV206','supTicketsBody']].forEach(([btnId,bodyId])=>{
+      const body=$(bodyId); if(!body || $(btnId)) return;
+      const host = body.closest('.card')?.querySelector('.filters') || body.closest('.card')?.querySelector('h2') || body.parentElement;
+      const btn=document.createElement('button'); btn.id=btnId; btn.type='button'; btn.className='light ticket-pdf-v206'; btn.textContent='تصدير PDF'; btn.onclick=window.ticketsDownloadPdfV206;
+      if(host?.classList?.contains('filters')) host.appendChild(btn); else host?.insertAdjacentElement('afterend', btn);
+    });
+  }
+  function summaryHtml(list){
+    const total=list.length, open=list.filter(t=>(t.status||'open')==='open').length, proc=list.filter(t=>t.status==='processing').length, closed=list.filter(t=>t.status==='closed').length, urgent=list.filter(t=>['urgent','high'].includes(t.priority)).length;
+    return `<div class="smart-ticket-kpi"><b>${total}</b><span>إجمالي التكتات</span></div><div class="smart-ticket-kpi red"><b>${open}</b><span>مفتوحة</span></div><div class="smart-ticket-kpi amber"><b>${proc}</b><span>تحت المعالجة</span></div><div class="smart-ticket-kpi green"><b>${closed}</b><span>مغلقة</span></div><div class="smart-ticket-kpi dark"><b>${urgent}</b><span>عاجلة / مهمة</span></div>`;
+  }
+  function card(t,mode){
+    const canDelete=mode==='admin';
+    const waFn = typeof window.sendTicketWhatsAppV43==='function' ? 'sendTicketWhatsAppV43' : (typeof window.sendTicketWhatsApp==='function' ? 'sendTicketWhatsApp' : '');
+    const actions = `<button type="button" onclick="viewTicketSmartV147&&viewTicketSmartV147(${Number(t.id)||0})">عرض</button><button type="button" class="light" onclick="ticketDownloadPdfV206(${Number(t.id)||0})">PDF</button><button type="button" class="light" onclick="editTicket(${Number(t.id)||0})">تعديل</button>${t.status==='closed'?`<button type="button" class="light" onclick="setTicketStatus(${Number(t.id)||0},'open')">إعادة فتح</button>`:`${t.status!=='processing'?`<button type="button" class="light" onclick="claimTicket(${Number(t.id)||0})">استلام</button>`:''}<button type="button" onclick="closeTicket(${Number(t.id)||0})">إغلاق</button>`}${waFn?`<button type="button" class="ticket-wa-v147" onclick="${waFn}(${Number(t.id)||0})">واتساب</button>`:''}${canDelete?`<button type="button" class="danger" onclick="deleteRow('tickets',${Number(t.id)||0})">حذف</button>`:''}`;
+    return `<article class="smart-ticket-card ${stClass(t.status)} ${prClass(t.priority)}"><div class="smart-ticket-top"><div><strong>${E(no(t))}</strong><small>${E(fmt(t.created_at))}</small></div><span class="smart-ticket-status ${stClass(t.status)}">${E(stLabel(t.status))}</span></div><h3>${E(t.title||'-')}</h3><div class="smart-ticket-meta"><span>المشروع: <b>${E(pName(t.project_id))}</b></span><span>المشرف: <b>${E(sName(t.supervisor_id))}</b></span><span>الأولوية: <b>${E(prLabel(t.priority))}</b></span><span>مدة الفتح: <b>${E(dur(t))}</b></span></div><p>${E(t.description||'لا يوجد وصف')}</p><div class="smart-ticket-mini"><span>استلم: ${E(t.claimed_by_name||'-')}</span><span>أغلق: ${E(t.closed_by_name||'-')}</span></div>${t.closure_note?`<div class="smart-ticket-note">الحل: ${E(t.closure_note)}</div>`:''}<div class="smart-ticket-actions">${actions}</div></article>`;
+  }
+  function renderTicketsV206(){
+    addPdfButtons();
+    if($('ticketsBody')){
+      const list=filteredTickets(); const sum=$('ticketsSmartSummary'); if(sum) sum.innerHTML=summaryHtml(list);
+      $('ticketsBody').classList.add('smart-ticket-grid'); $('ticketsBody').innerHTML=list.map(t=>card(t,'admin')).join('') || '<div class="empty-smart-ticket">لا توجد تكتات مطابقة للبحث الحالي</div>';
+    }
+    if($('supTicketsBody')){
+      const list=filteredTickets(); const sum=$('supTicketsSmartSummary'); if(sum) sum.innerHTML=summaryHtml(list);
+      $('supTicketsBody').classList.add('smart-ticket-grid'); $('supTicketsBody').innerHTML=list.map(t=>card(t,'supervisor')).join('') || '<div class="empty-smart-ticket">لا توجد تكتات مطابقة للبحث الحالي</div>';
+    }
+  }
+  window.renderTickets = renderTicketsV206;
+  const oldView = window.viewTicketSmartV147;
+  window.viewTicketSmartV147 = function(id){
+    if(typeof oldView==='function') oldView(id);
+    setTimeout(()=>{
+      const box=$('ticketSmartModalV147'); if(!box) return;
+      const actions=box.querySelector('.smart-modal-actions');
+      if(actions && !actions.querySelector('.ticket-single-pdf-v206')){
+        const b=document.createElement('button'); b.type='button'; b.className='light ticket-single-pdf-v206'; b.textContent='تنزيل PDF'; b.onclick=()=>window.ticketDownloadPdfV206(id);
+        actions.prepend(b);
+      }
+    },80);
+  };
+  function css(){
+    if($('v206Css')) return;
+    const st=document.createElement('style'); st.id='v206Css'; st.textContent='.ticket-pdf-v206{background:#eef7f3!important;color:#07563d!important;border:1px solid #cfe3da!important}.v180-stats{grid-template-columns:repeat(auto-fit,minmax(105px,1fr))!important}'; document.head.appendChild(st);
+  }
+  function boot(){ css(); addPdfButtons(); try{ if(typeof window.inventoryRenderItems==='function') window.inventoryRenderItems(); }catch(_){ } try{ renderTicketsV206(); }catch(_){ } }
+  ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(boot, ev==='load'?900:300)));
+  setTimeout(boot,1200);
+  console.log('Tasneef V206 remove total consumed + ticket PDF export loaded');
+})();
