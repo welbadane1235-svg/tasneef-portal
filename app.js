@@ -1,4 +1,4 @@
-/* TASNEEF BUILD V227 - stable inventory FIFO batches/report fast - 2026-05-20 */
+/* TASNEEF BUILD V228 - performance + attendance filter + inventory cleanup - 2026-05-20 */
 /* V154 Smart Loading Branding */
 (function(){
   if(window.__tasneefLoadingV154) return;
@@ -13191,7 +13191,7 @@ function financePrintReport(kind){
     ensureMovementCostInputV208();
     removeDuplicateFinanceTabsV208();
     removeTotalConsumptionBlocksV208();
-    /* V227 disabled duplicate old purchase batch block */
+    /* V228 disabled duplicate old purchase batch block */
     patchPdfButtonsV208();
   }
   window.tasneefBootV208 = bootV208;
@@ -15476,7 +15476,7 @@ function financePrintReport(kind){
       const card=$id('stockBatchCardV148');
       if(card && !$id('batchHelperV224')){
         const helper=document.createElement('div'); helper.id='batchHelperV224'; helper.className='footer-note';
-        helper.innerHTML='تنبيه تكلفة: عند إدخال نفس الصنف بسعر جديد يتم احتساب <b>متوسط تكلفة مرجح</b>، وعند الصرف يتم احتساب التكلفة بطريقة <b>FIFO</b> من أقدم دفعة أولًا.';
+        helper.innerHTML=''; helper.style.display='none';
         card.insertBefore(helper, card.children[1] || null);
       }
     }catch(e){ console.warn('V224 filters warning', e); }
@@ -15658,7 +15658,7 @@ function financePrintReport(kind){
 })();
 
 
-/* ===== V227: Stable inventory lots + correct batch prices + faster reports =====
+/* ===== V228: Stable inventory lots + correct batch prices + faster reports =====
    الهدف:
    - جدول دفعات الشراء يعرض سعر الفاتورة الحقيقي لكل دفعة، وليس متوسط الصنف.
    - متوسط التكلفة يحسب من المتبقي الحقيقي بعد FIFO: قيمة المتبقي ÷ كمية المتبقي.
@@ -15667,7 +15667,7 @@ function financePrintReport(kind){
 */
 (function(){
   'use strict';
-  window.TASNEEF_BUILD='V227_INVENTORY_STABLE_FIFO';
+  window.TASNEEF_BUILD='V228_INVENTORY_STABLE_FIFO';
   const $=id=>document.getElementById(id);
   const A=v=>Array.isArray(v)?v:[];
   const S=v=>String(v??'').trim();
@@ -15790,7 +15790,7 @@ function financePrintReport(kind){
       if(wc.avg>0) upd.unit_cost=+wc.avg.toFixed(4);
       if(qtyOverride!==undefined) upd.quantity=N(qtyOverride);
       if(Object.keys(upd).length) await sb.from('inventory_items').update(upd).eq('id',itemId);
-    }catch(e){ console.warn('V227 update item warning',e); }
+    }catch(e){ console.warn('V228 update item warning',e); }
   }
   function supplierList(){
     const set=new Set();
@@ -15802,15 +15802,15 @@ function financePrintReport(kind){
   function ensureDatalist(id, values){ let dl=$(id); if(!dl){ dl=document.createElement('datalist'); dl.id=id; document.body.appendChild(dl); } dl.innerHTML=values.map(v=>`<option value="${E(v)}"></option>`).join(''); }
   function enhanceInvoiceForm(){
     try{
-      ensureDatalist('supplierOptionsV227', supplierList()); ensureDatalist('unitOptionsV227', UNITS);
-      ['batchSupplierV148','inventoryItemSupplier','financeExpenseSupplier'].forEach(id=>{ const el=$(id); if(el) el.setAttribute('list','supplierOptionsV227'); });
-      ['batchUnitV148','inventoryItemUnit'].forEach(id=>{ const el=$(id); if(el) el.setAttribute('list','unitOptionsV227'); });
+      ensureDatalist('supplierOptionsV228', supplierList()); ensureDatalist('unitOptionsV228', UNITS);
+      ['batchSupplierV148','inventoryItemSupplier','financeExpenseSupplier'].forEach(id=>{ const el=$(id); if(el) el.setAttribute('list','supplierOptionsV228'); });
+      ['batchUnitV148','inventoryItemUnit'].forEach(id=>{ const el=$(id); if(el) el.setAttribute('list','unitOptionsV228'); });
       const sup=$('batchSupplierV148'); if(sup){ sup.placeholder='اختر المورد أو اكتب موردًا جديدًا'; }
       const unit=$('batchUnitV148'); if(unit){ unit.placeholder='اختر الوحدة أو اكتب وحدة جديدة'; }
       const card=$('stockBatchCardV148');
-      if(card && !$('#batchHelperV227')){
-        const d=document.createElement('div'); d.id='batchHelperV227'; d.className='footer-note';
-        d.innerHTML='سيتم حفظ سعر كل فاتورة كما هو، ويتم حساب متوسط تكلفة الصنف من الكمية المتبقية فقط. الصرف يعتمد FIFO من أقدم دفعة.';
+      if(card && !$('#batchHelperV228')){
+        const d=document.createElement('div'); d.id='batchHelperV228'; d.className='footer-note';
+        d.innerHTML=''; d.style.display='none';
         card.insertBefore(d, card.children[1]||null);
       }
     }catch(e){}
@@ -15869,13 +15869,13 @@ function financePrintReport(kind){
           const rows=saved.map(l=>({batch_id:br.data.id,item_id:l.item_id,product_code:l.product_code,item_name:l.item_name,category:l.category,item_type:l.item_type,unit:l.unit,quantity:l.quantity,unit_price_before_vat:+N(l.unit_cost).toFixed(4),unit_vat:+N(l.unit_vat).toFixed(4),unit_price_with_vat:+N(l.unit_gross).toFixed(4),total_before_vat:+N(l.line_net).toFixed(4),total_vat:+N(l.line_vat).toFixed(4),total_with_vat:+N(l.line_gross).toFixed(4),movement_id:l.movement_id}));
           const li=await sb.from('inventory_batch_items').insert(rows); if(li.error) throw li.error;
         }
-      }catch(e){ console.warn('V227 optional batch table warning',e); }
+      }catch(e){ console.warn('V228 optional batch table warning',e); }
       msg2('تم حفظ الفاتورة بسعر كل دفعة وتحديث متوسط تكلفة الصنف','ok');
       if(typeof stockBatchPrintV148==='function') stockBatchPrintV148({invoice_no:invoiceNo,batch_date:date,supplier,vat_mode:mode,lines:saved,total_before_vat:netTotal,total_vat:vatTotal,total_with_vat:grossTotal});
       if(typeof stockBatchClearV148==='function') stockBatchClearV148();
       if(typeof financeLoadAll==='function') await financeLoadAll();
       try{ if(typeof stockBatchLoadV148==='function') await stockBatchLoadV148(true); }catch(e){}
-      setTimeout(bootV227,250);
+      setTimeout(bootV228,250);
     }catch(e){ msg2(e.message||String(e),'err'); }
     finally{ if(btn) btn.disabled=false; }
   };
@@ -15899,7 +15899,7 @@ function financePrintReport(kind){
       msg2(OUT_TYPES.has(type)?'تم حفظ الصرف بتكلفة FIFO من أقدم دفعة':'تم حفظ حركة المخزون','ok');
       if(typeof inventoryClearMovementForm==='function') inventoryClearMovementForm();
       if(typeof financeLoadAll==='function') await financeLoadAll();
-      setTimeout(bootV227,250);
+      setTimeout(bootV228,250);
     }catch(e){ msg2(e.message||String(e),'err'); }
     finally{ if(btn) btn.disabled=false; }
   };
@@ -15926,7 +15926,7 @@ function financePrintReport(kind){
         const rows=lots.map(l=>`<tr><td>${E(l.date||'-')}</td><td>${E(l.invoice||'-')}</td><td>${E(l.supplier||'-')}</td><td>${qty2(l.originalQty)}</td><td>${qty2(l.issued)}</td><td>${qty2(l.remaining)}</td><td>${money2(l.cost)}</td><td>${money2(N(l.remaining)*N(l.cost))}</td></tr>`).join('')||'<tr><td colspan="8">لا توجد دفعات إدخال</td></tr>';
         box.innerHTML=`<h3>تفاصيل ${E(item.name||'-')}</h3><div class="grid"><div class="metric"><small>المتوفر</small><b>${qty2(wc.qty||item.quantity)}</b></div><div class="metric"><small>متوسط تكلفة الوحدة</small><b>${money2(wc.avg||item.unit_cost)}</b></div><div class="metric"><small>قيمة المتبقي</small><b>${money2(wc.value||N(item.quantity)*N(item.unit_cost))}</b></div></div><h3>دفعات الشراء وأسعارها الحقيقية</h3><table><thead><tr><th>التاريخ</th><th>الفاتورة</th><th>المورد</th><th>كمية الدفعة</th><th>المصروف منها</th><th>المتبقي</th><th>سعر الدفعة</th><th>قيمة المتبقي</th></tr></thead><tbody>${rows}</tbody></table>`;
       }
-    }catch(e){ console.warn('V227 report detail warning',e); }
+    }catch(e){ console.warn('V228 report detail warning',e); }
   };
   function updateVisiblePrices(){
     try{
@@ -15934,25 +15934,25 @@ function financePrintReport(kind){
         const wc=weightedCurrent(it.id);
         if(wc.avg>0) it.unit_cost=+wc.avg.toFixed(4);
       });
-      document.querySelectorAll('.export-hero-badge-v222').forEach(x=>x.textContent='V227');
+      document.querySelectorAll('.export-hero-badge-v222').forEach(x=>x.textContent='V228');
       document.querySelectorAll('small').forEach(s=>{ if(S(s.textContent)==='سعر الحبة') s.textContent='متوسط تكلفة الوحدة'; });
     }catch(e){}
   }
   const oldRenderItems=window.inventoryRenderItems;
   window.inventoryRenderItems=function(){ if(oldRenderItems) oldRenderItems.apply(this,arguments); setTimeout(()=>{ enhanceInvoiceForm(); updateVisiblePrices(); },60); };
-  function bootV227(){ enhanceInvoiceForm(); updateVisiblePrices(); try{ if(typeof financeRenderReports==='function') financeRenderReports(); }catch(e){} }
-  ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(bootV227,ev==='load'?1100:350)));
-  setTimeout(bootV227,1500);
-  console.log('Tasneef V227 stable inventory FIFO lots loaded');
+  function bootV228(){ enhanceInvoiceForm(); updateVisiblePrices(); try{ if(typeof financeRenderReports==='function') financeRenderReports(); }catch(e){} }
+  ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(bootV228,ev==='load'?1100:350)));
+  setTimeout(bootV228,1500);
+  console.log('Tasneef V228 stable inventory FIFO lots loaded');
 })();
 
-/* ===== Tasneef V227: fix product detail modal layout + stable attendance select ===== */
+/* ===== Tasneef V228: fix product detail modal layout + stable attendance select ===== */
 (function(){
-  const VERSION='V227';
+  const VERSION='V228';
   function injectCss(){
-    if(document.getElementById('tasneefV227Css')) return;
+    if(document.getElementById('tasneefV228Css')) return;
     const st=document.createElement('style');
-    st.id='tasneefV227Css';
+    st.id='tasneefV228Css';
     st.textContent=`
       .modal-backdrop.v225-product-modal,.modal-backdrop.v226-product-modal{
         position:fixed!important; inset:0!important; width:100vw!important; height:100vh!important;
@@ -16002,26 +16002,26 @@ function financePrintReport(kind){
   }
   window.inventoryOpenItemSmart=openFixedProduct;
   window.v118ShowProductDetail=openFixedProduct;
-  window.tasneefCloseProductDetailV227=removeProductModals;
+  window.tasneefCloseProductDetailV228=removeProductModals;
   function boot(){
     injectCss();
     document.querySelectorAll('.export-hero-badge-v222').forEach(x=>x.textContent=VERSION);
     document.querySelectorAll('h1,h2,h3,p,small,span').forEach(el=>{
-      if((el.textContent||'').includes('V227')) el.textContent=el.textContent.replace(/V227/g,VERSION);
+      if((el.textContent||'').includes('V228')) el.textContent=el.textContent.replace(/V228/g,VERSION);
     });
     removeProductModals();
   }
   ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(boot,ev==='load'?900:200)));
   setTimeout(boot,1200);
-  console.log('Tasneef V227 modal stability loaded');
+  console.log('Tasneef V228 modal stability loaded');
 })();
 
 
-/* ===== Tasneef V227: Inventory detail cleanup + complete meeting Excel reports ===== */
+/* ===== Tasneef V228: Inventory detail cleanup + complete meeting Excel reports ===== */
 (function(){
-  if(window.__tasneefV227ReportsPatch) return;
-  window.__tasneefV227ReportsPatch = true;
-  const VERSION='V227';
+  if(window.__tasneefV228ReportsPatch) return;
+  window.__tasneefV228ReportsPatch = true;
+  const VERSION='V228';
   const A=v=>Array.isArray(v)?v:[];
   const S=v=>String(v??'').trim();
   const N=v=>{ const n=Number(String(v??0).replace(/,/g,'')); return Number.isFinite(n)?n:0; };
@@ -16107,7 +16107,7 @@ function financePrintReport(kind){
   function alertsRows(){ const rows=[['نوع التنبيه','العنصر','الأهمية','الملاحظة']]; A(D().projects).filter(p=>!p.supervisor_id).forEach(p=>rows.push(['مشروع بدون مشرف',p.name,'حرج','يحتاج ربط مشرف'])); A(D().workers).filter(w=>!w.supervisor_id&&!w.assigned_supervisor_id).forEach(w=>rows.push(['عامل بدون مشرف',w.name||w.full_name,'عادي','يحتاج ربط مشرف'])); A(D().logs).filter(l=>l.check_in&&!l.check_out).forEach(l=>rows.push(['دخول بدون خروج',pName(l.project_id),'حرج',sName(l.supervisor_id)])); filteredTickets().filter(t=>!['closed','done','مغلق'].includes(S(t.status).toLowerCase())).forEach(t=>rows.push(['تكت مفتوح',pName(t.project_id),'عادي',t.title||t.subject||''])); return rows; }
   function usersRows(){ return [['الاسم','اسم المستخدم','الدور','الحالة','المشرف المرتبط','ملاحظات'], ...A(D().users).map(u=>[u.full_name||u.name,u.username||'',u.role||'',u.status||'',sName(u.supervisor_id||u.linked_supervisor_id),u.notes||''])]; }
   function suppliersRows(){ return [['المورد','الجوال','العنوان','الحالة','ملاحظات'], ...A(D().suppliers||D().inventorySuppliers).map(s=>[s.name||s.supplier_name,s.phone||s.mobile||'',s.address||'',s.status||'',s.notes||''])]; }
-  function exportSheetsV227(){ const f=currentExportFilters(); const sub=`شركة تصنيف لإدارة المرافق - تاريخ التصدير ${fmtDate(new Date())} - الشهر: ${f.month||'كل الأشهر'} - المشرف: ${f.supervisor?sName(f.supervisor):'كل المشرفين'} - المشروع: ${f.project?pName(f.project):'كل المشاريع'}`; return [
+  function exportSheetsV228(){ const f=currentExportFilters(); const sub=`شركة تصنيف لإدارة المرافق - تاريخ التصدير ${fmtDate(new Date())} - الشهر: ${f.month||'كل الأشهر'} - المشرف: ${f.supervisor?sName(f.supervisor):'كل المشرفين'} - المشروع: ${f.project?pName(f.project):'كل المشاريع'}`; return [
     sheetXml('الملخص التنفيذي',executiveRows(),{title:'الملخص التنفيذي للاجتماع',subtitle:sub}),
     sheetXml('المشاريع',projectsRows(),{title:'المشاريع - كل التفاصيل',subtitle:sub}),
     sheetXml('المستخدمون',usersRows(),{title:'المستخدمون والصلاحيات الأساسية',subtitle:sub}),
@@ -16127,10 +16127,10 @@ function financePrintReport(kind){
     sheetXml('التنبيهات',alertsRows(),{title:'التنبيهات',subtitle:sub})
   ]; }
   async function ensureExportData(){ try{ if(typeof refreshAll==='function') await refreshAll(); }catch(e){} try{ if(typeof financeLoadAll==='function') await financeLoadAll(false); }catch(e){} try{ if(typeof loadPremiumReportsOnly==='function') await loadPremiumReportsOnly(false); }catch(e){} }
-  window.exportMeetingExcelV227 = async function(btn){ try{ if(btn) btn.disabled=true; await ensureExportData(); const f=currentExportFilters(); downloadFile(`تقرير اجتماع تصنيف الشامل - ${f.month||today().slice(0,7)}.xls`, workbookXml(exportSheetsV227())); if(typeof msg==='function') msg('تم تنزيل ملف الاجتماع الشامل بكل تفاصيل التبويبات','ok'); } catch(e){ console.error(e); if(typeof msg==='function') msg(e.message||'تعذر التصدير','err'); alert(e.message||'تعذر التصدير'); } finally{ if(btn) btn.disabled=false; } };
-  window.exportMeetingExcelV223 = window.exportMeetingExcelV227;
-  window.exportMeetingExcelV222 = window.exportMeetingExcelV227;
-  window.exportMeetingExcelV221 = window.exportMeetingExcelV227;
+  window.exportMeetingExcelV228 = async function(btn){ try{ if(btn) btn.disabled=true; await ensureExportData(); const f=currentExportFilters(); downloadFile(`تقرير اجتماع تصنيف الشامل - ${f.month||today().slice(0,7)}.xls`, workbookXml(exportSheetsV228())); if(typeof msg==='function') msg('تم تنزيل ملف الاجتماع الشامل بكل تفاصيل التبويبات','ok'); } catch(e){ console.error(e); if(typeof msg==='function') msg(e.message||'تعذر التصدير','err'); alert(e.message||'تعذر التصدير'); } finally{ if(btn) btn.disabled=false; } };
+  window.exportMeetingExcelV223 = window.exportMeetingExcelV228;
+  window.exportMeetingExcelV222 = window.exportMeetingExcelV228;
+  window.exportMeetingExcelV221 = window.exportMeetingExcelV228;
   function cleanupDuplicateBatchBlocks(){ document.querySelectorAll('#purchaseBatchesV208').forEach(x=>x.remove()); }
   const oldOpen=window.inventoryOpenItemSmart || window.v118ShowProductDetail;
   if(typeof oldOpen==='function'){
@@ -16141,5 +16141,144 @@ function financePrintReport(kind){
   ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(boot,ev==='load'?900:250)));
   setInterval(cleanupDuplicateBatchBlocks,1600);
   setTimeout(boot,1200);
-  console.log('Tasneef V227 export complete + product detail cleanup loaded');
+  console.log('Tasneef V228 export complete + product detail cleanup loaded');
+})();
+
+
+/* ===== TASNEEF V228: attendance filter fix + inventory manager cleanup + speed guard ===== */
+(function(){
+  if(window.__tasneefV228FinalFix) return;
+  window.__tasneefV228FinalFix = true;
+  const VERSION='V228';
+  const $id=id=>document.getElementById(id);
+  const A=v=>Array.isArray(v)?v:[];
+  const S=v=>String(v??'').trim();
+  const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const D=()=>window.data || (typeof data!=='undefined'?data:{}) || {};
+  function today228(){ try{return today()}catch(e){return new Date().toISOString().slice(0,10);} }
+  function supIdOfWorker(w){ try{return workerSupId(w)}catch(e){return w?.supervisor_id||w?.assigned_supervisor_id||w?.supervisor||'';} }
+  function supName228(id){ try{return supervisorName(id)}catch(e){ return A(D().supervisors).concat(A(D().users)).find(u=>String(u.id)===String(id))?.full_name || '-'; } }
+  function uniqueByIdName(rows){
+    const seen=new Set();
+    return A(rows).filter(w=>{ const key=String(w.id||w.name||'').trim(); if(!key||seen.has(key)) return false; seen.add(key); return true; });
+  }
+  function supervisorRows228(){
+    const rows=A(D().supervisors).length?A(D().supervisors):A(D().users).filter(u=>u.role==='supervisor'||u.role==='مشرف');
+    return uniqueByIdName(rows).filter(x=>x.id!==undefined&&x.id!==null);
+  }
+  function fillMonthlySupervisor228(){
+    const el=$id('attendanceMatrixSupervisor'); if(!el) return '';
+    const old=el.value||'';
+    const opts=supervisorRows228().map(s=>`<option value="${E(s.id)}">${E(s.full_name||s.username||s.name||'-')}</option>`).join('');
+    el.innerHTML='<option value="">كل المشرفين</option>'+opts;
+    if([...el.options].some(o=>o.value===old)) el.value=old; else el.value='';
+    return el.value||'';
+  }
+  function ensureAttendanceMonth228(){
+    const el=$id('attendanceMatrixMonth');
+    if(el && (!el.value || el.value.includes('----'))) el.value=today228().slice(0,7);
+    return el?.value || today228().slice(0,7);
+  }
+  function statusText228(status){ return status==='present'?'ح':(status==='absent'?'غ':'-'); }
+  function statusClass228(status){ return status==='present'?'green':(status==='absent'?'red':''); }
+  function recForDay228(workerId,ds){
+    // إذا تكرر التحضير لنفس العامل في نفس اليوم نأخذ أحدث سجل متاح.
+    const rows=A(D().attendance).filter(r=>String(r.worker_id)===String(workerId)&&S(r.attendance_date)===ds);
+    return rows[rows.length-1]||null;
+  }
+  window.renderAttendanceMonthly=function(){
+    const body=$id('attendanceMatrixBody'), head=$id('attendanceMatrixHead'); if(!body||!head) return;
+    const month=ensureAttendanceMonth228();
+    const sid=fillMonthlySupervisor228();
+    const q=S($id('attendanceMatrixSearch')?.value);
+    const [yy,mm]=month.split('-').map(Number); const daysCount=(!yy||!mm)?31:new Date(yy,mm,0).getDate();
+    const days=Array.from({length:daysCount},(_,i)=>String(i+1).padStart(2,'0'));
+    let workers=uniqueByIdName(A(D().workers));
+    if(sid) workers=workers.filter(w=>String(supIdOfWorker(w))===String(sid));
+    if(q) workers=workers.filter(w=>S(w.name).includes(q)||S(w.phone).includes(q));
+    head.innerHTML=`<tr><th>العامل</th><th>المشرف</th>${days.map(d=>`<th>${d}</th>`).join('')}<th>حضور</th><th>غياب</th><th>النسبة</th></tr>`;
+    let totalP=0,totalA=0;
+    body.innerHTML=workers.map(w=>{
+      let p=0,a=0;
+      const cells=days.map(d=>{
+        const rec=recForDay228(w.id,`${month}-${d}`);
+        if(rec?.status==='present'){p++; totalP++;}
+        else if(rec?.status==='absent'){a++; totalA++;}
+        const st=statusText228(rec?.status);
+        const cls=statusClass228(rec?.status);
+        return `<td><span class="att-cell ${cls==='green'?'att-present':cls==='red'?'att-absent':'att-empty'}">${st}</span></td>`;
+      }).join('');
+      const pct=(p+a)?(p/(p+a)*100):0;
+      return `<tr><td><b>${E(w.name||'-')}</b></td><td>${E(supName228(supIdOfWorker(w)))}</td>${cells}<td>${p}</td><td>${a}</td><td>${pct.toFixed(1)}%</td></tr>`;
+    }).join('') || `<tr><td colspan="${days.length+5}">لا توجد بيانات حسب الفلتر المختار</td></tr>`;
+    const summary=$id('attendanceMatrixSummary');
+    if(summary){ const pct=(totalP+totalA)?(totalP/(totalP+totalA)*100):0; summary.innerHTML=`<div class="kpi"><small>عدد العمال</small><b>${workers.length}</b></div><div class="kpi"><small>إجمالي الحضور</small><b>${totalP}</b></div><div class="kpi"><small>إجمالي الغياب</small><b>${totalA}</b></div><div class="kpi"><small>نسبة الحضور</small><b>${pct.toFixed(1)}%</b></div>`; }
+  };
+
+  function removeExactWarningText228(){
+    const bad=['تنبيه تكلفة: عند إدخال نفس الصنف','سيتم حفظ سعر كل فاتورة كما هو','الصرف يعتمد FIFO','الصرف يعتمد على FIFO'];
+    document.querySelectorAll('body *').forEach(el=>{
+      if(!el || ['SCRIPT','STYLE','OPTION','SELECT','INPUT','TEXTAREA','TABLE','TBODY','TR','TD','TH'].includes(el.tagName)) return;
+      const txt=S(el.textContent);
+      if(!txt) return;
+      if(bad.some(b=>txt.includes(b)) && txt.length<420){ el.remove(); }
+    });
+    const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+    const nodes=[];
+    while(walker.nextNode()){ const n=walker.currentNode; const txt=S(n.nodeValue); if(bad.some(b=>txt.includes(b))) nodes.push(n); }
+    nodes.forEach(n=>{ try{ n.nodeValue=''; }catch(e){} });
+  }
+  function stripInventoryAdvancedBlocks228(root=document){
+    if(!root) return;
+    const titles=['دفعات الشراء وأسعارها الحقيقية','الصرف حسب أقدم دفعة أولًا FIFO','دفعات الشراء وأسعارها FIFO'];
+    root.querySelectorAll('h3,h2').forEach(h=>{
+      const t=S(h.textContent);
+      if(titles.some(x=>t.includes(x))){
+        let next=h.nextElementSibling;
+        h.remove();
+        let guard=0;
+        while(next && guard++<3){
+          const n=next.nextElementSibling;
+          if(next.matches('.table-wrap,table,.card,div')) next.remove();
+          next=n;
+          if(next && /^H[23]$/.test(next.tagName)) break;
+        }
+      }
+    });
+    // remove duplicated old batch block if any.
+    root.querySelectorAll('#purchaseBatchesV208').forEach(x=>x.remove());
+  }
+  const oldOpen228=window.inventoryOpenItemSmart || window.v118ShowProductDetail;
+  if(typeof oldOpen228==='function'){
+    window.inventoryOpenItemSmart=function(id){ const r=oldOpen228.apply(this,arguments); setTimeout(()=>{stripInventoryAdvancedBlocks228();removeExactWarningText228();},40); setTimeout(()=>{stripInventoryAdvancedBlocks228();removeExactWarningText228();},350); return r; };
+    window.v118ShowProductDetail=window.inventoryOpenItemSmart;
+  }
+  const oldFinanceRenderReports228=window.financeRenderReports;
+  if(typeof oldFinanceRenderReports228==='function'){
+    window.financeRenderReports=function(){ const r=oldFinanceRenderReports228.apply(this,arguments); setTimeout(()=>{stripInventoryAdvancedBlocks228($id('inventoryProductDetailBox')||document);removeExactWarningText228();},60); return r; };
+  }
+  // Supervisor daily report safety: refresh data before rendering and avoid breaking the supervisor page.
+  const oldSupClientReportInit228=window.supClientReportInit;
+  window.supClientReportInit=function(){
+    try{
+      const u=typeof session==='function'?session():null;
+      const projects=A(D().projects).filter(p=>!u?.id || String(p.supervisor_id||'')===String(u.id) || !p.supervisor_id);
+      if($id('supClientReportProject') && projects.length){
+        const old=$id('supClientReportProject').value||'';
+        $id('supClientReportProject').innerHTML='<option value="">اختر المشروع</option>'+projects.map(p=>`<option value="${E(p.id)}">${E(p.name||'-')}</option>`).join('');
+        if([...$id('supClientReportProject').options].some(o=>o.value===old)) $id('supClientReportProject').value=old;
+      }
+      if($id('supClientReportDate') && !$id('supClientReportDate').value) $id('supClientReportDate').value=today228();
+      if(typeof oldSupClientReportInit228==='function') oldSupClientReportInit228.apply(this,arguments);
+    }catch(e){ console.warn('V228 supervisor daily report safe init',e); }
+  };
+  function boot228(){
+    document.querySelectorAll('script[src*="app.js?v="]').forEach(()=>{});
+    document.querySelectorAll('.export-hero-badge-v222').forEach(x=>x.textContent=VERSION);
+    removeExactWarningText228(); stripInventoryAdvancedBlocks228();
+    if($id('attendanceMatrixBody')) window.renderAttendanceMonthly();
+  }
+  ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(boot228,ev==='load'?900:250)));
+  setTimeout(boot228,1300);
+  console.log('Tasneef V228 final patch loaded');
 })();
