@@ -14148,10 +14148,10 @@ function financePrintReport(kind){
 })();
 
 
-/* ===== V214: Client reports clean monthly grouping + remove instructional notes ===== */
+/* ===== V215: Client reports project filter fix + remove instructional notes ===== */
 (function(){
-  if(window.__tasneefV214ClientReportsMonthlyGroup) return;
-  window.__tasneefV214ClientReportsMonthlyGroup = true;
+  if(window.__tasneefV215ClientReportsProjectFilter) return;
+  window.__tasneefV215ClientReportsProjectFilter = true;
   const $ = (id)=>document.getElementById(id);
   const S = (v)=>String(v??'');
   const E = (v)=>S(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -14247,7 +14247,15 @@ function financePrintReport(kind){
     let rows=[...reports];
     if(q) rows=rows.filter(r=>[r.report_no,r.project_name,r.title,r.report_type,serviceNames([r.id]).join(' ')].join(' ').includes(q));
     if(smart) rows=rows.filter(r=>[r.report_no,r.project_name,r.title,r.report_type,serviceNames([r.id]).join(' ')].join(' ').includes(smart));
-    if(pid) rows=rows.filter(r=>S(r.project_id)===S(pid));
+    if(pid){
+      const sel=$('premiumReportFilterProject');
+      const ptxt=S(sel?.selectedOptions?.[0]?.textContent).trim();
+      rows=rows.filter(r=>{
+        const rpid=S(r.project_id).trim();
+        const rname=S(r.project_name || projectLabel(r)).trim();
+        return rpid===S(pid).trim() || rname===ptxt || rname===S(pid).trim() || rpid===ptxt;
+      });
+    }
     if(st) rows=rows.filter(r=>(r.status||'unpublished')===st);
     if(month) rows=rows.filter(r=>S(r.report_date).startsWith(month));
     let groups=groupedMonthlyReports214(rows);
@@ -14271,5 +14279,5 @@ function financePrintReport(kind){
   if(typeof oldShow==='function') window.showPage=function(page,btn){ const r=oldShow.apply(this,arguments); if(page==='clientReports') setTimeout(()=>{cleanClientReportNotes214(); try{window.renderPremiumReports();}catch(_){ }},150); return r; };
   window.addEventListener('load',()=>setTimeout(()=>{ cleanClientReportNotes214(); try{window.renderPremiumReports();}catch(_){ } },1100));
   setTimeout(()=>{ cleanClientReportNotes214(); try{window.renderPremiumReports();}catch(_){ } },1800);
-  console.log('Tasneef V214 client reports monthly grouping loaded');
+  console.log('Tasneef V215 client reports project filter fix loaded');
 })();
