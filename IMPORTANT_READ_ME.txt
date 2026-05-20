@@ -1,19 +1,10 @@
-Tasneef V204 - Upload Only
+نسخة V207 للرفع فقط
 
-ارفع هذه الملفات فقط للموقع:
-- index.html
-- admin.html
-- supervisor.html
-- technician.html
-- client-report.html
-- app.js
-- style.css
-- tasneef_logo_print.png
-- tasneef_stamp.jpeg
-- sounds
-
-مهم لقاعدة البيانات:
-شغل الملف التالي مرة واحدة في Supabase SQL Editor:
-sql/schema_update_v204_app_users_permissions_roles.sql
+التعديلات:
+1- تنزيل PDF مباشر للتكتات في مجلد التنزيلات.
+2- تقرير التكتات مرتب حسب اسم المشرف، وتحت كل مشرف التكتات الخاصة به.
+3- التقرير يلتزم بالفلاتر الحالية في صفحة التكتات.
+4- يظهر اسم من رفع التكت حتى لو كان إداريًا.
+5- تم تحويل أزرار PDF القديمة من نافذة طباعة إلى تنزيل مباشر، مع بديل طباعة إذا تعذر تحميل مكتبة PDF.
 
 بعد الرفع اضغط Ctrl + F5.
