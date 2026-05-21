@@ -17638,3 +17638,60 @@ function financePrintReport(kind){
   const oldShow=window.showPage; if(typeof oldShow==='function' && !oldShow._v238){ const fn=function(){const out=oldShow.apply(this,arguments); setTimeout(enhanceButtons,250); return out;}; fn._v238=true; window.showPage=fn; }
   console.log('Tasneef V239 lite network stable + smart PDF windows loaded');
 })();
+
+/* ===================== V240: FIX SMART PDF MODAL POSITION =====================
+   سبب المشكلة: نافذة PDF كانت تستخدم class عام بدون تنسيق fixed، فتظهر في آخر الصفحة.
+   هذا الإصلاح يثبت النافذة في وسط الشاشة ويمنع تمدد الصفحة عند فتح معاينة PDF.
+============================================================================ */
+(function(){
+  'use strict';
+  window.TASNEEF_BUILD = 'V240_SMART_PDF_MODAL_FIXED_2026_05_21';
+  function inject(){
+    if(document.getElementById('v240SmartPdfModalFixCss')) return;
+    const st=document.createElement('style'); st.id='v240SmartPdfModalFixCss';
+    st.textContent=`
+      #smartPdfModalV238{
+        position:fixed!important; inset:0!important; z-index:2147483000!important;
+        display:flex!important; align-items:center!important; justify-content:center!important;
+        background:rgba(5,28,23,.62)!important; padding:18px!important;
+        overflow:hidden!important; direction:rtl!important;
+      }
+      #smartPdfModalV238>.smart-pdf-modal-v238,
+      #smartPdfModalV238>.modal-card.smart-pdf-modal-v238{
+        width:min(1180px,96vw)!important; max-width:96vw!important; max-height:92vh!important;
+        background:#fff!important; border-radius:24px!important; overflow:hidden!important;
+        box-shadow:0 30px 90px rgba(0,0,0,.32)!important; border:1px solid #d6e7e0!important;
+        display:flex!important; flex-direction:column!important; margin:0!important; position:relative!important;
+      }
+      #smartPdfModalV238 .modal-head{
+        flex:0 0 auto!important; display:flex!important; align-items:center!important; justify-content:space-between!important;
+        gap:12px!important; padding:13px 18px!important; background:linear-gradient(135deg,#063f32,#0A5A49)!important;
+        color:#fff!important; border-radius:0!important;
+      }
+      #smartPdfModalV238 .modal-head h2{margin:0!important;color:#fff!important;font-size:22px!important}
+      #smartPdfModalV238 .modal-head button{background:#fff!important;color:#064633!important;border-radius:12px!important;padding:8px 13px!important;font-weight:900!important}
+      #smartPdfModalV238 .smart-pdf-actions-v238{
+        flex:0 0 auto!important; display:flex!important; gap:8px!important; justify-content:flex-start!important;
+        padding:12px 16px!important; margin:0!important; border-bottom:1px solid #dcebe5!important; background:#fbfdfc!important;
+      }
+      #smartPdfModalV238 .smart-pdf-preview-v238{
+        flex:1 1 auto!important; min-height:0!important; max-height:none!important; overflow:auto!important;
+        background:#eef4f1!important; border:0!important; border-radius:0!important; padding:14px!important;
+      }
+      #smartPdfModalV238 .smart-pdf-preview-v238 .tasneef-pdf-sheet{
+        margin:0 auto!important; box-shadow:0 14px 38px rgba(0,0,0,.08)!important;
+      }
+      @media(max-width:760px){
+        #smartPdfModalV238{align-items:flex-end!important;padding:0!important}
+        #smartPdfModalV238>.smart-pdf-modal-v238{width:100%!important;max-width:100%!important;max-height:94vh!important;border-radius:24px 24px 0 0!important}
+        #smartPdfModalV238 .smart-pdf-actions-v238{flex-wrap:wrap!important}
+        #smartPdfModalV238 .smart-pdf-actions-v238 button{flex:1 1 140px!important}
+      }
+      @media print{#smartPdfModalV238{position:static!important;background:#fff!important;padding:0!important;display:block!important}}
+    `;
+    document.head.appendChild(st);
+  }
+  inject();
+  window.addEventListener('DOMContentLoaded', inject);
+  window.addEventListener('load', inject);
+})();
