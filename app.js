@@ -17824,3 +17824,76 @@ function financePrintReport(kind){
   setTimeout(()=>{ try{ if($id('monthlyBody') && typeof renderMonthly==='function') renderMonthly(); }catch(e){} },900);
   console.log('Tasneef V241 old monthly centered PDF loaded');
 })();
+
+
+/* ===================== V242: Fix monthly PDF button under UI read-only + robust centered modal =====================
+   - Allow print/export/PDF buttons to work even when a section is read-only.
+   - Add delegated click handler for monthly PDF so the button always responds.
+===================== */
+(function(){
+  window.TASNEEF_BUILD = 'V242_MONTHLY_PDF_BUTTON_READONLY_FIX_2026_05_21';
+  const $id=(id)=>document.getElementById(id);
+  const S=(v)=>String(v??'');
+  function isReportActionButton(btn){
+    const txt=S(btn.textContent).trim();
+    const oc=S(btn.getAttribute('onclick'));
+    return /PDF|طباعة|تنزيل|تصدير|CSV|حفظ PDF|الأوقات الشهرية/.test(txt) || /printMonthlyReport|exportMonthly|SmartPdf|Download|CSV/i.test(oc);
+  }
+  function enableReadOnlyReportActionsV242(){
+    document.querySelectorAll('.ui-readonly-v236 button, .ui-readonly-v236 input[type="button"], .ui-readonly-v236 input[type="submit"]').forEach(btn=>{
+      if(isReportActionButton(btn)){
+        btn.disabled=false;
+        btn.classList.remove('ui-disabled-v236');
+        btn.style.pointerEvents='auto';
+        btn.style.opacity='1';
+        btn.dataset.uiPrevDisabled='0';
+      }
+    });
+  }
+  const oldApply=window.applyUiBlockRulesV236;
+  if(typeof oldApply==='function' && !oldApply.__v242Wrapped){
+    const wrapped=function(){
+      const r=oldApply.apply(this,arguments);
+      setTimeout(enableReadOnlyReportActionsV242,80);
+      setTimeout(enableReadOnlyReportActionsV242,450);
+      return r;
+    };
+    wrapped.__v242Wrapped=true;
+    window.applyUiBlockRulesV236=wrapped;
+  }
+  function makeMonthlyButtonWorkV242(){
+    document.querySelectorAll('#monthly button, button[onclick*="printMonthlyReport"], button[onclick*="exportMonthly"]').forEach(btn=>{
+      const txt=S(btn.textContent);
+      const oc=S(btn.getAttribute('onclick'));
+      if(/PDF الأوقات الشهرية|طباعة تقرير الأوقات الشهرية|طباعة التقرير|الأوقات الشهرية/.test(txt) || /printMonthlyReport/.test(oc)){
+        btn.textContent='PDF الأوقات الشهرية';
+        btn.disabled=false;
+        btn.classList.remove('ui-disabled-v236');
+        btn.style.pointerEvents='auto';
+        btn.style.opacity='1';
+        btn.removeAttribute('onclick');
+        btn.onclick=function(ev){
+          ev.preventDefault(); ev.stopPropagation();
+          const fn=window.printMonthlyReportV241 || window.printMonthlyReportV57 || window.printMonthlyReportV219;
+          if(typeof fn==='function') return fn();
+          alert('تعذر فتح تقرير الأوقات الشهرية. أعد تحديث الصفحة.');
+        };
+      }
+    });
+    enableReadOnlyReportActionsV242();
+  }
+  document.addEventListener('click', function(ev){
+    const btn=ev.target && ev.target.closest ? ev.target.closest('button') : null;
+    if(!btn) return;
+    const txt=S(btn.textContent); const oc=S(btn.getAttribute('onclick'));
+    if((btn.closest('#monthly') || /printMonthlyReport/.test(oc)) && /PDF الأوقات الشهرية|طباعة تقرير الأوقات الشهرية|طباعة التقرير|الأوقات الشهرية/.test(txt+oc)){
+      ev.preventDefault(); ev.stopPropagation();
+      btn.disabled=false;
+      const fn=window.printMonthlyReportV241 || window.printMonthlyReportV57 || window.printMonthlyReportV219;
+      if(typeof fn==='function') fn();
+    }
+  }, true);
+  [200,700,1400,2500].forEach(t=>setTimeout(makeMonthlyButtonWorkV242,t));
+  window.addEventListener('load', ()=>setTimeout(makeMonthlyButtonWorkV242,500));
+  console.log('Tasneef V242 monthly PDF button readonly fix loaded');
+})();
