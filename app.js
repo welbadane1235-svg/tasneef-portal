@@ -114,6 +114,108 @@
   }
 })();
 
+
+
+/* ===================== V239: LITE NETWORK RESILIENCE + OFFLINE CACHE ===================== */
+(function(){
+  if(window.__tasneefLiteNetworkV239) return;
+  window.__tasneefLiteNetworkV239 = true;
+  window.TASNEEF_BUILD = 'V239_LITE_NETWORK_STABLE_2026_05_21';
+
+  function addLiteStyle(){
+    if(document.getElementById('tasneefLiteStyleV239')) return;
+    const st=document.createElement('style');
+    st.id='tasneefLiteStyleV239';
+    st.textContent=`
+      .tasneef-netbar-v239{position:fixed;left:16px;bottom:16px;z-index:999998;direction:rtl;background:#064c3f;color:white;border-radius:16px;padding:10px 14px;box-shadow:0 12px 28px rgba(0,0,0,.18);font:700 13px Tahoma,Arial;display:none;max-width:360px;line-height:1.7}
+      .tasneef-netbar-v239.warn{background:#8a5b00}.tasneef-netbar-v239.err{background:#9b1c1c}.tasneef-netbar-v239.show{display:block}
+      .tasneef-lite-skeleton-v239{min-height:120px;border-radius:18px;background:linear-gradient(90deg,#eef6f3,#fff,#eef6f3);background-size:220% 100%;animation:tasneefSkV239 1.4s infinite;border:1px solid #d9e8e3}
+      @keyframes tasneefSkV239{0%{background-position:0 0}100%{background-position:-220% 0}}
+    `;
+    document.head.appendChild(st);
+  }
+  function netbar(text,type='warn',ms=4500){
+    try{
+      addLiteStyle();
+      let b=document.getElementById('tasneefNetbarV239');
+      if(!b){ b=document.createElement('div'); b.id='tasneefNetbarV239'; b.className='tasneef-netbar-v239'; document.body.appendChild(b); }
+      b.textContent=text; b.className='tasneef-netbar-v239 '+type+' show';
+      clearTimeout(b.__t); b.__t=setTimeout(()=>b.classList.remove('show'),ms);
+    }catch(e){}
+  }
+  window.tasneefNetbarV239 = netbar;
+
+  function pageReady(){
+    addLiteStyle();
+    window.addEventListener('offline',()=>netbar('الاتصال ضعيف أو غير متاح. سيتم عرض آخر بيانات محفوظة إن وجدت.','err',7000));
+    window.addEventListener('online',()=>netbar('تم رجوع الاتصال. يمكنك الضغط على تحديث البيانات.','warn',5000));
+    if(!navigator.onLine) netbar('أنت الآن بدون اتصال. النظام سيحاول العمل من آخر بيانات محفوظة.','err',8000);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',pageReady); else pageReady();
+
+  // Register service worker to cache app files for weak internet. Works after first successful visit.
+  if('serviceWorker' in navigator && !window.__tasneefSWRegV239){
+    window.__tasneefSWRegV239 = true;
+    window.addEventListener('load',()=>{
+      navigator.serviceWorker.register('tasneef-sw.js?v=239').catch(()=>{});
+    });
+  }
+
+  // Supabase GET cache fallback: network first, then cached data if internet is weak.
+  const previousFetch = window.fetch;
+  if(previousFetch && !previousFetch.__tasneefCacheV239){
+    const CACHE_PREFIX='tasneef_sb_cache_v239:';
+    const MAX_AGE_MS=1000*60*60*12; // 12 hours for emergency fallback
+    const NETWORK_TIMEOUT_MS=8500;
+    function currentUserKey(){
+      try{ const u=JSON.parse(localStorage.getItem('tasneef_user')||'null'); return (u?.username||u?.role||'guest'); }catch(e){ return 'guest'; }
+    }
+    function cacheKey(url){ return CACHE_PREFIX+currentUserKey()+':'+String(url); }
+    function canCache(url, init){
+      const method=String(init?.method || 'GET').toUpperCase();
+      return method==='GET' && /supabase\.co\/rest\/v1\//i.test(String(url));
+    }
+    function responseFromCache(key){
+      try{
+        const raw=localStorage.getItem(key); if(!raw) return null;
+        const obj=JSON.parse(raw); if(!obj || !obj.body) return null;
+        if(Date.now()-(obj.ts||0)>MAX_AGE_MS) return null;
+        netbar('الاتصال بطيء، تم عرض آخر بيانات محفوظة مؤقتًا.','warn',5000);
+        return new Response(obj.body,{status:200,statusText:'OK (Tasneef Cache)',headers:{'content-type':obj.contentType||'application/json','x-tasneef-cache':'1'}});
+      }catch(e){ return null; }
+    }
+    async function saveCache(key,res){
+      try{
+        if(!res || !res.ok) return;
+        const contentType=res.headers.get('content-type')||'application/json';
+        const txt=await res.clone().text();
+        if(!txt || txt.length>900000) return;
+        localStorage.setItem(key,JSON.stringify({ts:Date.now(),contentType,body:txt}));
+      }catch(e){}
+    }
+    const patched=function(input, init={}){
+      const url=(typeof input==='string')?input:(input&&input.url?input.url:'');
+      if(!canCache(url,init)) return previousFetch.apply(this,arguments);
+      const key=cacheKey(url);
+      const controller = new AbortController();
+      const merged = Object.assign({}, init, {signal: init.signal || controller.signal});
+      const timer=setTimeout(()=>{try{controller.abort()}catch(e){}}, NETWORK_TIMEOUT_MS);
+      return previousFetch.call(this,input,merged).then(res=>{
+        clearTimeout(timer);
+        saveCache(key,res);
+        return res;
+      }).catch(err=>{
+        clearTimeout(timer);
+        const cached=responseFromCache(key);
+        if(cached) return cached;
+        throw err;
+      });
+    };
+    patched.__tasneefCacheV239=true;
+    window.fetch=patched;
+  }
+})();
+
 // Tasneef HTML App V86 - Contract Services Cloud View Fix
 const SUPABASE_URL = "https://zmjdqiswytxlbfgnfjfv.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb";
@@ -17386,7 +17488,7 @@ function financePrintReport(kind){
 ============================================================================ */
 (function(){
   'use strict';
-  window.TASNEEF_BUILD = 'V238_SMART_DAILY_MONTHLY_PDF_WINDOWS_2026_05_21';
+  window.TASNEEF_BUILD = 'V239_LITE_NETWORK_STABLE_2026_05_21';
   const E = (v)=>String(v ?? '').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const $id = (id)=>document.getElementById(id);
   const say = (t,type)=>{ try{ (window.msg||window.setMsg||alert)(t,type); }catch{ alert(t); } };
@@ -17534,5 +17636,5 @@ function financePrintReport(kind){
   window.addEventListener('DOMContentLoaded',()=>setTimeout(enhanceButtons,900));
   window.addEventListener('load',()=>setTimeout(enhanceButtons,1600));
   const oldShow=window.showPage; if(typeof oldShow==='function' && !oldShow._v238){ const fn=function(){const out=oldShow.apply(this,arguments); setTimeout(enhanceButtons,250); return out;}; fn._v238=true; window.showPage=fn; }
-  console.log('Tasneef V238 smart PDF windows for daily logs and monthly times loaded');
+  console.log('Tasneef V239 lite network stable + smart PDF windows loaded');
 })();
