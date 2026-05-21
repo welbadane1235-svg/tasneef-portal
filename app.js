@@ -17117,3 +17117,173 @@ function financePrintReport(kind){
   setTimeout(boot,1200);
   console.log('Tasneef V235 final fixes loaded');
 })();
+
+/* ===== V236: System Admin UI Block Controls (hide / read only) ===== */
+(function(){
+  const VERSION='236';
+  const STORE_KEY='tasneef_ui_block_rules_v236';
+  const TABLE='ui_section_rules';
+  const ADMIN_AREA_ROLES=new Set(['admin','general_manager','operations_manager','financial_manager','warehouse_manager']);
+  const SYSTEM_ADMIN_USERNAMES=new Set(['admin','mustafa','مصطفى']);
+  const safeText=(s)=>String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+  const $id=(id)=>document.getElementById(id);
+  function getUser(){ try{return typeof session==='function'?(session()||{}):(JSON.parse(localStorage.getItem('tasneef_session')||'{}')||{});}catch{return {}} }
+  function isSystemAdmin(){ const u=getUser(); return String(u.role||'')==='admin' || SYSTEM_ADMIN_USERNAMES.has(String(u.username||'').toLowerCase()); }
+  function isAdminAreaUser(){ const u=getUser(); return ADMIN_AREA_ROLES.has(String(u.role||'')); }
+  function readLocal(){ try{return JSON.parse(localStorage.getItem(STORE_KEY)||'{}')||{};}catch{return {}} }
+  function writeLocal(rules){ try{localStorage.setItem(STORE_KEY,JSON.stringify(rules||{}));}catch{} }
+  function setMsg(text,type){ try{ if(typeof msg==='function') msg(text,type||''); else console.log(text); }catch{ console.log(text); } }
+  window.tasneefUiBlockRulesV236=window.tasneefUiBlockRulesV236||readLocal();
+  let loading=false, loadedOnce=false;
+  function rules(){ return window.tasneefUiBlockRulesV236 || {}; }
+  function saveRules(r){ window.tasneefUiBlockRulesV236=r||{}; writeLocal(window.tasneefUiBlockRulesV236); }
+  async function loadRemoteRules(){
+    if(loading || loadedOnce) return; loading=true;
+    try{
+      if(!window.sb) return;
+      const res=await sb.from(TABLE).select('*');
+      if(res && !res.error && Array.isArray(res.data)){
+        const next={};
+        res.data.forEach(x=>{ if(x && x.block_key) next[x.block_key]={hidden:!!x.hidden, readonly:!!x.readonly, title:x.title||''}; });
+        saveRules(Object.assign(readLocal(),next));
+        loadedOnce=true;
+      }
+    }catch(e){ /* table may not exist - local fallback */ }
+    finally{ loading=false; }
+  }
+  async function persistRule(key, patch, title){
+    const r=rules();
+    r[key]=Object.assign({hidden:false,readonly:false,title:title||key}, r[key]||{}, patch||{}, {title:title||r[key]?.title||key, updated_at:new Date().toISOString()});
+    saveRules(r);
+    try{
+      if(window.sb){
+        await sb.from(TABLE).upsert({block_key:key,title:title||key,hidden:!!r[key].hidden,readonly:!!r[key].readonly,updated_at:new Date().toISOString()},{onConflict:'block_key'});
+      }
+    }catch(e){ /* local fallback */ }
+    applyUiBlockRulesV236();
+  }
+  function blockTitle(el){
+    const h=el.querySelector('h1,h2,h3,.section-title,label');
+    let t=(h?.textContent||'').trim();
+    if(!t){
+      const page=el.closest('.page')?.id||'عام';
+      t=page+' - جزئية';
+    }
+    return t.replace(/\s+/g,' ').slice(0,60);
+  }
+  function blockKey(el,idx){
+    if(el.dataset.uiBlockKey) return el.dataset.uiBlockKey;
+    const page=el.closest('.page')?.id || 'global';
+    const id=el.id ? el.id : '';
+    const title=blockTitle(el).replace(/[\s\W]+/g,'_').slice(0,35) || 'block';
+    const key=`${page}.${id||title}.${idx}`;
+    el.dataset.uiBlockKey=key;
+    return key;
+  }
+  function blocks(){
+    const arr=[];
+    document.querySelectorAll('main .page .card, main .page .section-head, main .page .report-form-card, main .page .export-slide-v222').forEach((el,i)=>{
+      if(el.closest('.tasneef-ui-panel-v236')) return;
+      arr.push(el);
+      blockKey(el,i);
+    });
+    return arr;
+  }
+  function injectControls(el,key){
+    if(!isSystemAdmin()) return;
+    if(el.querySelector(':scope > .ui-control-v236')) return;
+    const title=blockTitle(el);
+    const wrap=document.createElement('div');
+    wrap.className='ui-control-v236';
+    wrap.innerHTML=`<span title="${safeText(key)}">تحكم مدير النظام</span><button type="button" class="light ui-hide-v236">إخفاء</button><button type="button" class="light ui-read-v236">قراءة فقط</button>`;
+    el.insertBefore(wrap, el.firstChild);
+    wrap.querySelector('.ui-hide-v236').onclick=(e)=>{ e.stopPropagation(); const cur=rules()[key]||{}; persistRule(key,{hidden:!cur.hidden},title); };
+    wrap.querySelector('.ui-read-v236').onclick=(e)=>{ e.stopPropagation(); const cur=rules()[key]||{}; persistRule(key,{readonly:!cur.readonly},title); };
+  }
+  function updateControlState(el, rule){
+    const c=el.querySelector(':scope > .ui-control-v236'); if(!c) return;
+    c.querySelector('.ui-hide-v236')?.classList.toggle('active',!!rule.hidden);
+    c.querySelector('.ui-read-v236')?.classList.toggle('active',!!rule.readonly);
+    c.querySelector('.ui-hide-v236').textContent=rule.hidden?'إلغاء الإخفاء':'إخفاء';
+    c.querySelector('.ui-read-v236').textContent=rule.readonly?'إلغاء القراءة فقط':'قراءة فقط';
+  }
+  function isAllowedButton(btn){
+    const txt=(btn.textContent||'').trim();
+    const okWords=['عرض','طباعة','تصدير','تنزيل','معاينة','بحث','تحديث','إغلاق','رجوع','فلتر','CSV','PDF'];
+    return okWords.some(w=>txt.includes(w));
+  }
+  function readonlyBlock(el){
+    el.classList.add('ui-readonly-v236');
+    el.querySelectorAll('input,select,textarea').forEach(x=>{
+      if(x.closest('.ui-control-v236')) return;
+      x.dataset.uiPrevDisabled=x.disabled?'1':'0';
+      x.disabled=true;
+    });
+    el.querySelectorAll('button').forEach(b=>{
+      if(b.closest('.ui-control-v236')) return;
+      if(isAllowedButton(b)) return;
+      b.dataset.uiPrevDisabled=b.disabled?'1':'0';
+      b.disabled=true; b.classList.add('ui-disabled-v236');
+    });
+    el.querySelectorAll('a[onclick], [contenteditable="true"]').forEach(x=>{ if(!x.closest('.ui-control-v236')) x.classList.add('ui-disabled-v236'); });
+  }
+  function clearReadonlyBlock(el){
+    el.classList.remove('ui-readonly-v236');
+    el.querySelectorAll('[data-ui-prev-disabled]').forEach(x=>{ if(x.dataset.uiPrevDisabled==='0') x.disabled=false; delete x.dataset.uiPrevDisabled; x.classList.remove('ui-disabled-v236'); });
+    el.querySelectorAll('.ui-disabled-v236').forEach(x=>x.classList.remove('ui-disabled-v236'));
+  }
+  function applyUiBlockRulesV236(){
+    if(!document.body) return;
+    const r=rules();
+    const sys=isSystemAdmin();
+    const adminUser=isAdminAreaUser();
+    blocks().forEach((el,idx)=>{
+      const key=blockKey(el,idx); const rule=r[key]||{};
+      injectControls(el,key);
+      updateControlState(el,rule);
+      el.classList.remove('ui-hidden-for-admins-v236');
+      clearReadonlyBlock(el);
+      if(!sys && adminUser){
+        if(rule.hidden){ el.classList.add('ui-hidden-for-admins-v236'); return; }
+        if(rule.readonly) readonlyBlock(el);
+      }
+    });
+  }
+  window.applyUiBlockRulesV236=applyUiBlockRulesV236;
+  window.uiBlockRulesPanelV236=function(){
+    if(!isSystemAdmin()) return setMsg('هذه اللوحة تظهر لمدير النظام فقط','err');
+    const r=rules();
+    const rows=Object.entries(r).filter(([,v])=>v.hidden||v.readonly).map(([k,v])=>`<tr><td>${safeText(v.title||k)}</td><td>${safeText(k)}</td><td>${v.hidden?'مخفي':'ظاهر'}</td><td>${v.readonly?'قراءة فقط':'كامل'}</td><td><button class="light" onclick="tasneefResetUiRuleV236('${safeText(k)}')">إعادة ضبط</button></td></tr>`).join('')||'<tr><td colspan="5">لا توجد قواعد مفعلة</td></tr>';
+    const old=document.getElementById('uiRulesModalV236'); if(old) old.remove();
+    document.body.insertAdjacentHTML('beforeend',`<div id="uiRulesModalV236" class="modal-backdrop" onclick="if(event.target===this)this.remove()"><div class="modal-card" style="max-width:900px"><div class="modal-head"><h2>صلاحيات عناصر الواجهة</h2><button onclick="this.closest('.modal-backdrop').remove()">إغلاق</button></div><div class="table-wrap"><table><thead><tr><th>الجزئية</th><th>المفتاح</th><th>الإخفاء</th><th>القراءة</th><th>إجراء</th></tr></thead><tbody>${rows}</tbody></table></div><div class="actions"><button class="danger" onclick="tasneefClearAllUiRulesV236()">إعادة ضبط الكل</button></div></div></div>`);
+  };
+  window.tasneefResetUiRuleV236=async function(key){ const r=rules(); delete r[key]; saveRules(r); try{ if(window.sb) await sb.from(TABLE).delete().eq('block_key',key); }catch{} applyUiBlockRulesV236(); document.getElementById('uiRulesModalV236')?.remove(); window.uiBlockRulesPanelV236(); };
+  window.tasneefClearAllUiRulesV236=async function(){ if(!confirm('إعادة ضبط كل قواعد الإخفاء والقراءة فقط؟')) return; saveRules({}); try{ if(window.sb) await sb.from(TABLE).delete().neq('block_key','__none__'); }catch{} applyUiBlockRulesV236(); document.getElementById('uiRulesModalV236')?.remove(); };
+  function addSystemPanelButton(){
+    if(!isSystemAdmin()) return;
+    const firstHero=document.querySelector('.hero .actions, .hero');
+    if(!firstHero || document.getElementById('uiRulesPanelBtnV236')) return;
+    const btn=document.createElement('button'); btn.id='uiRulesPanelBtnV236'; btn.className='light'; btn.textContent='صلاحيات الواجهة'; btn.onclick=window.uiBlockRulesPanelV236;
+    firstHero.appendChild(btn);
+  }
+  const oldShow=window.showPage;
+  if(typeof oldShow==='function' && !oldShow._v236){
+    const fn=function(){ const out=oldShow.apply(this,arguments); setTimeout(()=>{ addSystemPanelButton(); applyUiBlockRulesV236(); },120); return out; };
+    fn._v236=true; window.showPage=fn;
+  }
+  const oldRenderAll=window.renderAll;
+  if(typeof oldRenderAll==='function' && !oldRenderAll._v236){
+    const fn=function(){ const out=oldRenderAll.apply(this,arguments); setTimeout(()=>{ addSystemPanelButton(); applyUiBlockRulesV236(); },180); return out; };
+    fn._v236=true; window.renderAll=fn;
+  }
+  const css=document.createElement('style');
+  css.textContent=`
+  .ui-control-v236{display:flex;gap:6px;align-items:center;justify-content:flex-start;flex-wrap:wrap;margin:-4px 0 10px;padding:7px 9px;border:1px dashed #b9dfcb;background:#f4fbf8;border-radius:14px;color:#0A4033;font-size:12px;font-weight:800}
+  .ui-control-v236 button{padding:6px 9px;border-radius:10px;font-size:12px}.ui-control-v236 button.active{background:#0A4033!important;color:#fff!important}.ui-hidden-for-admins-v236{display:none!important}.ui-readonly-v236{position:relative;background:linear-gradient(180deg,#fff,#fbfdfc)}.ui-readonly-v236:after{content:'قراءة فقط';position:absolute;top:10px;left:10px;background:#fff5da;color:#8a6700;border:1px solid #edd188;border-radius:999px;padding:4px 9px;font-size:11px;font-weight:800;pointer-events:none}.ui-disabled-v236{opacity:.55!important;pointer-events:none!important}
+  #uiRulesPanelBtnV236{margin-inline-start:8px}`;
+  document.head.appendChild(css);
+  window.addEventListener('DOMContentLoaded',()=>{ loadRemoteRules().finally(()=>setTimeout(()=>{ addSystemPanelButton(); applyUiBlockRulesV236(); },700)); });
+  window.addEventListener('load',()=>{ loadRemoteRules().finally(()=>setTimeout(()=>{ addSystemPanelButton(); applyUiBlockRulesV236(); },1200)); });
+  setInterval(()=>{ try{ addSystemPanelButton(); applyUiBlockRulesV236(); }catch(e){} },4000);
+  console.log('Tasneef V236 UI block controls loaded');
+})();
