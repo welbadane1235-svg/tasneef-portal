@@ -17378,3 +17378,161 @@ function financePrintReport(kind){
   setInterval(()=>{ try{ addSystemPanelButton(); applyUiBlockRulesV236(); }catch(e){} },4000);
   console.log('Tasneef V237 UI block controls strict loaded');
 })();
+
+/* ===================== V238: SMART PDF WINDOWS FOR DAILY LOGS + MONTHLY TIMES =====================
+   - نفس فكرة التكتات: معاينة + طباعة/حفظ PDF + تنزيل PDF.
+   - يعتمد على الفلاتر الحالية في السجلات اليومية والأوقات الشهرية.
+   - لا يغير بيانات النظام؛ فقط طريقة عرض/طباعة التقارير.
+============================================================================ */
+(function(){
+  'use strict';
+  window.TASNEEF_BUILD = 'V238_SMART_DAILY_MONTHLY_PDF_WINDOWS_2026_05_21';
+  const E = (v)=>String(v ?? '').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const $id = (id)=>document.getElementById(id);
+  const say = (t,type)=>{ try{ (window.msg||window.setMsg||alert)(t,type); }catch{ alert(t); } };
+  const arr = (x)=>Array.isArray(x)?x:[];
+  const logoSrc = 'tasneef_logo_print.png';
+  function minuteText(n){
+    n = Number(n||0);
+    if(typeof window.minsToText==='function') return window.minsToText(n);
+    return `${Math.round(n)} دقيقة`;
+  }
+  function pct(n){
+    n=Number(n||0);
+    if(typeof window.percentText==='function') return window.percentText(n);
+    return `${n.toFixed(1)}%`;
+  }
+  function projName(id){ try{return typeof window.projectName==='function'?window.projectName(id):(arr(window.data?.projects).find(p=>String(p.id)===String(id))?.name||'-');}catch{return '-';} }
+  function supName(id){ try{return typeof window.supervisorName==='function'?window.supervisorName(id):(arr(window.data?.supervisors).find(s=>String(s.id)===String(id))?.full_name||arr(window.data?.users).find(u=>String(u.id)===String(id))?.full_name||'-');}catch{return '-';} }
+  function timeOnlySafe(v){ try{return typeof window.timeOnly==='function'?window.timeOnly(v):String(v||'').slice(11,16);}catch{return '-';} }
+  function actualMinutes(l){ try{return Number((typeof window.logActualMinutes==='function'?window.logActualMinutes(l):(l.duration_minutes||window.minutesBetween?.(l.check_in,l.check_out)))||0);}catch{return Number(l?.duration_minutes||0)||0;} }
+  function requiredMinutes(l){ try{return Number((typeof window.logRequiredMinutes==='function'?window.logRequiredMinutes(l):l.required_minutes)||0);}catch{return Number(l?.required_minutes||0)||0;} }
+  function dailyRows(){
+    let rows=[];
+    try{ rows = typeof window.dailyReportRowsV56==='function' ? window.dailyReportRowsV56() : (typeof window.filterLogs==='function' ? window.filterLogs() : arr(window.data?.logs)); }
+    catch{ rows = arr(window.data?.logs); }
+    return arr(rows).slice();
+  }
+  function monthlyRows(){
+    let rows=[];
+    try{ rows = typeof window.monthlyRowsV60==='function' ? window.monthlyRowsV60() : (typeof window.monthlyReportRowsV58==='function' ? window.monthlyReportRowsV58() : (typeof window.monthlyBaseRowsV59==='function'?window.monthlyBaseRowsV59():[])); }
+    catch{ rows=[]; }
+    return arr(rows).slice();
+  }
+  function monthLabel(m){
+    try{return typeof window.monthLabelV57==='function'?window.monthLabelV57(m):m;}catch{return m||'-';}
+  }
+  function currentDailyFiltersText(){
+    const d=$id('dailyDate')?.value||'';
+    const s=$id('dailySupervisor')?.value||'';
+    const p=$id('dailyProject')?.value||'';
+    return `التاريخ: ${d||'الكل'} | المشرف: ${s?supName(s):'الكل'} | المشروع: ${p?projName(p):'الكل'}`;
+  }
+  function currentMonthlyFiltersText(){
+    const m=$id('monthlyMonth')?.value||new Date().toISOString().slice(0,7);
+    const s=$id('monthlySupervisor')?.value||'';
+    return `الشهر: ${monthLabel(m)} | المشرف: ${s?supName(s):'الكل'}`;
+  }
+  function reportCss(){
+    return `
+      *{box-sizing:border-box} body{margin:0;font-family:Tahoma,Arial,sans-serif;direction:rtl;color:#123d32;background:#eef4f1}.tasneef-pdf-sheet{width:1120px;max-width:100%;margin:0 auto;background:#fff;padding:24px;border-radius:20px}.r-head{display:flex;align-items:center;justify-content:space-between;border-bottom:4px solid #0A4033;padding-bottom:14px;margin-bottom:14px}.brand{display:flex;align-items:center;gap:12px}.brand img{width:70px;height:70px;object-fit:contain;border:1px solid #d8e8e1;border-radius:18px;padding:6px;background:#fff}.brand h1{margin:0;color:#0A4033;font-size:26px}.brand p{margin:5px 0 0;color:#60746b}.company{font-weight:900;color:#0A4033;text-align:left}.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}.box{background:#f5fbf8;border:1px solid #d9e9e2;border-radius:15px;padding:12px;text-align:center}.box small{display:block;color:#63766f;margin-bottom:5px}.box b{font-size:20px;color:#0A4033}.section{margin:18px 0 10px;text-align:center}.section span{display:inline-block;background:#0A4033;color:#fff;border-radius:999px;padding:8px 34px;font-weight:900}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}.super-card,.panel{background:#fff;border:1px solid #d7e8e1;border-radius:16px;overflow:hidden;margin-bottom:14px;break-inside:avoid}.super-head{display:flex;justify-content:space-between;align-items:center;background:#0A4033;color:#fff;padding:11px 13px;font-weight:900}.sub-head{background:#f1f8f5;color:#0A4033;padding:9px 13px;font-weight:900;border-bottom:1px solid #d7e8e1}table{width:100%;border-collapse:collapse;font-size:12px}th{background:#eaf4f0;color:#0A4033;border:1px solid #d5e6df;padding:8px;text-align:center}td{border:1px solid #dde9e5;padding:7px;text-align:center;vertical-align:top}tr:nth-child(even) td{background:#fbfdfc}.txt-right{text-align:right}.pill{display:inline-block;border-radius:999px;padding:4px 9px;font-weight:900}.ok{background:#e3f5eb;color:#0b7139}.warn{background:#fff3d6;color:#8a5c00}.bad{background:#ffe5e5;color:#9d2020}.neutral{background:#edf2f3;color:#53636a}.footer{margin-top:14px;border-top:1px solid #dce8e3;padding-top:10px;text-align:center;color:#6b7c74;font-size:12px}.signs{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.sign{border:1px dashed #b8cbc4;border-radius:14px;padding:12px;height:95px}.sign b{display:block;color:#0A4033;margin-bottom:12px}.line{border-bottom:1px dotted #91aaa0;height:26px}@page{size:A4 landscape;margin:9mm}@media print{body{background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact}.tasneef-pdf-sheet{width:auto;border-radius:0;padding:0}.no-print{display:none!important}.super-card,.panel,.box{break-inside:avoid}}`;
+  }
+  function dailyReportNode(){
+    const rows=dailyRows();
+    let actual=0, required=0, within=0, over=0, under=0, open=0;
+    rows.forEach(l=>{const a=actualMinutes(l), r=requiredMinutes(l), diff=a-r; actual+=a; required+=r; if(!l.check_out) open++; if(diff<-5) under++; else if(diff>5) over++; else within++;});
+    const groups=new Map();
+    rows.forEach(l=>{const key=String(l.supervisor_id||'بدون مشرف'); if(!groups.has(key)) groups.set(key,[]); groups.get(key).push(l);});
+    const groupHtml=[...groups.entries()].map(([sid,items])=>{
+      const trs=items.map((l,i)=>{const a=actualMinutes(l), r=requiredMinutes(l), diff=a-r; const cls=diff<-5?'bad':diff>5?'warn':'ok'; const stat=diff<-5?'ناقص وقت':diff>5?'زيادة وقت':'ضمن الوقت'; const date=l.log_date||String(l.check_in||'').slice(0,10)||'-'; return `<tr><td>${i+1}</td><td>${E(date)}</td><td class="txt-right">${E(projName(l.project_id))}</td><td>${E(l.visit_type||'-')}</td><td>${E(timeOnlySafe(l.check_in))}</td><td>${E(timeOnlySafe(l.check_out))}</td><td>${E(minuteText(r))}</td><td>${E(minuteText(a))}</td><td><span class="pill ${cls}">${E(stat)}</span></td><td class="txt-right">${E(l.notes||'-')}</td></tr>`}).join('');
+      const total=items.reduce((s,l)=>s+actualMinutes(l),0);
+      return `<div class="super-card"><div class="super-head"><span>${E(supName(sid))}</span><span>${E(minuteText(total))}</span></div><table><thead><tr><th>#</th><th>التاريخ</th><th>المشروع</th><th>نوع الزيارة</th><th>الدخول</th><th>الخروج</th><th>المطلوب</th><th>الفعلي</th><th>الحالة</th><th>ملاحظات</th></tr></thead><tbody>${trs}</tbody></table></div>`;
+    }).join('') || `<div class="panel"><div class="sub-head">لا توجد بيانات</div></div>`;
+    const node=document.createElement('div'); node.className='tasneef-pdf-sheet';
+    node.innerHTML=`<style>${reportCss()}</style><div class="r-head"><div class="brand"><img src="${logoSrc}" onerror="this.style.display='none'"><div><h1>تقرير السجلات اليومية</h1><p>${E(currentDailyFiltersText())}</p><p>وقت الإنشاء: ${E(new Date().toLocaleString('ar-SA'))}</p></div></div><div class="company">شركة تصنيف لإدارة المرافق</div></div><div class="meta"><div class="box"><small>عدد السجلات</small><b>${rows.length}</b></div><div class="box"><small>إجمالي الفعلي</small><b>${E(minuteText(actual))}</b></div><div class="box"><small>إجمالي المطلوب</small><b>${E(minuteText(required))}</b></div><div class="box"><small>السجلات المفتوحة</small><b>${open}</b></div></div><div class="meta"><div class="box"><small>ضمن الوقت</small><b>${within}</b></div><div class="box"><small>زيادة وقت</small><b>${over}</b></div><div class="box"><small>ناقص وقت</small><b>${under}</b></div><div class="box"><small>فرق الوقت</small><b>${E(minuteText(actual-required))}</b></div></div><div class="section"><span>السجلات حسب المشرف</span></div>${groupHtml}<div class="signs"><div class="sign"><b>ملاحظات الإدارة</b><div class="line"></div><div class="line"></div></div><div class="sign"><b>اعتماد مدير التشغيل</b><div class="line"></div><div class="line"></div></div></div><div class="footer">هذا التقرير يعتمد على الفلاتر الحالية في صفحة السجلات اليومية.</div>`;
+    return node;
+  }
+  function projectType(pId){
+    const p=arr(window.data?.projects).find(x=>String(x.id)===String(pId));
+    const t=String(p?.operation_type||p?.type||'').toLowerCase();
+    const req=Number(p?.required_minutes_daily||p?.daily_required_minutes||0);
+    if(t.includes('full')||t.includes('permanent')||t.includes('دوام')||req>=480) return 'permanent';
+    return 'daily';
+  }
+  function monthlyReportNode(){
+    const rows=monthlyRows();
+    let actual=0, required=0; rows.forEach(r=>{actual+=Number(r.a||0); required+=Number(r.r||0);});
+    const commitment=required?actual/required*100:0;
+    const groups=[['مشاريع زيارة يومية', rows.filter(r=>projectType(r.p)==='daily')], ['مشاريع دائمة', rows.filter(r=>projectType(r.p)==='permanent')]];
+    function rowsTable(list){
+      let supTotals={}; list.forEach(r=>{const sid=String(r.s||''); supTotals[sid]=(supTotals[sid]||0)+Number(r.a||0);});
+      const trs=list.map(r=>{const supTotal=supTotals[String(r.s||'')]||0; const percent=supTotal?Number(r.a||0)/supTotal*100:(Number(r.workPercent)||0); const diff=Number(r.a||0)-Number(r.r||0); const cls=diff<-5?'bad':diff>5?'warn':'ok'; const st=diff<-5?'ناقص وقت':diff>5?'زيادة وقت':'ضمن الوقت'; return `<tr><td>${E(supName(r.s))}</td><td class="txt-right">${E(projName(r.p))}</td><td class="txt-right">${E(r.workers||'-')}</td><td>${Math.round(Number(r.a||0))}</td><td>${Math.round(Number(r.r||0))}</td><td>${Math.round(diff)}</td><td><span class="pill ok">${E(pct(percent))}</span></td><td><span class="pill ${cls}">${E(st)}</span></td></tr>`;}).join('') || `<tr><td colspan="8">لا توجد بيانات</td></tr>`;
+      const totalA=list.reduce((s,r)=>s+Number(r.a||0),0), totalR=list.reduce((s,r)=>s+Number(r.r||0),0); const totalPct=totalR?totalA/totalR*100:0;
+      return `<table><thead><tr><th>المشرف</th><th>المشروع</th><th>العمال</th><th>الدقائق الفعلية</th><th>الدقائق المطلوبة</th><th>الفرق بالدقائق</th><th>النسبة</th><th>الحالة</th></tr></thead><tbody>${trs}</tbody><tfoot><tr><th colspan="3">الإجمالي</th><th>${Math.round(totalA)}</th><th>${Math.round(totalR)}</th><th>${Math.round(totalA-totalR)}</th><th>${E(pct(totalPct))}</th><th>-</th></tr></tfoot></table>`;
+    }
+    const sectionHtml=groups.map(([title,list])=>`<div class="panel"><div class="sub-head">${E(title)} — ${list.length} مشروع</div>${rowsTable(list)}</div>`).join('');
+    const node=document.createElement('div'); node.className='tasneef-pdf-sheet';
+    node.innerHTML=`<style>${reportCss()}</style><div class="r-head"><div class="brand"><img src="${logoSrc}" onerror="this.style.display='none'"><div><h1>تقرير الأوقات الشهرية</h1><p>${E(currentMonthlyFiltersText())}</p><p>وقت الإنشاء: ${E(new Date().toLocaleString('ar-SA'))}</p></div></div><div class="company">شركة تصنيف لإدارة المرافق</div></div><div class="meta"><div class="box"><small>عدد المشاريع</small><b>${rows.length}</b></div><div class="box"><small>مجموع الدقائق الفعلية</small><b>${Math.round(actual)}</b></div><div class="box"><small>مجموع الدقائق المطلوبة</small><b>${Math.round(required)}</b></div><div class="box"><small>نسبة الالتزام</small><b>${E(pct(commitment))}</b></div></div><div class="section"><span>تفاصيل التقرير</span></div>${sectionHtml}<div class="signs"><div class="sign"><b>ملاحظات الإدارة</b><div class="line"></div><div class="line"></div></div><div class="sign"><b>اعتماد مدير التشغيل</b><div class="line"></div><div class="line"></div></div></div><div class="footer">نسبة المشروع داخل تقرير المشرف = دقائق المشروع ÷ إجمالي دقائق مشرفه. الإجماليات بالدقائق لتطابق طلب الإدارة.</div>`;
+    return node;
+  }
+  function showSmartPdfWindow(title, node, filename){
+    const old=document.getElementById('smartPdfModalV238'); if(old) old.remove();
+    const wrap=document.createElement('div'); wrap.id='smartPdfModalV238'; wrap.className='modal-backdrop';
+    wrap.innerHTML=`<div class="modal-card smart-pdf-modal-v238"><div class="modal-head"><h2>${E(title)}</h2><button type="button" onclick="document.getElementById('smartPdfModalV238')?.remove()">إغلاق</button></div><div class="smart-pdf-actions-v238"><button type="button" onclick="tasneefPrintSmartPdfV238()">طباعة / حفظ PDF</button><button type="button" class="light" onclick="tasneefDownloadSmartPdfV238()">تنزيل PDF</button></div><div id="smartPdfPreviewV238" class="smart-pdf-preview-v238"></div></div>`;
+    wrap.addEventListener('click',e=>{ if(e.target===wrap) wrap.remove(); });
+    document.body.appendChild(wrap);
+    const preview=$id('smartPdfPreviewV238'); preview.appendChild(node);
+    window.__tasneefSmartPdfV238={title, filename, node};
+  }
+  function openPrintWindowFromNode(node,title){
+    const w=window.open('','_blank');
+    if(!w){ say('المتصفح منع فتح نافذة الطباعة. اسمح بالنوافذ المنبثقة ثم حاول مرة أخرى.','err'); return; }
+    w.document.open(); w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${E(title)}</title></head><body>${node.outerHTML}<script>setTimeout(()=>window.print(),500)<\/script></body></html>`); w.document.close();
+  }
+  window.tasneefPrintSmartPdfV238=function(){
+    const st=window.__tasneefSmartPdfV238; if(!st?.node) return;
+    openPrintWindowFromNode(st.node.cloneNode(true), st.title);
+  };
+  function loadHtml2Pdf(){
+    return new Promise((resolve,reject)=>{
+      if(window.html2pdf) return resolve(window.html2pdf);
+      const exist=document.querySelector('script[data-tasneef-html2pdf-v238="1"]');
+      if(exist){ exist.addEventListener('load',()=>resolve(window.html2pdf)); exist.addEventListener('error',reject); return; }
+      const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'; s.async=true; s.dataset.tasneefHtml2pdfV238='1';
+      s.onload=()=>window.html2pdf?resolve(window.html2pdf):reject(new Error('html2pdf not loaded')); s.onerror=reject; document.head.appendChild(s);
+    });
+  }
+  window.tasneefDownloadSmartPdfV238=async function(){
+    const st=window.__tasneefSmartPdfV238; if(!st?.node) return;
+    try{
+      const h2p=await loadHtml2Pdf();
+      const clone=st.node.cloneNode(true); clone.style.maxWidth='none'; clone.style.width='1120px';
+      await h2p().set({margin:4,filename:st.filename||'tasneef-report.pdf',image:{type:'jpeg',quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'a4',orientation:'landscape'},pagebreak:{mode:['css','legacy'],avoid:['.super-card','.panel','.box']}}).from(clone).save();
+      say('تم تنزيل ملف PDF');
+    }catch(e){
+      say('تعذر التنزيل المباشر، فتحت نافذة الطباعة كحل بديل','err');
+      openPrintWindowFromNode(st.node.cloneNode(true), st.title);
+    }
+  };
+  window.exportDailyManagerPDF=function(){
+    const rows=dailyRows(); if(!rows.length){ say('لا توجد بيانات في السجلات اليومية للتصدير','err'); return; }
+    const d=($id('dailyDate')?.value||new Date().toISOString().slice(0,10)).replaceAll('-','');
+    showSmartPdfWindow('تقرير السجلات اليومية', dailyReportNode(), `تقرير-السجلات-اليومية-${d}.pdf`);
+  };
+  window.printMonthlyReportV57=function(){
+    const rows=monthlyRows(); if(!rows.length){ say('لا توجد بيانات في الأوقات الشهرية للتصدير','err'); return; }
+    const m=($id('monthlyMonth')?.value||new Date().toISOString().slice(0,7)).replace('-','');
+    showSmartPdfWindow('تقرير الأوقات الشهرية', monthlyReportNode(), `تقرير-الأوقات-الشهرية-${m}.pdf`);
+  };
+  function enhanceButtons(){
+    const dailyBtn=[...document.querySelectorAll('button')].find(b=>/طباعة التقرير|PDF/.test(b.textContent||'') && b.getAttribute('onclick')?.includes('exportDailyManagerPDF'));
+    if(dailyBtn){ dailyBtn.textContent='PDF السجلات اليومية'; dailyBtn.onclick=window.exportDailyManagerPDF; }
+    const monthlyBtn=[...document.querySelectorAll('button')].find(b=>/الأوقات الشهرية/.test(b.textContent||'') && b.getAttribute('onclick')?.includes('printMonthlyReportV57'));
+    if(monthlyBtn){ monthlyBtn.textContent='PDF الأوقات الشهرية'; monthlyBtn.onclick=window.printMonthlyReportV57; }
+  }
+  const css=document.createElement('style'); css.id='v238SmartPdfCss'; css.textContent=`.smart-pdf-modal-v238{max-width:96vw!important;width:1180px;max-height:94vh;display:flex;flex-direction:column}.smart-pdf-actions-v238{display:flex;gap:8px;justify-content:flex-start;margin:0 0 10px}.smart-pdf-preview-v238{background:#eef4f1;border:1px solid #d5e4de;border-radius:16px;padding:14px;overflow:auto;max-height:72vh}.smart-pdf-preview-v238 .tasneef-pdf-sheet{transform-origin:top right}`; document.head.appendChild(css);
+  window.addEventListener('DOMContentLoaded',()=>setTimeout(enhanceButtons,900));
+  window.addEventListener('load',()=>setTimeout(enhanceButtons,1600));
+  const oldShow=window.showPage; if(typeof oldShow==='function' && !oldShow._v238){ const fn=function(){const out=oldShow.apply(this,arguments); setTimeout(enhanceButtons,250); return out;}; fn._v238=true; window.showPage=fn; }
+  console.log('Tasneef V238 smart PDF windows for daily logs and monthly times loaded');
+})();
