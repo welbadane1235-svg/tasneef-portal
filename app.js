@@ -17897,3 +17897,103 @@ function financePrintReport(kind){
   window.addEventListener('load', ()=>setTimeout(makeMonthlyButtonWorkV242,500));
   console.log('Tasneef V242 monthly PDF button readonly fix loaded');
 })();
+
+/* ===== V243: Monthly report uses CURRENT project supervisor only + project de-dup ===== */
+(function(){
+  function normProjectKeyV243(v){
+    return String(v||'').toLowerCase().replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/\s+/g,' ').trim();
+  }
+  function projectObjV243(pid){
+    return (data.projects||[]).find(p=>String(p.id)===String(pid)) || null;
+  }
+  function projectCurrentRefV243(pid){
+    const p = projectObjV243(pid);
+    if(!p) return { id: pid, name: projectName(pid), supervisor_id: '' };
+    const key = normProjectKeyV243(p.name);
+    const matches = (data.projects||[]).filter(x=>normProjectKeyV243(x.name)===key);
+    // Prefer active/current project record, then the highest id as the latest known record.
+    const active = matches.filter(x=>(x.status||'active')!=='inactive');
+    const pool = active.length ? active : matches;
+    const chosen = pool.slice().sort((a,b)=>Number(b.id||0)-Number(a.id||0))[0] || p;
+    return { id: chosen.id || p.id || pid, name: chosen.name || p.name || projectName(pid), supervisor_id: chosen.supervisor_id || p.supervisor_id || '' };
+  }
+  function projectWorkersTextMultiV243(projectIds){
+    const ids = new Set((projectIds||[]).map(x=>String(x)));
+    const names = [];
+    (data.workers||[]).forEach(w=>{
+      const pid = (typeof workerProjectId === 'function') ? workerProjectId(w) : (w.project_id || w.project || '');
+      if(ids.has(String(pid)) && w.name) names.push(w.name);
+    });
+    const uniq = [...new Set(names.map(x=>String(x).trim()).filter(Boolean))];
+    if(uniq.length) return uniq.join('، ');
+    // fallback to first project helper if available
+    const first = [...ids][0];
+    return (typeof uniqueWorkersForProjectTextV60==='function' ? uniqueWorkersForProjectTextV60(first) : '-') || '-';
+  }
+  window.monthlyRowsV60 = function(){
+    const month = $('monthlyMonth')?.value || today().slice(0,7);
+    const selectedSupervisor = $('monthlySupervisor')?.value || '';
+    let logs = (data.logs||[]).filter(l=>{
+      const d = l.log_date || String(l.check_in||'').slice(0,10);
+      return d && d.slice(0,7) === month;
+    });
+
+    const map = new Map();
+    logs.forEach(l=>{
+      const ref = projectCurrentRefV243(l.project_id);
+      const currentSid = String(ref.supervisor_id || '');
+      if(selectedSupervisor && currentSid !== String(selectedSupervisor)) return;
+      // Merge duplicate project records by official/current project name, not by old log supervisor.
+      const projectKey = normProjectKeyV243(ref.name || projectName(l.project_id) || l.project_id);
+      const k = currentSid + '_' + projectKey;
+      if(!map.has(k)) map.set(k,{s:currentSid,p:ref.id,pName:ref.name,a:0,r:0,t:0, days:new Set(), reqByDay:{}, projectIds:new Set()});
+      const x = map.get(k);
+      x.projectIds.add(String(l.project_id||ref.id||''));
+      const logDate = l.log_date || String(l.check_in||'').slice(0,10);
+      const actual = Number((typeof logActualMinutes==='function' ? logActualMinutes(l) : (l.duration_minutes || minutesBetween(l.check_in,l.check_out))) || 0);
+      x.a += actual;
+      // Count required once per day per merged project, preventing duplicated requirement for repeated visits.
+      if(logDate){
+        x.days.add(logDate);
+        if(x.reqByDay[logDate] === undefined){
+          x.reqByDay[logDate] = Number((typeof logRequiredMinutes==='function' ? logRequiredMinutes(l) : l.required_minutes) || 0);
+        }
+      }
+      x.t += Number(l.travel_minutes || 0);
+    });
+    map.forEach(x=>{
+      x.uniqueDays = x.days ? x.days.size : 0;
+      x.r = Object.values(x.reqByDay || {}).reduce((a,v)=>a+Number(v||0),0);
+    });
+    const vals=[...map.values()];
+    const supTotals={};
+    vals.forEach(r=>{ const s=String(r.s||''); supTotals[s]=(supTotals[s]||0)+Number(r.a||0); });
+    return vals.map(r=>{
+      const supTotal = supTotals[String(r.s||'')] || 0;
+      const workPercent = supTotal ? (r.a/supTotal*100) : 0;
+      const commitmentPercent = r.r ? (r.a/r.r*100) : 0;
+      const diff = r.a-r.r;
+      const st = monthlyStatusFromDiffV60(diff,r.r);
+      return {
+        ...r,
+        supTotal,
+        workers: projectWorkersTextMultiV243([...r.projectIds]),
+        dailyReqText: (typeof dailyRequiredTextV81==='function' ? dailyRequiredTextV81(r.p) : 'غير محدد'),
+        dailyReqMinutes: (typeof projectDailyRequiredMinutesV81==='function' ? projectDailyRequiredMinutesV81(r.p) : 0),
+        workPercent,
+        commitmentPercent,
+        ccls: monthlyCommitmentClassV60(commitmentPercent,r.r),
+        diff,
+        st: st.text,
+        cls: st.cls
+      };
+    }).sort((a,b)=>{
+      const s = supervisorName(a.s).localeCompare(supervisorName(b.s),'ar');
+      return s || String(a.pName||projectName(a.p)).localeCompare(String(b.pName||projectName(b.p)),'ar');
+    });
+  };
+  window.monthlyBaseRowsV59 = function(){ return monthlyRowsV60(); };
+  window.monthlyReportRowsV58 = function(){ return monthlyRowsV60(); };
+  // Render after replacing the aggregation function.
+  setTimeout(()=>{ try{ if($('monthlyBody') && typeof renderMonthly==='function') renderMonthly(); }catch(e){} }, 300);
+})();
