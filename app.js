@@ -17997,3 +17997,126 @@ function financePrintReport(kind){
   // Render after replacing the aggregation function.
   setTimeout(()=>{ try{ if($('monthlyBody') && typeof renderMonthly==='function') renderMonthly(); }catch(e){} }, 300);
 })();
+
+/* ===== V244: Final monthly old-design grouping by canonical project + CURRENT supervisor ===== */
+(function(){
+  'use strict';
+  if(window.__tasneefV244MonthlyCanonical) return;
+  window.__tasneefV244MonthlyCanonical = true;
+  const S = (v)=>String(v ?? '').trim();
+  const N = (v)=>{ const x=Number(v||0); return Number.isFinite(x)?x:0; };
+  const $id = (id)=>document.getElementById(id);
+  const esc = (s)=>S(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const norm = (v)=>S(v).replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[\u064B-\u0652]/g,'').replace(/[^\u0600-\u06FF0-9a-zA-Z]+/g,' ').replace(/\s+/g,' ').toLowerCase().trim();
+  const normNameOnly = (v)=>norm(v).replace(/\b(مشروع|مجمع|مبنى|عمارة)\b/g,'').replace(/\s+/g,' ').trim();
+  const todayMonth = ()=> typeof today==='function' ? today().slice(0,7) : new Date().toISOString().slice(0,7);
+  const minuteText = (m)=>`${Math.round(N(m)).toLocaleString('en-US')} دقيقة`;
+  const pctText = (p)=>`${N(p).toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1})}%`;
+  const supName = (id)=> typeof supervisorName==='function' ? supervisorName(id) : ((window.data?.supervisors||[]).find(s=>S(s.id)===S(id))?.full_name || (window.data?.users||[]).find(u=>S(u.id)===S(id))?.full_name || '-');
+  const projNameBase = (id)=> typeof projectName==='function' ? projectName(id) : ((window.data?.projects||[]).find(p=>S(p.id)===S(id))?.name || '-');
+  function parseTimeScore(v){ const t=Date.parse(v||''); return Number.isFinite(t) ? t : 0; }
+  function projectById(pid){ return (window.data?.projects||[]).find(p=>S(p.id)===S(pid)) || null; }
+  function numericIdScore(v){ const n=Number(v); return Number.isFinite(n) ? n : 0; }
+  function projectSortScore(p, idx){
+    const active = !['inactive','deleted','stopped','archived'].includes(S(p?.status||'active').toLowerCase()) ? 1 : 0;
+    const hasSup = S(p?.supervisor_id) ? 1 : 0;
+    const time = Math.max(parseTimeScore(p?.updated_at), parseTimeScore(p?.modified_at), parseTimeScore(p?.created_at));
+    const idn = numericIdScore(p?.id);
+    return active*1e15 + hasSup*1e14 + time*10 + idn + idx/1000000;
+  }
+  function canonicalProject(pid){
+    const projects = window.data?.projects || [];
+    const p = projectById(pid);
+    const baseName = p?.name || projNameBase(pid) || S(pid);
+    const key = normNameOnly(baseName);
+    let matches = projects.map((x,i)=>({x,i})).filter(o=>normNameOnly(o.x?.name)===key);
+    if(!matches.length && key){
+      // fallback: if a duplicate differs by a small spelling variant but shares the same number and first word
+      const num = (key.match(/\d+/)||[''])[0];
+      const first = key.split(' ')[0] || '';
+      matches = projects.map((x,i)=>({x,i})).filter(o=>{ const k=normNameOnly(o.x?.name); return num && k.includes(num) && first && k.includes(first); });
+    }
+    if(!matches.length && p) matches=[{x:p,i:projects.indexOf(p)}];
+    const chosen = matches.sort((a,b)=>projectSortScore(b.x,b.i)-projectSortScore(a.x,a.i))[0]?.x || p || {};
+    return {
+      id: chosen.id || pid,
+      name: chosen.name || baseName,
+      supervisor_id: chosen.supervisor_id || p?.supervisor_id || ''
+    };
+  }
+  function logDateV244(l){ return S(l.log_date || l.date || l.check_in || l.created_at).slice(0,10); }
+  function actualMinsV244(l){ try{ if(typeof logActualMinutes==='function') return N(logActualMinutes(l)); }catch(_){ } try{ if(typeof minutesBetween==='function') return N(l.duration_minutes || minutesBetween(l.check_in,l.check_out)); }catch(_){ } return N(l.duration_minutes); }
+  function requiredMinsV244(l){ try{ if(typeof logRequiredMinutes==='function') return N(logRequiredMinutes(l)); }catch(_){ } return N(l.required_minutes || l.daily_required_minutes || l.required_daily_minutes); }
+  function isPermanentV244(pid, maxReq){
+    const p = canonicalProject(pid);
+    const row = projectById(p.id) || projectById(pid) || {};
+    const op = S(row.operation_type || row.visit_type_default || row.type || row.category || row.notes).toLowerCase();
+    const base = N(row.required_daily_minutes || row.required_minutes || row.daily_minutes || maxReq);
+    const name = S(p.name || row.name);
+    return base>=540 || op.includes('full') || op.includes('permanent') || op.includes('24') || name.includes('دائم') || name.includes('دائمة') || name.includes('دوام') || name.includes('24');
+  }
+  function workerProjectIdSafe(w){ try{ if(typeof workerProjectId==='function') return workerProjectId(w); }catch(_){ } return w.project_id || w.assigned_project_id || w.current_project_id || ''; }
+  function uniqueWorkersForProjectIdsV244(ids){
+    const idSet = new Set((ids||[]).map(x=>S(x)).filter(Boolean));
+    const nameSet = new Map();
+    (window.data?.workers||[]).forEach(w=>{
+      if(['inactive','deleted'].includes(S(w.status||'active').toLowerCase())) return;
+      const pid = S(workerProjectIdSafe(w));
+      if(!idSet.has(pid)) return;
+      const nm = S(w.name || w.full_name);
+      const k = norm(nm);
+      if(k && !nameSet.has(k)) nameSet.set(k,nm);
+    });
+    return [...nameSet.values()].sort((a,b)=>a.localeCompare(b,'ar')).join('، ') || '-';
+  }
+  function monthRangeV244(month){ const [y,m]=S(month).split('-').map(Number); const last=new Date(y,m,0).getDate(); return {start:`${month}-01`,end:`${month}-${String(last).padStart(2,'0')}`,days:last}; }
+  window.buildMonthlyV219 = function(){
+    const month=$id('monthlyMonth')?.value || todayMonth();
+    const selectedSupervisor=$id('monthlySupervisor')?.value || '';
+    const range=monthRangeV244(month);
+    const logs=(window.data?.logs||[]).filter(l=>{ const d=logDateV244(l); return d && d.slice(0,7)===month; });
+    const map=new Map();
+    logs.forEach(l=>{
+      const ref=canonicalProject(l.project_id);
+      const sid=S(ref.supervisor_id || l.supervisor_id || '');
+      if(selectedSupervisor && sid!==S(selectedSupervisor)) return;
+      const pKey=normNameOnly(ref.name || projNameBase(l.project_id) || l.project_id);
+      const key=pKey || S(ref.id || l.project_id);
+      if(!map.has(key)) map.set(key,{s:sid,p:ref.id,projectName:ref.name,actual:0,required:0,travel:0,records:0,maxReq:0,days:new Set(),projectIds:new Set()});
+      const g=map.get(key);
+      // If the canonical project later resolves to a supervisor, always keep the current one.
+      if(sid) g.s=sid;
+      g.projectIds.add(S(l.project_id));
+      g.projectIds.add(S(ref.id));
+      const req=requiredMinsV244(l); const d=logDateV244(l);
+      g.actual+=actualMinsV244(l); g.required+=req; g.travel+=N(l.travel_minutes); g.records++; g.maxReq=Math.max(g.maxReq,req); if(d) g.days.add(d);
+    });
+    const all=[...map.values()].map(g=>({
+      ...g,
+      workers:uniqueWorkersForProjectIdsV244([...g.projectIds]),
+      supervisorName:supName(g.s),
+      permanent:isPermanentV244(g.p,g.maxReq)
+    }));
+    const daily=all.filter(x=>!x.permanent), permanent=all.filter(x=>x.permanent);
+    const bySup={};
+    daily.forEach(r=>{ const k=S(r.s); (bySup[k]||(bySup[k]=[])).push(r); });
+    Object.keys(bySup).forEach(sid=>{
+      bySup[sid].sort((a,b)=>S(a.projectName).localeCompare(S(b.projectName),'ar'));
+      const total=bySup[sid].reduce((a,r)=>a+N(r.actual),0); let used=0;
+      bySup[sid].forEach((r,i)=>{ let pct=total?(N(r.actual)/total*100):0; if(i<bySup[sid].length-1){ pct=Math.round(pct*10)/10; used+=pct; } else { pct=total?Math.max(0,Math.round((100-used)*10)/10):0; } r.percent=pct; r.supTotal=total; });
+    });
+    const dailySorted=Object.keys(bySup).sort((a,b)=>supName(a).localeCompare(supName(b),'ar')).flatMap(s=>bySup[s]);
+    permanent.sort((a,b)=>{ const s=supName(a.s).localeCompare(supName(b.s),'ar'); return s || S(a.projectName).localeCompare(S(b.projectName),'ar'); });
+    return {month,range,daily:dailySorted,permanent,bySup};
+  };
+  window.monthlyRowsV60 = function(){
+    const res=window.buildMonthlyV219();
+    return [...res.daily,...res.permanent].map(x=>({s:x.s,p:x.p,pName:x.projectName,a:x.actual,r:x.required,t:x.travel,workers:x.workers,workPercent:x.percent||0,commitmentPercent:x.required?x.actual/x.required*100:0,diff:x.actual-x.required,st:(x.actual-x.required<0?'ناقص وقت':x.actual-x.required>0?'زيادة وقت':'ضمن الوقت'),cls:(x.actual-x.required<0?'bad':x.actual-x.required>0?'warn':'ok'),ccls:'green'}));
+  };
+  window.monthlyBaseRowsV59 = window.monthlyRowsV60;
+  window.monthlyReportRowsV58 = window.monthlyRowsV60;
+  // Re-render old design using the overridden builder.
+  setTimeout(()=>{ try{ if($id('monthlyBody') && typeof window.renderMonthly==='function') window.renderMonthly(); }catch(e){ console.warn('V244 monthly rerender',e); } }, 350);
+  window.addEventListener('load',()=>setTimeout(()=>{ try{ if($id('monthlyBody') && typeof window.renderMonthly==='function') window.renderMonthly(); }catch(e){} },900));
+  console.log('Tasneef V244 final monthly canonical current-supervisor loaded');
+})();
