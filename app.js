@@ -1,4 +1,23 @@
-/* TASNEEF BUILD V257 - stable live today logs/tickets fix - 2026-05-31 */
+/* TASNEEF BUILD V269 - force visible ticket WhatsApp - 2026-05-31 */
+
+/* ===== V268: clear stale Supabase caches that caused zero counts after refresh ===== */
+(function(){
+  try{
+    window.TASNEEF_BUILD = 'V268_STABLE_DATA_AND_TICKET_WHATSAPP_2026_05_31';
+    const badPrefixes = ['tasneef_sb_cache_v239:', 'tasneef_cache', 'tasneef_live_cache'];
+    const badIncludes = ['tasneef_sb_cache', 'supabase_cache'];
+    const remove=[];
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i)||'';
+      if(badPrefixes.some(p=>k.startsWith(p)) || badIncludes.some(x=>k.includes(x))) remove.push(k);
+    }
+    remove.forEach(k=>localStorage.removeItem(k));
+    if('caches' in window){
+      caches.keys().then(keys=>keys.filter(k=>/tasneef-v25|tasneef-v26|tasneef/i.test(k) && !/v268/.test(k)).forEach(k=>caches.delete(k))).catch(()=>{});
+    }
+  }catch(e){}
+})();
+
 /* V154 Smart Loading Branding */
 (function(){
   if(window.__tasneefLoadingV154) return;
@@ -157,7 +176,7 @@
   if('serviceWorker' in navigator && !window.__tasneefSWRegV239){
     window.__tasneefSWRegV239 = true;
     window.addEventListener('load',()=>{
-      navigator.serviceWorker.register('tasneef-sw.js?v=251').catch(()=>{});
+      navigator.serviceWorker.register('tasneef-sw.js?v=268').catch(()=>{});
     });
   }
 
@@ -166,7 +185,7 @@
   if(previousFetch && !previousFetch.__tasneefCacheV239){
     const CACHE_PREFIX='tasneef_sb_cache_v239:';
     const MAX_AGE_MS=1000*60*60*12; // 12 hours for emergency fallback
-    const NETWORK_TIMEOUT_MS=8500;
+    const NETWORK_TIMEOUT_MS=30000;
     function currentUserKey(){
       try{ const u=JSON.parse(localStorage.getItem('tasneef_user')||'null'); return (u?.username||u?.role||'guest'); }catch(e){ return 'guest'; }
     }
@@ -18837,7 +18856,7 @@ function financePrintReport(kind){
   function summaryHtml(list){ const open=list.filter(t=>t.status!=='closed').length, proc=list.filter(t=>t.status==='processing').length, closed=list.filter(t=>t.status==='closed').length, urgent=list.filter(t=>t.priority==='urgent'||t.priority==='high').length; return `<div class="smart-ticket-kpi"><b>${list.length}</b><span>إجمالي التكتات</span></div><div class="smart-ticket-kpi red"><b>${open}</b><span>مفتوحة</span></div><div class="smart-ticket-kpi amber"><b>${proc}</b><span>تحت المعالجة</span></div><div class="smart-ticket-kpi green"><b>${closed}</b><span>مغلقة</span></div><div class="smart-ticket-kpi dark"><b>${urgent}</b><span>عاجلة / مهمة</span></div>`; }
   function card(t,mode){
     const admin=mode==='admin';
-    const actions = admin ? `<button onclick="editTicket(${t.id})">تعديل</button>${t.status==='closed'?`<button class="light" onclick="setTicketStatus(${t.id},'open')">إعادة فتح</button>`:`${t.status!=='processing'?`<button class="light" onclick="claimTicket(${t.id})">استلام</button>`:''}<button onclick="closeTicket(${t.id})">إغلاق</button>`}<button class="light" onclick="downloadSingleTicketPdfV197&&downloadSingleTicketPdfV197(${t.id})">PDF</button><button class="danger" onclick="deleteRow('tickets',${t.id})">حذف</button>` : `${t.status==='closed'?'':`${!t.claimed_by?`<button onclick="techClaimTicket?techClaimTicket(${t.id}):claimTicket(${t.id})">استلام</button>`:''}<button onclick="techCloseTicket?techCloseTicket(${t.id}):closeTicket(${t.id})">إغلاق</button>`}<button class="light" onclick="sendTicketWhatsApp?sendTicketWhatsApp(${t.id}):null">واتساب</button>`;
+    const actions = admin ? `<button onclick="editTicket(${t.id})">تعديل</button>${t.status==='closed'?`<button class="light" onclick="setTicketStatus(${t.id},'open')">إعادة فتح</button>`:`${t.status!=='processing'?`<button class="light" onclick="claimTicket(${t.id})">استلام</button>`:''}<button onclick="closeTicket(${t.id})">إغلاق</button>`}<button class="light" onclick="downloadSingleTicketPdfV197&&downloadSingleTicketPdfV197(${t.id})">PDF</button><button type="button" class="ticket-wa-v267" onclick="(window.sendTicketWhatsAppV267||window.sendTicketWhatsAppV266||window.sendTicketWhatsApp)(${Number(t.id)||0})">إرسال واتساب</button><button class="danger" onclick="deleteRow('tickets',${t.id})">حذف</button>` : `${t.status==='closed'?'':`${!t.claimed_by?`<button onclick="techClaimTicket?techClaimTicket(${t.id}):claimTicket(${t.id})">استلام</button>`:''}<button onclick="techCloseTicket?techCloseTicket(${t.id}):closeTicket(${t.id})">إغلاق</button>`}<button type="button" class="ticket-wa-v267" onclick="(window.sendTicketWhatsAppV267||window.sendTicketWhatsAppV266||window.sendTicketWhatsApp)(${Number(t.id)||0})">إرسال واتساب</button>`;
     return `<article class="smart-ticket-card ${stClass(t.status)}"><div class="smart-ticket-top"><div><strong>${E(no(t))}</strong><small>${E(fmt(t.created_at))}</small></div><span class="smart-ticket-status ${stClass(t.status)}">${E(stLabel(t.status))}</span></div><h3>${E(t.title||'-')}</h3><div class="smart-ticket-meta"><span>المشروع: <b>${E(P(t.project_id))}</b></span><span>المشرف: <b>${E(S(t.supervisor_id))}</b></span><span>الأولوية: <b>${E(prLabel(t.priority))}</b></span><span>مدة الفتح: <b>${E(dur(t))}</b></span></div><p>${E(t.description||'لا يوجد وصف')}</p><div class="smart-ticket-mini"><span>استلم: ${E(t.claimed_by_name||'-')}</span><span>أغلق: ${E(t.closed_by_name||'-')}</span></div>${t.closure_note?`<div class="smart-ticket-note">الحل: ${E(t.closure_note)}</div>`:''}<div class="smart-ticket-actions">${actions}</div></article>`;
   }
   function paginationHtml(total){
@@ -20602,7 +20621,7 @@ setInterval(()=>{ try{ if(document.getElementById('logsBody')) renderTimeLogs();
 /* ===== V264: Orders WhatsApp send to Orders Group ===== */
 (function(){
   'use strict';
-  window.TASNEEF_BUILD = 'V264_ORDERS_WHATSAPP_GROUP_2026_05_31';
+  window.TASNEEF_BUILD = 'V265_RESTORE_TICKETS_WHATSAPP_2026_05_31';
   const $ = window.$ || (id=>document.getElementById(id));
   const arr = v => Array.isArray(v) ? v : [];
   const E = window.esc || (v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])));
@@ -20665,4 +20684,559 @@ setInterval(()=>{ try{ if(document.getElementById('logsBody')) renderTimeLogs();
   document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{injectOrdersGroupToolsV264(); renameOrderWhatsappButtonsV264();},1000));
   window.addEventListener('load',()=>setTimeout(()=>{injectOrdersGroupToolsV264(); renameOrderWhatsappButtonsV264();},1300));
   console.log('Tasneef V264 loaded: orders WhatsApp group send');
+})();
+
+
+/* ===== V265: Restore WhatsApp button inside Tickets cards/tables ===== */
+(function(){
+  'use strict';
+  window.TASNEEF_BUILD = 'V265_RESTORE_TICKETS_WHATSAPP_2026_05_31';
+  const arr = v => Array.isArray(v) ? v : [];
+  const E = window.esc || (v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])));
+  function ticketNoV265(t){ return t?.ticket_number || ('T-' + String(t?.id||0).padStart(4,'0')); }
+  function findTicketByNoV265(no){ return arr(window.data?.tickets).find(t=>String(ticketNoV265(t)).trim()===String(no||'').trim()); }
+  function waTextV265(t){
+    if(typeof window.buildTicketWhatsAppTextV42 === 'function') return window.buildTicketWhatsAppTextV42(t);
+    const project = (typeof window.projectName === 'function') ? window.projectName(t.project_id) : (t.project_name||'-');
+    const closed = String(t.status||'open') === 'closed';
+    return [closed?'تم إغلاق التكت':'تم تسجيل تكت جديد','',
+      'اسم المشروع: '+project,
+      'رقم التكت: '+ticketNoV265(t),
+      'عنوان التكت: '+(t.title||'-'),
+      'وصف المشكلة: '+(t.description||'-'),
+      'حالة المشكلة: '+(closed?'مغلق':(t.status||'مفتوح')),
+      t.closure_note ? 'طريقة الإغلاق: '+t.closure_note : '',
+      'التاريخ: '+new Date(t.created_at||Date.now()).toLocaleDateString('ar-SA')
+    ].filter(Boolean).join('\n');
+  }
+  async function copyTextV265(text){
+    try{ if(navigator.clipboard?.writeText){ await navigator.clipboard.writeText(text); return true; } }catch(_){ }
+    try{ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); return true; }catch(_){ return false; }
+  }
+  window.sendTicketWhatsAppV265 = async function(id){
+    const t=arr(window.data?.tickets).find(x=>String(x.id)===String(id));
+    if(!t) return (window.msg?msg('التكت غير موجود','err'):alert('التكت غير موجود'));
+    const text = waTextV265(t);
+    await copyTextV265(text);
+    window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank');
+    if(window.msg) msg(String(t.status)==='closed'?'تم تجهيز رسالة إغلاق التكت للواتساب':'تم تجهيز رسالة فتح التكت للواتساب');
+  };
+  function ticketWaButtonV265(t){
+    return `<button type="button" class="wa-ticket-btn-v265" onclick="sendTicketWhatsAppV265(${Number(t.id)||0})">واتساب<br><small>${String(t.status)==='closed'?'إغلاق التكت':'فتح التكت'}</small></button>`;
+  }
+  function restoreTicketButtonsV265(){
+    // Smart card layout
+    document.querySelectorAll('.smart-ticket-card').forEach(card=>{
+      const actions=card.querySelector('.smart-ticket-actions');
+      if(!actions || actions.querySelector('.wa-ticket-btn-v265,.wa-ticket-btn-v46,.wa-ticket-btn-v45,.wa-ticket-btn-v43,.wa-ticket-btn-v42')) return;
+      const no=(card.querySelector('.smart-ticket-top strong, strong')?.textContent||'').trim();
+      const t=findTicketByNoV265(no); if(!t) return;
+      actions.insertAdjacentHTML('beforeend', ticketWaButtonV265(t));
+    });
+    // Table layout fallback
+    ['ticketsBody','supTicketsBody','techTicketsBody'].forEach(id=>{
+      const body=document.getElementById(id); if(!body) return;
+      body.querySelectorAll('tr').forEach(tr=>{
+        if(tr.querySelector('.wa-ticket-btn-v265,.wa-ticket-btn-v46,.wa-ticket-btn-v45,.wa-ticket-btn-v43,.wa-ticket-btn-v42')) return;
+        const actions=tr.querySelector('.row-actions') || tr.lastElementChild; if(!actions) return;
+        const no=(tr.querySelector('td b, td strong')?.textContent||'').trim();
+        const t=findTicketByNoV265(no); if(!t) return;
+        actions.insertAdjacentHTML('beforeend', ticketWaButtonV265(t));
+      });
+    });
+  }
+  const oldRenderTickets=window.renderTickets;
+  window.renderTickets=function(){ const out=oldRenderTickets&&oldRenderTickets.apply(this,arguments); setTimeout(restoreTicketButtonsV265,40); setTimeout(restoreTicketButtonsV265,300); return out; };
+  const oldShowPage=window.showPage;
+  if(typeof oldShowPage==='function'){
+    window.showPage=function(id,btn){ const out=oldShowPage.apply(this,arguments); if(id==='tickets') setTimeout(()=>{ try{window.renderTickets&&window.renderTickets(); restoreTicketButtonsV265();}catch(_){ } },90); return out; };
+  }
+  if(!document.getElementById('ticketWaV265Css')){ const css=document.createElement('style'); css.id='ticketWaV265Css'; css.textContent='.wa-ticket-btn-v265{background:#128C7E!important;color:#fff!important;border:0!important;border-radius:10px!important;padding:8px 10px!important;line-height:1.25!important;min-width:105px!important;font-weight:800!important;cursor:pointer!important}.wa-ticket-btn-v265 small{font-size:10px;color:#fff!important;font-weight:600!important}'; document.head.appendChild(css); }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(restoreTicketButtonsV265,900));
+  window.addEventListener('load',()=>setTimeout(restoreTicketButtonsV265,1200));
+  console.log('Tasneef V265 loaded: tickets WhatsApp button restored');
+})();
+
+
+/* ===== V266: Final visible WhatsApp button for Tickets cards ===== */
+(function(){
+  'use strict';
+  window.TASNEEF_BUILD = 'V267_TICKETS_WHATSAPP_MUTATION_OBSERVER_2026_05_31';
+  const $ = id => document.getElementById(id);
+  const arr = v => Array.isArray(v) ? v : [];
+  const E = window.esc || (v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])));
+  const pageSize = 12;
+  function ticketNo(t){ return t?.ticket_number || ('T-' + String(t?.id||0).padStart(4,'0')); }
+  function projectName(id){ try{return window.projectName?window.projectName(id):(arr(window.data?.projects).find(p=>String(p.id)===String(id))?.name||'-');}catch(_){return '-'} }
+  function supervisorName(id){ try{return window.supervisorName?window.supervisorName(id):(arr(window.data?.users).find(u=>String(u.id)===String(id))?.full_name||'-');}catch(_){return '-'} }
+  function statusLabel(s){ return String(s)==='closed'?'مغلق':(String(s)==='processing'?'تحت المعالجة':'مفتوح'); }
+  function prLabel(p){ return String(p)==='urgent'?'عاجل':(String(p)==='high'?'مهم':(String(p)==='low'?'منخفض':'عادي')); }
+  function currentPageForBody(body){
+    const pager = body ? document.getElementById(body.id+'PagerV250') : null;
+    const active = pager?.querySelector('button.active');
+    const n = Number(active?.textContent||1);
+    return Number.isFinite(n) && n>0 ? n : 1;
+  }
+  function filteredTickets(mode){
+    let list = arr(window.data?.tickets).slice();
+    if(mode==='admin'){
+      const st=$('ticketFilterStatus')?.value||'';
+      const pid=$('ticketFilterProjectV197')?.value||'';
+      const title=($('ticketFilterTitleV197')?.value||'').trim().toLowerCase();
+      const q=($('ticketSearch')?.value||'').trim().toLowerCase();
+      if(st) list=list.filter(t=>String(t.status||'open')===String(st));
+      if(pid) list=list.filter(t=>String(t.project_id||'')===String(pid));
+      if(title) list=list.filter(t=>String(t.title||'').toLowerCase().includes(title));
+      if(q) list=list.filter(t=>[ticketNo(t),t.title,t.description,projectName(t.project_id),supervisorName(t.supervisor_id),t.claimed_by_name,t.closed_by_name,t.closure_note,statusLabel(t.status),prLabel(t.priority)].join(' ').toLowerCase().includes(q));
+    } else if(mode==='supervisor'){
+      const pid=$('supTicketFilterProject')?.value||'';
+      const st=$('supTicketFilterStatus')?.value||'';
+      const q=($('supTicketSearch')?.value||'').trim().toLowerCase();
+      if(pid) list=list.filter(t=>String(t.project_id||'')===String(pid));
+      if(st) list=list.filter(t=>String(t.status||'open')===String(st));
+      if(q) list=list.filter(t=>[ticketNo(t),t.title,t.description,projectName(t.project_id),t.claimed_by_name,t.closed_by_name,t.closure_note,statusLabel(t.status)].join(' ').toLowerCase().includes(q));
+    } else if(mode==='technician'){
+      const q=($('techTicketSearch')?.value||'').trim().toLowerCase();
+      const st=$('techTicketFilterStatus')?.value||'';
+      if(st) list=list.filter(t=>String(t.status||'open')===String(st));
+      if(q) list=list.filter(t=>[ticketNo(t),t.title,t.description,projectName(t.project_id),t.claimed_by_name,t.closed_by_name,t.closure_note,statusLabel(t.status)].join(' ').toLowerCase().includes(q));
+    }
+    return list.sort((a,b)=>String(b.created_at||b.id||'').localeCompare(String(a.created_at||a.id||'')));
+  }
+  function ticketText(t){
+    if(typeof window.buildTicketWhatsAppTextV42 === 'function') return window.buildTicketWhatsAppTextV42(t);
+    const closed = String(t.status||'open')==='closed';
+    return [closed?'تم إغلاق التكت':'تم تسجيل تكت جديد','',
+      'اسم المشروع: '+projectName(t.project_id),
+      'رقم التكت: '+ticketNo(t),
+      'عنوان التكت: '+(t.title||'-'),
+      'وصف المشكلة: '+(t.description||'-'),
+      'حالة المشكلة: '+statusLabel(t.status),
+      t.closure_note ? 'طريقة الإغلاق: '+t.closure_note : '',
+      'التاريخ: '+new Date(t.created_at||Date.now()).toLocaleDateString('ar-SA')
+    ].filter(Boolean).join('\n');
+  }
+  async function copyText(text){
+    try{ if(navigator.clipboard?.writeText){ await navigator.clipboard.writeText(text); return; } }catch(_){ }
+    try{ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }catch(_){ }
+  }
+  window.sendTicketWhatsAppV266 = async function(id){
+    const t = arr(window.data?.tickets).find(x=>String(x.id)===String(id));
+    if(!t) return window.msg ? msg('التكت غير موجود','err') : alert('التكت غير موجود');
+    const text=ticketText(t);
+    await copyText(text);
+    window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank');
+    if(window.msg) msg('تم نسخ رسالة التكت وفتح واتساب');
+  };
+  window.sendTicketWhatsApp = window.sendTicketWhatsAppV266;
+  function button(t){ return `<button type="button" class="wa-ticket-btn-v266" onclick="sendTicketWhatsAppV266(${Number(t.id)||0})">إرسال واتساب</button>`; }
+  function addButtonsToBody(body, mode){
+    if(!body) return;
+    const cards = [...body.querySelectorAll('.smart-ticket-card')];
+    const rows = cards.length ? cards : [...body.querySelectorAll('tr')].filter(tr=>!tr.textContent.includes('لا توجد'));
+    if(!rows.length) return;
+    const page=currentPageForBody(body);
+    const list=filteredTickets(mode).slice((page-1)*pageSize, page*pageSize);
+    rows.forEach((row,i)=>{
+      const t=list[i]; if(!t) return;
+      if(row.querySelector('.wa-ticket-btn-v266,.wa-ticket-btn-v265,.wa-ticket-btn-v46,.wa-ticket-btn-v45,.wa-ticket-btn-v43,.wa-ticket-btn-v42,.ticket-wa-v147')) return;
+      const actions = row.querySelector('.smart-ticket-actions,.row-actions') || row.lastElementChild || row;
+      actions.insertAdjacentHTML('beforeend', button(t));
+    });
+  }
+  function restore(){
+    addButtonsToBody($('ticketsBody'),'admin');
+    addButtonsToBody($('supTicketsBody'),'supervisor');
+    addButtonsToBody($('techTicketsBody'),'technician');
+  }
+  const oldRender = window.renderTickets;
+  window.renderTickets = function(){ const out = typeof oldRender==='function' ? oldRender.apply(this,arguments) : undefined; setTimeout(restore,30); setTimeout(restore,250); setTimeout(restore,900); return out; };
+  const oldShow = window.showPage;
+  if(typeof oldShow==='function'){
+    window.showPage = function(id,btn){ const out=oldShow.apply(this,arguments); if(String(id).includes('ticket')||id==='tickets'||id==='supTickets'||id==='techTickets') setTimeout(()=>{ try{ if(typeof window.renderTickets==='function') window.renderTickets(); restore(); }catch(_){ restore(); } },120); return out; };
+  }
+  document.addEventListener('click',function(e){
+    const p=e.target.closest('#ticketsBodyPagerV250 button,#supTicketsBodyPagerV250 button');
+    if(p) setTimeout(restore,180);
+  },true);
+  ['input','change'].forEach(ev=>document.addEventListener(ev,function(e){ if(e.target && /ticket/i.test(String(e.target.id||''))) setTimeout(restore,250); },true));
+  if(!document.getElementById('ticketWaV266Css')){
+    const css=document.createElement('style'); css.id='ticketWaV266Css';
+    css.textContent='.wa-ticket-btn-v266{background:#128C7E!important;color:#fff!important;border:0!important;border-radius:10px!important;padding:8px 12px!important;line-height:1.2!important;min-width:110px!important;font-weight:900!important;cursor:pointer!important;box-shadow:0 2px 8px rgba(18,140,126,.18)!important}.smart-ticket-actions .wa-ticket-btn-v266{order:50}.wa-ticket-btn-v266:hover{filter:brightness(.95)}';
+    document.head.appendChild(css);
+  }
+  document.addEventListener('DOMContentLoaded',()=>{ setTimeout(restore,700); setTimeout(restore,1800); });
+  window.addEventListener('load',()=>{ setTimeout(restore,800); setTimeout(restore,2200); });
+  setTimeout(restore,1200);
+  console.log('Tasneef V266 loaded: final visible tickets WhatsApp button');
+})();
+
+
+/* ===== V267: Force WhatsApp button to appear in every ticket card/table ===== */
+(function(){
+  'use strict';
+  window.TASNEEF_BUILD = 'V267_TICKETS_WHATSAPP_FORCE_VISIBLE_2026_05_31';
+  const E = window.esc || (v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])));
+  function arr(v){ return Array.isArray(v)?v:[]; }
+  function ticketNo(t){ return t?.ticket_number || ('T-' + String(t?.id||0).padStart(4,'0')); }
+  function getProject(id){ try{return typeof window.projectName==='function'?window.projectName(id):(arr(window.data?.projects).find(p=>String(p.id)===String(id))?.name||'-');}catch(e){return '-';} }
+  function getSupervisor(id){ try{return typeof window.supervisorName==='function'?window.supervisorName(id):(arr(window.data?.users).find(u=>String(u.id)===String(id))?.full_name||'-');}catch(e){return '-';} }
+  function statusLabel(s){ return String(s)==='closed'?'مغلق':(String(s)==='processing'?'تحت المعالجة':'مفتوح'); }
+  function textFor(t){
+    if(typeof window.buildTicketWhatsAppTextV42==='function') return window.buildTicketWhatsAppTextV42(t);
+    const closed = String(t.status||'open')==='closed';
+    return [closed?'تم إغلاق التكت':'تم تسجيل تكت جديد','شركة تصنيف لإدارة المرافق','',
+      'رقم التكت: '+ticketNo(t),
+      'المشروع: '+getProject(t.project_id),
+      'المشرف: '+getSupervisor(t.supervisor_id),
+      'العنوان: '+(t.title||'-'),
+      'التفاصيل: '+(t.description||'-'),
+      'الحالة: '+statusLabel(t.status),
+      t.claimed_by_name?'استلم بواسطة: '+t.claimed_by_name:'',
+      t.closed_by_name?'أغلق بواسطة: '+t.closed_by_name:'',
+      t.closure_note?'طريقة الإغلاق: '+t.closure_note:'',
+      'التاريخ: '+new Date(t.created_at||Date.now()).toLocaleString('ar-SA')
+    ].filter(Boolean).join('\n');
+  }
+  async function copyText(text){
+    try{ if(navigator.clipboard?.writeText){ await navigator.clipboard.writeText(text); return; } }catch(e){}
+    try{ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); ta.remove(); }catch(e){}
+  }
+  window.sendTicketWhatsAppV267 = async function(id){
+    const t = arr(window.data?.tickets).find(x=>String(x.id)===String(id));
+    if(!t){ if(window.msg) msg('التكت غير موجود','err'); else alert('التكت غير موجود'); return; }
+    const text=textFor(t);
+    await copyText(text);
+    window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank');
+    if(window.msg) msg('تم نسخ رسالة التكت وفتح واتساب');
+  };
+  window.sendTicketWhatsApp = window.sendTicketWhatsAppV267;
+  function findTicketFromCard(card){
+    const txt = card.textContent || '';
+    const m = txt.match(/T-\d{3,6}/);
+    if(m){
+      const byNo = arr(window.data?.tickets).find(t=>ticketNo(t)===m[0] || String(t.ticket_number||'')===m[0]);
+      if(byNo) return byNo;
+    }
+    const title = (card.querySelector('h3')?.textContent || '').trim();
+    if(title){
+      const candidates = arr(window.data?.tickets).filter(t=>String(t.title||'').trim()===title);
+      if(candidates.length===1) return candidates[0];
+      const cardProject = (card.textContent.match(/المشروع:\s*([^\nاستلمأغلقالأولوية]+)/)||[])[1];
+      if(cardProject){
+        const byProject = candidates.find(t=>txt.includes(getProject(t.project_id)));
+        if(byProject) return byProject;
+      }
+    }
+    return null;
+  }
+  function button(id){
+    return `<button type="button" class="ticket-wa-v267" onclick="sendTicketWhatsAppV267(${Number(id)||0})">إرسال واتساب</button>`;
+  }
+  function ensureInCard(card){
+    if(!card || card.querySelector('.ticket-wa-v267,.wa-ticket-btn-v266,.wa-ticket-btn-v265,.ticket-wa-v147')) return;
+    const t=findTicketFromCard(card); if(!t) return;
+    const actions = card.querySelector('.smart-ticket-actions,.row-actions') || card.lastElementChild || card;
+    actions.insertAdjacentHTML('beforeend', button(t.id));
+  }
+  function ensureAll(){
+    document.querySelectorAll('#ticketsBody .smart-ticket-card,#supTicketsBody .smart-ticket-card,#techTicketsBody .smart-ticket-card').forEach(ensureInCard);
+    document.querySelectorAll('#ticketsBody tr,#supTicketsBody tr,#techTicketsBody tr').forEach(tr=>{
+      if(tr.querySelector('th') || tr.textContent.includes('لا توجد')) return;
+      if(tr.querySelector('.ticket-wa-v267,.wa-ticket-btn-v266,.wa-ticket-btn-v265,.ticket-wa-v147')) return;
+      const t=findTicketFromCard(tr); if(!t) return;
+      const actions=tr.querySelector('.row-actions') || tr.lastElementChild || tr;
+      actions.insertAdjacentHTML('beforeend', button(t.id));
+    });
+  }
+  const oldRenderTickets = window.renderTickets;
+  window.renderTickets = function(){ const out = typeof oldRenderTickets==='function'?oldRenderTickets.apply(this,arguments):undefined; setTimeout(ensureAll,20); setTimeout(ensureAll,200); setTimeout(ensureAll,700); return out; };
+  if(!document.getElementById('ticketWaV267Css')){
+    const st=document.createElement('style'); st.id='ticketWaV267Css';
+    st.textContent='.ticket-wa-v267{background:#128C7E!important;color:#fff!important;border:0!important;border-radius:10px!important;padding:8px 12px!important;font-weight:900!important;cursor:pointer!important;min-width:108px!important}.ticket-wa-v267:hover{filter:brightness(.95)}.smart-ticket-actions .ticket-wa-v267{order:60}';
+    document.head.appendChild(st);
+  }
+  const mo = new MutationObserver(()=>{ clearTimeout(window.__ticketWa267Timer); window.__ticketWa267Timer=setTimeout(ensureAll,80); });
+  function start(){ try{ mo.observe(document.body,{childList:true,subtree:true}); }catch(e){} ensureAll(); setTimeout(ensureAll,500); setTimeout(ensureAll,1500); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
+  window.addEventListener('load',()=>setTimeout(ensureAll,700));
+  console.log('Tasneef V267 loaded: tickets WhatsApp forced visible');
+})();
+
+
+/* ===== V268: Stable live data reload + force WhatsApp button in tickets ===== */
+(function(){
+  'use strict';
+  window.TASNEEF_BUILD = 'V268_STABLE_DATA_AND_TICKET_WHATSAPP_2026_05_31';
+
+  const E = window.esc || (v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])));
+  const arr = v => Array.isArray(v) ? v : [];
+  const $ = id => document.getElementById(id);
+
+  function clearSbCaches(){
+    try{
+      const keys=[];
+      for(let i=0;i<localStorage.length;i++){
+        const k=localStorage.key(i)||'';
+        if(k.includes('tasneef_sb_cache') || k.includes('supabase_cache') || k.includes('tasneef_live_today')) keys.push(k);
+      }
+      keys.forEach(k=>localStorage.removeItem(k));
+    }catch(e){}
+  }
+  window.tasneefClearDataCacheV268 = clearSbCaches;
+
+  async function hardReloadData(){
+    clearSbCaches();
+    if(typeof window.loadAll==='function') await window.loadAll();
+    try{ if(typeof window.hydrateForms==='function') window.hydrateForms(); }catch(e){}
+    try{ if(typeof window.renderAll==='function') window.renderAll(); }catch(e){}
+    try{ forceTicketWhatsAppButtons(); }catch(e){}
+  }
+  window.tasneefHardReloadDataV268 = hardReloadData;
+
+  const oldRefreshAll = window.refreshAll;
+  window.refreshAll = async function(){
+    clearSbCaches();
+    if(typeof oldRefreshAll==='function') return oldRefreshAll.apply(this, arguments);
+    return hardReloadData();
+  };
+
+  function ticketNo(t){ return t?.ticket_number || ('T-' + String(t?.id||0).padStart(4,'0')); }
+  function statusLabel(s){ return String(s)==='closed'?'مغلق':(String(s)==='processing'?'تحت المعالجة':'مفتوح'); }
+  function projectNameOf(t){ try{return typeof window.projectName==='function'?window.projectName(t.project_id):(arr(window.data?.projects).find(p=>String(p.id)===String(t.project_id))?.name||'-');}catch(e){return '-';} }
+  function supervisorNameOf(t){ try{return typeof window.supervisorName==='function'?window.supervisorName(t.supervisor_id):(arr(window.data?.users).find(u=>String(u.id)===String(t.supervisor_id))?.full_name||'-');}catch(e){return '-';} }
+  function buildText(t){
+    if(typeof window.buildTicketWhatsAppTextV43==='function') return window.buildTicketWhatsAppTextV43(t);
+    if(typeof window.buildTicketWhatsAppTextV42==='function') return window.buildTicketWhatsAppTextV42(t);
+    return [
+      String(t.status)==='closed'?'تم إغلاق التكت':'تم تسجيل تكت / بلاغ',
+      'شركة تصنيف لإدارة المرافق','',
+      'رقم التكت: '+ticketNo(t),
+      'المشروع: '+projectNameOf(t),
+      'المشرف: '+supervisorNameOf(t),
+      'العنوان: '+(t.title||'-'),
+      'التفاصيل: '+(t.description||'-'),
+      'الحالة: '+statusLabel(t.status),
+      t.claimed_by_name?'استلم بواسطة: '+t.claimed_by_name:'',
+      t.closed_by_name?'أغلق بواسطة: '+t.closed_by_name:'',
+      t.closure_note?'طريقة الإغلاق: '+t.closure_note:'',
+      'التاريخ: '+new Date(t.created_at||Date.now()).toLocaleString('ar-SA')
+    ].filter(Boolean).join('\n');
+  }
+  async function copyText(text){
+    try{ if(navigator.clipboard?.writeText){ await navigator.clipboard.writeText(text); return true; } }catch(e){}
+    try{ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); ta.remove(); return true; }catch(e){ return false; }
+  }
+  window.sendTicketWhatsAppV268 = window.sendTicketWhatsApp = async function(id){
+    const t = arr(window.data?.tickets).find(x=>String(x.id)===String(id));
+    if(!t){ if(window.msg) msg('التكت غير موجود. اضغط تحديث البيانات ثم جرب مرة أخرى','err'); else alert('التكت غير موجود'); return; }
+    const text = buildText(t);
+    await copyText(text);
+    window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank');
+    if(window.msg) msg('تم نسخ رسالة التكت وفتح واتساب');
+  };
+
+  function findTicket(card, idx){
+    const txt=card.textContent||'';
+    const m=txt.match(/T-\d{3,7}/);
+    if(m){
+      const byNo = arr(window.data?.tickets).find(t=>ticketNo(t)===m[0] || String(t.ticket_number||'')===m[0]);
+      if(byNo) return byNo;
+      const n=Number(m[0].replace(/\D/g,''));
+      const byId=arr(window.data?.tickets).find(t=>Number(t.id)===n);
+      if(byId) return byId;
+    }
+    const title=(card.querySelector('h3')?.textContent||'').trim();
+    if(title){
+      const candidates=arr(window.data?.tickets).filter(t=>String(t.title||'').trim()===title);
+      if(candidates.length===1) return candidates[0];
+      const byProject=candidates.find(t=>txt.includes(projectNameOf(t)));
+      if(byProject) return byProject;
+    }
+    const visible=arr(window.data?.tickets);
+    return visible[idx] || null;
+  }
+  function makeBtn(id){
+    const b=document.createElement('button');
+    b.type='button'; b.className='ticket-wa-v268'; b.textContent='إرسال واتساب';
+    b.onclick=function(ev){ ev.preventDefault(); ev.stopPropagation(); window.sendTicketWhatsAppV268(id); };
+    return b;
+  }
+  function forceTicketWhatsAppButtons(){
+    const cards=[...document.querySelectorAll('#ticketsBody .smart-ticket-card,#supTicketsBody .smart-ticket-card,#techTicketsBody .smart-ticket-card')];
+    cards.forEach((card,idx)=>{
+      if(card.querySelector('.ticket-wa-v268,.ticket-wa-v267,.wa-ticket-btn-v266,.wa-ticket-btn-v265,.ticket-wa-v147')) return;
+      const t=findTicket(card,idx); if(!t) return;
+      const actions=card.querySelector('.smart-ticket-actions,.row-actions') || card;
+      actions.appendChild(makeBtn(t.id));
+    });
+    [...document.querySelectorAll('#ticketsBody tr,#supTicketsBody tr,#techTicketsBody tr')].forEach((tr,idx)=>{
+      if(tr.querySelector('th') || tr.querySelector('.ticket-wa-v268,.ticket-wa-v267,.wa-ticket-btn-v266,.wa-ticket-btn-v265,.ticket-wa-v147')) return;
+      const t=findTicket(tr,idx); if(!t) return;
+      const actions=tr.querySelector('.row-actions') || tr.lastElementChild || tr;
+      actions.appendChild(makeBtn(t.id));
+    });
+  }
+  window.forceTicketWhatsAppButtonsV268 = forceTicketWhatsAppButtons;
+
+  const oldRenderTickets = window.renderTickets;
+  window.renderTickets = function(){
+    const out = typeof oldRenderTickets==='function' ? oldRenderTickets.apply(this, arguments) : undefined;
+    setTimeout(forceTicketWhatsAppButtons, 10);
+    setTimeout(forceTicketWhatsAppButtons, 120);
+    setTimeout(forceTicketWhatsAppButtons, 500);
+    return out;
+  };
+
+  if(!document.getElementById('ticketWaV268Css')){
+    const st=document.createElement('style'); st.id='ticketWaV268Css';
+    st.textContent='.ticket-wa-v268{background:#128C7E!important;color:#fff!important;border:0!important;border-radius:10px!important;padding:8px 12px!important;font-weight:900!important;cursor:pointer!important;min-width:118px!important}.ticket-wa-v268:hover{filter:brightness(.94)}.smart-ticket-actions .ticket-wa-v268{order:70}.tasneef-force-refresh-v268{background:#064c3f!important;color:#fff!important;border-radius:12px!important;padding:9px 13px!important;font-weight:900!important}';
+    document.head.appendChild(st);
+  }
+
+  function addRefreshButton(){
+    if(document.getElementById('forceDataReloadV268')) return;
+    const host=document.querySelector('.hero-actions,.actions') || document.querySelector('header') || document.body;
+    const btn=document.createElement('button'); btn.id='forceDataReloadV268'; btn.type='button'; btn.className='tasneef-force-refresh-v268'; btn.textContent='تحديث مباشر من القاعدة';
+    btn.onclick=async()=>{ btn.disabled=true; const old=btn.textContent; btn.textContent='جاري التحديث...'; try{ await hardReloadData(); if(window.msg) msg('تم تحديث البيانات من القاعدة'); }catch(e){ if(window.msg) msg(e.message||String(e),'err'); } finally{ btn.disabled=false; btn.textContent=old; } };
+    host.appendChild(btn);
+  }
+
+  const mo=new MutationObserver(()=>{ clearTimeout(window.__tasTicketWa268T); window.__tasTicketWa268T=setTimeout(forceTicketWhatsAppButtons,80); });
+  function boot(){ clearSbCaches(); addRefreshButton(); forceTicketWhatsAppButtons(); try{ mo.observe(document.body,{childList:true,subtree:true}); }catch(e){} setTimeout(forceTicketWhatsAppButtons,700); setTimeout(forceTicketWhatsAppButtons,1600); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+  window.addEventListener('load',()=>setTimeout(()=>{ addRefreshButton(); forceTicketWhatsAppButtons(); },900));
+  console.log('Tasneef V268 loaded: stable data cache cleanup + tickets WhatsApp');
+})();
+
+
+/* ===== V269: FINAL visible WhatsApp button inside ticket cards - no skip ===== */
+(function(){
+  'use strict';
+  window.TASNEEF_BUILD = 'V269_FINAL_VISIBLE_TICKET_WHATSAPP_2026_05_31';
+  const arr = v => Array.isArray(v) ? v : [];
+  const esc = window.esc || (v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])));
+  function ticketNo(t){ return t?.ticket_number || ('T-' + String(t?.id||0).padStart(4,'0')); }
+  function projectNameOf(t){ try{return typeof window.projectName==='function'?window.projectName(t.project_id):(arr(window.data?.projects).find(p=>String(p.id)===String(t.project_id))?.name||'-');}catch(e){return '-';} }
+  function supervisorNameOf(t){ try{return typeof window.supervisorName==='function'?window.supervisorName(t.supervisor_id):(arr(window.data?.users).find(u=>String(u.id)===String(t.supervisor_id))?.full_name||'-');}catch(e){return '-';} }
+  function statusLabel(s){ s=String(s||'open'); return s==='closed'?'مغلق':(s==='processing'?'تحت المعالجة':'مفتوح'); }
+  function priorityLabel(p){ p=String(p||'normal'); return p==='urgent'?'عاجل':(p==='high'?'مهم':(p==='low'?'منخفض':'عادي')); }
+  function textForTicket(t){
+    if(typeof window.buildTicketWhatsAppTextV42==='function'){
+      try{return window.buildTicketWhatsAppTextV42(t);}catch(e){}
+    }
+    return [
+      t.status==='closed'?'✅ تم إغلاق التكت':'📌 تكت / بلاغ',
+      'شركة تصنيف لإدارة المرافق','',
+      'رقم التكت: '+ticketNo(t),
+      'المشروع: '+projectNameOf(t),
+      'المشرف: '+supervisorNameOf(t),
+      'الأولوية: '+priorityLabel(t.priority),
+      'الحالة: '+statusLabel(t.status),
+      'العنوان: '+(t.title||'-'),
+      'التفاصيل: '+(t.description||'-'),
+      t.claimed_by_name?'تم الاستلام بواسطة: '+t.claimed_by_name:'',
+      t.closed_by_name?'تم الإغلاق بواسطة: '+t.closed_by_name:'',
+      t.closure_note?'طريقة الإغلاق: '+t.closure_note:'',
+      'تاريخ التكت: '+new Date(t.created_at||Date.now()).toLocaleString('ar-SA')
+    ].filter(Boolean).join('\n');
+  }
+  async function copyText(txt){
+    try{ if(navigator.clipboard?.writeText){ await navigator.clipboard.writeText(txt); return; } }catch(e){}
+    try{ const ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.top='-2000px'; document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); ta.remove(); }catch(e){}
+  }
+  window.sendTicketWhatsAppV269 = async function(id){
+    const t=arr(window.data?.tickets).find(x=>String(x.id)===String(id));
+    if(!t){ if(window.msg) msg('لم يتم العثور على التكت، اضغط تحديث البيانات ثم جرّب مرة أخرى','err'); else alert('لم يتم العثور على التكت'); return; }
+    const txt=textForTicket(t);
+    await copyText(txt);
+    window.open('https://wa.me/?text='+encodeURIComponent(txt),'_blank');
+    if(window.msg) msg('تم نسخ رسالة التكت وفتح واتساب');
+  };
+  window.sendTicketWhatsApp = window.sendTicketWhatsAppV269;
+
+  function findTicketFromCard(card, fallbackIndex){
+    const txt=card.textContent||'';
+    const m=txt.match(/T-\d{3,7}/);
+    if(m){
+      const byNo=arr(window.data?.tickets).find(t=>ticketNo(t)===m[0] || String(t.ticket_number||'')===m[0]);
+      if(byNo) return byNo;
+    }
+    const title=(card.querySelector('h3')?.textContent||'').trim();
+    if(title){
+      const c=arr(window.data?.tickets).filter(t=>String(t.title||'').trim()===title);
+      if(c.length===1) return c[0];
+      const byP=c.find(t=>txt.includes(projectNameOf(t)));
+      if(byP) return byP;
+    }
+    const visibleNo=[...document.querySelectorAll('#ticketsBody .smart-ticket-card,#supTicketsBody .smart-ticket-card,#techTicketsBody .smart-ticket-card')].indexOf(card);
+    return arr(window.data?.tickets)[visibleNo>=0?visibleNo:fallbackIndex] || null;
+  }
+  function makeButton(id){
+    const b=document.createElement('button');
+    b.type='button';
+    b.className='ticket-wa-v269';
+    b.innerHTML='واتساب';
+    b.disabled=false;
+    b.onclick=function(e){ e.preventDefault(); e.stopPropagation(); window.sendTicketWhatsAppV269(id); };
+    return b;
+  }
+  function unhideOldButtons(card){
+    card.querySelectorAll('.ticket-wa-v147,.ticket-wa-v267,.ticket-wa-v268,.wa-ticket-btn-v266,.wa-ticket-btn-v265,.wa-ticket-btn-v46,.wa-ticket-btn-v45,.wa-ticket-btn-v43,.wa-ticket-btn-v42').forEach(b=>{
+      b.style.setProperty('display','inline-flex','important');
+      b.style.setProperty('visibility','visible','important');
+      b.style.setProperty('opacity','1','important');
+      b.style.setProperty('pointer-events','auto','important');
+      b.disabled=false; b.classList.remove('ui-disabled-v236','ui-disabled-v248','hidden');
+      if(!/واتساب/.test(b.textContent||'')) b.textContent='واتساب';
+      b.classList.add('ticket-wa-v269-old');
+    });
+  }
+  function ensureForCard(card,idx){
+    if(!card) return;
+    unhideOldButtons(card);
+    if(card.querySelector('.ticket-wa-v269')) return;
+    const t=findTicketFromCard(card,idx); if(!t) return;
+    const actions=card.querySelector('.smart-ticket-actions,.row-actions');
+    const b=makeButton(t.id);
+    if(actions) actions.insertBefore(b, actions.firstChild);
+    else card.appendChild(b);
+  }
+  function ensureAll(){
+    const cards=[...document.querySelectorAll('#ticketsBody .smart-ticket-card,#supTicketsBody .smart-ticket-card,#techTicketsBody .smart-ticket-card')];
+    cards.forEach(ensureForCard);
+    const rows=[...document.querySelectorAll('#ticketsBody tr,#supTicketsBody tr,#techTicketsBody tr')].filter(r=>!r.querySelector('th')&&!/لا توجد/.test(r.textContent||''));
+    rows.forEach((r,idx)=>{
+      unhideOldButtons(r);
+      if(r.querySelector('.ticket-wa-v269')) return;
+      const t=findTicketFromCard(r,idx); if(!t) return;
+      const actions=r.querySelector('.row-actions') || r.lastElementChild || r;
+      actions.insertBefore(makeButton(t.id), actions.firstChild||null);
+    });
+  }
+  window.forceTicketWhatsAppV269 = ensureAll;
+  const oldRender=window.renderTickets;
+  window.renderTickets=function(){
+    const out=typeof oldRender==='function'?oldRender.apply(this,arguments):undefined;
+    setTimeout(ensureAll,0); setTimeout(ensureAll,100); setTimeout(ensureAll,400); setTimeout(ensureAll,1000);
+    return out;
+  };
+  if(!document.getElementById('ticketWaV269Css')){
+    const st=document.createElement('style'); st.id='ticketWaV269Css';
+    st.textContent=`
+      .ticket-wa-v269,.ticket-wa-v269-old,.ticket-wa-v147,.ticket-wa-v267,.ticket-wa-v268{
+        display:inline-flex!important;align-items:center!important;justify-content:center!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;
+        background:#128C7E!important;color:#fff!important;border:0!important;border-radius:11px!important;padding:8px 11px!important;font-weight:900!important;cursor:pointer!important;min-width:82px!important;line-height:1.2!important;
+      }
+      .smart-ticket-actions .ticket-wa-v269{order:-20!important;box-shadow:0 6px 14px rgba(18,140,126,.18)!important}
+      .smart-ticket-actions{overflow:visible!important}
+      .ui-readonly-v236 .ticket-wa-v269,.ui-readonly-v248 .ticket-wa-v269{opacity:1!important;pointer-events:auto!important}
+    `;
+    document.head.appendChild(st);
+  }
+  const mo=new MutationObserver(()=>{ clearTimeout(window.__wa269Timer); window.__wa269Timer=setTimeout(ensureAll,60); });
+  function start(){ ensureAll(); try{mo.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style','disabled']});}catch(e){} setInterval(ensureAll,1500); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
+  window.addEventListener('load',()=>setTimeout(ensureAll,800));
+  console.log('Tasneef V269 loaded: final force visible WhatsApp button in tickets');
 })();
