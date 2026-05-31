@@ -18,7 +18,7 @@
   }catch(e){}
   window.TASNEEF_BUILD='V279_RECOVERY_LOCAL_SUPABASE_FALLBACK';
 })();
-/* TASNEEF BUILD V257 - stable live today logs/tickets fix - 2026-05-31 */
+/* TASNEEF BUILD V280 - stable live today logs/tickets fix - 2026-05-31 */
 /* V154 Smart Loading Branding */
 (function(){
   if(window.__tasneefLoadingV154) return;
@@ -2732,10 +2732,10 @@ function exportContractServicesCSV(){
     if(table==='time_logs'){
       const month=$('monthlyMonth')?.value || today().slice(0,7);
       const start=monthStart(month), end=monthEnd(month);
-      const res=await sb.from('time_logs').select(LOG_COLS).gte('log_date',start).lte('log_date',end).order('id',{ascending:false}).limit(5000);
+      const res=await sb.from('time_logs').select(LOG_COLS).gte('log_date',start).lte('log_date',end).order('id',{ascending:false}).limit(500);
       rows=res.data||[]; error=res.error;
     }else{
-      const res=await sb.from(table).select('*').limit(5000);
+      const res=await sb.from(table).select('*').limit(500);
       rows=res.data||[]; error=res.error;
     }
     if(error) return msg(error.message,'err');
@@ -18801,9 +18801,9 @@ function financePrintReport(kind){
       q('المستخدمين', sb.from('app_users').select('*').order('id'), []),
       q('المشاريع', sb.from('projects').select('*').order('id'), []),
       q('العمال', sb.from('workers').select('*').order('id'), []),
-      q('الحضور', sb.from('attendance').select('*').gte('attendance_date', addDays(d,-90)).order('attendance_date',{ascending:false}).limit(5000), []),
-      q('التكتات', sb.from('tickets').select('*').order('id',{ascending:false}).limit(5000), []),
-      q('الخدمات', sb.from('contract_services').select('*').order('id',{ascending:false}).limit(5000), [])
+      q('الحضور', sb.from('attendance').select('*').gte('attendance_date', addDays(d,-14)).order('attendance_date',{ascending:false}).limit(500), []),
+      q('التكتات', sb.from('tickets').select('*').order('id',{ascending:false}).limit(500), []),
+      q('الخدمات', sb.from('contract_services').select('*').order('id',{ascending:false}).limit(500), [])
     ]);
     window.data = window.data || data || {};
     data.users=users.data||[];
@@ -19057,11 +19057,11 @@ function financePrintReport(kind){
     try{
       const [projects, ticketsAll, ticketsToday, logsByDate, logsByCheck, services] = await Promise.all([
         client.from('projects').select('*').order('id'),
-        client.from('tickets').select('*').order('id',{ascending:false}).limit(5000),
+        client.from('tickets').select('*').order('id',{ascending:false}).limit(500),
         client.from('tickets').select('*').gte('created_at',startIso).lte('created_at',endIso).order('id',{ascending:false}).limit(1000),
         applySup(client.from('time_logs').select('*').eq('log_date',d).order('id',{ascending:false}).limit(1000)).then(r=>r),
         applySup(client.from('time_logs').select('*').gte('check_in',startIso).lte('check_in',endIso).order('id',{ascending:false}).limit(1000)).then(r=>r),
-        client.from('contract_services').select('*').order('id',{ascending:false}).limit(5000)
+        client.from('contract_services').select('*').order('id',{ascending:false}).limit(500)
       ]);
       window.data = window.data || data || {};
       if(projects && !projects.error){
@@ -19805,7 +19805,7 @@ function financePrintReport(kind){
 (function(){
   if(window.__tasneefV257LiveTodayFix) return;
   window.__tasneefV257LiveTodayFix = true;
-  window.TASNEEF_BUILD = 'V257_STABLE_LIVE_TODAY_LOGS_TICKETS_2026_05_31';
+  window.TASNEEF_BUILD = 'V280_FAST_STABLE_NO_HEAVY_LIVE_LOAD_2026_05_31';
 
   const SUPA_URL = (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://zmjdqiswytxlbfgnfjfv.supabase.co');
   const SUPA_KEY = (typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb');
@@ -19887,8 +19887,8 @@ function financePrintReport(kind){
     const isSup = u && u.role === 'supervisor';
     try{
       const [logsLive, ticketsLive] = await Promise.all([
-        xhrGetJson(noStoreUrl('time_logs','select=*&order=check_in.desc&limit=3000')),
-        xhrGetJson(noStoreUrl('tickets','select=*&order=created_at.desc&limit=3000'))
+        xhrGetJson(noStoreUrl('time_logs','select=*&order=check_in.desc&limit=300')),
+        xhrGetJson(noStoreUrl('tickets','select=*&order=created_at.desc&limit=300'))
       ]);
       if(typeof data !== 'undefined'){
         data.logs = sortLogs257(mergeById257(data.logs, logsLive));
@@ -19997,13 +19997,11 @@ function financePrintReport(kind){
   const initAdminBase257 = window.initAdmin || (typeof initAdmin === 'function' ? initAdmin : null);
   window.initAdmin = async function(){
     const out = initAdminBase257 ? await initAdminBase257.apply(this, arguments) : undefined;
-    await refreshAndRender257();
     return out;
   };
   const initSupervisorBase257 = window.initSupervisor || (typeof initSupervisor === 'function' ? initSupervisor : null);
   window.initSupervisor = async function(){
     const out = initSupervisorBase257 ? await initSupervisorBase257.apply(this, arguments) : undefined;
-    await refreshAndRender257();
     return out;
   };
 
@@ -20023,12 +20021,11 @@ function financePrintReport(kind){
     };
   }
 
-  document.addEventListener('DOMContentLoaded',()=>{ setTimeout(addLiveButton257,700); setTimeout(refreshAndRender257,1100); });
-  window.addEventListener('load',()=>{ setTimeout(addLiveButton257,600); setTimeout(refreshAndRender257,1600); });
-  document.addEventListener('visibilitychange',()=>{ if(!document.hidden) refreshAndRender257(); });
-  setInterval(()=>{ if(document.visibilityState !== 'hidden') refreshAndRender257(); }, 120000);
+  document.addEventListener('DOMContentLoaded',()=>{ setTimeout(addLiveButton257,700); });
+  window.addEventListener('load',()=>{ setTimeout(addLiveButton257,600); });
+  // V280: أوقفنا التحديث الحي التلقائي الثقيل. التحديث يتم يدويًا من زر التحديث أو بعد الحفظ فقط.
 
-  console.log('Tasneef V257 loaded: stable live today logs/tickets without stale cache or UTC date mismatch');
+  console.log('Tasneef V280 loaded: stable fast mode - no heavy auto live loads');
 })();
 
 
