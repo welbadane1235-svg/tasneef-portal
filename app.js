@@ -157,7 +157,7 @@
   if('serviceWorker' in navigator && !window.__tasneefSWRegV239){
     window.__tasneefSWRegV239 = true;
     window.addEventListener('load',()=>{
-      navigator.serviceWorker.register('tasneef-sw.js?v=239').catch(()=>{});
+      navigator.serviceWorker.register('tasneef-sw.js?v=197').catch(()=>{});
     });
   }
 
@@ -12679,7 +12679,7 @@ function financePrintReport(kind){
   function requestIsIssued(r){ return /approved|issued|صرف|معتمد|done|completed/i.test(S(r?.status)); }
   function stats(it){
     const moves = arr(window.data?.inventoryMovements).filter(m=>matchItem(it,m));
-    let enteredMov=0, enteredBatch=0, issuedReq=0, issuedMov=0, returned=0, direct=0;
+    let enteredMov=197, enteredBatch=0, issuedReq=0, issuedMov=197, returned=0, direct=0;
     moves.forEach(m=>{
       const t=S(m.movement_type).toLowerCase(); const q=Math.abs(N(m.quantity));
       if(['in','إدخال','add','invoice_add','purchase'].includes(t)) enteredMov+=q;
@@ -18638,335 +18638,69 @@ function financePrintReport(kind){
 })();
 
 
-/* ===== V195: Dashboard units/buildings + ticket PDF/dropdown + product stock formula + permissions helpers ===== */
+/* ===== V197: Tickets filters + Orders module ===== */
 (function(){
-  if(window.__tasneefV195DashboardTicketsStock) return;
-  window.__tasneefV195DashboardTicketsStock = true;
-  const $ = id => document.getElementById(id);
-  const A = v => Array.isArray(v)?v:[];
-  const D = () => window.data || {};
-  const S = v => String(v ?? '').trim();
-  const N = v => Number(v || 0) || 0;
-  const esc = v => S(v).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
-  const q = v => { const n=N(v); return Number.isInteger(n)?String(n):n.toFixed(2); };
-  const money = v => `${N(v).toFixed(2)} ر.س`;
-  const user = () => { try{return typeof session==='function'?(session()||{}):(window.currentUser||{});}catch(e){return window.currentUser||{};} };
-  const projectNameSafe = id => { try{return typeof projectName==='function'?projectName(id):(A(D().projects).find(p=>S(p.id)===S(id))?.name||'-');}catch(e){return A(D().projects).find(p=>S(p.id)===S(id))?.name||'-';} };
-  const supervisorNameSafe = id => { try{return typeof supervisorName==='function'?supervisorName(id):(A(D().supervisors).concat(A(D().users)).find(u=>S(u.id)===S(id))?.full_name||'-');}catch(e){return '-';} };
-  const codeOf = it => S((typeof v118ProductCode==='function' ? v118ProductCode(it) : '') || it.product_code || it.company_code || it.serial_number || it.barcode || ('INV-'+(it.id||'')));
-  const imgOf = it => S(it.image_url || it.product_image || it.product_image_url || it.image || it.photo_url || it.img || '');
-
-  function addDashboardKpis(){
-    const kpis = document.querySelector('#dashboard .kpis');
-    if(!kpis || $('kpiBuildings') || $('kpiUnits')) return;
-    kpis.insertAdjacentHTML('beforeend', `
-      <div class="kpi"><small>إجمالي العمائر</small><b id="kpiBuildings">0</b></div>
-      <div class="kpi"><small>إجمالي الشقق</small><b id="kpiUnits">0</b></div>
-    `);
-  }
-  function updateDashboardProjectTotals(){
-    addDashboardKpis();
-    const projects = A(D().projects);
-    const buildings = projects.reduce((s,p)=>s+N(p.buildings_count ?? p.buildings ?? p.building_count ?? p.towers_count),0);
-    const units = projects.reduce((s,p)=>s+N(p.units_count ?? p.apartments_count ?? p.flats_count ?? p.units ?? p.apartments),0);
-    if($('kpiBuildings')) $('kpiBuildings').textContent = buildings;
-    if($('kpiUnits')) $('kpiUnits').textContent = units;
-  }
-  const oldRenderDashboardV195 = window.renderDashboard;
-  window.renderDashboard = function(){
-    if(typeof oldRenderDashboardV195 === 'function') oldRenderDashboardV195.apply(this, arguments);
-    updateDashboardProjectTotals();
-  };
-
-  function ensureTicketTitleList(){
-    if(!document.getElementById('ticketTitleOptionsV195')){
-      document.body.insertAdjacentHTML('beforeend', `<datalist id="ticketTitleOptionsV195">
-        <option value="مشكلة كهرباء"><option value="مشكلة سباكة"><option value="مشكلة مصعد"><option value="مشكلة كاميرات"><option value="مشكلة إنارة"><option value="مشكلة تكييف"><option value="تسريب مياه"><option value="انسداد صرف"><option value="نظافة"><option value="باب / قفل"><option value="أخرى">
-      </datalist>`);
-    }
-    ['ticketTitle','techNewTicketTitle'].forEach(id=>{ const el=$(id); if(el){ el.setAttribute('list','ticketTitleOptionsV195'); el.setAttribute('placeholder','اختر أو اكتب عنوان التكت'); } });
-  }
-
+  const $ = window.$ || (id=>document.getElementById(id));
+  const esc = window.esc || (s=>String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])));
+  const fmt = window.fmt || (v=>v?new Date(v).toLocaleString('ar-SA'):'-');
+  function n(v){ const x=Number(v); return isFinite(x)?x:0; }
+  function money(v){ return n(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function projectNameLocal(id){ try{return window.projectName?window.projectName(id):((window.data?.projects||[]).find(p=>String(p.id)===String(id))?.name||'-');}catch(_){return '-'} }
+  function supervisorNameLocal(id){ try{return window.supervisorName?window.supervisorName(id):((window.data?.users||[]).find(u=>String(u.id)===String(id))?.full_name||'-');}catch(_){return '-'} }
   function ticketNo(t){ return t.ticket_number || ('T-' + String(t.id||0).padStart(4,'0')); }
-  function ticketStatusLabel(s){ return s==='closed'?'مغلق':(s==='processing'?'تحت المعالجة':'مفتوح'); }
+  function ticketStatusLabel(status){ return status==='closed'?'مغلق':(status==='processing'?'تحت المعالجة':'مفتوح'); }
   function ticketPriorityLabel(p){ return p==='urgent'?'عاجل':(p==='high'?'مهم':(p==='low'?'منخفض':'عادي')); }
-  function filteredTicketsForPrint(){
-    let rows = A(D().tickets).slice();
-    const adminBody=$('ticketsBody'), supBody=$('supTicketsBody');
-    const st = adminBody ? ($('ticketFilterStatus')?.value||'') : ($('supTicketFilterStatus')?.value||'');
-    const pid = adminBody ? '' : ($('supTicketFilterProject')?.value||'');
-    const qv = (adminBody ? ($('ticketSearch')?.value||'') : ($('supTicketSearch')?.value||'')).toLowerCase().trim();
-    if(st) rows = rows.filter(t=>S(t.status||'open')===st);
-    if(pid) rows = rows.filter(t=>S(t.project_id)===S(pid));
-    if(qv) rows = rows.filter(t=>[ticketNo(t),t.title,t.description,projectNameSafe(t.project_id),supervisorNameSafe(t.supervisor_id),ticketStatusLabel(t.status),t.closed_by_name,t.claimed_by_name,t.closure_note].join(' ').toLowerCase().includes(qv));
-    return rows;
+  function ticketRowClass(t){ if(t.status==='closed') return 'ticket-row-closed'; if(t.status==='processing') return 'ticket-row-processing'; if(t.priority==='urgent'||t.priority==='high') return 'ticket-row-urgent'; return 'ticket-row-normal'; }
+  function statusBadge(t){ const cls=t.status==='closed'?'green':(t.status==='processing'?'amber':((t.priority==='urgent'||t.priority==='high')?'red':'pink')); return `<span class="badge ${cls}">${ticketStatusLabel(t.status)}</span>`; }
+  function priorityBadge(t){ const cls=t.priority==='urgent'?'red':(t.priority==='high'?'amber':'pink'); return `<span class="badge ${cls}">${ticketPriorityLabel(t.priority)}</span>`; }
+  function shortText(s){ s=String(s||''); return s.length>90 ? esc(s.slice(0,90))+'…' : esc(s||'-'); }
+  function fillTicketFiltersV197(){
+    const p=$('ticketFilterProjectV197'); if(p){ const old=p.value; p.innerHTML='<option value="">كل المشاريع</option>'+((window.data?.projects||[]).map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')); p.value=old; }
+    const dl=$('ticketTitleFilterListV197'); if(dl){ const titles=[...new Set((window.data?.tickets||[]).map(t=>(t.title||'').trim()).filter(Boolean))].sort(); dl.innerHTML=titles.map(t=>`<option value="${esc(t)}"></option>`).join(''); }
   }
-  function ticketPdfHtml(list){
-    const rows = list.map(t=>`<tr><td>${esc(ticketNo(t))}</td><td>${esc(projectNameSafe(t.project_id))}</td><td>${esc(supervisorNameSafe(t.supervisor_id))}</td><td>${esc(t.title||'-')}</td><td>${esc(ticketPriorityLabel(t.priority))}</td><td>${esc(ticketStatusLabel(t.status))}</td><td>${esc(S(t.created_at).slice(0,10))}</td><td>${esc(t.description||'-')}</td><td>${esc(t.closure_note||'-')}</td></tr>`).join('') || `<tr><td colspan="9">لا توجد تكتات</td></tr>`;
-    return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير التكتات</title><style>@page{size:A4 landscape;margin:10mm}body{font-family:Arial,Tahoma,sans-serif;color:#123} .head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #0A4033;padding-bottom:10px;margin-bottom:14px}.brand{display:flex;gap:10px;align-items:center}.brand img{width:72px;height:72px;object-fit:contain}.brand h1{font-size:20px;margin:0;color:#0A4033}.meta{font-size:12px;color:#60706a}table{width:100%;border-collapse:collapse;font-size:11px}th{background:#0A4033;color:#fff}td,th{border:1px solid #cfded8;padding:7px;text-align:center;vertical-align:top}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}.k{border:1px solid #dbe8e3;border-radius:12px;padding:8px;background:#f6fbf9}.k b{font-size:18px;color:#0A4033}</style></head><body><div class="head"><div class="brand"><img src="tasneef_logo_print.png"><div><h1>شركة تصنيف لإدارة المرافق</h1><div class="meta">تقرير التكتات بصيغة PDF / طباعة</div></div></div><div class="meta">تاريخ التقرير: ${new Date().toLocaleString('ar-SA')}</div></div><div class="summary"><div class="k">إجمالي<br><b>${list.length}</b></div><div class="k">مفتوحة<br><b>${list.filter(t=>S(t.status||'open')==='open').length}</b></div><div class="k">تحت المعالجة<br><b>${list.filter(t=>S(t.status)==='processing').length}</b></div><div class="k">مغلقة<br><b>${list.filter(t=>S(t.status)==='closed').length}</b></div></div><table><thead><tr><th>رقم التكت</th><th>المشروع</th><th>المشرف</th><th>العنوان</th><th>الأولوية</th><th>الحالة</th><th>التاريخ</th><th>الوصف</th><th>الإغلاق</th></tr></thead><tbody>${rows}</tbody></table><script>setTimeout(()=>window.print(),300)<\/script></body></html>`;
-  }
-  window.downloadTicketsPdfV195 = function(){
-    const list=filteredTicketsForPrint();
-    const w=window.open('','_blank');
-    if(!w){ if(typeof msg==='function') msg('المتصفح منع فتح نافذة PDF. فعّل النوافذ المنبثقة.','err'); return; }
-    w.document.open(); w.document.write(ticketPdfHtml(list)); w.document.close();
-  };
-  function ensureTicketPdfButtons(){
-    const adminFilters = document.querySelector('#tickets .filters');
-    if(adminFilters && !$('ticketPdfAllV195')) adminFilters.insertAdjacentHTML('beforeend','<button type="button" id="ticketPdfAllV195" class="light" onclick="downloadTicketsPdfV195()">تحميل PDF</button>');
-    const supFilters = document.querySelector('#supTicketsBody')?.closest('section')?.querySelector('.filters');
-    if(supFilters && !$('supTicketPdfAllV195')) supFilters.insertAdjacentHTML('beforeend','<button type="button" id="supTicketPdfAllV195" class="light" onclick="downloadTicketsPdfV195()">تحميل PDF</button>');
-  }
-  const oldRenderTicketsV195 = window.renderTickets;
   window.renderTickets = function(){
-    if(typeof oldRenderTicketsV195 === 'function') oldRenderTicketsV195.apply(this, arguments);
-    ensureTicketTitleList();
-    ensureTicketPdfButtons();
-  };
-
-  function requestLines(req){
-    let lines = req.request_items || req.items || req.request_lines || [];
-    if(typeof lines === 'string'){ try{ lines = JSON.parse(lines||'[]'); }catch(e){ lines=[]; } }
-    return A(lines);
-  }
-  function itemById(id){ return A(D().inventoryItems).find(x=>S(x.id)===S(id)) || {}; }
-  function movementsOf(id){ return A(D().inventoryMovements).filter(m=>S(m.item_id)===S(id)); }
-  function productStats(id){
-    let incoming=0, issued=0, returned=0, consumed=0, directConsumed=0;
-    movementsOf(id).forEach(m=>{
-      const t=S(m.movement_type).toLowerCase(); const qn=N(m.quantity);
-      if(['in','add','purchase','invoice_add','إدخال','شراء'].includes(t) || /إدخال|شراء/.test(S(m.reason||m.notes||m.movement_type))) incoming += qn;
-      else if(['return','returned','مرتجع'].includes(t) || /مرتجع/.test(S(m.movement_type||m.reason||m.notes))) returned += qn;
-      else if((['consume','consumption','استهلاك مباشر'].includes(t) || /استهلاك/.test(S(m.movement_type||m.reason||m.notes))) && !m.request_id){ directConsumed += qn; consumed += qn; }
-      else if(['out','issue','صرف'].includes(t) || /صرف/.test(S(m.movement_type||m.reason||m.notes))) issued += qn;
-    });
-    A(D().inventoryRequests).filter(r=>['approved','done','completed','closed'].includes(S(r.status||'').toLowerCase()) || S(r.current_step)==='done').forEach(r=>{
-      requestLines(r).forEach(l=>{
-        if(S(l.item_id)!==S(id)) return;
-        const out=N(l.quantity); issued += out;
-        const allocs=A(l.settlement_allocations);
-        let c = allocs.length ? allocs.reduce((a,x)=>a+N(x.consumed_qty||x.qty),0) : N(l.consumed_qty);
-        let ret = N(l.returned_qty);
-        if(c<=0 && ret>0) c = Math.max(0,out-ret);
-        if(c>out) c=out;
-        if(ret>out) ret=out;
-        consumed += c;
-        returned += ret;
-      });
-    });
-    const stock = Math.max(0, incoming - issued + returned);
-    const custody = Math.max(0, issued - consumed - returned);
-    return {incoming, issued, returned, consumed, directConsumed, stock, custody};
-  }
-  function openProductDetailV195(id){
-    const it = itemById(id); if(!it.id && !it.name) return;
-    document.querySelectorAll('.modal-backdrop.v195-product-modal,.modal-backdrop.v234-product-modal,.modal-backdrop.v235-product-modal').forEach(x=>x.remove());
-    const st = productStats(id); const src = imgOf(it);
-    const img = src ? `<img src="${esc(src)}" style="max-width:170px;max-height:170px;object-fit:contain;border:1px solid #d7e4df;border-radius:18px;background:#fff;padding:8px" onerror="this.outerHTML='<span class=&quot;inventory-image-empty&quot;>لا توجد صورة</span>'">` : `<span class="inventory-image-empty">لا توجد صورة</span>`;
-    const costVisible = !['warehouse_manager','مدير المخزون','مدير مخزون'].includes(S(user().role).toLowerCase());
-    const costLine = costVisible ? `<div class="m"><small>تكلفة الوحدة</small><b>${money(it.unit_cost || it.unit_price || it.price)}</b></div>` : '';
-    const movRows = movementsOf(id).slice(-16).reverse().map(m=>`<tr><td>${esc(S(m.movement_date||m.created_at).slice(0,10))}</td><td>${esc(m.movement_type||'-')}</td><td>${q(m.quantity)} ${esc(it.unit||'')}</td><td>${esc(m.project_name||projectNameSafe(m.project_id)||'-')}</td><td>${esc(m.receiver||m.receiver_name||'-')}</td><td>${esc(m.reason||m.notes||'-')}</td></tr>`).join('') || '<tr><td colspan="6">لا توجد حركات</td></tr>';
-    const html = `<div class="modal-backdrop v195-product-modal" onclick="if(event.target===this)this.remove()"><div class="modal-card" style="max-width:1120px"><div class="modal-head"><h2>تفاصيل المنتج</h2><button onclick="this.closest('.modal-backdrop').remove()">إغلاق</button></div><div style="padding:16px"><div class="grid two"><div class="card soft-card"><h2>${esc(it.name||'-')}</h2><p>كود المنتج: <b>${esc(codeOf(it)||'-')}</b></p><p>المورد: <b>${esc(it.supplier||'-')}</b> | الوحدة: <b>${esc(it.unit||'-')}</b></p><div class="smart-meta-v129"><div class="m"><small>الداخل</small><b>${q(st.incoming)}</b></div><div class="m"><small>الصادر عهدة</small><b>${q(st.issued)}</b></div><div class="m"><small>المستهلك الفعلي</small><b>${q(st.consumed)}</b></div><div class="m"><small>المرتجع</small><b>${q(st.returned)}</b></div><div class="m"><small>العهدة الحالية</small><b>${q(st.custody)}</b></div><div class="m"><small>المتبقي في المخزون</small><b>${q(st.stock)}</b></div>${costLine}</div></div><div class="card soft-card" style="text-align:center;display:flex;align-items:center;justify-content:center;min-height:185px">${img}</div></div><h3>آخر الحركات</h3><div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>الكمية</th><th>المشروع</th><th>المستلم</th><th>السبب</th></tr></thead><tbody>${movRows}</tbody></table></div></div></div></div>`;
-    document.body.insertAdjacentHTML('beforeend', html);
-  }
-  window.inventoryOpenItemSmart = openProductDetailV195;
-  window.v118ShowProductDetail = openProductDetailV195;
-  window.openProductDetail = openProductDetailV195;
-
-  function ensurePermissionMatrixV195(){
-    const grid = document.querySelector('.perm-grid-v72');
-    if(!grid || document.getElementById('perm_can_edit_all')) return;
-    const perms = [
-      ['can_edit_all','صلاحية تعديل عامة'],['can_delete_all','صلاحية حذف عامة'],['can_print_all','صلاحية طباعة عامة'],['can_approve_all','صلاحية اعتماد عامة'],
-      ['can_edit_projects','تعديل المشاريع'],['can_delete_projects','حذف المشاريع'],['can_edit_contracts','تعديل العقود والخدمات'],['can_delete_contracts','حذف العقود والخدمات'],
-      ['can_edit_tickets','تعديل التكتات'],['can_delete_tickets','حذف التكتات'],['can_print_tickets','طباعة التكتات PDF'],
-      ['can_edit_finance','تعديل المصروفات والمخزون'],['can_delete_finance','حذف المصروفات والمخزون'],['can_approve_inventory','اعتماد طلبات الصرف'],['can_edit_inventory_requests','تعديل طلبات الصرف'],['can_delete_inventory_requests','حذف طلبات الصرف']
-    ];
-    grid.insertAdjacentHTML('beforeend', perms.map(([k,l])=>`<label class="perm-item-v72"><input type="checkbox" id="perm_${k}" data-perm="${k}"> <span>${l}</span></label>`).join(''));
-  }
-
-  function bootV195(){
-    addDashboardKpis(); updateDashboardProjectTotals(); ensureTicketTitleList(); ensureTicketPdfButtons(); ensurePermissionMatrixV195();
-  }
-  ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(bootV195, ev==='load'?700:150)));
-  setTimeout(bootV195,1000); setInterval(()=>{ try{ensureTicketTitleList();ensureTicketPdfButtons();ensurePermissionMatrixV195();}catch(e){} },2500);
-  console.log('Tasneef V195 dashboard/tickets/stock/permissions loaded');
-})();
-
-
-/* ===== V196: Stable core fix - daily records visibility, contracts totals only, instant CRUD refresh ===== */
-(function(){
-  if(window.__tasneefV196StableCoreFix) return;
-  window.__tasneefV196StableCoreFix = true;
-  const $ = (id)=>document.getElementById(id);
-  const arr = (v)=>Array.isArray(v)?v:[];
-  const S = (v)=>String(v ?? '').trim();
-  const N = (v)=>Number(v || 0) || 0;
-  const todayStr = ()=>{
-    try{ return typeof today==='function' ? today() : new Date().toISOString().slice(0,10); }
-    catch(_){ return new Date().toISOString().slice(0,10); }
-  };
-  const monthStr = ()=>{
-    const v = $('monthlyMonth')?.value || todayStr().slice(0,7);
-    return v;
-  };
-  const mStart = (m)=>`${m}-01`;
-  const mEnd = (m)=>{
-    const [y,mo]=String(m).split('-').map(Number);
-    return new Date(y, mo, 0).toISOString().slice(0,10);
-  };
-  function getData(){ window.data = window.data || {}; return window.data; }
-  function currentUser(){ try{return typeof session==='function' ? (session()||{}) : (window.currentUser||{});}catch(_){return window.currentUser||{};} }
-  function isAdminUser(){ const u=currentUser(); return ['admin','general_manager','operations_manager','financial_manager'].includes(S(u.role)); }
-  function esc(v){ return S(v).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])); }
-
-  /* 1) إخفاء إجمالي الشقق/العمائر من الرئيسية، وإظهارها داخل العقود والخدمات فقط */
-  function hideDashboardApartmentKpis(){
-    ['kpiBuildings','kpiUnits'].forEach(id=>{
-      const el=$(id); const box=el?.closest('.kpi'); if(box) box.style.display='none';
-    });
-  }
-  function ensureContractsTotalsKpis(){
-    const contracts = $('contracts');
-    if(!contracts) return;
-    let kpis = contracts.querySelector('.kpis');
-    if(!kpis){
-      const header = contracts.querySelector('.page-head') || contracts.querySelector('.card') || contracts.firstElementChild;
-      kpis = document.createElement('div'); kpis.className='kpis';
-      (header?.parentNode || contracts).insertBefore(kpis, header?.nextSibling || contracts.firstChild);
+    fillTicketFiltersV197();
+    const adminBody=$('ticketsBody'), supBody=$('supTicketsBody'); if(!adminBody&&!supBody) return;
+    let rows=[...(window.data?.tickets||[])];
+    if(adminBody){
+      const st=$('ticketFilterStatus')?.value||'', pid=$('ticketFilterProjectV197')?.value||'', title=($('ticketFilterTitleV197')?.value||'').trim().toLowerCase(), q=($('ticketSearch')?.value||'').trim().toLowerCase();
+      let list=rows;
+      if(st) list=list.filter(t=>t.status===st);
+      if(pid) list=list.filter(t=>String(t.project_id)===String(pid));
+      if(title) list=list.filter(t=>String(t.title||'').toLowerCase().includes(title));
+      if(q) list=list.filter(t=>[ticketNo(t),t.title,t.description,projectNameLocal(t.project_id),supervisorNameLocal(t.supervisor_id),ticketStatusLabel(t.status),t.claimed_by_name,t.closed_by_name,t.closure_note].join(' ').toLowerCase().includes(q));
+      const summary=$('ticketsSmartSummary');
+      if(summary){ const open=list.filter(t=>t.status!=='closed').length, closed=list.filter(t=>t.status==='closed').length, urgent=list.filter(t=>t.priority==='urgent'||t.priority==='high').length; summary.innerHTML=`<div class="kpi"><small>إجمالي التكتات</small><b>${list.length}</b></div><div class="kpi"><small>مفتوحة</small><b>${open}</b></div><div class="kpi"><small>مغلقة</small><b>${closed}</b></div><div class="kpi"><small>عاجلة / مهمة</small><b>${urgent}</b></div>`; }
+      const stats=$('ticketTitleStatsV197');
+      if(stats){ const map={}; list.forEach(t=>{ const k=(t.title||'بدون عنوان').trim()||'بدون عنوان'; map[k]=(map[k]||0)+1; }); const top=Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,12); stats.innerHTML=top.map(([k,v])=>`<div class="summary-item"><b>${esc(k)}</b><br><small>عدد المشكلات: ${v}</small></div>`).join('') || '<div class="summary-item">لا توجد عناوين حسب الفلتر</div>'; }
+      adminBody.innerHTML=list.map(t=>`<tr class="${ticketRowClass(t)}"><td><b>${esc(ticketNo(t))}</b></td><td>${esc(projectNameLocal(t.project_id))}</td><td>${esc(supervisorNameLocal(t.supervisor_id))}</td><td>${esc(t.title||'-')}</td><td style="white-space:normal;min-width:220px">${shortText(t.description)}</td><td>${priorityBadge(t)}</td><td>${statusBadge(t)}</td><td>${fmt(t.created_at)}</td><td>${esc(t.claimed_by_name||'-')}</td><td>${esc(t.closed_by_name||'-')}</td><td style="white-space:normal;min-width:200px">${shortText(t.closure_note)}</td><td class="row-actions"><button onclick="editTicket(${t.id})">تعديل</button>${t.status==='closed'?`<button class="light" onclick="setTicketStatus(${t.id},'open')">إعادة فتح</button>`:`${t.status!=='processing'?`<button class="light" onclick="claimTicket(${t.id})">استلام</button>`:''}<button onclick="closeTicket(${t.id})">إغلاق</button>`}<button class="light" onclick="downloadSingleTicketPdfV197(${t.id})">PDF</button><button class="danger" onclick="deleteRow('tickets',${t.id})">حذف</button></td></tr>`).join('') || '<tr><td colspan="12">لا توجد تكتات</td></tr>';
     }
-    if(!$('contractsBuildingsTotal')){
-      kpis.insertAdjacentHTML('beforeend', '<div class="kpi contracts-units-v196"><small>إجمالي العمائر</small><b id="contractsBuildingsTotal">0</b></div><div class="kpi contracts-units-v196"><small>إجمالي الشقق</small><b id="contractsUnitsTotal">0</b></div>');
-    }
-  }
-  function updateContractsTotalsOnly(){
-    hideDashboardApartmentKpis();
-    ensureContractsTotalsKpis();
-    const projects = arr(getData().projects);
-    const buildings = projects.reduce((s,p)=>s+N(p.buildings_count ?? p.buildings ?? p.building_count ?? p.towers_count),0);
-    const units = projects.reduce((s,p)=>s+N(p.units_count ?? p.apartments_count ?? p.flats_count ?? p.units ?? p.apartments),0);
-    if($('contractsBuildingsTotal')) $('contractsBuildingsTotal').textContent = buildings;
-    if($('contractsUnitsTotal')) $('contractsUnitsTotal').textContent = units;
-  }
-
-  /* 2) تحميل سجلات اليوم/الشهر من قاعدة البيانات مباشرة بدون كاش قديم */
-  async function reloadTimeLogsForVisibleRangeV196(){
-    if(!window.sb) return;
-    const dailyDate = $('dailyDate')?.value || todayStr();
-    const month = monthStr();
-    const start = mStart(month);
-    const end = mEnd(month);
-    try{
-      const cols = 'id,user_id,supervisor_id,project_id,check_in,check_out,log_date,duration_minutes,travel_minutes,visit_type,required_minutes,time_difference_minutes,time_status,notes,created_at,updated_at';
-      const {data:monthRows,error:e1}=await sb.from('time_logs').select(cols).gte('log_date',start).lte('log_date',end).order('check_in',{ascending:false}).limit(5000);
-      if(e1) console.warn('V196 monthly logs reload:', e1.message);
-      const {data:dayRows,error:e2}=await sb.from('time_logs').select(cols).eq('log_date',dailyDate).order('check_in',{ascending:false}).limit(2000);
-      if(e2) console.warn('V196 daily logs reload:', e2.message);
-      const map = new Map();
-      [...arr(monthRows), ...arr(dayRows)].forEach(r=>{ if(r && r.id!==undefined) map.set(String(r.id), r); });
-      getData().logs = Array.from(map.values()).sort((a,b)=>new Date(b.check_in||b.created_at||0)-new Date(a.check_in||a.created_at||0));
-    }catch(e){ console.warn('V196 reloadTimeLogsForVisibleRange failed:', e); }
-  }
-  window.reloadTimeLogsForVisibleRangeV196 = reloadTimeLogsForVisibleRangeV196;
-
-  /* 3) تحديث فوري بعد الحذف بدون الحاجة لرفرش كامل */
-  const oldDeleteRowV196 = window.deleteRow;
-  window.deleteRow = async function(table,id){
-    if(!confirm('تأكيد الحذف؟')) return;
-    try{
-      const {error}=await sb.from(table).delete().eq('id',id);
-      if(error) return msg(error.message,'err');
-      // حذف فوري من الذاكرة حتى يختفي الصف مباشرة
-      const D=getData();
-      const keyMap={app_users:'users',projects:'projects',workers:'workers',attendance:'attendance',time_logs:'logs',tickets:'tickets',contract_services:'contractServices'};
-      const key=keyMap[table];
-      if(key && Array.isArray(D[key])) D[key]=D[key].filter(x=>String(x.id)!==String(id));
-      try{ renderAll && renderAll(); }catch(_){ }
-      if(table==='time_logs') await reloadTimeLogsForVisibleRangeV196();
-      try{ renderTimeLogs && renderTimeLogs(); renderMonthly && renderMonthly(); renderDashboard && renderDashboard(); updateContractsTotalsOnly(); }catch(_){ }
-      msg('تم الحذف');
-    }catch(e){
-      console.error(e);
-      if(typeof oldDeleteRowV196==='function') return oldDeleteRowV196.apply(this,arguments);
-      msg(e.message||String(e),'err');
-    }
+    if(supBody && typeof window.renderSupervisorTicketsOriginalV197==='function') return window.renderSupervisorTicketsOriginalV197();
   };
+  window.downloadSingleTicketPdfV197=function(id){ const t=(window.data?.tickets||[]).find(x=>String(x.id)===String(id)); if(!t) return alert('التكت غير موجود'); const html=`<html dir="rtl"><head><title>${ticketNo(t)}</title><style>body{font-family:Tahoma;padding:30px}h1{color:#0A4033}.box{border:1px solid #ddd;border-radius:14px;padding:14px;margin:10px 0}table{width:100%;border-collapse:collapse}td,th{border:1px solid #ddd;padding:9px;text-align:right}</style></head><body><h1>تقرير تكت</h1><div class="box"><b>رقم التكت:</b> ${esc(ticketNo(t))}<br><b>المشروع:</b> ${esc(projectNameLocal(t.project_id))}<br><b>العنوان:</b> ${esc(t.title||'-')}<br><b>الحالة:</b> ${ticketStatusLabel(t.status)}<br><b>الأولوية:</b> ${ticketPriorityLabel(t.priority)}</div><div class="box"><h3>الوصف</h3>${esc(t.description||'-')}</div><div class="box"><h3>الإغلاق</h3><b>أغلق بواسطة:</b> ${esc(t.closed_by_name||'-')}<br><b>ملاحظة الإغلاق:</b><br>${esc(t.closure_note||'-')}</div><script>window.print();<\/script></body></html>`; const w=window.open('','_blank'); if(w){w.document.write(html);w.document.close();} };
 
-  /* 4) عند الحفظ/التعديل في سجلات المشرفين يتم إعادة تحميل السجلات الحالية فقط */
-  const oldSaveTimeLogV196 = window.saveTimeLog;
-  if(typeof oldSaveTimeLogV196 === 'function'){
-    window.saveTimeLog = async function(){
-      const out = await oldSaveTimeLogV196.apply(this,arguments);
-      await reloadTimeLogsForVisibleRangeV196();
-      try{ hydrateForms && hydrateForms(); renderTimeLogs && renderTimeLogs(); renderMonthly && renderMonthly(); renderDashboard && renderDashboard(); }catch(_){ }
-      return out;
-    };
+  window.ordersV197=[];
+  async function loadOrdersFromDb(){
+    if(!window.sb) return [];
+    const {data,error}=await sb.from('maintenance_orders').select('*').order('order_date',{ascending:false}).order('id',{ascending:false});
+    if(error){ console.warn('orders load',error.message); return []; }
+    return data||[];
   }
-
-  /* 5) ضمان أن الإدارة ترى سجلات اليوم دائماً، وعدم ترك الصلاحيات أو الكاش يخفيها */
-  const oldFilterLogsV196 = window.filterLogs;
-  window.filterLogs = function(){
-    let rows = Array.isArray(getData().logs) ? [...getData().logs] : [];
-    const d=$('dailyDate')?.value, s=$('dailySupervisor')?.value, p=$('dailyProject')?.value, q=($('dailySearch')?.value||'').trim();
-    if(d) rows=rows.filter(l=>(l.log_date||String(l.check_in||'').slice(0,10))===d);
-    if(s) rows=rows.filter(l=>String(l.supervisor_id)===String(s));
-    if(p) rows=rows.filter(l=>String(l.project_id)===String(p));
-    if(q){
-      const sup = (id)=>{ try{return supervisorName(id)}catch(_){return ''} };
-      const pro = (id)=>{ try{return projectName(id)}catch(_){return ''} };
-      rows=rows.filter(l=>[sup(l.supervisor_id),pro(l.project_id),l.visit_type,l.time_status,l.notes].join(' ').includes(q));
-    }
-    return rows;
-  };
-
-  /* 6) إعادة تحديث القسم الظاهر فقط بعد تعديل/حذف لتقليل التهنيج */
-  function rerenderVisiblePageV196(){
-    const visible=document.querySelector('.page:not(.hidden)')?.id;
-    try{
-      if(visible==='daily') renderTimeLogs();
-      else if(visible==='monthly') renderMonthly();
-      else if(visible==='contracts'){ renderContracts&&renderContracts(); renderContractServices&&renderContractServices(); updateContractsTotalsOnly(); }
-      else if(visible==='projects'){ renderProjects&&renderProjects(); updateContractsTotalsOnly(); }
-      else if(visible==='dashboard'){ renderDashboard&&renderDashboard(); }
-      else if(typeof renderAll==='function') renderAll();
-    }catch(e){ console.warn('V196 rerender visible failed:', e); }
+  window.loadOrdersV197=async function(force){ window.ordersV197=await loadOrdersFromDb(); hydrateOrdersV197(); renderOrdersV197(); };
+  function hydrateOrdersV197(){
+    const fill=(id, arr, val='name', label='name', first='اختر')=>{ const el=$(id); if(!el) return; const old=el.value; el.innerHTML=`<option value="">${first}</option>`+arr.map(x=>`<option value="${esc(x[val]??x)}">${esc(x[label]??x)}</option>`).join(''); el.value=old; };
+    fill('orderProjectV197', window.data?.projects||[], 'id','name','اختر المشروع'); fill('orderFilterProjectV197', window.data?.projects||[], 'id','name','كل المشاريع');
+    const supNames=[...new Set([...(window.data?.users||[]).map(u=>u.full_name),...(window.data?.supervisors||[]).map(s=>s.full_name),...(window.data?.workers||[]).map(w=>w.name)].filter(Boolean))].sort();
+    ['orderExecutorsListV197','orderSendersListV197'].forEach(id=>{ const dl=$(id); if(dl) dl.innerHTML=supNames.map(x=>`<option value="${esc(x)}"></option>`).join(''); });
   }
-  window.rerenderVisiblePageV196 = rerenderVisiblePageV196;
-
-  const oldRenderDashboardV196 = window.renderDashboard;
-  window.renderDashboard = function(){
-    if(typeof oldRenderDashboardV196==='function') oldRenderDashboardV196.apply(this,arguments);
-    hideDashboardApartmentKpis();
-  };
-  const oldRenderContractsV196 = window.renderContracts;
-  if(typeof oldRenderContractsV196==='function'){
-    window.renderContracts = function(){ const out=oldRenderContractsV196.apply(this,arguments); updateContractsTotalsOnly(); return out; };
-  }
-
-  function bootV196(){
-    hideDashboardApartmentKpis();
-    updateContractsTotalsOnly();
-    if($('dailyDate') && !$('dailyDate').value) $('dailyDate').value=todayStr();
-  }
-  const oldShowPageV196 = window.showPage;
-  if(typeof oldShowPageV196==='function' && !oldShowPageV196.__v196){
-    const fn=function(id,btn){
-      const out=oldShowPageV196.apply(this,arguments);
-      setTimeout(()=>{
-        bootV196();
-        if(id==='daily') reloadTimeLogsForVisibleRangeV196().then(()=>{ try{renderTimeLogs();renderDashboard();}catch(_){} });
-        if(id==='contracts') updateContractsTotalsOnly();
-      },80);
-      return out;
-    };
-    fn.__v196=true; window.showPage=fn;
-  }
-  if(!document.getElementById('v196StableCoreCss')){
-    const st=document.createElement('style'); st.id='v196StableCoreCss';
-    st.textContent='#dashboard #kpiBuildings,#dashboard #kpiUnits{display:none!important}.contracts-units-v196{background:linear-gradient(135deg,#f6fffb,#ffffff)!important;border:1px solid #d8eee4!important}';
-    document.head.appendChild(st);
-  }
-  ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(()=>{bootV196(); if(ev==='load') reloadTimeLogsForVisibleRangeV196().then(()=>{try{renderTimeLogs();renderDashboard();}catch(_){}});},ev==='load'?800:150)));
-  setTimeout(()=>{bootV196();},1200);
-  console.log('Tasneef V196 Stable Core Fix loaded');
+  window.calcOrderV197=function(){ const price=n($('orderPriceInclV197')?.value), cost=n($('orderCostV197')?.value); const vat=price?price*15/115:0, before=price-vat, profit=before-cost; if($('orderVatV197')) $('orderVatV197').value=money(vat); if($('orderBeforeVatV197')) $('orderBeforeVatV197').value=money(before); if($('orderProfitV197')) $('orderProfitV197').value=money(profit); };
+  function orderPayload(){ const price=n($('orderPriceInclV197')?.value), vat=price?price*15/115:0, before=price-vat, cost=n($('orderCostV197')?.value); return {group_no:$('orderGroupNoV197')?.value||'', order_date:$('orderDateV197')?.value||null, order_time:$('orderTimeV197')?.value||null, sender:$('orderSenderV197')?.value||'', project_id:n($('orderProjectV197')?.value)||null, property_type:$('orderPropertyTypeV197')?.value||'', unit_no:$('orderUnitNoV197')?.value||'', client_name:$('orderClientNameV197')?.value||'', client_phone:$('orderClientPhoneV197')?.value||'', executor:$('orderExecutorV197')?.value||'', details:$('orderDetailsV197')?.value||'', notes:$('orderNotesV197')?.value||'', concern:$('orderConcernV197')?.value||'', done_date:$('orderDoneDateV197')?.value||null, execution_method:$('orderMethodV197')?.value||'', execution_status:$('orderStatusV197')?.value||'', report_status:$('orderReportV197')?.value||'', price_incl_vat:price, vat_amount:vat, price_before_vat:before, cost:cost, profit:before-cost, payment_status:$('orderPaymentV197')?.value||'', invoice_no:$('orderInvoiceNoV197')?.value||'', system_invoice_status:$('orderSystemInvoiceV197')?.value||''}; }
+  window.saveOrderV197=async function(){ const row=orderPayload(); if(!row.order_date) return msg('تاريخ الطلب مطلوب','err'); if(!row.project_id) return msg('اختر المشروع','err'); if(!row.details.trim()) return msg('التفاصيل مطلوبة','err'); const id=$('orderIdV197')?.value; const res=id?await sb.from('maintenance_orders').update(row).eq('id',id):await sb.from('maintenance_orders').insert(row); if(res.error) return msg(res.error.message,'err'); msg(id?'تم تحديث الأوردر':'تم حفظ الأوردر'); clearOrderFormV197(); await loadOrdersV197(true); };
+  window.clearOrderFormV197=function(){ ['orderIdV197','orderGroupNoV197','orderDateV197','orderTimeV197','orderSenderV197','orderPropertyTypeV197','orderUnitNoV197','orderClientNameV197','orderClientPhoneV197','orderExecutorV197','orderDetailsV197','orderNotesV197','orderDoneDateV197','orderMethodV197','orderPriceInclV197','orderCostV197','orderVatV197','orderBeforeVatV197','orderProfitV197','orderInvoiceNoV197'].forEach(id=>{ if($(id)) $(id).value=''; }); if($('orderProjectV197')) $('orderProjectV197').value=''; if($('orderFormTitleV197')) $('orderFormTitleV197').textContent='إضافة أوردر'; };
+  window.editOrderV197=function(id){ const o=(window.ordersV197||[]).find(x=>String(x.id)===String(id)); if(!o) return; const set=(id,v)=>{ if($(id)) $(id).value=v??''; }; set('orderIdV197',o.id); set('orderGroupNoV197',o.group_no); set('orderDateV197',o.order_date); set('orderTimeV197',o.order_time); set('orderSenderV197',o.sender); set('orderProjectV197',o.project_id); set('orderPropertyTypeV197',o.property_type); set('orderUnitNoV197',o.unit_no); set('orderClientNameV197',o.client_name); set('orderClientPhoneV197',o.client_phone); set('orderExecutorV197',o.executor); set('orderDetailsV197',o.details); set('orderNotesV197',o.notes); set('orderConcernV197',o.concern); set('orderDoneDateV197',o.done_date); set('orderMethodV197',o.execution_method); set('orderStatusV197',o.execution_status); set('orderReportV197',o.report_status); set('orderPriceInclV197',o.price_incl_vat); set('orderCostV197',o.cost); set('orderPaymentV197',o.payment_status); set('orderInvoiceNoV197',o.invoice_no); set('orderSystemInvoiceV197',o.system_invoice_status); calcOrderV197(); if($('orderFormTitleV197')) $('orderFormTitleV197').textContent='تعديل أوردر'; window.scrollTo({top:0,behavior:'smooth'}); };
+  window.deleteOrderV197=async function(id){ if(!confirm('حذف الأوردر؟')) return; const {error}=await sb.from('maintenance_orders').delete().eq('id',id); if(error) return msg(error.message,'err'); msg('تم حذف الأوردر'); await loadOrdersV197(true); };
+  window.renderOrdersV197=function(){ hydrateOrdersV197(); let rows=[...(window.ordersV197||[])]; const from=$('orderDateFromV197')?.value, to=$('orderDateToV197')?.value, pid=$('orderFilterProjectV197')?.value, q=($('orderSearchV197')?.value||'').trim().toLowerCase(); if(from) rows=rows.filter(o=>String(o.order_date||'')>=from); if(to) rows=rows.filter(o=>String(o.order_date||'')<=to); if(pid) rows=rows.filter(o=>String(o.project_id)===String(pid)); if(q) rows=rows.filter(o=>[o.group_no,o.details,o.notes,o.invoice_no,o.executor,o.sender,projectNameLocal(o.project_id),o.execution_status,o.payment_status,o.system_invoice_status].join(' ').toLowerCase().includes(q)); const body=$('ordersBodyV197'); if(body) body.innerHTML=rows.map(o=>`<tr><td><b>${esc(o.order_no||('ORD'+String(o.id||'').padStart(4,'0')))}</b><br><small>${esc(o.group_no||'')}</small></td><td>${esc(o.order_date||'-')}</td><td>${esc(projectNameLocal(o.project_id))}</td><td>${esc(o.executor||'-')}</td><td style="white-space:normal;min-width:240px">${shortText(o.details)}</td><td><span class="badge ${o.execution_status==='تم التنفيذ'?'green':(o.execution_status==='لم ينفذ'?'red':'amber')}">${esc(o.execution_status||'-')}</span></td><td>${esc(o.payment_status||'-')}</td><td>${money(o.price_incl_vat)}</td><td>${money(o.cost)}</td><td class="${n(o.profit)>=0?'money-pos':'money-neg'}">${money(o.profit)}</td><td>${esc(o.system_invoice_status||'-')}</td><td class="row-actions"><button onclick="editOrderV197(${o.id})">تعديل</button><button class="danger" onclick="deleteOrderV197(${o.id})">حذف</button></td></tr>`).join('') || '<tr><td colspan="12">لا توجد أوردرات</td></tr>'; const kpis=$('ordersKpisV197'); if(kpis){ const done=rows.filter(o=>o.execution_status==='تم التنفيذ').length, not=rows.filter(o=>o.execution_status==='لم ينفذ').length, paid=rows.filter(o=>o.payment_status==='تم السداد').length, due=rows.filter(o=>o.payment_status==='آجل').length, rev=rows.reduce((s,o)=>s+n(o.price_incl_vat),0), cost=rows.reduce((s,o)=>s+n(o.cost),0), profit=rows.reduce((s,o)=>s+n(o.profit),0); kpis.innerHTML=`<div class="kpi"><small>إجمالي الأوردرات</small><b>${rows.length}</b></div><div class="kpi"><small>تم التنفيذ</small><b>${done}</b></div><div class="kpi"><small>لم ينفذ</small><b>${not}</b></div><div class="kpi"><small>تم السداد</small><b>${paid}</b></div><div class="kpi"><small>آجل</small><b>${due}</b></div><div class="kpi"><small>الإيرادات</small><b>${money(rev)}</b></div><div class="kpi"><small>التكلفة</small><b>${money(cost)}</b></div><div class="kpi"><small>صافي الربح</small><b>${money(profit)}</b></div>`; } const al=$('ordersAlertsV197'); if(al){ const delayed=rows.filter(o=>o.payment_status==='آجل').length, noInv=rows.filter(o=>o.execution_status==='تم التنفيذ'&&o.system_invoice_status==='لم تتم').length, pending=rows.filter(o=>o.execution_status==='لم ينفذ').length; al.innerHTML=`<div class="alert-item ${pending?'warn':''}">لم ينفذ: ${pending}</div><div class="alert-item ${delayed?'warn':''}">سداد آجل: ${delayed}</div><div class="alert-item ${noInv?'danger':''}">تم التنفيذ بدون فوترة: ${noInv}</div>`; } };
+  const oldShow=window.showPage;
+  window.showPage=function(id,btn){ const r=oldShow?oldShow.apply(this,arguments):undefined; if(id==='tickets') setTimeout(()=>window.renderTickets(),50); if(id==='orders') setTimeout(()=>window.loadOrdersV197(),50); return r; };
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{ fillTicketFiltersV197(); hydrateOrdersV197(); },600));
 })();

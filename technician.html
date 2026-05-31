@@ -22,7 +22,7 @@
     <div class="grid two">
       <div><label>المشروع</label><select id="techNewTicketProject"><option value="">اختر المشروع</option></select></div>
       <div><label>الأولوية</label><select id="techNewTicketPriority"><option value="normal">عادي</option><option value="high">مهم</option><option value="urgent">عاجل</option><option value="low">منخفض</option></select></div>
-      <div><label>عنوان المشكلة</label><input id="techNewTicketTitle" list="ticketTitleOptionsV195" placeholder="اختر أو اكتب عنوان المشكلة"><datalist id="ticketTitleOptionsV195"><option value="مشكلة كهرباء"><option value="مشكلة سباكة"><option value="مشكلة مصعد"><option value="مشكلة كاميرات"><option value="مشكلة إنارة"><option value="مشكلة تكييف"><option value="تسريب مياه"><option value="انسداد صرف"><option value="نظافة"><option value="باب / قفل"><option value="أخرى"></datalist></div>
+      <div><label>عنوان المشكلة</label><input id="techNewTicketTitle" placeholder="مثال: تسريب مياه / عطل إنارة"></div>
       <div><label>وصف المشكلة</label><input id="techNewTicketDescription" placeholder="اكتب وصف واضح للمشكلة"></div>
     </div>
     <div class="actions" style="margin-top:10px"><button onclick="saveTechnicianTicket()">حفظ التكت</button><button class="light" onclick="clearTechnicianTicketForm()">مسح</button></div>
@@ -48,6 +48,6 @@
   <section id="techMine" class="tech-page card"><h2>تكتاتي قيد المعالجة</h2><div class="table-wrap"><table><thead><tr><th>رقم</th><th>المشروع</th><th>العنوان</th><th>الوصف</th><th>الأولوية</th><th>الحالة</th><th>مدة الفتح</th><th>استلم بواسطة</th><th>أغلق بواسطة</th><th>كيف تم الإغلاق</th><th>واتساب</th><th>إجراء</th></tr></thead><tbody id="techMyTicketsBody"></tbody></table></div></section>
   <section id="techDone" class="tech-page card"><h2>التكتات التي أغلقتها</h2><div class="table-wrap"><table><thead><tr><th>رقم</th><th>المشروع</th><th>العنوان</th><th>الوصف</th><th>الأولوية</th><th>الحالة</th><th>مدة الفتح</th><th>استلم بواسطة</th><th>أغلق بواسطة</th><th>كيف تم الإغلاق</th><th>واتساب</th><th>إجراء</th></tr></thead><tbody id="techDoneTicketsBody"></tbody></table></div></section>
 </div>
-<script src="app.js?v=196"></script>
+<script src="app.js?v=248"></script>
 </body>
 </html>
