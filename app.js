@@ -1,4 +1,4 @@
-/* TASNEEF BUILD V253 - no stuck loading + counts cards - 2026-05-31 */
+/* TASNEEF BUILD V254 - import screenshot tickets + stronger counts cards - 2026-05-31 */
 /* V154 Smart Loading Branding */
 (function(){
   if(window.__tasneefLoadingV154) return;
@@ -19362,4 +19362,174 @@ function financePrintReport(kind){
   setTimeout(function(){ hideStuckLoading(); updateCountCards(); try{ window.renderContracts && window.renderContracts(); }catch(_){ } try{ window.renderContractServices && window.renderContractServices(); }catch(_){ } }, 1800);
   setTimeout(function(){ hideStuckLoading(); updateCountCards(); }, 7000);
   console.log('Tasneef V253 loaded: loading guard + buildings/units KPI cards and service cards');
+})();
+
+
+/* ===== V254: Import screenshot tickets + stronger buildings/units cards ===== */
+(function(){
+  if(window.__tasneefV254Fix) return;
+  window.__tasneefV254Fix = true;
+  window.TASNEEF_BUILD = 'V254_IMPORT_SCREENSHOT_TICKETS_COUNTS_2026_05_31';
+
+  const A = v => Array.isArray(v) ? v : [];
+  const $ = id => document.getElementById(id);
+  const E = v => String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const norm = s => String(s||'').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/ؤ/g,'و').replace(/ئ/g,'ي').replace(/[\u064B-\u065F]/g,'').replace(/\s+/g,' ').trim().toLowerCase();
+  function n(v){ const x=Number(v); return Number.isFinite(x)?x:0; }
+  function firstNum(obj, keys){ for(const k of keys){ if(obj && obj[k]!==undefined && obj[k]!==null && obj[k]!=='' && !Number.isNaN(Number(obj[k]))) return Number(obj[k]); } return 0; }
+  function projArr(){ return A(window.data?.projects); }
+  function svcArr(){ return A(window.data?.contractServices); }
+  function bCount(p){ return firstNum(p, ['buildings_count','building_count','buildings','building_no','buildingsCount','number_of_buildings','عمائر','عدد_العمائر']); }
+  function uCount(p){ return firstNum(p, ['units_count','apartments_count','apartment_count','units','apartments','flats_count','unitsCount','number_of_units','number_of_apartments','شقق','عدد_الشقق']); }
+  window.projectBuildingsCountV254 = bCount;
+  window.projectUnitsCountV254 = uCount;
+
+  function ensureStyle(){
+    if($('tasneefV254Css')) return;
+    const st=document.createElement('style'); st.id='tasneefV254Css';
+    st.textContent = `
+      .v254-mini-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:10px 0 14px}
+      .v254-mini-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:12px;box-shadow:0 6px 18px rgba(15,23,42,.06)}
+      .v254-mini-card small{display:block;color:#64748b;margin-bottom:5px}.v254-mini-card b{font-size:22px;color:#0f5132}
+      .v254-count-line{display:block;margin-top:4px;color:#0f5132;font-size:12px;font-weight:700}
+      .v254-import-box{border:1px dashed #0f766e;background:#f0fdfa;border-radius:14px;padding:10px;margin:10px 0}.v254-import-box button{margin-inline-start:8px}
+    `;
+    document.head.appendChild(st);
+  }
+
+  function totals(){ return projArr().reduce((a,p)=>{ a.buildings+=bCount(p); a.units+=uCount(p); return a; }, {buildings:0, units:0}); }
+  function ensureMiniCards(container, prefix){
+    if(!container) return;
+    let box=$(prefix+'CountsBoxV254');
+    if(!box){
+      box=document.createElement('div'); box.id=prefix+'CountsBoxV254'; box.className='v254-mini-grid';
+      container.prepend(box);
+    }
+    const t=totals();
+    box.innerHTML=`<div class="v254-mini-card"><small>إجمالي العمائر</small><b>${t.buildings}</b></div><div class="v254-mini-card"><small>إجمالي الشقق</small><b>${t.units}</b></div>`;
+  }
+  function forceCountsCards(){
+    ensureStyle();
+    // Admin: contracts/services page has multiple possible containers across versions
+    ['contractsServices','contracts','services','projects','dashboard'].forEach(id=>{
+      const sec=$(id);
+      if(sec && (id==='contractsServices' || sec.textContent.includes('العقود') || sec.textContent.includes('الخدمات'))){
+        const card=sec.querySelector('.card') || sec;
+        ensureMiniCards(card, id);
+      }
+    });
+    // If services KPI container exists, inject there too
+    ['contractServicesKpis','servicesKpis','contractsKpis','contractKpis','dashboardKpis'].forEach(id=>{
+      const el=$(id); if(el) ensureMiniCards(el,id);
+    });
+  }
+
+  function serviceProject(s){
+    const pid=s?.project_id ?? s?.projectId ?? s?.project;
+    let p=projArr().find(x=>String(x.id)===String(pid));
+    if(p) return p;
+    const name=norm(s?.project_name || s?.projectName || s?.project || s?.name || '');
+    if(name) p=projArr().find(x=>norm(x.name)===name || norm(x.name).includes(name) || name.includes(norm(x.name)));
+    return p || {};
+  }
+  function addCountsToServiceCards(){
+    document.querySelectorAll('.quick-item').forEach(item=>{
+      if(item.querySelector('.v254-count-line')) return;
+      const txt=norm(item.textContent);
+      const p=projArr().find(x=>txt.includes(norm(x.name)));
+      if(p){
+        const span=document.createElement('span'); span.className='v254-count-line'; span.textContent=`العمائر: ${bCount(p)} | الشقق: ${uCount(p)}`;
+        const target=item.querySelector('span') || item; target.appendChild(span);
+      }
+    });
+  }
+
+  function findProjectId(name){
+    const wanted=norm(name);
+    const aliases={
+      '39 جاده':'جادة 39','جاده 39':'جادة 39','جود الياسمين':'جود الياسمين','مغني 29':'مغنى 29','مغنى 29':'مغنى 29','مكين 37':'مكين 37','عالم الابتكار 47':'عالم الابتكار 47','الين 32':'الين 32','ألين 32':'الين 32','فرساي 11':'فرساي 11','فرساي 7':'فرساي 7','اتحاد العاصمه':'اتحاد العاصمة','اتحاد العاصمة':'اتحاد العاصمة'};
+    const ali=aliases[wanted] || name;
+    const w=norm(ali);
+    const p=projArr().find(x=>norm(x.name)===w) || projArr().find(x=>norm(x.name).includes(w) || w.includes(norm(x.name)));
+    return p?.id || null;
+  }
+  function findSupervisorId(name, projectId){
+    const w=norm(name);
+    const users=A(window.data?.users);
+    let u=users.find(x=>norm(x.full_name||x.name||x.username).includes(w) || w.includes(norm(x.full_name||x.name||x.username)));
+    if(u) return u.id;
+    const p=projArr().find(x=>String(x.id)===String(projectId));
+    return p?.supervisor_id || null;
+  }
+
+  const screenshotTicketsV254 = [
+    {old:'1545', project:'عام', raiser:'هيثم', type:'عام', time:'', desc:'طلب جميع حراس المشاريع بتجهيزات'},
+    {old:'2112', project:'اتحاد العاصمة', raiser:'حارس', type:'نظافة', time:'11:09', desc:'رئيس الجمعية يبقى دورية كل مدخل فيه واجهات نظافة ومواعيد أداء المدينة'},
+    {old:'2133', project:'جادة 39', raiser:'هشام', type:'صيانة', time:'09:37', desc:'تهريب من السطح ومراجعته وإجراء حل مناسب لتفادي المشكلة مستقبلًا'},
+    {old:'2162', project:'جود الياسمين', raiser:'هيثم', type:'صيانة', time:'07:48', desc:'تنبيه جميع الإضاءات الداخلية والخارجية والبيسمنت وتوحيد الإضاءات كاملة'},
+    {old:'2171', project:'جود الياسمين', raiser:'مازن', type:'نظافة', time:'11:20', desc:'ورق تعليمات إزالة البلدية'},
+    {old:'2178', project:'جادة 39', raiser:'مصطفى', type:'صيانة', time:'04:03', desc:'إلى أين الحل المناسب للمدخل وترتيب الكابلات لتقليل فتحة السلم'},
+    {old:'2191', project:'جود الياسمين', raiser:'مازن', type:'صيانة', time:'11:11', desc:'كهربائي، قاطع كهرباء في F3'},
+    {old:'2213', project:'جود الياسمين', raiser:'مازن', type:'صيانة', time:'11:55', desc:'دفاش مبنى A'},
+    {old:'2217', project:'جود الياسمين', raiser:'مازن', type:'صيانة', time:'04:56', desc:'دفاش مبنى C'},
+    {old:'2234', project:'مغنى 29', raiser:'هيثم', type:'نظافة', time:'05:44', desc:'جهاز مفتوح'},
+    {old:'2240', project:'مكين 37', raiser:'محمود', type:'صيانة', time:'09:03', desc:'المبنى A&B في البسمنت مشكلة الأبواب رجعت تعمل كما في خارج لها تعليق كما موضح في الفيديوهات المرفقة'},
+    {old:'2279', project:'عالم الابتكار 47', raiser:'فهد', type:'صيانة', time:'02:19', desc:'وصل المشكلة للدكان'},
+    {old:'2280', project:'الين 32', raiser:'عبده طاهر', type:'نظافة', time:'02:26', desc:'الخارجية للمبنى كلها لا تعمل'},
+    {old:'2281', project:'مغنى 29', raiser:'فهد', type:'صيانة', time:'04:14', desc:'جهاز التعطير الأول لا يوجد عطل وتم إغلاقه حتى الآن'},
+    {old:'2283', project:'فرساي 7', raiser:'فهد', type:'صيانة', time:'08:51', desc:'وصف المشكلة: جهاز التعطير الأول لا يوجد عطل وتم إغلاقه حتى الآن'},
+    {old:'2289', project:'عالم الابتكار 47', raiser:'فهد', type:'نظافة', time:'01:15', desc:'جهاز التعطير الأول لا يوجد عطل وتم إغلاقه حتى الآن وتم تركيب جهاز بديل جديد'},
+    {old:'2295', project:'فرساي 11', raiser:'فهد', type:'نظافة', time:'05:14', desc:'جهاز التعطير الأول لا يوجد عطل وتم إغلاقه حتى الآن وتم تركيب جهاز جديد'}
+  ];
+  window.screenshotTicketsV254 = screenshotTicketsV254;
+
+  function rowToTicket(r){
+    const projectId = r.project==='عام' ? null : findProjectId(r.project);
+    const supervisorId = findSupervisorId(r.raiser, projectId);
+    const title = (r.type==='صيانة' ? 'صيانة: ' : r.type==='نظافة' ? 'نظافة: ' : 'عام: ') + (r.desc||'').slice(0,55);
+    const description = `رقم التكت في الملف القديم: ${r.old}\nرافع التكت: ${r.raiser || '-'}\nوقت التكت في الملف القديم: ${r.time || '-'}\nنوع الشكوى: ${r.type || '-'}\nالمشروع في الملف القديم: ${r.project || '-'}\n\nالتفاصيل:\n${r.desc || '-'}`;
+    return { project_id: projectId, supervisor_id: supervisorId, title, description, priority: r.type==='صيانة'?'high':'normal', status:'open', updated_at:new Date().toISOString() };
+  }
+
+  window.importScreenshotTicketsV254 = async function(){
+    if(!window.sb) return alert('لم يتم الاتصال بقاعدة البيانات');
+    const ok=confirm('سيتم استيراد تكتات الصورة إلى النظام. الرقم القديم سيظهر داخل وصف/تفاصيل كل تكت. هل تريد المتابعة؟');
+    if(!ok) return;
+    try{ if(typeof window.loadAll==='function') await window.loadAll(); }catch(_){ }
+    let inserted=0, skipped=0, failed=0;
+    for(const r of screenshotTicketsV254){
+      const marker = `رقم التكت في الملف القديم: ${r.old}`;
+      const exists=A(window.data?.tickets).some(t=>String(t.description||'').includes(marker));
+      if(exists){ skipped++; continue; }
+      const row=rowToTicket(r);
+      const res=await window.sb.from('tickets').insert(row).select('*').single();
+      if(res.error){ console.warn('Import ticket failed', r.old, res.error.message); failed++; continue; }
+      inserted++;
+      if(res.data && !res.data.ticket_number){
+        const tn='T-'+String(res.data.id).padStart(4,'0');
+        await window.sb.from('tickets').update({ticket_number:tn}).eq('id',res.data.id);
+        res.data.ticket_number=tn;
+      }
+      if(window.data?.tickets) window.data.tickets.unshift(res.data);
+    }
+    if(typeof window.refreshAll==='function') await window.refreshAll();
+    alert(`تم الاستيراد\nالمضاف: ${inserted}\nالموجود مسبقًا: ${skipped}\nفشل: ${failed}`);
+  };
+
+  function addImportButton(){
+    const section=$('tickets'); if(!section || $('importScreenshotTicketsV254Box')) return;
+    const card=section.querySelector('.card'); if(!card) return;
+    const box=document.createElement('div'); box.id='importScreenshotTicketsV254Box'; box.className='v254-import-box';
+    box.innerHTML='<b>استيراد تكتات الصورة</b><br><small>يتم إضافة الرقم الظاهر في الصورة داخل وصف/تفاصيل التكت، مع منع التكرار حسب الرقم القديم.</small><div class="actions"><button type="button" onclick="importScreenshotTicketsV254()">استيراد تكتات الصورة</button></div>';
+    card.prepend(box);
+  }
+
+  const oldRenderAll = window.renderAll;
+  if(typeof oldRenderAll==='function'){
+    window.renderAll = function(){ const r=oldRenderAll.apply(this, arguments); setTimeout(()=>{ forceCountsCards(); addCountsToServiceCards(); addImportButton(); }, 50); return r; };
+  }
+  document.addEventListener('DOMContentLoaded', ()=>{ ensureStyle(); setTimeout(()=>{ forceCountsCards(); addCountsToServiceCards(); addImportButton(); }, 300); setTimeout(()=>{ forceCountsCards(); addCountsToServiceCards(); addImportButton(); }, 1200); });
+  setInterval(()=>{ if(document.hidden) return; try{ forceCountsCards(); addCountsToServiceCards(); addImportButton(); }catch(_){} }, 3000);
+
+  console.log('Tasneef V254 loaded: import screenshot tickets + stronger counts cards');
 })();
