@@ -21240,3 +21240,66 @@ setInterval(()=>{ try{ if(document.getElementById('logsBody')) renderTimeLogs();
   window.addEventListener('load',()=>setTimeout(ensureAll,800));
   console.log('Tasneef V269 loaded: final force visible WhatsApp button in tickets');
 })();
+
+/* ===== V270: One WhatsApp button only for each ticket card/row ===== */
+(function(){
+  const VER='v270';
+  function ticketIdFromCard(card){
+    const b = [...card.querySelectorAll('button')].find(x=>/sendTicketWhatsApp|TicketWhatsApp|واتساب/i.test(x.getAttribute('onclick')||x.textContent||''));
+    const oc = b ? (b.getAttribute('onclick')||'') : '';
+    const m = oc.match(/\((\d+)\)/);
+    if(m) return Number(m[1]);
+    const no = (card.querySelector('.smart-ticket-top strong')?.textContent || card.querySelector('td b')?.textContent || '').trim();
+    const t = (window.data&&Array.isArray(data.tickets)) ? data.tickets.find(x => String(x.ticket_number||('T-'+String(x.id||0).padStart(4,'0'))) === no) : null;
+    return t ? Number(t.id) : 0;
+  }
+  function sendFnName(){
+    if(typeof window.sendTicketWhatsAppV267==='function') return 'sendTicketWhatsAppV267';
+    if(typeof window.sendTicketWhatsAppV266==='function') return 'sendTicketWhatsAppV266';
+    if(typeof window.sendTicketWhatsAppV43==='function') return 'sendTicketWhatsAppV43';
+    if(typeof window.sendTicketWhatsApp==='function') return 'sendTicketWhatsApp';
+    return '';
+  }
+  function makeButton(id){
+    const fn = sendFnName();
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.className='ticket-wa-single-v270';
+    btn.textContent='واتساب';
+    if(fn && id) btn.setAttribute('onclick', fn+'('+id+')');
+    else btn.addEventListener('click', function(){ if(typeof msg==='function') msg('تعذر تجهيز رسالة الواتساب، حدّث الصفحة','err'); });
+    return btn;
+  }
+  function normalizeActions(actions){
+    const wa=[...actions.querySelectorAll('button')].filter(b=>/واتساب/i.test((b.textContent||'')+' '+(b.getAttribute('onclick')||'')+' '+(b.className||'')));
+    if(!wa.length) return;
+    const id=ticketIdFromCard(actions.closest('.smart-ticket-card')||actions.closest('tr')||actions);
+    const one=makeButton(id);
+    wa[0].replaceWith(one);
+    wa.slice(1).forEach(b=>b.remove());
+  }
+  function cleanup(){
+    document.querySelectorAll('.smart-ticket-actions').forEach(normalizeActions);
+    document.querySelectorAll('tr .row-actions').forEach(normalizeActions);
+    document.querySelectorAll('td.whatsapp-col').forEach(td=>{
+      const id=ticketIdFromCard(td.closest('tr')||td);
+      td.innerHTML='';
+      td.appendChild(makeButton(id));
+    });
+  }
+  const oldRender=window.renderTickets;
+  window.renderTickets=function(){
+    const r = (typeof oldRender==='function') ? oldRender.apply(this, arguments) : undefined;
+    setTimeout(cleanup,0); setTimeout(cleanup,150); setTimeout(cleanup,500);
+    return r;
+  };
+  window.addEventListener('load',()=>{setTimeout(cleanup,300);setTimeout(cleanup,1200);});
+  document.addEventListener('click',()=>setTimeout(cleanup,100),true);
+  try{
+    const mo=new MutationObserver(()=>{ clearTimeout(window.__ticketWaV270Timer); window.__ticketWaV270Timer=setTimeout(cleanup,80); });
+    mo.observe(document.body,{childList:true,subtree:true});
+  }catch(e){}
+  const css=document.createElement('style');
+  css.textContent='.ticket-wa-single-v270{background:#128C7E!important;color:#fff!important;border:0!important;border-radius:10px!important;padding:8px 12px!important;font-weight:800!important;box-shadow:0 3px 8px rgba(0,0,0,.08)!important}.wa-ticket-btn-v42,.wa-ticket-btn-v43,.wa-ticket-btn-v45,.ticket-wa-v267{display:none!important}';
+  document.head.appendChild(css);
+})();
