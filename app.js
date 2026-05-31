@@ -20142,3 +20142,162 @@ setInterval(()=>{ try{ if(document.getElementById('logsBody')) renderTimeLogs();
   window.addEventListener('load',()=>setTimeout(v260Msg,1200));
   console.log('Tasneef V260 loaded: no 3-second refresh loops');
 })();
+
+
+/* ===== V261: Orders filters + total before VAT ===== */
+(function(){
+  'use strict';
+  window.TASNEEF_BUILD = 'V261_ORDERS_FILTER_BEFORE_VAT_2026_05_31';
+  const $ = window.$ || (id=>document.getElementById(id));
+  const esc = window.esc || (v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])));
+  const num = v=>{ const x=Number(String(v??'').replace(/,/g,'')); return Number.isFinite(x)?x:0; };
+  const money = window.money || (v=> (Math.round(num(v)*100)/100).toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2}));
+  const shortText = window.shortText || (v=>esc(String(v??'')).slice(0,120));
+  const projectNameLocal = window.projectNameLocal || window.projectName || (id=>{
+    const p=(window.data?.projects||[]).find(x=>String(x.id)===String(id));
+    return p?.name || id || '-';
+  });
+  function beforeVat(o){
+    const stored=num(o?.price_before_vat);
+    if(stored) return stored;
+    const incl=num(o?.price_incl_vat);
+    return incl ? incl * 100 / 115 : 0;
+  }
+  function vatAmount(o){
+    const stored=num(o?.vat_amount);
+    if(stored) return stored;
+    return num(o?.price_incl_vat) - beforeVat(o);
+  }
+  function monthStart(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`; }
+  function today(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+  function addOrdersFiltersV261(){
+    const orders=$('orders');
+    if(!orders) return;
+    const filters=orders.querySelector('.filters');
+    if(!filters || $('orderFilterStatusV261')) return;
+    filters.insertAdjacentHTML('beforeend', `
+      <select id="orderFilterStatusV261" onchange="renderOrdersV197()">
+        <option value="">كل حالات التنفيذ</option>
+        <option value="تم التنفيذ">تم التنفيذ</option>
+        <option value="لم ينفذ">لم ينفذ</option>
+        <option value="جزئي">جزئي</option>
+      </select>
+      <select id="orderFilterPaymentV261" onchange="renderOrdersV197()">
+        <option value="">كل حالات السداد</option>
+        <option value="تم السداد">تم السداد</option>
+        <option value="آجل">آجل</option>
+        <option value="مجاني">مجاني</option>
+      </select>
+      <select id="orderFilterInvoiceV261" onchange="renderOrdersV197()">
+        <option value="">كل حالات الفوترة</option>
+        <option value="تمت الفوترة">تمت الفوترة</option>
+        <option value="لم تتم">لم تتم</option>
+        <option value="معفى">معفى</option>
+      </select>
+      <select id="orderFilterPeriodV261" onchange="applyOrderPeriodV261(this.value)">
+        <option value="">كل الفترات</option>
+        <option value="today">اليوم</option>
+        <option value="month">الشهر الحالي</option>
+      </select>
+      <button type="button" class="light" onclick="resetOrdersFiltersV261()">مسح الفلتر</button>
+    `);
+  }
+  window.applyOrderPeriodV261=function(v){
+    const from=$('orderDateFromV197'), to=$('orderDateToV197');
+    if(v==='today'){ if(from) from.value=today(); if(to) to.value=today(); }
+    else if(v==='month'){ if(from) from.value=monthStart(); if(to) to.value=today(); }
+    else { if(from) from.value=''; if(to) to.value=''; }
+    try{ window.renderOrdersV197(); }catch(e){}
+  };
+  window.resetOrdersFiltersV261=function(){
+    ['orderDateFromV197','orderDateToV197','orderFilterProjectV197','orderSearchV197','orderFilterStatusV261','orderFilterPaymentV261','orderFilterInvoiceV261','orderFilterPeriodV261'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
+    try{ window.renderOrdersV197(); }catch(e){}
+  };
+  function filteredOrders(){
+    let rows=[...(window.ordersV197||[])];
+    const from=$('orderDateFromV197')?.value, to=$('orderDateToV197')?.value, pid=$('orderFilterProjectV197')?.value;
+    const st=$('orderFilterStatusV261')?.value, pay=$('orderFilterPaymentV261')?.value, inv=$('orderFilterInvoiceV261')?.value;
+    const q=($('orderSearchV197')?.value||'').trim().toLowerCase();
+    if(from) rows=rows.filter(o=>String(o.order_date||'')>=from);
+    if(to) rows=rows.filter(o=>String(o.order_date||'')<=to);
+    if(pid) rows=rows.filter(o=>String(o.project_id)===String(pid));
+    if(st) rows=rows.filter(o=>String(o.execution_status||'')===st);
+    if(pay) rows=rows.filter(o=>String(o.payment_status||'')===pay);
+    if(inv) rows=rows.filter(o=>String(o.system_invoice_status||'')===inv);
+    if(q) rows=rows.filter(o=>[
+      o.order_no,o.group_no,o.order_date,o.details,o.notes,o.invoice_no,o.executor,o.sender,o.client_name,o.client_phone,
+      projectNameLocal(o.project_id),o.execution_status,o.payment_status,o.system_invoice_status,o.concern,o.unit_no
+    ].join(' ').toLowerCase().includes(q));
+    return rows;
+  }
+  function badgeClass(v){ return v==='تم التنفيذ'?'green':(v==='لم ينفذ'?'red':'amber'); }
+  window.renderOrdersV197=function(){
+    try{ if(typeof window.hydrateOrdersV197==='function') window.hydrateOrdersV197(); }catch(e){}
+    addOrdersFiltersV261();
+    const rows=filteredOrders();
+    const table=$('ordersBodyV197')?.closest('table');
+    if(table){
+      table.innerHTML = `<thead><tr>
+        <th>رقم الطلب</th><th>تاريخ الطلب</th><th>المشروع</th><th>المنفذ</th><th>التفاصيل</th><th>الحالة</th><th>السداد</th>
+        <th>قبل الضريبة</th><th>الضريبة</th><th>شامل الضريبة</th><th>التكلفة</th><th>الربح</th><th>الفوترة</th><th>إجراء</th>
+      </tr></thead><tbody id="ordersBodyV197"></tbody>`;
+    }
+    const body=$('ordersBodyV197');
+    if(body){
+      body.innerHTML = rows.map(o=>{
+        const before=beforeVat(o), vat=vatAmount(o), incl=num(o.price_incl_vat), cost=num(o.cost), profit=(o.profit!==undefined&&o.profit!==null&&String(o.profit)!=='')?num(o.profit):(before-cost);
+        return `<tr>
+          <td><b>${esc(o.order_no||('ORD'+String(o.id||'').padStart(4,'0')))}</b><br><small>${esc(o.group_no||'')}</small></td>
+          <td>${esc(o.order_date||'-')}</td>
+          <td>${esc(projectNameLocal(o.project_id))}</td>
+          <td>${esc(o.executor||'-')}</td>
+          <td style="white-space:normal;min-width:260px">${shortText(o.details)}</td>
+          <td><span class="badge ${badgeClass(o.execution_status)}">${esc(o.execution_status||'-')}</span></td>
+          <td>${esc(o.payment_status||'-')}</td>
+          <td><b>${money(before)}</b></td>
+          <td>${money(vat)}</td>
+          <td>${money(incl)}</td>
+          <td>${money(cost)}</td>
+          <td class="${profit>=0?'money-pos':'money-neg'}">${money(profit)}</td>
+          <td>${esc(o.system_invoice_status||'-')}</td>
+          <td class="row-actions"><button onclick="editOrderV197(${o.id})">تعديل</button><button class="danger" onclick="deleteOrderV197(${o.id})">حذف</button></td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="14">لا توجد أوردرات حسب الفلتر المحدد</td></tr>';
+    }
+    const kpis=$('ordersKpisV197');
+    if(kpis){
+      const done=rows.filter(o=>o.execution_status==='تم التنفيذ').length;
+      const not=rows.filter(o=>o.execution_status==='لم ينفذ').length;
+      const paid=rows.filter(o=>o.payment_status==='تم السداد').length;
+      const due=rows.filter(o=>o.payment_status==='آجل').length;
+      const before=rows.reduce((s,o)=>s+beforeVat(o),0);
+      const vat=rows.reduce((s,o)=>s+vatAmount(o),0);
+      const incl=rows.reduce((s,o)=>s+num(o.price_incl_vat),0);
+      const cost=rows.reduce((s,o)=>s+num(o.cost),0);
+      const profit=rows.reduce((s,o)=>s+((o.profit!==undefined&&o.profit!==null&&String(o.profit)!=='')?num(o.profit):(beforeVat(o)-num(o.cost))),0);
+      kpis.innerHTML=`
+        <div class="kpi"><small>إجمالي الأوردرات</small><b>${rows.length}</b></div>
+        <div class="kpi"><small>تم التنفيذ</small><b>${done}</b></div>
+        <div class="kpi"><small>لم ينفذ</small><b>${not}</b></div>
+        <div class="kpi"><small>تم السداد</small><b>${paid}</b></div>
+        <div class="kpi"><small>آجل</small><b>${due}</b></div>
+        <div class="kpi"><small>إجمالي قبل الضريبة</small><b>${money(before)}</b></div>
+        <div class="kpi"><small>إجمالي الضريبة</small><b>${money(vat)}</b></div>
+        <div class="kpi"><small>الإجمالي شامل الضريبة</small><b>${money(incl)}</b></div>
+        <div class="kpi"><small>التكلفة</small><b>${money(cost)}</b></div>
+        <div class="kpi"><small>صافي الربح</small><b>${money(profit)}</b></div>`;
+    }
+    const al=$('ordersAlertsV197');
+    if(al){
+      const delayed=rows.filter(o=>o.payment_status==='آجل').length;
+      const noInv=rows.filter(o=>o.execution_status==='تم التنفيذ'&&o.system_invoice_status==='لم تتم').length;
+      const pending=rows.filter(o=>o.execution_status==='لم ينفذ').length;
+      al.innerHTML=`<div class="alert-item ${pending?'warn':''}">لم ينفذ: ${pending}</div><div class="alert-item ${delayed?'warn':''}">سداد آجل: ${delayed}</div><div class="alert-item ${noInv?'danger':''}">تم التنفيذ بدون فوترة: ${noInv}</div>`;
+    }
+  };
+  const oldShowV261=window.showPage;
+  if(typeof oldShowV261==='function') window.showPage=function(id,btn){ const r=oldShowV261.apply(this,arguments); if(id==='orders') setTimeout(()=>{ addOrdersFiltersV261(); try{ window.renderOrdersV197(); }catch(e){} },120); return r; };
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(addOrdersFiltersV261,900));
+  window.addEventListener('load',()=>setTimeout(addOrdersFiltersV261,1200));
+  console.log('Tasneef V261 loaded: orders filters and before VAT totals');
+})();
