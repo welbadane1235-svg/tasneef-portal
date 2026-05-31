@@ -223,7 +223,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // V167: expose Supabase client for late-loaded fixes and feature wrappers.
 window.sb = sb;
 const $ = id => document.getElementById(id);
-const today = () => new Date().toISOString().slice(0,10);
+const today = () => { const d=new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
 const nowTime = () => new Date().toTimeString().slice(0,5);
 /* V249: Unified session storage fix
    بعض أجزاء النظام القديمة كانت تقرأ tasneef_session بينما الدخول يحفظ tasneef_user فقط.
@@ -6557,7 +6557,7 @@ function financePrintReport(kind){
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const num = v => { const n=Number(String(v ?? 0).replace(/,/g,'')); return Number.isFinite(n)?n:0; };
   const dateOnly = v => String(v || '').slice(0,10);
-  const today = () => new Date().toISOString().slice(0,10);
+  const today = () => { const d=new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
   function inMonth(d,month){ d=dateOnly(d); return d && d.slice(0,7)===(month||today().slice(0,7)); }
   function minsText(m){ return (typeof window.minsToText==='function') ? window.minsToText(num(m)) : String(num(m)); }
   function pctText(v){ return (typeof window.percentText==='function') ? window.percentText(num(v)) : (num(v).toFixed(1)+'%'); }
@@ -6818,7 +6818,7 @@ function financePrintReport(kind){
   const num = v => { const n = Number(String(v ?? 0).replace(/[^0-9.\-]/g,'')); return Number.isFinite(n) ? n : 0; };
   const fmtQty = v => Number(num(v)).toLocaleString('en-US',{maximumFractionDigits:2});
   const fmtMoney = v => Number(num(v)).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' SAR';
-  const today = () => new Date().toISOString().slice(0,10);
+  const today = () => { const d=new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
   const dateOnly = v => String(v || '').slice(0,10);
   const monthEnd = m => { const [y,mo]=String(m||today().slice(0,7)).split('-').map(Number); return `${y}-${String(mo).padStart(2,'0')}-${String(new Date(y,mo,0).getDate()).padStart(2,'0')}`; };
   const inRange = (d,a,b) => d>=a && d<=b;
@@ -6980,7 +6980,7 @@ function financePrintReport(kind){
   const n = v => { const x = Number(String(v ?? 0).replace(/[^0-9.\-]/g,'')); return Number.isFinite(x) ? x : 0; };
   const qty = v => Number(n(v)).toLocaleString('en-US',{maximumFractionDigits:2});
   const money = v => Number(n(v)).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' SAR';
-  const today = () => new Date().toISOString().slice(0,10);
+  const today = () => { const d=new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
   const dateOnly = v => String(v || '').slice(0,10);
   const monthEnd = m => { const [y,mo]=String(m||today().slice(0,7)).split('-').map(Number); return `${y}-${String(mo).padStart(2,'0')}-${String(new Date(y,mo,0).getDate()).padStart(2,'0')}`; };
   const inRange = (d,a,b) => d >= a && d <= b;
@@ -18993,4 +18993,162 @@ function financePrintReport(kind){
     try{ await reloadLiveAfterSave(); }catch(e){ console.warn(e); }
   });
   console.log('Tasneef V251 loaded: dynamic cache cleared after supervisor saves');
+})();
+
+
+/* ===== V252: Force live today data + cache version + project units/buildings compatibility ===== */
+(function(){
+  const $ = window.$ || (id=>document.getElementById(id));
+  const E = window.esc || (v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])));
+  function localDate(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
+  window.tasneefTodayV252 = localDate;
+  function dateOnly(v){
+    if(!v) return '';
+    const s=String(v);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const d=new Date(s);
+    if(isNaN(d)) return s.slice(0,10);
+    d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
+    return d.toISOString().slice(0,10);
+  }
+  function clearAllRuntimeCaches(){
+    try{
+      const remove=[];
+      for(let i=0;i<localStorage.length;i++){
+        const k=localStorage.key(i)||'';
+        if(k.includes('tasneef_sb_cache') || k.includes('tasneef_cache') || k.includes('supabase')) remove.push(k);
+      }
+      remove.forEach(k=>localStorage.removeItem(k));
+    }catch(e){ console.warn('V252 local cache clear failed', e); }
+    try{ if(window.caches) caches.keys().then(keys=>keys.filter(k=>/^tasneef-v(249|250|251)/.test(k)).forEach(k=>caches.delete(k))); }catch(e){}
+  }
+  window.clearTasneefDynamicCacheV252 = clearAllRuntimeCaches;
+
+  async function hardLoadLiveDataV252(){
+    if(!window.sb && typeof sb==='undefined') return;
+    const client = window.sb || sb;
+    const u = (typeof session==='function') ? session() : null;
+    const isSup = u && u.role === 'supervisor';
+    const d = localDate();
+    const startUtc = new Date(d+'T00:00:00');
+    const endUtc = new Date(d+'T23:59:59');
+    const startIso = startUtc.toISOString();
+    const endIso = endUtc.toISOString();
+    function applySup(q, col){ return isSup ? q.eq(col || 'supervisor_id', u.id) : q; }
+    try{
+      const [projects, ticketsAll, ticketsToday, logsByDate, logsByCheck, services] = await Promise.all([
+        client.from('projects').select('*').order('id'),
+        client.from('tickets').select('*').order('id',{ascending:false}).limit(5000),
+        client.from('tickets').select('*').gte('created_at',startIso).lte('created_at',endIso).order('id',{ascending:false}).limit(1000),
+        applySup(client.from('time_logs').select('*').eq('log_date',d).order('id',{ascending:false}).limit(1000)).then(r=>r),
+        applySup(client.from('time_logs').select('*').gte('check_in',startIso).lte('check_in',endIso).order('id',{ascending:false}).limit(1000)).then(r=>r),
+        client.from('contract_services').select('*').order('id',{ascending:false}).limit(5000)
+      ]);
+      window.data = window.data || data || {};
+      if(projects && !projects.error){
+        data.projects = projects.data || [];
+        if(isSup) data.projects = data.projects.filter(p=>String(p.supervisor_id||'')===String(u.id));
+      }
+      function mergeById(oldRows,newRows){ const m=new Map((oldRows||[]).map(r=>[String(r.id),r])); (newRows||[]).forEach(r=>{ if(r && r.id!=null) m.set(String(r.id),r); }); return [...m.values()].sort((a,b)=>Number(b.id||0)-Number(a.id||0)); }
+      if(ticketsAll && !ticketsAll.error){ data.tickets = ticketsAll.data || []; }
+      if(ticketsToday && !ticketsToday.error){ data.tickets = mergeById(data.tickets, ticketsToday.data || []); }
+      if(isSup){
+        const pids = new Set((data.projects||[]).map(p=>String(p.id)));
+        data.tickets = (data.tickets||[]).filter(t=>String(t.supervisor_id||'')===String(u.id) || String(t.created_by||'')===String(u.id) || pids.has(String(t.project_id||'')));
+      }
+      data.logs = mergeById(data.logs||[], [...(logsByDate.data||[]), ...(logsByCheck.data||[])]);
+      if(isSup) data.logs = (data.logs||[]).filter(l=>String(l.supervisor_id||'')===String(u.id));
+      if(services && !services.error){ data.contractServices = services.data || []; data.contractServicesError=''; }
+    }catch(e){ console.warn('V252 hard live load failed', e); }
+  }
+  window.hardLoadLiveDataV252 = hardLoadLiveDataV252;
+
+  const oldSaveTimeLog = window.saveTimeLog || (typeof saveTimeLog==='function' ? saveTimeLog : null);
+  window.saveTimeLog = async function(){
+    clearAllRuntimeCaches();
+    const out = oldSaveTimeLog ? await oldSaveTimeLog.apply(this, arguments) : undefined;
+    clearAllRuntimeCaches();
+    await hardLoadLiveDataV252();
+    try{ if(typeof hydrateForms==='function') hydrateForms(); }catch(_){ }
+    try{ if(typeof renderTimeLogs==='function') renderTimeLogs(); }catch(_){ }
+    try{ if(typeof renderDashboard==='function') renderDashboard(); }catch(_){ }
+    try{ if(typeof window.renderSupervisorDailySummary==='function') window.renderSupervisorDailySummary(); }catch(_){ }
+    return out;
+  };
+
+  const oldSaveTicket = window.saveTicket || (typeof saveTicket==='function' ? saveTicket : null);
+  window.saveTicket = async function(){
+    clearAllRuntimeCaches();
+    const out = oldSaveTicket ? await oldSaveTicket.apply(this, arguments) : undefined;
+    clearAllRuntimeCaches();
+    await hardLoadLiveDataV252();
+    try{ if(typeof hydrateForms==='function') hydrateForms(); }catch(_){ }
+    try{ if(typeof renderTickets==='function') renderTickets(); }catch(_){ }
+    try{ if(typeof window.renderSupervisorDailySummary==='function') window.renderSupervisorDailySummary(); }catch(_){ }
+    return out;
+  };
+
+  const oldInitSupervisor = window.initSupervisor || (typeof initSupervisor==='function' ? initSupervisor : null);
+  window.initSupervisor = async function(){
+    clearAllRuntimeCaches();
+    const out = oldInitSupervisor ? await oldInitSupervisor.apply(this, arguments) : undefined;
+    await hardLoadLiveDataV252();
+    try{ const u=(typeof session==='function')?session():null; if($('supTitle')&&u) $('supTitle').textContent=`لوحة المشرف - ${u.full_name||u.username||''}`; }catch(_){ }
+    try{ if($('logProject')) fillSelect('logProject',data.projects||[],'name','اختر المشروع'); }catch(_){ }
+    try{ if($('attendanceProject')) fillSelect('attendanceProject',data.projects||[],'name','اختر المشروع'); }catch(_){ }
+    try{ if($('ticketProject')) fillSelect('ticketProject',data.projects||[],'name','اختر المشروع'); }catch(_){ }
+    try{ if($('supTicketFilterProject')) fillSelect('supTicketFilterProject',data.projects||[],'name','كل المشاريع'); }catch(_){ }
+    try{ if(typeof renderTimeLogs==='function') renderTimeLogs(); }catch(_){ }
+    try{ if(typeof renderTickets==='function') renderTickets(); }catch(_){ }
+    try{ if(typeof window.renderSupervisorDailySummary==='function') window.renderSupervisorDailySummary(); }catch(_){ }
+    return out;
+  };
+
+  function firstNum(obj, keys){
+    for(const k of keys){ const n=Number(obj?.[k]); if(Number.isFinite(n) && n>0) return n; }
+    return 0;
+  }
+  window.projectBuildingsCountV252 = function(p){ return firstNum(p, ['buildings_count','building_count','buildings','building_no','buildingsCount','number_of_buildings','عمائر','عدد_العمائر']); };
+  window.projectUnitsCountV252 = function(p){ return firstNum(p, ['units_count','apartments_count','apartment_count','units','apartments','flats_count','unitsCount','number_of_units','number_of_apartments','شقق','عدد_الشقق']); };
+
+  const oldRenderContractServices = window.renderContractServices || (typeof renderContractServices==='function' ? renderContractServices : null);
+  window.renderContractServices = function(){
+    if(!$('contractServicesBody')) return oldRenderContractServices ? oldRenderContractServices.apply(this, arguments) : undefined;
+    try{ if(typeof hydrateServiceTypes==='function') hydrateServiceTypes(); }catch(_){ }
+    const rows=(typeof getFilteredContractServices==='function'?getFilteredContractServices():(data.contractServices||[]));
+    const table=$('contractServicesBody').closest('table');
+    const head=table?.querySelector('thead tr');
+    if(head && !head.dataset.v252Counts){
+      const labels=[...head.children].map(th=>(th.textContent||'').trim());
+      if(!labels.includes('العمائر')) head.children[0]?.insertAdjacentHTML('afterend','<th>العمائر</th><th>الشقق</th>');
+      head.dataset.v252Counts='1';
+    }
+    const empty = data.contractServicesError ? ('تعذر تحميل الخدمات: '+E(data.contractServicesError)) : 'لا توجد خدمات بعد.';
+    $('contractServicesBody').innerHTML = rows.slice(0,1000).map(s=>{
+      const p=(typeof csProjectObj==='function' ? csProjectObj(s) : null) || (data.projects||[]).find(x=>String(x.id)===String(s.project_id)) || {};
+      const k=(typeof csStatusKey==='function'?csStatusKey(s):(s.status||''));
+      const projectName=(typeof csProjectName==='function'?csProjectName(s):(p.name||s.project_name||'-'));
+      const supName=(typeof csSupervisorName==='function'?csSupervisorName(s):'');
+      const serviceName=(typeof csServiceName==='function'?csServiceName(s):(s.service_name||'-'));
+      const serviceType=(typeof csServiceType==='function'?csServiceType(s):(s.service_type||'-'));
+      const freq=(typeof csFrequency==='function'?csFrequency(s):(s.frequency||'-'));
+      const visits=(typeof csVisits==='function'?csVisits(s):(s.visit_count||0));
+      const done=(typeof csDone==='function'?csDone(s):(s.executed_count||0));
+      const remain=(typeof csRemaining==='function'?csRemaining(s):(s.remaining_count||0));
+      const last=(typeof csLastDate==='function'?csLastDate(s):(s.last_execution_date||''));
+      const due=(typeof csDueDate==='function'?csDueDate(s):(s.next_due_date||''));
+      const bcls=(typeof csBadgeClass==='function'?csBadgeClass(k):'amber');
+      const stxt=(typeof csStatusText==='function'?csStatusText(k):(s.status||'-'));
+      const executor=(typeof csExecutor==='function'?csExecutor(s):(s.executor_name||'-'));
+      const notes=(typeof csNotes==='function'?csNotes(s):(s.notes||'-'));
+      const buildings=projectBuildingsCountV252(p) || projectBuildingsCountV252(s);
+      const units=projectUnitsCountV252(p) || projectUnitsCountV252(s);
+      return `<tr><td><b>${E(projectName)}</b></td><td>${buildings}</td><td>${units}</td><td>${E(supName)}</td><td><b>${E(serviceName)}</b></td><td>${E(serviceType)}</td><td>${E(freq)}</td><td>${visits}</td><td>${E(executor)}</td><td>${done}</td><td>${remain}</td><td>${E(last||'-')}</td><td>${E(due||'-')}</td><td><span class="badge ${bcls}">${E(stxt)}</span></td><td>${E(notes||'-')}</td><td class="row-actions"><button onclick="executeContractService(${Number(s.id)||0})">تسجيل تنفيذ</button><button class="light" onclick="editContractService(${Number(s.id)||0})">تعديل</button><button class="light" onclick="whatsappContractService(${Number(s.id)||0})">واتساب</button></td></tr>`;
+    }).join('') || `<tr><td colspan="16">${empty}</td></tr>`;
+    try{ const all=data.contractServices||[]; [['servicesTotalCount',all.length]].forEach(([id,v])=>{if($(id)) $(id).textContent=v;}); }catch(_){ }
+  };
+
+  document.addEventListener('visibilitychange', async ()=>{ if(!document.hidden){ await hardLoadLiveDataV252(); try{ renderTimeLogs&&renderTimeLogs(); renderTickets&&renderTickets(); renderContractServices&&renderContractServices(); }catch(_){ } } });
+  setTimeout(async()=>{ await hardLoadLiveDataV252(); try{ if(typeof renderTimeLogs==='function') renderTimeLogs(); if(typeof renderTickets==='function') renderTickets(); if(typeof renderContractServices==='function') renderContractServices(); }catch(_){ } },900);
+  console.log('Tasneef V252 loaded: live today logs/tickets + units/buildings counts + cache bust');
 })();
