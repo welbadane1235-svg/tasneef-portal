@@ -20147,7 +20147,7 @@ setInterval(()=>{ try{ if(document.getElementById('logsBody')) renderTimeLogs();
 /* ===== V261: Orders filters + total before VAT ===== */
 (function(){
   'use strict';
-  window.TASNEEF_BUILD = 'V262_TECHNICIAN_ORDERS_WORKSPACE_2026_05_31';
+  window.TASNEEF_BUILD = 'V263_ORDERS_WHATSAPP_RECEIPT_2026_05_31';
   const $ = window.$ || (id=>document.getElementById(id));
   const esc = window.esc || (v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])));
   const num = v=>{ const x=Number(String(v??'').replace(/,/g,'')); return Number.isFinite(x)?x:0; };
@@ -20305,7 +20305,7 @@ setInterval(()=>{ try{ if(document.getElementById('logsBody')) renderTimeLogs();
 /* ===== V262: Technician orders workspace ===== */
 (function(){
   'use strict';
-  window.TASNEEF_BUILD = 'V262_TECHNICIAN_ORDERS_WORKSPACE_2026_05_31';
+  window.TASNEEF_BUILD = 'V263_ORDERS_WHATSAPP_RECEIPT_2026_05_31';
   const $ = window.$ || (id=>document.getElementById(id));
   const esc = window.esc || (v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])));
   const arr = v => Array.isArray(v) ? v : [];
@@ -20425,4 +20425,176 @@ setInterval(()=>{ try{ if(document.getElementById('logsBody')) renderTimeLogs();
     window.__techOrdersTimerV262=setInterval(async()=>{ await loadTechnicianOrders(); renderTechnicianOrdersV262(); },120000);
   };
   console.log('Tasneef V262 loaded: technician orders workspace');
+})();
+
+
+/* ===== V263: Orders WhatsApp button + payment receipt attachment ===== */
+(function(){
+  'use strict';
+  window.TASNEEF_BUILD = 'V263_ORDERS_WHATSAPP_RECEIPT_2026_05_31';
+  const $ = window.$ || (id=>document.getElementById(id));
+  const E = window.esc || (v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])));
+  const arr = v => Array.isArray(v) ? v : [];
+  const N = v => { const n=Number(v); return Number.isFinite(n)?n:0; };
+  const money = v => N(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  function pName(id){ try{ if(typeof window.projectName==='function') return window.projectName(id); }catch(_){} const p=arr(window.data?.projects).find(x=>String(x.id)===String(id)); return p?.name || id || '-'; }
+  function orderNo(o){ return o?.order_no || ('ORD'+String(o?.id||'').padStart(4,'0')); }
+  function phoneClean(v){ let s=String(v||'').replace(/[^0-9+]/g,''); if(!s) return ''; if(s.startsWith('+')) s=s.slice(1); if(s.startsWith('00')) s=s.slice(2); if(s.startsWith('0') && s.length===10) s='966'+s.slice(1); if(s.length===9 && s.startsWith('5')) s='966'+s; return s; }
+  function receiptUrl(o){ return o?.receipt_url || o?.payment_receipt_url || o?.receipt_file_url || o?.payment_attachment_url || ''; }
+  function beforeVat(o){ const b=N(o?.price_before_vat); if(b) return b; const incl=N(o?.price_incl_vat); return incl?incl/1.15:0; }
+  function vatAmount(o){ const v=N(o?.vat_amount); if(v) return v; const incl=N(o?.price_incl_vat); return incl?incl-(incl/1.15):0; }
+  function baseOrderPayloadV263(){
+    const price=N($('orderPriceInclV197')?.value), vat=price?price*15/115:0, before=price-vat, cost=N($('orderCostV197')?.value);
+    return {
+      group_no:$('orderGroupNoV197')?.value||'', order_date:$('orderDateV197')?.value||null, order_time:$('orderTimeV197')?.value||null,
+      sender:$('orderSenderV197')?.value||'', project_id:N($('orderProjectV197')?.value)||null, property_type:$('orderPropertyTypeV197')?.value||'', unit_no:$('orderUnitNoV197')?.value||'',
+      client_name:$('orderClientNameV197')?.value||'', client_phone:$('orderClientPhoneV197')?.value||'', executor:$('orderExecutorV197')?.value||'',
+      details:$('orderDetailsV197')?.value||'', notes:$('orderNotesV197')?.value||'', concern:$('orderConcernV197')?.value||'', done_date:$('orderDoneDateV197')?.value||null,
+      execution_method:$('orderMethodV197')?.value||'', execution_status:$('orderStatusV197')?.value||'', report_status:$('orderReportV197')?.value||'',
+      price_incl_vat:price, vat_amount:vat, price_before_vat:before, cost:cost, profit:before-cost,
+      payment_status:$('orderPaymentV197')?.value||'', invoice_no:$('orderInvoiceNoV197')?.value||'', system_invoice_status:$('orderSystemInvoiceV197')?.value||''
+    };
+  }
+  function injectReceiptField(){
+    if(!$('orderPaymentV197') || $('orderReceiptFileV263')) return;
+    const target=$('orderSystemInvoiceV197') || $('orderInvoiceNoV197') || $('orderPaymentV197');
+    target.insertAdjacentHTML('afterend', `
+      <div class="order-receipt-box-v263">
+        <label>سند إيصال السداد</label>
+        <input id="orderReceiptFileV263" type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx">
+        <input id="orderReceiptUrlV263" placeholder="رابط سند السداد إن وجد" style="margin-top:6px">
+        <div id="orderReceiptPreviewV263" class="muted" style="font-size:12px;margin-top:5px">يمكن رفع صورة أو PDF لسند السداد.</div>
+      </div>`);
+    $('orderReceiptFileV263')?.addEventListener('change',()=>{ const f=$('orderReceiptFileV263')?.files?.[0]; const el=$('orderReceiptPreviewV263'); if(el) el.textContent=f?('ملف مختار: '+f.name):'يمكن رفع صورة أو PDF لسند السداد.'; });
+  }
+  async function uploadReceiptIfAny(orderId){
+    const file=$('orderReceiptFileV263')?.files?.[0];
+    const manual=String($('orderReceiptUrlV263')?.value||'').trim();
+    if(manual) return {url:manual, fileName:file?.name||''};
+    if(!file) return {url:'', fileName:''};
+    if(!window.sb || !window.sb.storage) throw new Error('رفع الملفات غير متاح حالياً');
+    const ext=(file.name.split('.').pop()||'bin').toLowerCase();
+    const path=`orders/${orderId||'new'}-${Date.now()}.${ext}`;
+    const up=await window.sb.storage.from('order-receipts').upload(path,file,{cacheControl:'3600',upsert:false});
+    if(up.error) throw up.error;
+    const pub=window.sb.storage.from('order-receipts').getPublicUrl(path);
+    return {url:pub?.data?.publicUrl||path, fileName:file.name};
+  }
+  function appendReceiptToNotes(notes,url){
+    notes=String(notes||''); if(!url) return notes;
+    if(notes.includes('سند السداد:') || notes.includes(url)) return notes;
+    return (notes?notes+'\n':'')+'سند السداد: '+url;
+  }
+  async function dbSave(row,id){
+    let res=id?await window.sb.from('maintenance_orders').update(row).eq('id',id).select('*').maybeSingle():await window.sb.from('maintenance_orders').insert(row).select('*').single();
+    const msg=String(res.error?.message||'');
+    if(res.error && /(receipt_|payment_receipt|column|schema cache|Could not find)/i.test(msg)){
+      const fallback={...row}; const url=fallback.receipt_url||fallback.payment_receipt_url||''; delete fallback.receipt_url; delete fallback.receipt_file_name; delete fallback.payment_receipt_url;
+      fallback.notes=appendReceiptToNotes(fallback.notes,url);
+      res=id?await window.sb.from('maintenance_orders').update(fallback).eq('id',id).select('*').maybeSingle():await window.sb.from('maintenance_orders').insert(fallback).select('*').single();
+    }
+    return res;
+  }
+  window.saveOrderV197=async function(){
+    try{
+      injectReceiptField();
+      const id=$('orderIdV197')?.value;
+      let row=baseOrderPayloadV263();
+      if(!row.order_date) return (window.msg?msg('تاريخ الطلب مطلوب','err'):alert('تاريخ الطلب مطلوب'));
+      if(!row.project_id) return (window.msg?msg('اختر المشروع','err'):alert('اختر المشروع'));
+      if(!String(row.details||'').trim()) return (window.msg?msg('التفاصيل مطلوبة','err'):alert('التفاصيل مطلوبة'));
+      let receipt={url:String($('orderReceiptUrlV263')?.value||'').trim(), fileName:''};
+      const file=$('orderReceiptFileV263')?.files?.[0];
+      if(file){
+        try{ receipt=await uploadReceiptIfAny(id||'new'); }
+        catch(e){ if(window.msg) msg('تعذر رفع سند السداد: '+(e.message||e)+' — سيتم حفظ الأوردر بدون ملف. تأكد من إنشاء bucket باسم order-receipts.','err'); }
+      }
+      if(receipt.url){ row.receipt_url=receipt.url; row.payment_receipt_url=receipt.url; row.receipt_file_name=receipt.fileName||''; }
+      const res=await dbSave(row,id);
+      if(res.error) return (window.msg?msg(res.error.message,'err'):alert(res.error.message));
+      if(window.msg) msg(id?'تم تحديث الأوردر':'تم حفظ الأوردر');
+      try{ if(typeof window.clearOrderFormV197==='function') window.clearOrderFormV197(); }catch(_){}
+      if($('orderReceiptFileV263')) $('orderReceiptFileV263').value=''; if($('orderReceiptUrlV263')) $('orderReceiptUrlV263').value='';
+      if(typeof window.loadOrdersV197==='function') await window.loadOrdersV197(true);
+    }catch(e){ console.error(e); if(window.msg) msg('تعذر حفظ الأوردر: '+(e.message||e),'err'); else alert(e.message||e); }
+  };
+  const oldClear=window.clearOrderFormV197;
+  window.clearOrderFormV197=function(){ if(typeof oldClear==='function') oldClear(); injectReceiptField(); if($('orderReceiptFileV263')) $('orderReceiptFileV263').value=''; if($('orderReceiptUrlV263')) $('orderReceiptUrlV263').value=''; if($('orderReceiptPreviewV263')) $('orderReceiptPreviewV263').textContent='يمكن رفع صورة أو PDF لسند السداد.'; };
+  const oldEdit=window.editOrderV197;
+  window.editOrderV197=function(id){ if(typeof oldEdit==='function') oldEdit(id); injectReceiptField(); const o=arr(window.ordersV197).find(x=>String(x.id)===String(id)); const url=receiptUrl(o) || (String(o?.notes||'').match(/سند السداد:\s*(\S+)/)?.[1]||''); if($('orderReceiptUrlV263')) $('orderReceiptUrlV263').value=url; if($('orderReceiptPreviewV263')) $('orderReceiptPreviewV263').innerHTML=url?`السند الحالي: <a href="${E(url)}" target="_blank">فتح السند</a>`:'يمكن رفع صورة أو PDF لسند السداد.'; };
+  window.buildOrderWhatsAppTextV263=function(o){
+    const before=beforeVat(o), vat=vatAmount(o), total=N(o?.price_incl_vat);
+    const url=receiptUrl(o) || (String(o?.notes||'').match(/سند السداد:\s*(\S+)/)?.[1]||'');
+    return [
+      'شركة تصنيف لإدارة المرافق',
+      'تفاصيل الأوردر',
+      '',
+      'رقم الأوردر: '+orderNo(o),
+      o?.group_no?'رقم الطلب بالجروب: '+o.group_no:'',
+      'المشروع: '+pName(o?.project_id),
+      o?.unit_no?'رقم الوحدة/الشقة: '+o.unit_no:'',
+      'التفاصيل: '+(o?.details||'-'),
+      'حالة التنفيذ: '+(o?.execution_status||'-'),
+      'حالة السداد: '+(o?.payment_status||'-'),
+      'المبلغ قبل الضريبة: '+money(before)+' ريال',
+      'الضريبة: '+money(vat)+' ريال',
+      'الإجمالي شامل الضريبة: '+money(total)+' ريال',
+      o?.invoice_no?'رقم الفاتورة: '+o.invoice_no:'',
+      url?'سند السداد: '+url:''
+    ].filter(Boolean).join('\n');
+  };
+  window.sendOrderWhatsAppV263=function(id){
+    const o=[...arr(window.ordersV197),...arr(window.technicianOrdersV262)].find(x=>String(x.id)===String(id));
+    if(!o) return (window.msg?msg('الأوردر غير موجود','err'):alert('الأوردر غير موجود'));
+    const text=window.buildOrderWhatsAppTextV263(o);
+    const phone=phoneClean(o.client_phone);
+    const url='https://wa.me/'+(phone?phone:'')+'?text='+encodeURIComponent(text);
+    try{ if(navigator.clipboard?.writeText) navigator.clipboard.writeText(text).catch(()=>{}); }catch(_){}
+    window.open(url,'_blank');
+    if(window.msg) msg('تم تجهيز رسالة واتساب للأوردر');
+  };
+  function receiptCell(o){ const url=receiptUrl(o) || (String(o?.notes||'').match(/سند السداد:\s*(\S+)/)?.[1]||''); return url?`<a href="${E(url)}" target="_blank">عرض السند</a>`:'-'; }
+  const renderAdmin = window.renderOrdersV197;
+  window.renderOrdersV197=function(){
+    injectReceiptField();
+    if(typeof renderAdmin==='function') renderAdmin();
+    const table=$('ordersBodyV197')?.closest('table');
+    const body=$('ordersBodyV197');
+    if(!table || !body) return;
+    const head=table.querySelector('thead tr');
+    if(head && ![...head.children].some(th=>(th.textContent||'').trim()==='سند السداد')){
+      const last=head.lastElementChild; last?.insertAdjacentHTML('beforebegin','<th>سند السداد</th><th>واتساب</th>');
+    }
+    [...body.querySelectorAll('tr')].forEach(tr=>{
+      const btn=tr.querySelector('button[onclick^="editOrderV197"]');
+      if(!btn || tr.dataset.v263) return;
+      const m=(btn.getAttribute('onclick')||'').match(/editOrderV197\((\d+)\)/); if(!m) return;
+      const id=m[1]; const o=arr(window.ordersV197).find(x=>String(x.id)===String(id));
+      const actions=tr.lastElementChild;
+      actions?.insertAdjacentHTML('beforebegin',`<td>${receiptCell(o)}</td><td><button type="button" class="wa-order-btn-v263" onclick="sendOrderWhatsAppV263(${id})">واتساب</button></td>`);
+      tr.dataset.v263='1';
+    });
+  };
+  const renderTech = window.renderTechnicianOrdersV262;
+  window.renderTechnicianOrdersV262=function(){
+    if(typeof renderTech==='function') renderTech();
+    const body=$('techOrdersBodyV262'); if(!body) return;
+    const table=body.closest('table'), head=table?.querySelector('thead tr');
+    if(head && ![...head.children].some(th=>(th.textContent||'').trim()==='واتساب')) head.insertAdjacentHTML('beforeend','<th>سند السداد</th><th>واتساب</th>');
+    [...body.querySelectorAll('tr')].forEach(tr=>{
+      const b=tr.querySelector('button[onclick^="techClaimOrderV262"],button[onclick^="techStartOrderV262"],button[onclick^="techCloseOrderV262"]');
+      if(tr.dataset.v263Tech) return;
+      let id='';
+      if(b){ const m=(b.getAttribute('onclick')||'').match(/V262\((\d+)\)/); id=m?.[1]||''; }
+      if(!id){ const txt=(tr.querySelector('td b')?.textContent||'').trim(); const o=arr(window.technicianOrdersV262).find(x=>orderNo(x)===txt); id=o?.id||''; }
+      if(!id) return;
+      const o=arr(window.technicianOrdersV262).find(x=>String(x.id)===String(id));
+      tr.insertAdjacentHTML('beforeend',`<td>${receiptCell(o)}</td><td><button type="button" class="wa-order-btn-v263" onclick="sendOrderWhatsAppV263(${id})">واتساب</button></td>`);
+      tr.dataset.v263Tech='1';
+    });
+  };
+  if(!document.getElementById('ordersV263Css')){ const css=document.createElement('style'); css.id='ordersV263Css'; css.textContent='.wa-order-btn-v263{background:#128C7E!important;color:#fff!important;border:0!important;border-radius:10px!important;padding:7px 10px!important;font-weight:800!important}.order-receipt-box-v263{border:1px solid #d7eadf;background:#f8fcfa;border-radius:14px;padding:10px;margin:10px 0}'; document.head.appendChild(css); }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{injectReceiptField(); try{window.renderOrdersV197&&window.renderOrdersV197(); window.renderTechnicianOrdersV262&&window.renderTechnicianOrdersV262();}catch(_){}},1000));
+  window.addEventListener('load',()=>setTimeout(()=>{injectReceiptField(); try{window.renderOrdersV197&&window.renderOrdersV197(); window.renderTechnicianOrdersV262&&window.renderTechnicianOrdersV262();}catch(_){}},1200));
+  console.log('Tasneef V263 loaded: orders WhatsApp + receipt attachment');
 })();
