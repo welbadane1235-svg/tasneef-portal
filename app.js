@@ -1,3 +1,23 @@
+
+/* V277 EMERGENCY STABLE ROLLBACK: no Service Worker, no cache, direct Supabase */
+(function(){
+  try{
+    var kill=[];
+    for(var i=0;i<localStorage.length;i++){
+      var k=localStorage.key(i)||'';
+      if(/^tasneef/i.test(k) && !/tasneef_(user|session)/.test(k)) kill.push(k);
+      if(k.indexOf('sb_cache')>-1 || k.indexOf('supabase')>-1) kill.push(k);
+    }
+    kill.forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
+  }catch(e){}
+  try{
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.getRegistrations().then(function(regs){ regs.forEach(function(r){ r.unregister().catch(function(){}); }); }).catch(function(){});
+    }
+    if(window.caches){ caches.keys().then(function(keys){ keys.forEach(function(k){ if(/^tasneef/i.test(k)) caches.delete(k); }); }).catch(function(){}); }
+  }catch(e){}
+  window.TASNEEF_BUILD='V277_STABLE_ROLLBACK_NO_SW';
+})();
 /* TASNEEF BUILD V257 - stable live today logs/tickets fix - 2026-05-31 */
 /* V154 Smart Loading Branding */
 (function(){
@@ -120,7 +140,7 @@
 (function(){
   if(window.__tasneefLiteNetworkV239) return;
   window.__tasneefLiteNetworkV239 = true;
-  window.TASNEEF_BUILD = 'V251_SUPERVISOR_LIVE_DATA_2026_05_31';
+  window.TASNEEF_BUILD = 'V277_STABLE_ROLLBACK_NO_SW';
 
   function addLiteStyle(){
     if(document.getElementById('tasneefLiteStyleV239')) return;
@@ -153,15 +173,61 @@
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',pageReady); else pageReady();
 
-  // Register service worker to cache app files for weak internet. Works after first successful visit.
-  if('serviceWorker' in navigator && !window.__tasneefSWRegV239){
-    window.__tasneefSWRegV239 = true;
-    window.addEventListener('load',()=>{
-      navigator.serviceWorker.register('tasneef-sw.js?v=251').catch(()=>{});
-    });
-  }
+  // V277: Service Worker disabled. Direct network loading only.
 
-  // V276: تم إلغاء كاش/Timeout fetch لأنه سبب AbortError وبيانات صفر.
+  // Supabase GET cache fallback: network first, then cached data if internet is weak.
+  const previousFetch = window.fetch;
+  if(previousFetch && !previousFetch.__tasneefCacheV239){
+    const CACHE_PREFIX='tasneef_sb_cache_v239:';
+    const MAX_AGE_MS=1000*60*60*12; // 12 hours for emergency fallback
+    const NETWORK_TIMEOUT_MS=8500;
+    function currentUserKey(){
+      try{ const u=JSON.parse(localStorage.getItem('tasneef_user')||'null'); return (u?.username||u?.role||'guest'); }catch(e){ return 'guest'; }
+    }
+    function cacheKey(url){ return CACHE_PREFIX+currentUserKey()+':'+String(url); }
+    function canCache(url, init){
+      const method=String(init?.method || 'GET').toUpperCase();
+      return method==='GET' && /supabase\.co\/rest\/v1\//i.test(String(url));
+    }
+    function responseFromCache(key){
+      try{
+        const raw=localStorage.getItem(key); if(!raw) return null;
+        const obj=JSON.parse(raw); if(!obj || !obj.body) return null;
+        if(Date.now()-(obj.ts||0)>MAX_AGE_MS) return null;
+        netbar('الاتصال بطيء، تم عرض آخر بيانات محفوظة مؤقتًا.','warn',5000);
+        return new Response(obj.body,{status:200,statusText:'OK (Tasneef Cache)',headers:{'content-type':obj.contentType||'application/json','x-tasneef-cache':'1'}});
+      }catch(e){ return null; }
+    }
+    async function saveCache(key,res){
+      try{
+        if(!res || !res.ok) return;
+        const contentType=res.headers.get('content-type')||'application/json';
+        const txt=await res.clone().text();
+        if(!txt || txt.length>900000) return;
+        localStorage.setItem(key,JSON.stringify({ts:Date.now(),contentType,body:txt}));
+      }catch(e){}
+    }
+    const patched=function(input, init={}){
+      const url=(typeof input==='string')?input:(input&&input.url?input.url:'');
+      if(!canCache(url,init)) return previousFetch.apply(this,arguments);
+      const key=cacheKey(url);
+      const controller = new AbortController();
+      const merged = Object.assign({}, init, {signal: init.signal || controller.signal});
+      const timer=setTimeout(()=>{try{controller.abort()}catch(e){}}, NETWORK_TIMEOUT_MS);
+      return previousFetch.call(this,input,merged).then(res=>{
+        clearTimeout(timer);
+        saveCache(key,res);
+        return res;
+      }).catch(err=>{
+        clearTimeout(timer);
+        const cached=responseFromCache(key);
+        if(cached) return cached;
+        throw err;
+      });
+    };
+    patched.__tasneefCacheV239=true;
+    window.fetch=patched;
+  }
 })();
 
 // Tasneef HTML App V86 - Contract Services Cloud View Fix
@@ -213,22 +279,9 @@ async function login(){
     setSession({id:1,full_name:'مدير النظام',username:'admin',role:'admin',is_active:true});
     location.href='admin.html'; return;
   }
-  try{
-    const res = await sb.from('app_users')
-      .select('*')
-      .eq('username',username)
-      .eq('password',password)
-      .eq('is_active',true)
-      .maybeSingle();
-    const u=res.data, error=res.error;
-    if(error||!u) return msg(error?.message || 'بيانات الدخول غير صحيحة','err');
-    setSession(u);
-    location.href = roleHomeUrl(u.role);
-  }catch(e){
-    console.error('login failed', e);
-    const m=String(e?.message||e||'');
-    return msg(m.includes('aborted') ? 'تعذر الاتصال بقاعدة البيانات. تم تعطيل كاش المتصفح، حدث الصفحة وجرب مرة أخرى.' : m, 'err');
-  }
+  const {data:u,error}=await sb.from('app_users').select('*').eq('username',username).eq('password',password).eq('is_active',true).maybeSingle();
+  if(error||!u) return msg(error?.message || 'بيانات الدخول غير صحيحة','err');
+  setSession(u); location.href = roleHomeUrl(u.role);
 }
 function logout(){ clearSession(); location.href='index.html'; }
 async function loadAll(){
@@ -17457,7 +17510,7 @@ function financePrintReport(kind){
 ============================================================================ */
 (function(){
   'use strict';
-  window.TASNEEF_BUILD = 'V251_SUPERVISOR_LIVE_DATA_2026_05_31';
+  window.TASNEEF_BUILD = 'V277_STABLE_ROLLBACK_NO_SW';
   const E = (v)=>String(v ?? '').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const $id = (id)=>document.getElementById(id);
   const say = (t,type)=>{ try{ (window.msg||window.setMsg||alert)(t,type); }catch{ alert(t); } };
@@ -19502,7 +19555,7 @@ function financePrintReport(kind){
 (function(){
   if(window.__tasneefV255ProFix) return;
   window.__tasneefV255ProFix = true;
-  window.TASNEEF_BUILD = 'V276_PRO_NO_3SEC_REFRESH_2026_05_31';
+  window.TASNEEF_BUILD = 'V260_PRO_NO_3SEC_REFRESH_2026_05_31';
   const $v255 = (id)=>document.getElementById(id);
   const arrV255 = (x)=>Array.isArray(x)?x:[];
   const escV255 = (s)=>String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -20077,11 +20130,11 @@ setInterval(()=>{ try{ if(document.getElementById('logsBody')) renderTimeLogs();
 })();
 
 
-/* ===== V276: Professional refresh policy - no 3 second auto refresh ===== */
+/* ===== V260: Professional refresh policy - no 3 second auto refresh ===== */
 (function(){
   'use strict';
-  window.TASNEEF_BUILD = 'V276_PRO_NO_3SEC_REFRESH_2026_05_31';
-  window.TASNEEF_REFRESH_POLICY_V276 = {
+  window.TASNEEF_BUILD = 'V260_PRO_NO_3SEC_REFRESH_2026_05_31';
+  window.TASNEEF_REFRESH_POLICY_V260 = {
     liveTodaySeconds: 120,
     openVisitTimerSeconds: 60,
     noThreeSecondRefresh: true
@@ -20101,52 +20154,5 @@ setInterval(()=>{ try{ if(document.getElementById('logsBody')) renderTimeLogs();
   }
   document.addEventListener('DOMContentLoaded',()=>setTimeout(v260Msg,900));
   window.addEventListener('load',()=>setTimeout(v260Msg,1200));
-  console.log('Tasneef V276 loaded: no 3-second refresh loops');
-})();
-
-
-/* V276 RECOVERY: stable direct data loading without fetch timeout/cache */
-(function(){
-  try{
-    // Clear corrupted old fetch/local caches once.
-    const kill=[];
-    for(let i=0;i<localStorage.length;i++){
-      const k=localStorage.key(i)||'';
-      if(k.includes('tasneef_sb_cache') || k.includes('tasneef_dynamic_cache') || k.includes('sb_cache')) kill.push(k);
-    }
-    kill.forEach(k=>localStorage.removeItem(k));
-  }catch(_){ }
-  if('serviceWorker' in navigator){
-    navigator.serviceWorker.getRegistrations().then(regs=>regs.forEach(r=>r.unregister())).catch(()=>{});
-  }
-  window.loadAll = async function(){
-    const q = async (name, builder, fallback=[])=>{
-      try{
-        const res = await builder;
-        if(res.error){ console.warn('Supabase '+name, res.error.message); return fallback; }
-        return Array.isArray(res.data) ? res.data : fallback;
-      }catch(e){ console.error('Supabase '+name+' failed', e); return fallback; }
-    };
-    const old = window.data || data || {};
-    const [users, projects, workers, attendance, logs, tickets, contractServices] = await Promise.all([
-      q('app_users', sb.from('app_users').select('*').order('id'), old.users||[]),
-      q('projects', sb.from('projects').select('*').order('id'), old.projects||[]),
-      q('workers', sb.from('workers').select('*').order('id'), old.workers||[]),
-      q('attendance', sb.from('attendance').select('*').order('attendance_date',{ascending:false}), old.attendance||[]),
-      q('time_logs', sb.from('time_logs').select('*').order('check_in',{ascending:false}), old.logs||[]),
-      q('tickets', sb.from('tickets').select('*').order('created_at',{ascending:false}), old.tickets||[]),
-      q('contract_services', sb.from('contract_services').select('*').order('id',{ascending:false}), old.contractServices||[])
-    ]);
-    data.users = users;
-    data.supervisors = users.filter(u=>u.role==='supervisor' && u.is_active!==false);
-    data.technicians = users.filter(u=>u.role==='technician' && u.is_active!==false);
-    data.projects = projects;
-    data.workers = workers;
-    data.attendance = attendance;
-    data.logs = logs;
-    data.tickets = tickets;
-    data.contractServices = contractServices;
-    window.data = data;
-    return data;
-  };
+  console.log('Tasneef V260 loaded: no 3-second refresh loops');
 })();
