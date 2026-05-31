@@ -16580,3 +16580,165 @@ function financePrintReport(kind){
   window.TASNEEF_BUILD = 'V231_ABU_SAMER_FIXES_2026_05_31';
   console.log('Tasneef V231 Abu Samer fixes loaded');
 })();
+
+/* ===== V232 Abu Samer: إصلاح جذري لظهور تسجيلات اليوم ===== */
+(function(){
+  if(window.__tasneefV232TodayLogsFix) return;
+  window.__tasneefV232TodayLogsFix = true;
+
+  const LOG_COLS_V232 = 'id,user_id,supervisor_id,project_id,check_in,check_out,duration_minutes,travel_minutes,visit_type,required_minutes,time_difference_minutes,time_status,notes,created_at,updated_at,log_date';
+  const $v232 = id => document.getElementById(id);
+  const arr = v => Array.isArray(v) ? v : [];
+  const str = v => String(v ?? '').trim();
+
+  function pad2(n){ return String(n).padStart(2,'0'); }
+  function localDate(d){
+    const x = d instanceof Date ? d : new Date(d || Date.now());
+    if(isNaN(x)) return '';
+    return x.getFullYear() + '-' + pad2(x.getMonth()+1) + '-' + pad2(x.getDate());
+  }
+  function todayV232(){ return localDate(new Date()); }
+  function addDaysV232(dateStr, days){
+    const d = new Date(String(dateStr).slice(0,10) + 'T00:00:00');
+    d.setDate(d.getDate() + Number(days||0));
+    return localDate(d);
+  }
+  function monthStartV232(month){ return (month || todayV232().slice(0,7)) + '-01'; }
+  function monthEndV232(month){
+    const parts = (month || todayV232().slice(0,7)).split('-').map(Number);
+    return localDate(new Date(parts[0], parts[1], 0));
+  }
+  function normalizeDateV232(v){
+    if(!v) return '';
+    const s = str(v);
+    let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+    m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if(m) return `${m[3]}-${pad2(m[2])}-${pad2(m[1])}`;
+    const d = new Date(s);
+    return isNaN(d) ? '' : localDate(d);
+  }
+  function logDateV232(l){ return normalizeDateV232(l?.log_date) || normalizeDateV232(l?.check_in) || normalizeDateV232(l?.created_at); }
+  function mergeLogsV232(rows){
+    window.data = window.data || {};
+    const map = new Map(arr(window.data.logs).map(l => [String(l.id), l]));
+    arr(rows).forEach(l => { if(l && l.id != null) map.set(String(l.id), l); });
+    window.data.logs = [...map.values()].sort((a,b)=>(Date.parse(b.check_in||b.created_at||'')||0)-(Date.parse(a.check_in||a.created_at||'')||0));
+  }
+  async function qLogsV232(label, builder){
+    try{
+      const r = await builder;
+      if(r.error){ console.warn('V232 تعذر تحميل سجلات '+label+':', r.error.message); return []; }
+      return r.data || [];
+    }catch(e){ console.warn('V232 تعذر تحميل سجلات '+label+':', e?.message || e); return []; }
+  }
+
+  window.fetchTimeLogsRangeV232 = async function(start, end, options={}){
+    if(!start || !end || !window.sb) return arr(window.data && window.data.logs);
+    const next = addDaysV232(end, 1);
+    let q1 = sb.from('time_logs').select(LOG_COLS_V232).gte('log_date', start).lte('log_date', end).order('id',{ascending:false}).limit(options.limit || 3000);
+    let q2 = sb.from('time_logs').select(LOG_COLS_V232).gte('check_in', start + 'T00:00:00').lt('check_in', next + 'T00:00:00').order('id',{ascending:false}).limit(options.limit || 3000);
+    let q3 = sb.from('time_logs').select(LOG_COLS_V232).gte('created_at', start + 'T00:00:00').lt('created_at', next + 'T00:00:00').order('id',{ascending:false}).limit(500);
+    if(options.supervisorId){ q1 = q1.eq('supervisor_id', options.supervisorId); q2 = q2.eq('supervisor_id', options.supervisorId); q3 = q3.eq('supervisor_id', options.supervisorId); }
+    const [a,b,c] = await Promise.all([qLogsV232('log_date', q1), qLogsV232('check_in', q2), qLogsV232('created_at', q3)]);
+    mergeLogsV232([...(a||[]), ...(b||[]), ...(c||[])]);
+    window.data.logsLoadError = '';
+    return arr(window.data.logs);
+  };
+
+  async function safeV232(name, builder, fallback=[]){
+    try{
+      const r = await builder;
+      if(r.error){ console.warn('V232 تعذر تحميل '+name+':', r.error.message); return {data:fallback,error:r.error}; }
+      return {data:r.data || fallback, error:null};
+    }catch(e){ console.warn('V232 تعذر تحميل '+name+':', e?.message || e); return {data:fallback,error:e}; }
+  }
+
+  const oldLoadAllV232 = window.loadAll;
+  window.loadAll = async function(){
+    const d = todayV232();
+    const month = d.slice(0,7);
+    const start = monthStartV232(month);
+    const end = monthEndV232(month);
+
+    if(!window.sb){ if(typeof oldLoadAllV232 === 'function') return oldLoadAllV232(); return; }
+    const usersP = safeV232('المستخدمين', sb.from('app_users').select('*').order('id'));
+    const projectsP = safeV232('المشاريع', sb.from('projects').select('*').order('id'));
+    const workersP = safeV232('العمال', sb.from('workers').select('*').order('id'));
+    const attendanceP = safeV232('الحضور', sb.from('attendance').select('*').gte('attendance_date', addDaysV232(d,-45)).order('attendance_date',{ascending:false}).limit(3000));
+    const ticketsP = safeV232('التكتات', sb.from('tickets').select('*').order('id',{ascending:false}).limit(3000));
+    const servicesP = safeV232('الخدمات', sb.from('contract_services').select('*').order('id',{ascending:false}).limit(3000));
+
+    const [users, projects, workers, attendance, tickets, contractServices] = await Promise.all([usersP,projectsP,workersP,attendanceP,ticketsP,servicesP]);
+    window.data = window.data || {};
+    data.users = users.data || [];
+    data.supervisors = data.users.filter(u=>u.role==='supervisor' && u.is_active!==false);
+    data.technicians = data.users.filter(u=>u.role==='technician' && u.is_active!==false);
+    data.projects = projects.data || [];
+    data.workers = workers.data || [];
+    data.attendance = attendance.data || [];
+    data.tickets = tickets.data || [];
+    data.contractServices = contractServices.data || [];
+    data.contractServicesError = contractServices.error ? contractServices.error.message : '';
+    data.logs = [];
+    await window.fetchTimeLogsRangeV232(start, end, {limit:5000});
+    await window.fetchTimeLogsRangeV232(d, d, {limit:1500});
+  };
+
+  window.reloadTodayLogsV91 = async function(){
+    const d = todayV232();
+    await window.fetchTimeLogsRangeV232(d, d, {limit:1500});
+    try{ renderAll(); }catch(e){ console.warn(e); }
+  };
+  window.reloadTodayLogsV232 = window.reloadTodayLogsV91;
+
+  window.filterLogs = function(){
+    let rows = arr(window.data && window.data.logs).slice();
+    const d = str($v232('dailyDate')?.value || $v232('supLogDate')?.value || '');
+    const s = str($v232('dailySupervisor')?.value || '');
+    const p = str($v232('dailyProject')?.value || $v232('logProjectFilter')?.value || '');
+    const q = str($v232('dailySearch')?.value || '').toLowerCase();
+    if(d) rows = rows.filter(l => logDateV232(l) === d);
+    if(s) rows = rows.filter(l => str(l.supervisor_id) === s);
+    if(p) rows = rows.filter(l => str(l.project_id) === p);
+    if(q){
+      rows = rows.filter(l => [
+        (typeof supervisorName==='function'?supervisorName(l.supervisor_id):''),
+        (typeof projectName==='function'?projectName(l.project_id):''),
+        l.visit_type,l.time_status,l.notes
+      ].join(' ').toLowerCase().includes(q));
+    }
+    return rows;
+  };
+
+  function updateDashboardV232(){
+    const d = todayV232();
+    const logs = arr(window.data && window.data.logs).filter(l => logDateV232(l) === d);
+    if($v232('kpiTodayLogs')) $v232('kpiTodayLogs').textContent = logs.length.toLocaleString('ar-SA');
+    const box = $v232('todaySummary');
+    if(box && arr(window.data && window.data.supervisors).length){
+      box.innerHTML = arr(data.supervisors).map(s=>{
+        const sLogs = logs.filter(l => str(l.supervisor_id) === str(s.id));
+        const mins = sLogs.reduce((a,l)=>a + Number(l.duration_minutes || (typeof minutesBetween==='function'?minutesBetween(l.check_in,l.check_out):0) || 0),0);
+        const txt = typeof minsToText==='function' ? minsToText(mins) : (mins + ' دقيقة');
+        return `<div class="summary-item"><b>${String(s.full_name||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}</b><br>عدد التسجيلات: ${sLogs.length}<br>إجمالي الوقت: ${txt}</div>`;
+      }).join('') || '<div class="summary-item">لا توجد تسجيلات اليوم</div>';
+    }
+  }
+
+  const oldRenderDashboardV232 = window.renderDashboard;
+  window.renderDashboard = function(){
+    if(typeof oldRenderDashboardV232 === 'function') oldRenderDashboardV232.apply(this, arguments);
+    updateDashboardV232();
+  };
+
+  const oldRenderTimeLogsV232 = window.renderTimeLogs;
+  window.renderTimeLogs = async function(){
+    const d = str($v232('dailyDate')?.value || $v232('supLogDate')?.value || '');
+    if(d && window.fetchTimeLogsRangeV232) await window.fetchTimeLogsRangeV232(d, d, {limit:1500});
+    if(typeof oldRenderTimeLogsV232 === 'function') return oldRenderTimeLogsV232.apply(this, arguments);
+  };
+
+  setTimeout(()=>{ try{ updateDashboardV232(); }catch(_){} }, 1500);
+  console.log('Tasneef V232 today logs fix loaded');
+})();
