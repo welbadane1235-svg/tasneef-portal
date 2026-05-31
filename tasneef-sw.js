@@ -1,5 +1,5 @@
 /* Tasneef V262 Service Worker - professional cache refresh */
-const CACHE_NAME = 'tasneef-v271-stable';
+const CACHE_NAME = 'tasneef-v272-stable';
 const APP_SHELL = ['./','./index.html','./admin.html','./supervisor.html','./technician.html','./client-report.html','./style.css','./app.js?v=271','./tasneef_logo_print.png','./tasneef_stamp.jpeg'];
 self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL).catch(()=>null)).then(()=>self.skipWaiting())); });
 self.addEventListener('activate', event => { event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))).then(()=>self.clients.claim())); });
