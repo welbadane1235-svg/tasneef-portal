@@ -1,9 +1,6 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>لوحة الإدارة - تصنيف</title>
@@ -132,7 +129,6 @@
     <button class="nav" onclick="showPage('attendance',this)">الحضور والغياب</button>
     <button class="nav" onclick="showPage('monthly',this)">الأوقات الشهرية</button>
     <button class="nav" onclick="showPage('tickets',this)">التكتات</button>
-    <button class="nav" onclick="showPage('orders',this)">الأوردرات</button>
     <button class="nav" onclick="showPage('clientReports',this)">تقارير العملاء</button>
     <button class="nav" onclick="showPage('clientRatings',this)">تقييمات العملاء</button>
     <button class="nav" onclick="showPage('financeDashboard',this)">المصروفات والمخزون</button>
@@ -430,64 +426,14 @@
           <h2>التكتات</h2>
           <div class="filters">
             <select id="ticketFilterStatus" onchange="renderTickets()"><option value="">كل الحالات</option><option value="open">مفتوح</option><option value="processing">تحت المعالجة</option><option value="closed">مغلق</option></select>
-            <select id="ticketFilterProjectV197" onchange="renderTickets()"><option value="">كل المشاريع</option></select>
-            <input id="ticketFilterTitleV197" list="ticketTitleFilterListV197" oninput="renderTickets()" placeholder="فلتر عنوان التكت"><datalist id="ticketTitleFilterListV197"></datalist>
             <input id="ticketSearch" oninput="renderTickets()" placeholder="بحث برقم التكت، المشروع، العنوان أو الوصف">
           </div>
-          <div id="ticketsSmartSummary" class="smart-ticket-summary"></div><div id="ticketTitleStatsV197" class="smart-ticket-summary"></div><div id="ticketsBody" class="smart-ticket-grid"></div>
+          <div id="ticketsSmartSummary" class="smart-ticket-summary"></div><div id="ticketsBody" class="smart-ticket-grid"></div>
         </div>
       </div>
     </section>
 
 
-
-
-
-    <section id="orders" class="page hidden">
-      <div class="card section-head">
-        <div>
-          <h2>الأوردرات</h2>
-          <p>نظام طلبات الصيانة الخارجية بنفس فكرة ملف الإكسل: متابعة التنفيذ، السداد، الفوترة، والتقارير.</p>
-        </div>
-        <button class="light" onclick="loadOrdersV197(true)">تحديث</button>
-      </div>
-      <div id="ordersKpisV197" class="kpis"></div>
-      <div class="grid two">
-        <div class="card">
-          <h2 id="orderFormTitleV197">إضافة أوردر</h2>
-          <input type="hidden" id="orderIdV197">
-          <label>رقم الطلب بالجروب</label><input id="orderGroupNoV197" placeholder="مثال: 2851">
-          <div class="split"><div><label>تاريخ الطلب</label><input type="date" id="orderDateV197"></div><div><label>وقت الطلب</label><input type="time" id="orderTimeV197"></div></div>
-          <label>مرسل الطلب</label><input id="orderSenderV197" list="orderSendersListV197"><datalist id="orderSendersListV197"></datalist>
-          <label>المشروع</label><select id="orderProjectV197"></select>
-          <div class="split"><div><label>نوع العقار</label><input id="orderPropertyTypeV197" list="orderPropertyTypesListV197"><datalist id="orderPropertyTypesListV197"><option value="شقة"><option value="عمارة"><option value="فيلا"><option value="محل"><option value="مكتب"><option value="مستودع"></datalist></div><div><label>رقم الشقة</label><input id="orderUnitNoV197"></div></div>
-          <div class="split"><div><label>اسم العميل</label><input id="orderClientNameV197"></div><div><label>رقم العميل</label><input id="orderClientPhoneV197"></div></div>
-          <label>المنفذ</label><input id="orderExecutorV197" list="orderExecutorsListV197"><datalist id="orderExecutorsListV197"></datalist>
-          <label>التفاصيل</label><textarea id="orderDetailsV197"></textarea>
-          <label>ملاحظات</label><textarea id="orderNotesV197"></textarea>
-          <div class="split"><div><label>تخص</label><select id="orderConcernV197"><option value="تخص العميل">تخص العميل</option><option value="تخص الجمعية">تخص الجمعية</option><option value="داخلي">داخلي</option></select></div><div><label>تاريخ التنفيذ</label><input type="date" id="orderDoneDateV197"></div></div>
-          <label>كيفية التنفيذ</label><textarea id="orderMethodV197"></textarea>
-          <div class="split"><div><label>حالة التنفيذ</label><select id="orderStatusV197"><option value="تم التنفيذ">تم التنفيذ</option><option value="لم ينفذ">لم ينفذ</option><option value="جزئي">جزئي</option></select></div><div><label>التقرير</label><select id="orderReportV197"><option value="صدر التقرير">صدر التقرير</option><option value="لم يصدر">لم يصدر</option></select></div></div>
-          <div class="split"><div><label>السعر شامل الضريبة</label><input id="orderPriceInclV197" type="number" step="0.01" oninput="calcOrderV197()"></div><div><label>التكلفة</label><input id="orderCostV197" type="number" step="0.01" oninput="calcOrderV197()"></div></div>
-          <div class="split"><div><label>الضريبة 15%</label><input id="orderVatV197" readonly></div><div><label>السعر قبل الضريبة</label><input id="orderBeforeVatV197" readonly></div></div>
-          <label>الربح</label><input id="orderProfitV197" readonly>
-          <div class="split"><div><label>حالة السداد</label><select id="orderPaymentV197"><option value="تم السداد">تم السداد</option><option value="آجل">آجل</option><option value="مجاني">مجاني</option></select></div><div><label>رقم الفاتورة</label><input id="orderInvoiceNoV197"></div></div>
-          <label>فوترة بالسيستم</label><select id="orderSystemInvoiceV197"><option value="تمت الفوترة">تمت الفوترة</option><option value="لم تتم">لم تتم</option><option value="معفى">معفى</option></select>
-          <div class="actions"><button onclick="saveOrderV197()">حفظ الأوردر</button><button class="light" onclick="clearOrderFormV197()">جديد</button></div>
-        </div>
-        <div class="card">
-          <h2>قائمة الأوردرات</h2>
-          <div class="filters">
-            <input type="date" id="orderDateFromV197" onchange="renderOrdersV197()" placeholder="من تاريخ">
-            <input type="date" id="orderDateToV197" onchange="renderOrdersV197()" placeholder="إلى تاريخ">
-            <select id="orderFilterProjectV197" onchange="renderOrdersV197()"><option value="">كل المشاريع</option></select>
-            <input id="orderSearchV197" oninput="renderOrdersV197()" placeholder="بحث بالطلب، المشروع، التفاصيل، الفاتورة">
-          </div>
-          <div id="ordersAlertsV197" class="alerts"></div>
-          <div class="table-wrap"><table><thead><tr><th>رقم الطلب</th><th>تاريخ الطلب</th><th>المشروع</th><th>المنفذ</th><th>التفاصيل</th><th>الحالة</th><th>السداد</th><th>السعر شامل</th><th>التكلفة</th><th>الربح</th><th>الفوترة</th><th>إجراء</th></tr></thead><tbody id="ordersBodyV197"></tbody></table></div>
-        </div>
-      </div>
-    </section>
 
     <section id="clientReports" class="page hidden">
       <div class="card section-head">
@@ -822,7 +768,7 @@
             <h3>تصدير ملف اجتماع شامل</h3>
             <p>ينزل ملف Excel واحد يحتوي على الملخص التنفيذي، المشاريع، المشرفين، العمال، السجلات اليومية، الحضور والغياب، الأوقات الشهرية، التكتات، المخزون، المصروفات، تقارير العملاء، التقييمات والتنبيهات.</p>
             <div class="actions export-actions-v222">
-              <button onclick="exportMeetingExcelV235(this)">تنزيل ملف الاجتماع Excel</button>
+              <button onclick="exportMeetingExcelV229(this)">تنزيل ملف الاجتماع Excel</button>
               <button class="light" onclick="previewMeetingExportV223()">معاينة قبل التنزيل</button>
             </div>
           </article>
@@ -832,7 +778,7 @@
             <h3>نموذج استيراد شامل</h3>
             <p>ملف Excel واحد فارغ بتبويبات منظمة لتجهيز بيانات المشاريع، المشرفين، العمال، المستخدمين، التكتات، السجلات اليومية، المخزون والمصروفات.</p>
             <div class="actions export-actions-v222">
-              <button class="light" onclick="downloadImportTemplateV235()">تنزيل نموذج الاستيراد</button>
+              <button class="light" onclick="downloadImportTemplateV223()">تنزيل نموذج الاستيراد</button>
             </div>
             <div class="mini-note-v222">الاستيراد الفعلي لا يعتمد إلا بعد المعاينة وفحص الأخطاء في مرحلة لاحقة.</div>
           </article>
@@ -849,6 +795,6 @@
     </section>
   </main>
 </div>
-<script src="app.js?v=280"></script>
+<script src="app.js?v=230"></script>
 </body>
 </html>
