@@ -10186,7 +10186,7 @@ function financePrintReport(kind){
       inp.addEventListener('change',()=>setTimeout(()=>setCameraBusy(false),650));
     });
   }
-  document.addEventListener('DOMContentLoaded',stabilizeFileInputs); setInterval(stabilizeFileInputs,2500);
+  document.addEventListener('DOMContentLoaded',stabilizeFileInputs); setTimeout(stabilizeFileInputs,2500); // v260: no repeated 2.5s refresh loop
   // Faster page switching: render only the opened page instead of every heavy section.
   const pageRenderers={dashboard:['renderDashboard','renderAlerts'],daily:['renderTimeLogs'],users:['renderUsers'],projects:['renderProjects'],workers:['renderWorkers'],attendance:['renderAttendance'],monthly:['renderMonthly'],tickets:['renderTickets'],contracts:['renderContractServices'],financeDashboard:['financeRenderAll'],premiumReports:['renderPremiumReports'],clientRatings:['renderClientRatings']};
   window.showPage=function(id,btn){
@@ -11777,7 +11777,7 @@ function financePrintReport(kind){
   document.addEventListener('click',()=>setTimeout(forceUnitFieldV185,60),true);
   document.addEventListener('focusin',()=>setTimeout(forceUnitFieldV185,30),true);
   window.addEventListener('load',()=>setTimeout(forceUnitFieldV185,700));
-  setInterval(()=>{ if($('stockBatchCardV148')?.classList.contains('v149-open')) forceUnitFieldV185(); },500);
+  setInterval(()=>{ if(document.hidden) return; if($('stockBatchCardV148')?.classList.contains('v149-open')) forceUnitFieldV185(); },30000); // v260 reduced polling
   setTimeout(forceUnitFieldV185,1200);
   console.log('V185 invoice unit dropdown final visible fix loaded');
 })();
@@ -12643,7 +12643,7 @@ function financePrintReport(kind){
     if($('financeDashboard') && !document.querySelector('#financeDashboard .finance-tab-page:not(.hidden)')) showTabPage(activeKey || 'overview', active);
   }
   ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(init, ev==='load'?900:200)));
-  setInterval(()=>{ if($('financeDashboard')) ensureTabs(); }, 2500);
+  setTimeout(()=>{ if($('financeDashboard')) ensureTabs(); }, 2500); // v260 no constant refresh
   console.log('Tasneef V205 safe tabs/reports fix loaded');
 })();
 
@@ -13320,7 +13320,7 @@ function financePrintReport(kind){
   }
   window.tasneefBootV208 = bootV208;
   ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(bootV208, ev==='load'?1000:300)));
-  setInterval(bootV208, 1200);
+  setTimeout(bootV208, 1200); // v260 no constant refresh
   setTimeout(bootV208, 500);
   setTimeout(bootV208, 2000);
   console.log('Tasneef V208 real fixes loaded');
@@ -13549,7 +13549,7 @@ function financePrintReport(kind){
 
   function bootV209(){ patchTicketPdfButtons(); renderSmartAlertsV209(); removeTotalConsumptionLeftovers(); }
   ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(bootV209, ev==='load'?1200:300)));
-  setTimeout(bootV209,500); setTimeout(bootV209,2000); setInterval(bootV209,2500);
+  setTimeout(bootV209,500); setTimeout(bootV209,2000); // v260 no constant refresh
   console.log('Tasneef V209 real PDF + smart alerts loaded');
 })();
 
@@ -13791,7 +13791,7 @@ function financePrintReport(kind){
   }
   function bootV210(){ overrideBatchAddLineV210(); overrideBatchSaveV210(); cleanupProductCardsV210(); patchPdfButtonsV210(); }
   ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(bootV210,ev==='load'?1400:400)));
-  setTimeout(bootV210,700); setTimeout(bootV210,2500); setInterval(bootV210,2500);
+  setTimeout(bootV210,700); setTimeout(bootV210,2500); // v260 no constant refresh
   console.log('Tasneef V210 clean PDF + weighted cost loaded');
 })();
 
@@ -14033,7 +14033,7 @@ function financePrintReport(kind){
     });
   }
   ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(patchButtonsV211,ev==='load'?1600:500)));
-  setTimeout(patchButtonsV211,800); setTimeout(patchButtonsV211,2600); setInterval(patchButtonsV211,3000);
+  setTimeout(patchButtonsV211,800); setTimeout(patchButtonsV211,2600); // v260 no 3s button patch loop
   console.log('Tasneef V211 smart ticket PDF window loaded');
 })();
 
@@ -14743,7 +14743,7 @@ function financePrintReport(kind){
   }
   function updateVersionLabels(){ document.querySelectorAll('h1,h2,h3,.version,.app-version').forEach(el=>{ if(S(el.textContent).includes('V217')) el.textContent=el.textContent.replace('V217','V217'); }); }
   ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(()=>{patchButtons(); updateVersionLabels();},ev==='load'?1600:500)));
-  setTimeout(()=>{patchButtons(); updateVersionLabels();},1000); setInterval(patchButtons,3000);
+  setTimeout(()=>{patchButtons(); updateVersionLabels();},1000); // v260 no 3s button patch loop
   console.log('Tasneef V217 current project supervisor report logic loaded');
 })();
 
@@ -16314,7 +16314,7 @@ function financePrintReport(kind){
   }
   function boot(){ cleanupDuplicateBatchBlocks(); document.querySelectorAll('.export-hero-badge-v222').forEach(x=>x.textContent=VERSION); document.querySelectorAll('script[src*="app.js?v="]').forEach(()=>{}); }
   ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(boot,ev==='load'?900:250)));
-  setInterval(cleanupDuplicateBatchBlocks,1600);
+  setTimeout(cleanupDuplicateBatchBlocks,1600); // v260 no constant refresh
   setTimeout(boot,1200);
   console.log('Tasneef V232 export complete + product detail cleanup loaded');
 })();
@@ -17284,7 +17284,7 @@ function financePrintReport(kind){
 
   function boot(){ fixExportAliases(); fixTicketButtons(); try{ if($('inventoryItemsBody')) renderInventoryItemsV235(); }catch(e){console.warn(e);} }
   ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(boot,ev==='load'?900:300)));
-  setInterval(()=>{ try{ fixExportAliases(); fixTicketButtons(); }catch(e){} },2500);
+  setTimeout(()=>{ try{ fixExportAliases(); fixTicketButtons(); }catch(e){} },2500); // v260 no constant refresh
   setTimeout(boot,1200);
   console.log('Tasneef V235 final fixes loaded');
 })();
@@ -19532,7 +19532,7 @@ function financePrintReport(kind){
     window.renderAll = function(){ const r=oldRenderAll.apply(this, arguments); setTimeout(()=>{ forceCountsCards(); addCountsToServiceCards(); addImportButton(); }, 50); return r; };
   }
   document.addEventListener('DOMContentLoaded', ()=>{ ensureStyle(); setTimeout(()=>{ forceCountsCards(); addCountsToServiceCards(); addImportButton(); }, 300); setTimeout(()=>{ forceCountsCards(); addCountsToServiceCards(); addImportButton(); }, 1200); });
-  setInterval(()=>{ if(document.hidden) return; try{ forceCountsCards(); addCountsToServiceCards(); addImportButton(); }catch(_){} }, 3000);
+  setTimeout(()=>{ if(document.hidden) return; try{ forceCountsCards(); addCountsToServiceCards(); addImportButton(); }catch(_){} }, 3000); // v260 no 3s dashboard refresh loop
 
   console.log('Tasneef V254 loaded: import screenshot tickets + stronger counts cards');
 })();
@@ -19541,7 +19541,7 @@ function financePrintReport(kind){
 (function(){
   if(window.__tasneefV255ProFix) return;
   window.__tasneefV255ProFix = true;
-  window.TASNEEF_BUILD = 'V255_PRO_FAST_IMPORT_COUNTS_2026_05_31';
+  window.TASNEEF_BUILD = 'V260_PRO_NO_3SEC_REFRESH_2026_05_31';
   const $v255 = (id)=>document.getElementById(id);
   const arrV255 = (x)=>Array.isArray(x)?x:[];
   const escV255 = (s)=>String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -19553,7 +19553,7 @@ function financePrintReport(kind){
   }
   window.hideBlockingLoadersV255 = hideBlockingLoadersV255;
   setTimeout(hideBlockingLoadersV255, 900); setTimeout(hideBlockingLoadersV255, 1800); setTimeout(hideBlockingLoadersV255, 3200);
-  setInterval(()=>{ const l=$v255('tasneefLoadingV154'); if(l && !l.classList.contains('hidden')) l.classList.add('hidden'); }, 3500);
+  setTimeout(()=>{ const l=$v255('tasneefLoadingV154'); if(l && !l.classList.contains('hidden')) l.classList.add('hidden'); }, 3500); // v260 no loader loop
   function addStyleV255(){
     if($v255('tasneefStyleV255')) return;
     const st=document.createElement('style'); st.id='tasneefStyleV255';
@@ -20113,4 +20113,32 @@ setInterval(()=>{ try{ if(document.getElementById('logsBody')) renderTimeLogs();
     try{ if(typeof invalidateRuntimeCachesV251==='function') invalidateRuntimeCachesV251(); }catch(e){}
     try{ if(typeof initSupervisor==='function') await initSupervisor(); else if(typeof refreshAll==='function') await refreshAll(); }catch(e){}
   };
+})();
+
+
+/* ===== V260: Professional refresh policy - no 3 second auto refresh ===== */
+(function(){
+  'use strict';
+  window.TASNEEF_BUILD = 'V260_PRO_NO_3SEC_REFRESH_2026_05_31';
+  window.TASNEEF_REFRESH_POLICY_V260 = {
+    liveTodaySeconds: 120,
+    openVisitTimerSeconds: 60,
+    noThreeSecondRefresh: true
+  };
+  function v260Msg(){
+    try{
+      const el=document.getElementById('v260RefreshPolicyNote');
+      if(el) return;
+      const dash=document.getElementById('dashboard')?.querySelector('.card');
+      if(!dash) return;
+      const box=document.createElement('div');
+      box.id='v260RefreshPolicyNote';
+      box.style.cssText='margin:10px 0;padding:9px 12px;border:1px solid #d8eee6;background:#f4fbf8;border-radius:12px;color:#064c3f;font-size:12px;font-weight:800;direction:rtl';
+      box.textContent='وضع احترافي: تم إلغاء التحديث كل 3 ثواني. التحديث الحي يتم عند الحفظ أو الضغط على زر التحديث أو كل دقيقتين فقط.';
+      dash.prepend(box);
+    }catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(v260Msg,900));
+  window.addEventListener('load',()=>setTimeout(v260Msg,1200));
+  console.log('Tasneef V260 loaded: no 3-second refresh loops');
 })();

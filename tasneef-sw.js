@@ -1,6 +1,6 @@
 /* Tasneef V257 Service Worker - professional cache refresh */
-const CACHE_NAME = 'tasneef-v259-checkout-link-cache';
-const APP_SHELL = ['./','./index.html','./admin.html','./supervisor.html','./technician.html','./client-report.html','./style.css','./app.js?v=259','./tasneef_logo_print.png','./tasneef_stamp.jpeg'];
+const CACHE_NAME = 'tasneef-v260-pro-cache';
+const APP_SHELL = ['./','./index.html','./admin.html','./supervisor.html','./technician.html','./client-report.html','./style.css','./app.js?v=260','./tasneef_logo_print.png','./tasneef_stamp.jpeg'];
 self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL).catch(()=>null)).then(()=>self.skipWaiting())); });
 self.addEventListener('activate', event => { event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))).then(()=>self.clients.claim())); });
 self.addEventListener('fetch', event => { const req=event.request; if(req.method!=='GET') return; const url=new URL(req.url); if(/supabase\.co/i.test(url.hostname)) return; const isAppFile=/\/(index|admin|supervisor|technician|client-report)\.html$/i.test(url.pathname)||/\/(app\.js|style\.css|tasneef_logo_print\.png|tasneef_stamp\.jpeg)$/i.test(url.pathname); if(!isAppFile) return; event.respondWith(fetch(req).then(res=>{ if(res&&res.ok)caches.open(CACHE_NAME).then(cache=>cache.put(req,res.clone())).catch(()=>{}); return res; }).catch(()=>caches.match(req))); });
