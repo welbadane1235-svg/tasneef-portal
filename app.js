@@ -1,4 +1,4 @@
-/* TASNEEF BUILD V254 - import screenshot tickets + stronger counts cards - 2026-05-31 */
+/* TASNEEF BUILD V257 - stable live today logs/tickets fix - 2026-05-31 */
 /* V154 Smart Loading Branding */
 (function(){
   if(window.__tasneefLoadingV154) return;
@@ -19775,4 +19775,239 @@ function financePrintReport(kind){
   document.addEventListener('DOMContentLoaded',()=>setTimeout(addOrdersImportPanel,600));
   window.addEventListener('load',()=>setTimeout(addOrdersImportPanel,1000));
   console.log('Tasneef V256 loaded: Excel import for orders');
+})();
+
+
+/* ===== V257: FINAL STABLE LIVE TODAY DATA FIX =====
+   الهدف: منع تكرار مشكلة عدم ظهور سجلات/تكتات اليوم في الأيام القادمة.
+   الحل هنا لا يعتمد على كاش التطبيق ولا على UTC فقط؛ يجلب time_logs/tickets مباشرة من Supabase بـ XHR
+   ثم يطابق التاريخ محليًا: log_date أو check_in أو created_at.
+*/
+(function(){
+  if(window.__tasneefV257LiveTodayFix) return;
+  window.__tasneefV257LiveTodayFix = true;
+  window.TASNEEF_BUILD = 'V257_STABLE_LIVE_TODAY_LOGS_TICKETS_2026_05_31';
+
+  const SUPA_URL = (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://zmjdqiswytxlbfgnfjfv.supabase.co');
+  const SUPA_KEY = (typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb');
+  const $v257 = id => document.getElementById(id);
+  const arr257 = v => Array.isArray(v) ? v : [];
+  const esc257 = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  function pad2(n){ return String(n).padStart(2,'0'); }
+  function localToday257(){ const d=new Date(); return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+  function localDate257(v){
+    if(!v) return '';
+    const s=String(v);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    // لو القيمة تاريخ فقط أو ISO، نستخدم التاريخ المحلي من المتصفح وليس UTC slice.
+    const d=new Date(s);
+    if(!isNaN(d.getTime())) return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
+    const m=s.match(/(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : '';
+  }
+  window.tasneefLocalDateV257 = localDate257;
+  window.tasneefTodayV257 = localToday257;
+
+  function logDate257(l){
+    return localDate257(l?.log_date) || localDate257(l?.check_in) || localDate257(l?.created_at) || localDate257(l?.check_out);
+  }
+  function ticketDate257(t){
+    return localDate257(t?.ticket_date) || localDate257(t?.created_at) || localDate257(t?.updated_at) || localDate257(t?.closed_at);
+  }
+  window.tasneefLogDateV257 = logDate257;
+  window.tasneefTicketDateV257 = ticketDate257;
+
+  function noStoreUrl(table, query){ return SUPA_URL.replace(/\/$/,'') + '/rest/v1/' + table + '?' + query; }
+  function xhrGetJson(url){
+    return new Promise((resolve,reject)=>{
+      try{
+        const x=new XMLHttpRequest();
+        x.open('GET', url, true);
+        x.setRequestHeader('apikey', SUPA_KEY);
+        x.setRequestHeader('Authorization', 'Bearer ' + SUPA_KEY);
+        x.setRequestHeader('Accept', 'application/json');
+        x.setRequestHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        x.setRequestHeader('Pragma', 'no-cache');
+        x.timeout = 15000;
+        x.onload = function(){
+          if(x.status>=200 && x.status<300){ try{ resolve(JSON.parse(x.responseText||'[]')); }catch(e){ resolve([]); } }
+          else reject(new Error('HTTP '+x.status+' '+(x.responseText||'')));
+        };
+        x.onerror = ()=>reject(new Error('Network error'));
+        x.ontimeout = ()=>reject(new Error('Timeout'));
+        x.send();
+      }catch(e){ reject(e); }
+    });
+  }
+  function mergeById257(oldRows,newRows){
+    const m=new Map();
+    arr257(oldRows).forEach(r=>{ if(r && r.id!=null) m.set(String(r.id), r); });
+    arr257(newRows).forEach(r=>{ if(r && r.id!=null) m.set(String(r.id), r); });
+    return [...m.values()];
+  }
+  function sortLogs257(rows){ return arr257(rows).sort((a,b)=> new Date(b.check_in||b.created_at||0) - new Date(a.check_in||a.created_at||0)); }
+  function sortTickets257(rows){ return arr257(rows).sort((a,b)=> new Date(b.created_at||b.updated_at||0) - new Date(a.created_at||a.updated_at||0)); }
+
+  function clearMutableCaches257(){
+    try{ if(typeof window.clearTasneefDynamicCacheV251==='function') window.clearTasneefDynamicCacheV251(); }catch(_){ }
+    try{
+      const kill=[];
+      for(let i=0;i<localStorage.length;i++){
+        const k=localStorage.key(i)||'';
+        if(k.includes('time_logs') || k.includes('tickets') || k.includes('tasneef_sb_cache')) kill.push(k);
+      }
+      kill.forEach(k=>localStorage.removeItem(k));
+    }catch(_){ }
+  }
+
+  async function liveMutableLoad257(){
+    clearMutableCaches257();
+    window.data = window.data || (typeof data !== 'undefined' ? data : {});
+    const u = (typeof session === 'function') ? session() : null;
+    const isSup = u && u.role === 'supervisor';
+    try{
+      const [logsLive, ticketsLive] = await Promise.all([
+        xhrGetJson(noStoreUrl('time_logs','select=*&order=check_in.desc&limit=3000')),
+        xhrGetJson(noStoreUrl('tickets','select=*&order=created_at.desc&limit=3000'))
+      ]);
+      if(typeof data !== 'undefined'){
+        data.logs = sortLogs257(mergeById257(data.logs, logsLive));
+        data.tickets = sortTickets257(mergeById257(data.tickets, ticketsLive));
+        if(isSup){
+          const uid=String(u.id||'');
+          const pids=new Set(arr257(data.projects).filter(p=>String(p.supervisor_id||'')===uid).map(p=>String(p.id)));
+          data.logs = arr257(data.logs).filter(l=>String(l.supervisor_id||'')===uid);
+          data.tickets = arr257(data.tickets).filter(t=>String(t.supervisor_id||'')===uid || String(t.created_by||'')===uid || pids.has(String(t.project_id||'')));
+        }
+        window.data = data;
+      }else{
+        window.data.logs = sortLogs257(mergeById257(window.data.logs, logsLive));
+        window.data.tickets = sortTickets257(mergeById257(window.data.tickets, ticketsLive));
+      }
+      return true;
+    }catch(e){
+      console.warn('V257 live mutable load failed', e);
+      return false;
+    }
+  }
+  window.liveMutableLoadV257 = liveMutableLoad257;
+
+  // فلترة السجلات حسب التاريخ المحلي الحقيقي
+  const oldFilterLogs257 = window.filterLogs || (typeof filterLogs === 'function' ? filterLogs : null);
+  window.filterLogs = function(){
+    let rows = arr257((typeof data !== 'undefined' ? data.logs : window.data?.logs));
+    const d = $v257('dailyDate')?.value || '';
+    const s = $v257('dailySupervisor')?.value || '';
+    const p = $v257('dailyProject')?.value || '';
+    const q = ($v257('dailySearch')?.value || '').trim();
+    if(d) rows = rows.filter(l => logDate257(l) === d);
+    if(s) rows = rows.filter(l => String(l.supervisor_id||'') === String(s));
+    if(p) rows = rows.filter(l => String(l.project_id||'') === String(p));
+    if(q){
+      rows = rows.filter(l => [
+        (typeof supervisorName==='function'?supervisorName(l.supervisor_id):''),
+        (typeof projectName==='function'?projectName(l.project_id):''),
+        (typeof visitTypeText==='function'?visitTypeText(l.visit_type):l.visit_type),
+        (typeof timeStatusText==='function'?timeStatusText(l.time_status):l.time_status),
+        l.notes
+      ].join(' ').includes(q));
+    }
+    return sortLogs257(rows);
+  };
+
+  // لوحة التحكم: عدد سجلات اليوم بدون UTC slice
+  const oldRenderDashboard257 = window.renderDashboard || (typeof renderDashboard === 'function' ? renderDashboard : null);
+  window.renderDashboard = function(){
+    if(oldRenderDashboard257) oldRenderDashboard257.apply(this, arguments);
+    try{
+      const today = localToday257();
+      const logs = arr257(typeof data !== 'undefined' ? data.logs : window.data?.logs);
+      const tickets = arr257(typeof data !== 'undefined' ? data.tickets : window.data?.tickets);
+      if($v257('kpiTodayLogs')) $v257('kpiTodayLogs').textContent = logs.filter(l=>logDate257(l)===today).length;
+      const div=$v257('todaySummary');
+      if(div && typeof supervisorName === 'function'){
+        const sups=arr257(typeof data !== 'undefined' ? data.supervisors : window.data?.supervisors);
+        div.innerHTML = sups.map(s=>{
+          const mine=logs.filter(l=>String(l.supervisor_id||'')===String(s.id) && logDate257(l)===today);
+          const mins=mine.reduce((a,l)=>a+(Number(l.duration_minutes)|| (typeof minutesBetween==='function'?minutesBetween(l.check_in,l.check_out):0)),0);
+          return `<div class="summary-item"><b>${esc257(s.full_name)}</b><br>عدد التسجيلات: ${mine.length}<br>إجمالي الوقت: ${typeof minsToText==='function'?minsToText(mins):mins}</div>`;
+        }).join('') || '<div class="summary-item">لا توجد تسجيلات اليوم</div>';
+      }
+      let box=$v257('v257LiveTodayBox');
+      const dash=$v257('dashboard');
+      if(dash && !box){
+        box=document.createElement('div'); box.id='v257LiveTodayBox'; box.className='kpis';
+        const ref=dash.querySelector('.kpis') || dash.firstElementChild; if(ref) ref.insertAdjacentElement('afterend',box); else dash.prepend(box);
+      }
+      if(box){
+        box.innerHTML = `<div class="kpi"><small>تكتات اليوم</small><b>${tickets.filter(t=>ticketDate257(t)===today).length}</b></div><div class="kpi"><small>آخر تحديث حي</small><b style="font-size:18px">${new Date().toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'})}</b></div>`;
+      }
+    }catch(e){ console.warn('V257 dashboard patch failed', e); }
+  };
+
+  // بعد تحميل التطبيق أو الرجوع للنافذة: جلب حي للتكتات والسجلات فقط بدون تعطيل الصفحة.
+  async function refreshAndRender257(){
+    await liveMutableLoad257();
+    try{ if($v257('dailyDate') && !$v257('dailyDate').value) $v257('dailyDate').value = localToday257(); }catch(_){ }
+    try{ if(typeof hydrateForms === 'function') hydrateForms(); }catch(_){ }
+    try{ if(typeof renderDashboard === 'function') renderDashboard(); }catch(_){ }
+    try{ if(typeof renderTimeLogs === 'function') renderTimeLogs(); }catch(_){ }
+    try{ if(typeof renderTickets === 'function') renderTickets(); }catch(_){ }
+    try{ if(typeof window.renderSupervisorDailySummary === 'function') window.renderSupervisorDailySummary(); }catch(_){ }
+  }
+  window.refreshTodayLiveV257 = refreshAndRender257;
+
+  // نغلف الحفظ: بعد الحفظ مباشرة نجلب من القاعدة الحية ونرندر، فلا يعتمد على كاش أو فلتر قديم.
+  const saveLogBase257 = window.saveTimeLog || (typeof saveTimeLog === 'function' ? saveTimeLog : null);
+  window.saveTimeLog = async function(){
+    clearMutableCaches257();
+    const out = saveLogBase257 ? await saveLogBase257.apply(this, arguments) : undefined;
+    await refreshAndRender257();
+    return out;
+  };
+  const saveTicketBase257 = window.saveTicket || (typeof saveTicket === 'function' ? saveTicket : null);
+  window.saveTicket = async function(){
+    clearMutableCaches257();
+    const out = saveTicketBase257 ? await saveTicketBase257.apply(this, arguments) : undefined;
+    await refreshAndRender257();
+    return out;
+  };
+
+  // تحديث initAdmin/initSupervisor حتى أول فتح يكون حيًا
+  const initAdminBase257 = window.initAdmin || (typeof initAdmin === 'function' ? initAdmin : null);
+  window.initAdmin = async function(){
+    const out = initAdminBase257 ? await initAdminBase257.apply(this, arguments) : undefined;
+    await refreshAndRender257();
+    return out;
+  };
+  const initSupervisorBase257 = window.initSupervisor || (typeof initSupervisor === 'function' ? initSupervisor : null);
+  window.initSupervisor = async function(){
+    const out = initSupervisorBase257 ? await initSupervisorBase257.apply(this, arguments) : undefined;
+    await refreshAndRender257();
+    return out;
+  };
+
+  // زر فحص سريع داخل لوحة التحكم والتكتات
+  function addLiveButton257(){
+    if($v257('refreshLiveBtnV257')) return;
+    const target = $v257('dashboard')?.querySelector('.card') || $v257('tickets')?.querySelector('.card') || document.body;
+    if(!target) return;
+    const wrap=document.createElement('div'); wrap.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;direction:rtl';
+    wrap.innerHTML='<button id="refreshLiveBtnV257" type="button" class="light">تحديث سجلات وتكتات اليوم الآن</button><span id="refreshLiveMsgV257" style="align-self:center;color:#60726a;font-size:12px"></span>';
+    target.prepend(wrap);
+    $v257('refreshLiveBtnV257').onclick=async()=>{
+      const m=$v257('refreshLiveMsgV257'); if(m) m.textContent='جاري التحديث الحي...';
+      await refreshAndRender257();
+      if(m) m.textContent='تم التحديث من قاعدة البيانات مباشرة.';
+      setTimeout(()=>{ if(m) m.textContent=''; },4000);
+    };
+  }
+
+  document.addEventListener('DOMContentLoaded',()=>{ setTimeout(addLiveButton257,700); setTimeout(refreshAndRender257,1100); });
+  window.addEventListener('load',()=>{ setTimeout(addLiveButton257,600); setTimeout(refreshAndRender257,1600); });
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden) refreshAndRender257(); });
+  setInterval(()=>{ if(document.visibilityState !== 'hidden') refreshAndRender257(); }, 120000);
+
+  console.log('Tasneef V257 loaded: stable live today logs/tickets without stale cache or UTC date mismatch');
 })();
