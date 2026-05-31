@@ -120,7 +120,7 @@
 (function(){
   if(window.__tasneefLiteNetworkV239) return;
   window.__tasneefLiteNetworkV239 = true;
-  window.TASNEEF_BUILD = 'V249_SESSION_PERMISSION_STABLE_2026_05_31';
+  window.TASNEEF_BUILD = 'V251_SUPERVISOR_LIVE_DATA_2026_05_31';
 
   function addLiteStyle(){
     if(document.getElementById('tasneefLiteStyleV239')) return;
@@ -157,7 +157,7 @@
   if('serviceWorker' in navigator && !window.__tasneefSWRegV239){
     window.__tasneefSWRegV239 = true;
     window.addEventListener('load',()=>{
-      navigator.serviceWorker.register('tasneef-sw.js?v=250').catch(()=>{});
+      navigator.serviceWorker.register('tasneef-sw.js?v=251').catch(()=>{});
     });
   }
 
@@ -17493,7 +17493,7 @@ function financePrintReport(kind){
 ============================================================================ */
 (function(){
   'use strict';
-  window.TASNEEF_BUILD = 'V249_SESSION_PERMISSION_STABLE_2026_05_31';
+  window.TASNEEF_BUILD = 'V251_SUPERVISOR_LIVE_DATA_2026_05_31';
   const E = (v)=>String(v ?? '').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const $id = (id)=>document.getElementById(id);
   const say = (t,type)=>{ try{ (window.msg||window.setMsg||alert)(t,type); }catch{ alert(t); } };
@@ -18906,4 +18906,91 @@ function financePrintReport(kind){
   window.showPage=function(id,btn){ const out=oldShow?oldShow.apply(this,arguments):undefined; if(id==='tickets') setTimeout(()=>window.renderTickets(),80); if(id==='contracts') setTimeout(()=>window.renderContractServices(),80); return out; };
   setTimeout(()=>{ try{ window.renderTickets(); window.renderContractServices(); }catch(e){console.warn(e)} },700);
   console.log('Tasneef V250 loaded: stable data load, paginated ticket cards, project counts in services');
+})();
+
+/* ===== V251: Live supervisor saves - clear stale Supabase cache after tickets/logs/attendance ===== */
+(function(){
+  const DYNAMIC_TABLES = ['time_logs','tickets','attendance','contract_services','maintenance_orders'];
+  function isDynamicCacheKey(k){
+    if(!String(k||'').startsWith('tasneef_sb_cache_v239:')) return false;
+    return DYNAMIC_TABLES.some(t => String(k).includes('/rest/v1/'+t) || String(k).includes('%2Frest%2Fv1%2F'+t));
+  }
+  window.clearTasneefDynamicCacheV251 = function(){
+    try{
+      const remove=[];
+      for(let i=0;i<localStorage.length;i++){
+        const k=localStorage.key(i);
+        if(isDynamicCacheKey(k)) remove.push(k);
+      }
+      remove.forEach(k=>localStorage.removeItem(k));
+      return remove.length;
+    }catch(e){ console.warn('V251 cache clear failed', e); return 0; }
+  };
+  async function reloadLiveAfterSave(){
+    try{ window.clearTasneefDynamicCacheV251(); }catch(_){ }
+    try{
+      if(typeof window.loadAll === 'function') await window.loadAll();
+      else if(typeof loadAll === 'function') await loadAll();
+    }catch(e){ console.warn('V251 live load failed', e); }
+    try{ if(typeof hydrateForms === 'function') hydrateForms(); }catch(e){ console.warn(e); }
+    try{ if(typeof renderAll === 'function') renderAll(); }catch(e){ console.warn(e); }
+    try{ if(typeof window.renderSupervisorDailySummary === 'function') window.renderSupervisorDailySummary(); }catch(e){ console.warn(e); }
+  }
+
+  const oldSaveTimeLogV251 = window.saveTimeLog || (typeof saveTimeLog === 'function' ? saveTimeLog : null);
+  window.saveTimeLog = async function(){
+    try{ window.clearTasneefDynamicCacheV251(); }catch(_){ }
+    const out = oldSaveTimeLogV251 ? await oldSaveTimeLogV251.apply(this, arguments) : undefined;
+    try{ window.clearTasneefDynamicCacheV251(); }catch(_){ }
+    const u = (typeof session === 'function') ? session() : null;
+    if(u && u.role === 'supervisor'){
+      await reloadLiveAfterSave();
+      try{ if(typeof renderTimeLogs === 'function') renderTimeLogs(); }catch(e){ console.warn(e); }
+    }
+    return out;
+  };
+
+  const oldSaveTicketV251 = window.saveTicket || (typeof saveTicket === 'function' ? saveTicket : null);
+  window.saveTicket = async function(){
+    try{ window.clearTasneefDynamicCacheV251(); }catch(_){ }
+    const out = oldSaveTicketV251 ? await oldSaveTicketV251.apply(this, arguments) : undefined;
+    try{ window.clearTasneefDynamicCacheV251(); }catch(_){ }
+    const u = (typeof session === 'function') ? session() : null;
+    if(u && u.role === 'supervisor'){
+      await reloadLiveAfterSave();
+      try{ if(typeof renderTickets === 'function') renderTickets(); }catch(e){ console.warn(e); }
+    }
+    return out;
+  };
+
+  const oldSaveSupervisorAttendanceV251 = window.saveSupervisorAttendance || (typeof saveSupervisorAttendance === 'function' ? saveSupervisorAttendance : null);
+  window.saveSupervisorAttendance = async function(){
+    try{ window.clearTasneefDynamicCacheV251(); }catch(_){ }
+    const out = oldSaveSupervisorAttendanceV251 ? await oldSaveSupervisorAttendanceV251.apply(this, arguments) : undefined;
+    try{ window.clearTasneefDynamicCacheV251(); }catch(_){ }
+    const u = (typeof session === 'function') ? session() : null;
+    if(u && u.role === 'supervisor'){
+      await reloadLiveAfterSave();
+      try{ if(typeof renderSupervisorAttendanceList === 'function') renderSupervisorAttendanceList(); }catch(e){ console.warn(e); }
+    }
+    return out;
+  };
+
+  const oldInitSupervisorV251 = window.initSupervisor || (typeof initSupervisor === 'function' ? initSupervisor : null);
+  window.initSupervisor = async function(){
+    try{ window.clearTasneefDynamicCacheV251(); }catch(_){ }
+    return oldInitSupervisorV251 ? await oldInitSupervisorV251.apply(this, arguments) : undefined;
+  };
+
+  // عند الرجوع للصفحة أو التركيز عليها، نحدث الجداول المتغيرة حتى يظهر ما سجله المشرف فورًا.
+  let lastFocusReload = 0;
+  window.addEventListener('focus', async function(){
+    const now=Date.now();
+    if(now-lastFocusReload < 15000) return;
+    lastFocusReload = now;
+    const u = (typeof session === 'function') ? session() : null;
+    if(!u) return;
+    try{ await reloadLiveAfterSave(); }catch(e){ console.warn(e); }
+  });
+  console.log('Tasneef V251 loaded: dynamic cache cleared after supervisor saves');
 })();

@@ -1,5 +1,5 @@
-/* Tasneef V250 Service Worker - cache app shell for weak internet */
-const CACHE_NAME = 'tasneef-v250-lite-cache';
+/* Tasneef V251 Service Worker - cache app shell for weak internet */
+const CACHE_NAME = 'tasneef-v251-lite-cache';
 const APP_SHELL = [
   './',
   './index.html',
