@@ -1,5 +1,5 @@
 
-/* V277 EMERGENCY STABLE ROLLBACK: no Service Worker, no cache, direct Supabase */
+/* V279 RECOVERY: no Service Worker, no cache, direct Supabase + fallback client */
 (function(){
   try{
     var kill=[];
@@ -16,7 +16,7 @@
     }
     if(window.caches){ caches.keys().then(function(keys){ keys.forEach(function(k){ if(/^tasneef/i.test(k)) caches.delete(k); }); }).catch(function(){}); }
   }catch(e){}
-  window.TASNEEF_BUILD='V278_STABLE_NO_ABORT_NO_CACHE';
+  window.TASNEEF_BUILD='V279_RECOVERY_LOCAL_SUPABASE_FALLBACK';
 })();
 /* TASNEEF BUILD V257 - stable live today logs/tickets fix - 2026-05-31 */
 /* V154 Smart Loading Branding */
@@ -136,11 +136,11 @@
 
 
 
-/* ===================== V278: STABLE NETWORK - NO ABORT, NO SUPABASE CACHE ===================== */
+/* ===================== V279: STABLE NETWORK + LOCAL SUPABASE FALLBACK ===================== */
 (function(){
   if(window.__tasneefStableNetworkV278) return;
   window.__tasneefStableNetworkV278 = true;
-  window.TASNEEF_BUILD = 'V278_STABLE_NO_ABORT_NO_CACHE';
+  window.TASNEEF_BUILD = 'V279_RECOVERY_LOCAL_SUPABASE_FALLBACK';
 
   function addLiteStyle(){
     if(document.getElementById('tasneefLiteStyleV278')) return;
@@ -175,10 +175,61 @@
   // أي طلب Supabase يذهب مباشرة للقاعدة حتى لا تظهر البيانات صفر ولا يفشل تسجيل الدخول.
 })();
 
+
 // Tasneef HTML App V86 - Contract Services Cloud View Fix
+/* V279: fallback Supabase REST client إذا فشل تحميل مكتبة Supabase من CDN */
+function createTasneefRestClientV279(baseUrl, anonKey){
+  function encodeVal(v){ return encodeURIComponent(String(v)); }
+  function headers(extra){ return Object.assign({
+    apikey: anonKey,
+    Authorization: 'Bearer '+anonKey,
+    'Content-Type':'application/json',
+    Prefer:'return=representation'
+  }, extra||{}); }
+  class QB{
+    constructor(table){ this.table=table; this.method='GET'; this.cols='*'; this.filters=[]; this.orders=[]; this._limit=null; this._range=null; this._single=false; this.body=undefined; }
+    select(cols){ this.method = (this.method==='POST'||this.method==='PATCH') ? this.method : 'GET'; this.cols=cols||'*'; return this; }
+    insert(row){ this.method='POST'; this.body=row; return this; }
+    update(row){ this.method='PATCH'; this.body=row; return this; }
+    upsert(row){ this.method='POST'; this.body=row; this._upsert=true; return this; }
+    delete(){ this.method='DELETE'; return this; }
+    eq(c,v){ this.filters.push(`${encodeURIComponent(c)}=eq.${encodeVal(v)}`); return this; }
+    neq(c,v){ this.filters.push(`${encodeURIComponent(c)}=neq.${encodeVal(v)}`); return this; }
+    gte(c,v){ this.filters.push(`${encodeURIComponent(c)}=gte.${encodeVal(v)}`); return this; }
+    lte(c,v){ this.filters.push(`${encodeURIComponent(c)}=lte.${encodeVal(v)}`); return this; }
+    ilike(c,v){ this.filters.push(`${encodeURIComponent(c)}=ilike.${encodeVal(v)}`); return this; }
+    in(c,arr){ const vals=Array.isArray(arr)?arr:[]; this.filters.push(`${encodeURIComponent(c)}=in.(${vals.map(x=>String(x).replace(/,/g,'')).join(',')})`); return this; }
+    order(c,opt){ this.orders.push(`${encodeURIComponent(c)}.${opt&&opt.ascending===false?'desc':'asc'}`); return this; }
+    limit(n){ this._limit=n; return this; }
+    range(a,b){ this._range=[a,b]; return this; }
+    single(){ this._single=true; return this; }
+    maybeSingle(){ this._single=true; this._maybe=true; return this; }
+    async _exec(){
+      try{
+        const qs=[];
+        if(this.method==='GET') qs.push('select='+encodeURIComponent(this.cols||'*'));
+        qs.push(...this.filters);
+        if(this.orders.length) qs.push('order='+this.orders.join(','));
+        if(this._limit!=null) qs.push('limit='+encodeURIComponent(this._limit));
+        let url=`${baseUrl}/rest/v1/${this.table}`+(qs.length?'?'+qs.join('&'):'');
+        const h=headers();
+        if(this._range){ h.Range = `${this._range[0]}-${this._range[1]}`; }
+        if(this._single){ h.Accept='application/vnd.pgrst.object+json'; }
+        if(this._upsert){ h.Prefer='resolution=merge-duplicates,return=representation'; }
+        const res=await fetch(url,{method:this.method,headers:h,body:this.body===undefined?undefined:JSON.stringify(this.body)});
+        let txt=await res.text(); let json=null; try{ json=txt?JSON.parse(txt):null; }catch(_){ json=txt; }
+        if(!res.ok){ return {data:null,error:{message:(json&&json.message)||txt||res.statusText, details:json}}; }
+        return {data:json,error:null};
+      }catch(e){ return {data:null,error:{message:e.message||String(e)}}; }
+    }
+    then(resolve,reject){ return this._exec().then(resolve,reject); }
+  }
+  return { from:(table)=>new QB(table), storage:{ from(){ return { upload:async()=>({data:null,error:{message:'Storage upload غير متاح في وضع الطوارئ'}}), getPublicUrl:(path)=>({data:{publicUrl:''}}) }; } } };
+}
 const SUPABASE_URL = "https://zmjdqiswytxlbfgnfjfv.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb";
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sb = (window.supabase && window.supabase.createClient) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : createTasneefRestClientV279(SUPABASE_URL, SUPABASE_ANON_KEY);
+if(!(window.supabase && window.supabase.createClient)){ console.warn('Tasneef V279: using local REST Supabase fallback because CDN client is unavailable'); }
 // V167: expose Supabase client for late-loaded fixes and feature wrappers.
 window.sb = sb;
 const $ = id => document.getElementById(id);
@@ -241,7 +292,13 @@ async function loadAll(){
 
   let contractServices = await sb.from('contract_services').select('*').order('id', { ascending: false });
 
-  for(const r of [users,projects,workers,attendance,logs,tickets,contractServices]) if(r.error) console.warn(r.error.message);
+  const loadResultsV279 = {users, projects, workers, attendance, logs, tickets, contractServices};
+  window.__tasneefLastLoadResults = loadResultsV279;
+  const errsV279 = Object.entries(loadResultsV279).filter(([k,r])=>r && r.error).map(([k,r])=>`${k}: ${r.error.message}`);
+  if(errsV279.length){
+    console.warn('Tasneef load errors:', errsV279);
+    try{ if(typeof msg==='function') msg('خطأ تحميل بيانات: '+errsV279.slice(0,2).join(' | '),'err'); }catch(_){ }
+  }
   data.users = users.data || [];
   data.supervisors = data.users.filter(u=>u.role==='supervisor' && u.is_active!==false);
   data.technicians = data.users.filter(u=>u.role==='technician' && u.is_active!==false);
@@ -17455,7 +17512,7 @@ function financePrintReport(kind){
 ============================================================================ */
 (function(){
   'use strict';
-  window.TASNEEF_BUILD = 'V278_STABLE_NO_ABORT_NO_CACHE';
+  window.TASNEEF_BUILD = 'V279_RECOVERY_LOCAL_SUPABASE_FALLBACK';
   const E = (v)=>String(v ?? '').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const $id = (id)=>document.getElementById(id);
   const say = (t,type)=>{ try{ (window.msg||window.setMsg||alert)(t,type); }catch{ alert(t); } };
