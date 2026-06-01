@@ -17490,3 +17490,150 @@ function financePrintReport(kind){
   document.addEventListener('DOMContentLoaded', function(){ showBadgeV282(); setTimeout(()=>refreshAllV282(), 500); });
   console.log('Tasneef '+FIX_VERSION+' loaded');
 })();
+
+
+/* Tasneef v283 - Smart Supervisor Projects & Workers Assignment Window */
+(function(){
+  const FIX_VERSION='v283-smart-supervisor-assignment';
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function sid(v){ return v==null ? '' : String(v); }
+  function activeWorkers(){ return (window.data?.workers||[]).filter(w => (w.status||'active') !== 'inactive'); }
+  function isAssigned(wid,pid){ return (window.data?.workerAssignments||[]).some(a => sid(a.worker_id)===sid(wid) && sid(a.project_id)===sid(pid) && a.is_active!==false); }
+  function assignedProjectNames(wid){
+    const ids = new Set();
+    const w = (window.data?.workers||[]).find(x=>sid(x.id)===sid(wid));
+    if(w?.project_id) ids.add(sid(w.project_id));
+    (window.data?.workerAssignments||[]).forEach(a=>{ if(sid(a.worker_id)===sid(wid) && a.is_active!==false && a.project_id) ids.add(sid(a.project_id)); });
+    const names=[...ids].map(id => (typeof projectName==='function'?projectName(id):id)).filter(Boolean);
+    return names.length ? names.join('، ') : '-';
+  }
+  function workerMatchesSupervisor(w, supervisorId){
+    if(!supervisorId) return true;
+    if(sid(w.supervisor_id)===sid(supervisorId) || sid(w.app_supervisor_id)===sid(supervisorId)) return true;
+    const supProjectIds = new Set((window.data?.projects||[]).filter(p=>sid(p.supervisor_id)===sid(supervisorId)).map(p=>sid(p.id)));
+    if(w.project_id && supProjectIds.has(sid(w.project_id))) return true;
+    return (window.data?.workerAssignments||[]).some(a => sid(a.worker_id)===sid(w.id) && a.is_active!==false && supProjectIds.has(sid(a.project_id)));
+  }
+  function ensureSmartModal(){
+    if($('smartWorkerProjectModalV283')) return;
+    const wrap=document.createElement('div');
+    wrap.id='smartWorkerProjectModalV283';
+    wrap.className='smart-modal-v283 hidden';
+    wrap.innerHTML=`
+      <div class="smart-card-v283" dir="rtl">
+        <div class="smart-head-v283">
+          <div><h2>ربط العمال بالمشاريع حسب المشرف</h2><p>اختر المشرف، ثم حدد المشاريع والعمال من نافذة واحدة.</p></div>
+          <button type="button" class="light" onclick="closeSmartWorkerProjectModalV283()">إغلاق</button>
+        </div>
+        <div class="smart-top-v283">
+          <div><label>المشرف</label><select id="smartSupervisorV283" onchange="renderSmartWorkerProjectV283()"></select></div>
+          <div><label>نوع الربط</label><select id="smartWorkerTypeV283"><option value="primary">أساسي</option><option value="support">بديل / مساند</option></select></div>
+          <div><label>بحث عامل</label><input id="smartWorkerSearchV283" oninput="renderSmartWorkerProjectV283()" placeholder="اكتب اسم العامل"></div>
+          <label class="smart-check-v283"><input type="checkbox" id="smartShowAllWorkersV283" onchange="renderSmartWorkerProjectV283()"> عرض كل العمال</label>
+        </div>
+        <div class="smart-grid-v283">
+          <div class="smart-panel-v283">
+            <div class="smart-panel-title-v283"><h3>مشاريع المشرف</h3><button type="button" class="light" onclick="toggleSmartProjectsV283(true)">تحديد الكل</button></div>
+            <div id="smartProjectsListV283" class="smart-list-v283"></div>
+          </div>
+          <div class="smart-panel-v283">
+            <div class="smart-panel-title-v283"><h3>العمال</h3><button type="button" class="light" onclick="toggleSmartWorkersV283(true)">تحديد الكل</button></div>
+            <div id="smartWorkersListV283" class="smart-list-v283"></div>
+          </div>
+        </div>
+        <div class="smart-actions-v283">
+          <button type="button" onclick="saveSmartWorkerProjectLinksV283()">حفظ الربط</button>
+          <button type="button" class="danger" onclick="removeSmartWorkerProjectLinksV283()">إزالة الربط المحدد</button>
+          <button type="button" class="light" onclick="toggleSmartProjectsV283(false);toggleSmartWorkersV283(false)">إلغاء التحديد</button>
+        </div>
+        <div class="smart-preview-title-v283">معاينة الربط الحالي</div>
+        <div class="table-wrap smart-preview-v283"><table><thead><tr><th>العامل</th><th>مشاريعه الحالية</th></tr></thead><tbody id="smartPreviewBodyV283"></tbody></table></div>
+      </div>`;
+    document.body.appendChild(wrap);
+    const st=document.createElement('style');
+    st.textContent=`
+      .smart-modal-v283{position:fixed;inset:0;z-index:99990;background:rgba(0,0,0,.42);display:flex;align-items:flex-start;justify-content:center;padding:24px;overflow:auto}.smart-modal-v283.hidden{display:none}
+      .smart-card-v283{width:min(1120px,100%);background:#fff;border-radius:22px;padding:18px;box-shadow:0 20px 60px #0003;color:#123}.smart-head-v283,.smart-panel-title-v283,.smart-actions-v283{display:flex;align-items:center;justify-content:space-between;gap:10px}.smart-head-v283 h2{margin:0}.smart-head-v283 p{margin:4px 0 0;color:#667}
+      .smart-top-v283{display:grid;grid-template-columns:1.2fr .8fr 1fr auto;gap:12px;margin:14px 0}.smart-top-v283 label{font-weight:700;font-size:13px}.smart-check-v283{display:flex;align-items:end;gap:6px;padding-bottom:10px;white-space:nowrap}
+      .smart-grid-v283{display:grid;grid-template-columns:1fr 1fr;gap:14px}.smart-panel-v283{border:1px solid #e4ebe7;border-radius:18px;padding:12px;background:#fbfdfc}.smart-panel-title-v283 h3{margin:0 0 8px}
+      .smart-list-v283{display:grid;gap:8px;max-height:330px;overflow:auto;padding:4px}.smart-item-v283{display:flex;gap:8px;align-items:flex-start;background:#fff;border:1px solid #e7eee9;border-radius:14px;padding:9px}.smart-item-v283 small{color:#667;display:block;margin-top:3px}.smart-actions-v283{justify-content:flex-start;margin:14px 0}.smart-preview-title-v283{font-weight:800;margin-top:6px}.smart-preview-v283{max-height:230px;overflow:auto}.smart-injected-btn-v283{margin-inline-start:8px}
+      @media(max-width:800px){.smart-top-v283,.smart-grid-v283{grid-template-columns:1fr}.smart-modal-v283{padding:10px}.smart-card-v283{border-radius:16px}.smart-head-v283{align-items:flex-start}.smart-check-v283{align-items:center;padding:0}}
+    `;
+    document.head.appendChild(st);
+  }
+  function fillSmartSupervisor(){
+    const sel=$('smartSupervisorV283'); if(!sel) return;
+    const old=sel.value;
+    sel.innerHTML='<option value="">اختر المشرف</option>'+(window.data?.supervisors||[]).map(s=>`<option value="${esc(s.id)}">${esc(s.full_name||s.username||s.id)}</option>`).join('');
+    if(old) sel.value=old;
+  }
+  window.openSmartWorkerProjectModalV283 = async function(){
+    ensureSmartModal();
+    if(typeof refreshAll === 'function') { try{ await refreshAll(); }catch(e){ console.warn(e); } }
+    fillSmartSupervisor();
+    $('smartWorkerProjectModalV283').classList.remove('hidden');
+    renderSmartWorkerProjectV283();
+  };
+  window.closeSmartWorkerProjectModalV283 = function(){ const m=$('smartWorkerProjectModalV283'); if(m) m.classList.add('hidden'); };
+  window.renderSmartWorkerProjectV283 = function(){
+    ensureSmartModal(); fillSmartSupervisor();
+    const supervisorId=$('smartSupervisorV283')?.value||'';
+    const q=($('smartWorkerSearchV283')?.value||'').trim();
+    const showAll=$('smartShowAllWorkersV283')?.checked;
+    const projects=(window.data?.projects||[]).filter(p=>!supervisorId || sid(p.supervisor_id)===sid(supervisorId));
+    let workers=activeWorkers();
+    if(supervisorId && !showAll) workers=workers.filter(w=>workerMatchesSupervisor(w,supervisorId));
+    if(q) workers=workers.filter(w=>[w.name,w.phone,assignedProjectNames(w.id)].join(' ').includes(q));
+    $('smartProjectsListV283').innerHTML = supervisorId ? (projects.map(p=>`<label class="smart-item-v283"><input type="checkbox" class="smartProjectChkV283" value="${esc(p.id)}"><span><b>${esc(p.name)}</b><small>${esc(p.location||'')} ${p.status==='inactive'?' - متوقف':''}</small></span></label>`).join('') || '<div class="footer-note">لا توجد مشاريع لهذا المشرف</div>') : '<div class="footer-note">اختر المشرف أولاً لعرض مشاريعه</div>';
+    $('smartWorkersListV283').innerHTML = supervisorId ? (workers.map(w=>`<label class="smart-item-v283"><input type="checkbox" class="smartWorkerChkV283" value="${esc(w.id)}"><span><b>${esc(w.name)}</b><small>${esc(assignedProjectNames(w.id))}</small></span></label>`).join('') || '<div class="footer-note">لا يوجد عمال مطابقون</div>') : '<div class="footer-note">اختر المشرف أولاً لعرض العمال</div>';
+    $('smartPreviewBodyV283').innerHTML = workers.slice(0,120).map(w=>`<tr><td>${esc(w.name)}</td><td>${esc(assignedProjectNames(w.id))}</td></tr>`).join('') || '<tr><td colspan="2">لا توجد بيانات</td></tr>';
+  };
+  window.toggleSmartProjectsV283 = function(on){ document.querySelectorAll('.smartProjectChkV283').forEach(x=>x.checked=!!on); };
+  window.toggleSmartWorkersV283 = function(on){ document.querySelectorAll('.smartWorkerChkV283').forEach(x=>x.checked=!!on); };
+  function selectedVals(cls){ return [...document.querySelectorAll(cls+':checked')].map(x=>Number(x.value)).filter(Boolean); }
+  window.saveSmartWorkerProjectLinksV283 = async function(){
+    const pids=selectedVals('.smartProjectChkV283'), wids=selectedVals('.smartWorkerChkV283'), type=$('smartWorkerTypeV283')?.value||'primary';
+    if(!pids.length || !wids.length) return msg('حدد مشروع واحد وعامل واحد على الأقل','err');
+    const rows=[]; wids.forEach(wid=>pids.forEach(pid=>rows.push({worker_id:wid,project_id:pid,worker_type:type,is_active:true,updated_at:new Date().toISOString()})));
+    const res=await sb.from('worker_project_assignments').upsert(rows,{onConflict:'worker_id,project_id'});
+    if(res.error) return msg('يجب تشغيل SQL v283 أولاً: '+res.error.message,'err');
+    // توافق مع الشاشات القديمة: نضع مشرف أول مشروع كمرجع فقط، والربط الحقيقي يبقى في جدول worker_project_assignments.
+    const firstProject=(window.data?.projects||[]).find(p=>Number(p.id)===pids[0]);
+    if(firstProject?.supervisor_id){
+      await sb.from('workers').update({supervisor_id:firstProject.supervisor_id,app_supervisor_id:firstProject.supervisor_id}).in('id',wids);
+    }
+    msg('تم ربط العمال بالمشاريع المحددة بنجاح');
+    if(typeof refreshAll==='function') await refreshAll();
+    renderSmartWorkerProjectV283();
+  };
+  window.removeSmartWorkerProjectLinksV283 = async function(){
+    const pids=selectedVals('.smartProjectChkV283'), wids=selectedVals('.smartWorkerChkV283');
+    if(!pids.length || !wids.length) return msg('حدد المشاريع والعمال المراد إزالة الربط بينهم','err');
+    if(!confirm('سيتم إزالة الربط بين العمال والمشاريع المحددة فقط. هل أنت متأكد؟')) return;
+    let ok=true, errMsg='';
+    for(const wid of wids){
+      const res=await sb.from('worker_project_assignments').update({is_active:false,updated_at:new Date().toISOString()}).eq('worker_id',wid).in('project_id',pids);
+      if(res.error){ ok=false; errMsg=res.error.message; break; }
+    }
+    if(!ok) return msg(errMsg,'err');
+    msg('تمت إزالة الربط المحدد');
+    if(typeof refreshAll==='function') await refreshAll();
+    renderSmartWorkerProjectV283();
+  };
+  function injectButton(){
+    if($('openSmartWorkerProjectBtnV283')) return;
+    const projectsSection=$('projects'); if(!projectsSection) return;
+    const head=projectsSection.querySelector('.section-head'); if(!head) return;
+    const btn=document.createElement('button'); btn.id='openSmartWorkerProjectBtnV283'; btn.className='smart-injected-btn-v283'; btn.textContent='ربط العمال بالمشاريع'; btn.type='button'; btn.onclick=()=>openSmartWorkerProjectModalV283();
+    head.appendChild(btn);
+  }
+  function showBadge(){
+    ['tasneefFixBadgeV280','tasneefFixBadgeV281','tasneefFixBadgeV282','tasneefFixBadgeV283'].forEach(id=>{ const old=$(id); if(old) old.remove(); });
+    const b=document.createElement('div'); b.id='tasneefFixBadgeV283'; document.body.appendChild(b);
+    b.textContent='Tasneef '+FIX_VERSION;
+    b.style.cssText='position:fixed;left:10px;bottom:10px;z-index:99999;background:#0a4033;color:#fff;padding:6px 10px;border-radius:12px;font:12px Arial;box-shadow:0 4px 12px #0002;opacity:.9';
+  }
+  document.addEventListener('DOMContentLoaded', function(){ ensureSmartModal(); injectButton(); showBadge(); setTimeout(()=>{ injectButton(); showBadge(); }, 900); });
+  console.log('Tasneef '+FIX_VERSION+' loaded');
+})();
