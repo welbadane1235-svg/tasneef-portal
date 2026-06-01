@@ -17317,3 +17317,176 @@ function financePrintReport(kind){
   document.addEventListener('DOMContentLoaded', function(){ showBadge(); setTimeout(()=>{ if(document.body) refreshAllV281(); }, 300); });
   console.log('Tasneef '+FIX_VERSION+' loaded');
 })();
+
+
+/* Tasneef v282 - worker multi-project assignments fix */
+(function(){
+  const FIX_VERSION='v282-worker-multi-project';
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function safeId(v){ return v==null ? '' : String(v); }
+  async function safeQuery(name, q){
+    try{ const r=await q; if(r.error){ console.warn('[Tasneef '+FIX_VERSION+'] '+name, r.error.message); return []; } return r.data||[]; }
+    catch(e){ console.warn('[Tasneef '+FIX_VERSION+'] '+name, e?.message||e); return []; }
+  }
+  const oldLoadAll = window.loadAll;
+  const oldRefreshAll = window.refreshAll;
+  async function loadAssignments(){
+    // هذا الجدول يجعل العامل يظهر في أكثر من مشروع. إذا لم يتم تشغيل SQL، يعمل النظام بالآلية القديمة مؤقتًا.
+    return await safeQuery('worker_project_assignments',
+      sb.from('worker_project_assignments').select('*').eq('is_active', true).order('id')
+    );
+  }
+  async function loadAllV282(){
+    if(typeof oldLoadAll === 'function') await oldLoadAll();
+    data.workerAssignments = await loadAssignments();
+    data.__fixVersion = FIX_VERSION;
+  }
+  async function refreshAllV282(){
+    await loadAllV282();
+    try{ hydrateForms(); }catch(e){ console.warn(e); }
+    try{ renderAll(); }catch(e){ console.warn(e); }
+    showBadgeV282();
+  }
+  window.loadAll = loadAllV282;
+  window.refreshAll = refreshAllV282;
+  try{ loadAll = loadAllV282; refreshAll = refreshAllV282; }catch(e){}
+
+  function workerAssignments(wid){
+    return (data.workerAssignments||[]).filter(a=>safeId(a.worker_id)===safeId(wid) && a.is_active!==false);
+  }
+  function workerAssignedProjectIds(w){
+    const ids = new Set();
+    const primary = (typeof workerProjectId === 'function') ? workerProjectId(w) : (w.project_id || w.assigned_project_id || '');
+    if(primary) ids.add(safeId(primary));
+    workerAssignments(w.id).forEach(a=>{ if(a.project_id) ids.add(safeId(a.project_id)); });
+    return [...ids];
+  }
+  function workerAssignedSupervisorIds(w){
+    const ids = new Set();
+    const direct = (typeof workerSupId === 'function') ? workerSupId(w) : (w.app_supervisor_id || w.supervisor_id || '');
+    if(direct) ids.add(safeId(direct));
+    workerAssignedProjectIds(w).forEach(pid=>{
+      const p=(data.projects||[]).find(x=>safeId(x.id)===safeId(pid));
+      if(p?.supervisor_id) ids.add(safeId(p.supervisor_id));
+    });
+    return [...ids];
+  }
+  function workerBelongsToProject(w,pid){
+    if(!pid) return true;
+    return workerAssignedProjectIds(w).includes(safeId(pid));
+  }
+  function workerBelongsToSupervisor(w,sid){
+    if(!sid) return true;
+    return workerAssignedSupervisorIds(w).includes(safeId(sid));
+  }
+  function assignmentProjectNames(w){
+    const ids=workerAssignedProjectIds(w);
+    if(!ids.length) return '-';
+    return ids.map(id=>typeof projectName==='function'?projectName(id):id).join('، ');
+  }
+  function assignmentSupervisorNames(w){
+    const ids=workerAssignedSupervisorIds(w);
+    if(!ids.length) return '-';
+    return ids.map(id=>typeof supervisorName==='function'?supervisorName(id):id).join('، ');
+  }
+
+  window.renderProjectManager = function(){
+    const b=$('projectWorkersBody'); if(!b) return;
+    const pid=$('manageProjectId')?.value;
+    if(!pid){ b.innerHTML='<tr><td colspan="5">اختر مشروع من زر إدارة المشروع</td></tr>'; return; }
+    const rows=(data.workers||[]).filter(w=>workerBelongsToProject(w,pid));
+    b.innerHTML=rows.map(w=>`<tr><td>${esc(w.name)}</td><td>${esc(assignmentSupervisorNames(w))}</td><td><span class="badge ${(w.worker_type||'primary')==='support'?'amber':'green'}">${typeof workerTypeText==='function'?workerTypeText(w.worker_type):'أساسي'}</span></td><td><span class="badge ${w.status==='inactive'?'red':'green'}">${w.status==='inactive'?'موقوف':'نشط'}</span></td><td class="row-actions"><button class="danger" onclick="removeWorkerFromProject(${w.id})">إزالة من هذا المشروع</button></td></tr>`).join('')||'<tr><td colspan="5">لا يوجد عمال مرتبطون بهذا المشروع</td></tr>';
+  };
+  try{ renderProjectManager = window.renderProjectManager; }catch(e){}
+
+  window.addExistingWorkerToProject = async function(){
+    const pid=Number($('manageProjectId')?.value), wid=Number($('manageWorkerSelect')?.value), type=$('manageWorkerType')?.value||'primary';
+    if(!pid||!wid) return msg('اختر المشروع والعامل','err');
+    const p=(data.projects||[]).find(x=>Number(x.id)===pid); const sid=p?.supervisor_id||null;
+    // نضيف ربط جديد بدل تحديث project_id حتى لا يختفي العامل من مشروعه السابق.
+    let res = await sb.from('worker_project_assignments').upsert({worker_id:wid, project_id:pid, worker_type:type, is_active:true},{onConflict:'worker_id,project_id'});
+    if(res.error){
+      // fallback إذا لم تشغّل ملف SQL بعد.
+      res = await sb.from('workers').update({project_id:pid, supervisor_id:sid, app_supervisor_id:sid, worker_type:type}).eq('id',wid);
+      if(res.error) return msg('شغّل ملف SQL الخاص بتعدد المشاريع أولاً: '+res.error.message,'err');
+      msg('تم ربط العامل بالمشروع، لكن لتعدّد المشاريع شغّل ملف SQL v282','err');
+    } else {
+      await sb.from('workers').update({supervisor_id:sid, app_supervisor_id:sid}).eq('id',wid);
+      msg('تم إضافة العامل لهذا المشروع بدون إزالته من المشاريع الأخرى');
+    }
+    await refreshAllV282(); openProjectManager(pid);
+  };
+  try{ addExistingWorkerToProject = window.addExistingWorkerToProject; }catch(e){}
+
+  window.addWorkerInsideProject = async function(){
+    const pid=Number($('manageProjectId')?.value); if(!pid) return msg('اختر المشروع أولاً','err');
+    const name=$('manageNewWorkerName')?.value.trim(); if(!name) return msg('اسم العامل مطلوب','err');
+    const p=(data.projects||[]).find(x=>x.id===pid); const sid=p?.supervisor_id||null;
+    const row={name, phone:$('manageNewWorkerPhone')?.value.trim()||'', salary:Number($('manageNewWorkerSalary')?.value||1500), supervisor_id:sid, app_supervisor_id:sid, project_id:pid, worker_type:$('manageNewWorkerType')?.value||'primary', status:'active'};
+    const ins=await sb.from('workers').insert(row).select('id').single();
+    if(ins.error) return msg(ins.error.message,'err');
+    await sb.from('worker_project_assignments').upsert({worker_id:ins.data.id, project_id:pid, worker_type:row.worker_type, is_active:true},{onConflict:'worker_id,project_id'});
+    ['manageNewWorkerName','manageNewWorkerPhone'].forEach(id=>$(id)&&($(id).value=''));
+    if($('manageNewWorkerSalary')) $('manageNewWorkerSalary').value=1500;
+    msg('تم إضافة العامل وربطه بالمشروع');
+    await refreshAllV282(); openProjectManager(pid);
+  };
+  try{ addWorkerInsideProject = window.addWorkerInsideProject; }catch(e){}
+
+  window.removeWorkerFromProject = async function(wid){
+    if(!confirm('إزالة العامل من هذا المشروع فقط؟')) return;
+    const pid=Number($('manageProjectId')?.value);
+    let res = await sb.from('worker_project_assignments').update({is_active:false}).eq('worker_id',wid).eq('project_id',pid);
+    if(res.error){
+      res = await sb.from('workers').update({project_id:null}).eq('id',wid).eq('project_id',pid);
+      if(res.error) return msg(res.error.message,'err');
+    }
+    msg('تمت إزالة العامل من هذا المشروع فقط');
+    await refreshAllV282(); if(pid) openProjectManager(pid);
+  };
+  try{ removeWorkerFromProject = window.removeWorkerFromProject; }catch(e){}
+
+  window.renderWorkers = function(){
+    const b=$('workersBody'); if(!b) return;
+    const s=$('workerFilterSupervisor')?.value, p=$('workerFilterProject')?.value, st=$('workerFilterStatus')?.value, tp=$('workerFilterType')?.value, q=($('workerSearch')?.value||'').trim();
+    let rows=data.workers||[];
+    if(s) rows=rows.filter(w=>workerBelongsToSupervisor(w,s));
+    if(p) rows=rows.filter(w=>workerBelongsToProject(w,p));
+    if(st) rows=rows.filter(w=>(w.status||'active')===st);
+    if(tp) rows=rows.filter(w=>(w.worker_type||'primary')===tp || workerAssignments(w.id).some(a=>(a.worker_type||'primary')===tp));
+    if(q) rows=rows.filter(w=>[w.name,w.phone,assignmentSupervisorNames(w),assignmentProjectNames(w),w.notes].join(' ').includes(q));
+    b.innerHTML=rows.map(w=>`<tr><td>${esc(w.name)}</td><td>${esc(assignmentSupervisorNames(w))}</td><td>${esc(assignmentProjectNames(w))}</td><td><span class="badge ${(w.worker_type||'primary')==='support'?'amber':'green'}">${typeof workerTypeText==='function'?workerTypeText(w.worker_type):'أساسي'}</span></td><td>${esc(w.phone)}</td><td>${w.salary||0}</td><td><span class="badge ${w.status==='inactive'?'red':'green'}">${w.status==='inactive'?'موقوف':'نشط'}</span></td><td>${esc(w.notes||'-')}</td><td class="row-actions"><button onclick="editWorker(${w.id})">تعديل</button><button class="light" onclick="toggleWorkerStatus(${w.id})">${w.status==='inactive'?'تفعيل':'إيقاف'}</button><button class="danger" onclick="deleteRow('workers',${w.id})">حذف</button></td></tr>`).join('')||'<tr><td colspan="9">لا توجد بيانات</td></tr>';
+  };
+  try{ renderWorkers = window.renderWorkers; }catch(e){}
+
+  const oldInitSupervisor = window.initSupervisor;
+  window.initSupervisor = async function(){
+    const u=requireRole('supervisor'); if(!u) return;
+    await loadAllV282();
+    data.projects=(data.projects||[]).filter(p=>safeId(p.supervisor_id)===safeId(u.id));
+    const supProjectIds = new Set(data.projects.map(p=>safeId(p.id)));
+    data.workers=(data.workers||[]).filter(w=>workerBelongsToSupervisor(w,u.id) || workerAssignedProjectIds(w).some(pid=>supProjectIds.has(safeId(pid))));
+    data.logs=(data.logs||[]).filter(l=>safeId(l.supervisor_id)===safeId(u.id) || supProjectIds.has(safeId(l.project_id)));
+    data.tickets=(data.tickets||[]).filter(t=>safeId(t.supervisor_id)===safeId(u.id) || safeId(t.created_by)===safeId(u.id) || supProjectIds.has(safeId(t.project_id)));
+    if($('supTitle')) $('supTitle').textContent=`لوحة المشرف - ${u.full_name}`;
+    if(typeof fillSelect==='function'){
+      fillSelect('logProject',data.projects,'name','اختر المشروع'); fillSelect('attendanceProject',data.projects,'name','اختر المشروع'); fillSelect('ticketProject',data.projects,'name','اختر المشروع');
+    }
+    if($('logDate')) $('logDate').value=(typeof today==='function'?today():new Date().toISOString().slice(0,10));
+    if($('attendanceDate')) $('attendanceDate').value=(typeof today==='function'?today():new Date().toISOString().slice(0,10));
+    try{ renderSupervisorAttendanceList(); renderTimeLogs(); }catch(e){ console.warn(e); }
+    try{ await supervisorInventoryLoad(); }catch(e){}
+    showBadgeV282();
+  };
+  try{ initSupervisor = window.initSupervisor; }catch(e){}
+
+  function showBadgeV282(){
+    ['tasneefFixBadgeV280','tasneefFixBadgeV281','tasneefFixBadgeV282'].forEach(id=>{ const old=document.getElementById(id); if(old) old.remove(); });
+    const b=document.createElement('div'); b.id='tasneefFixBadgeV282'; document.body.appendChild(b);
+    b.textContent='Tasneef '+FIX_VERSION;
+    b.style.cssText='position:fixed;left:10px;bottom:10px;z-index:99999;background:#0a4033;color:#fff;padding:6px 10px;border-radius:12px;font:12px Arial;box-shadow:0 4px 12px #0002;opacity:.9';
+  }
+  document.addEventListener('DOMContentLoaded', function(){ showBadgeV282(); setTimeout(()=>refreshAllV282(), 500); });
+  console.log('Tasneef '+FIX_VERSION+' loaded');
+})();
