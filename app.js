@@ -17637,3 +17637,127 @@ function financePrintReport(kind){
   document.addEventListener('DOMContentLoaded', function(){ ensureSmartModal(); injectButton(); showBadge(); setTimeout(()=>{ injectButton(); showBadge(); }, 900); });
   console.log('Tasneef '+FIX_VERSION+' loaded');
 })();
+
+/* Tasneef v284 - Real Monthly Previous Months + Supervisor Worker Distribution Export */
+(function(){
+  'use strict';
+  const FIX_VERSION='v284-monthly-history-distribution-export';
+  const $ = id => document.getElementById(id);
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const sid = v => v==null ? '' : String(v);
+  const num = v => { const n=Number(String(v ?? 0).replace(/,/g,'')); return Number.isFinite(n)?n:0; };
+  const today = () => new Date().toISOString().slice(0,10);
+  const monthVal = () => $('monthlyMonth')?.value || today().slice(0,7);
+  const monthStart = m => (m || monthVal()) + '-01';
+  const monthEndExclusive = m => { const [y,mo]=String(m||monthVal()).split('-').map(Number); return new Date(y, mo, 1).toISOString().slice(0,10); };
+  const dateOnly = v => String(v || '').slice(0,10).replace(/\//g,'-');
+  const inMonth = (v,m) => dateOnly(v).slice(0,7) === String(m||monthVal()).slice(0,7);
+  function supName(id){ return (typeof window.supervisorName==='function'?window.supervisorName(id):'') || (window.data?.users||[]).find(u=>sid(u.id)===sid(id))?.full_name || '-'; }
+  function projName(id){ return (typeof window.projectName==='function'?window.projectName(id):'') || (window.data?.projects||[]).find(p=>sid(p.id)===sid(id))?.name || '-'; }
+  function projectSup(pid){ return (window.data?.projects||[]).find(p=>sid(p.id)===sid(pid))?.supervisor_id || null; }
+  function actualMinutes(l){
+    if(num(l.duration_minutes)) return num(l.duration_minutes);
+    if(l.check_in && l.check_out && typeof window.minutesBetween==='function') return num(window.minutesBetween(l.check_in,l.check_out));
+    if(l.check_in && l.check_out){ const a=new Date(l.check_in), b=new Date(l.check_out); const d=(b-a)/60000; return Number.isFinite(d)&&d>0?Math.round(d):0; }
+    return 0;
+  }
+  function minsText(m){ return (typeof window.minsToText==='function') ? window.minsToText(num(m)) : (Math.floor(num(m)/60)+' ساعة '+(num(m)%60)+' دقيقة'); }
+  function pctText(v){ return (num(v).toFixed(1).replace(/\.0$/,'') + '%'); }
+  function status(percent){ const p=num(percent); if(p>=90&&p<=110) return {text:'ممتاز',cls:'green'}; if((p>=70&&p<90)||(p>110&&p<=140)) return {text:'جيد',cls:'amber'}; return {text:'ضعيف',cls:'red'}; }
+  function assignments(){ return (window.data?.workerAssignments||[]).filter(a=>a && a.is_active!==false); }
+  function workerName(id){ return (typeof window.workerName==='function'?window.workerName(id):'') || (window.data?.workers||[]).find(w=>sid(w.id)===sid(id))?.name || ''; }
+  function workersForProject(pid){
+    const names = new Set();
+    (window.data?.workers||[]).forEach(w=>{ if(sid(w.project_id)===sid(pid) && (w.status||'active')!=='inactive') names.add(w.name); });
+    assignments().forEach(a=>{ if(sid(a.project_id)===sid(pid)){ const n=workerName(a.worker_id); if(n) names.add(n); } });
+    return [...names].filter(Boolean).join('، ') || '-';
+  }
+  function mergeLogs(newRows){
+    if(!window.data) window.data={};
+    const map = new Map();
+    (window.data.logs||[]).forEach(l=>{ if(l && l.id!=null) map.set(sid(l.id), l); });
+    (newRows||[]).forEach(l=>{ if(l && l.id!=null) map.set(sid(l.id), l); });
+    window.data.logs = [...map.values()];
+  }
+  window.fetchMonthlyLogsV284 = async function(month){
+    month = month || monthVal();
+    const start=monthStart(month), end=monthEndExclusive(month);
+    const cacheKey='__monthly_v284_'+month;
+    if(window.data?.[cacheKey]) return (window.data.logs||[]).filter(l=>inMonth(l.log_date||l.check_in||l.created_at,month));
+    const results=[]; const errors=[];
+    try{
+      const r1 = await sb.from('time_logs').select('*').gte('log_date',start).lt('log_date',end).order('id',{ascending:false}).limit(10000);
+      if(r1.error) errors.push(r1.error.message); else results.push(...(r1.data||[]));
+    }catch(e){ errors.push(e?.message||String(e)); }
+    try{
+      const r2 = await sb.from('time_logs').select('*').gte('check_in',start).lt('check_in',end).order('id',{ascending:false}).limit(10000);
+      if(r2.error) errors.push(r2.error.message); else results.push(...(r2.data||[]));
+    }catch(e){ errors.push(e?.message||String(e)); }
+    mergeLogs(results);
+    window.data[cacheKey]=true;
+    if(errors.length) window.data.monthlyV284Error=errors.join(' | '); else window.data.monthlyV284Error='';
+    return (window.data.logs||[]).filter(l=>inMonth(l.log_date||l.check_in||l.created_at,month));
+  };
+  window.monthlyRowsV284 = function(){
+    const month=monthVal(); const selectedSup=$('monthlySupervisor')?.value || '';
+    let logs=(window.data?.logs||[]).filter(l=>inMonth(l.log_date||l.check_in||l.created_at,month));
+    const map=new Map();
+    logs.forEach(l=>{
+      const pid=l.project_id; if(!pid) return;
+      const sup=l.supervisor_id || projectSup(pid) || '';
+      if(selectedSup && sid(sup)!==sid(selectedSup)) return;
+      const key=sid(sup)+'_'+sid(pid);
+      if(!map.has(key)) map.set(key,{s:sup,p:pid,a:0,c:0});
+      const row=map.get(key); row.a += actualMinutes(l); row.c += 1;
+    });
+    const rows=[...map.values()];
+    const supTotals={}; rows.forEach(r=>{ const s=sid(r.s); supTotals[s]=(supTotals[s]||0)+num(r.a); });
+    return rows.map(r=>{ const total=supTotals[sid(r.s)]||0; const percent=total?num(r.a)/total*100:0; const st=status(percent); return {...r,total,percent,workers:workersForProject(r.p),st:st.text,cls:st.cls}; })
+      .sort((a,b)=>String(supName(a.s)).localeCompare(String(supName(b.s)),'ar') || String(projName(a.p)).localeCompare(String(projName(b.p)),'ar'));
+  };
+  window.renderMonthly = async function(){
+    const body=$('monthlyBody'); if(!body) return;
+    const month=monthVal();
+    body.innerHTML='<tr><td colspan="6">جاري تحميل سجلات الشهر من قاعدة البيانات...</td></tr>';
+    await window.fetchMonthlyLogsV284(month);
+    const table=body.closest('table');
+    if(table?.tHead) table.tHead.innerHTML='<tr><th>المشرف</th><th>المشروع</th><th>أسماء العمال</th><th>الساعات الفعلية</th><th>نسبة العمل</th><th>حالة الأداء</th></tr>';
+    const rows=window.monthlyRowsV284();
+    if(!rows.length){
+      const err=window.data?.monthlyV284Error ? '<br><small style="color:#b00020">'+esc(window.data.monthlyV284Error)+'</small>' : '';
+      body.innerHTML='<tr><td colspan="6">لا توجد بيانات لهذا الشهر في جدول time_logs'+err+'</td></tr>';
+      if($('monthlySummary')) $('monthlySummary').innerHTML='<div class="kpi"><small>إجمالي الساعات الفعلية</small><b>0 دقيقة</b></div><div class="kpi"><small>عدد المشرفين</small><b>0</b></div><div class="kpi"><small>عدد المشاريع</small><b>0</b></div>';
+      return;
+    }
+    let html='', last='__none__', groupTotal=0;
+    const flush=()=>{ if(last!=='__none__'){ html += `<tr class="monthly-total-row" style="background:#f4fbf8;font-weight:900"><td colspan="3">مجموع ${esc(supName(last))}</td><td>${esc(minsText(groupTotal))}</td><td><span class="badge green">100%</span></td><td>—</td></tr>`; }};
+    rows.forEach(r=>{ if(last!=='__none__' && sid(last)!==sid(r.s)){ flush(); groupTotal=0; } last=r.s; groupTotal+=num(r.a); html+=`<tr><td>${esc(supName(r.s))}</td><td>${esc(projName(r.p))}</td><td>${esc(r.workers||'-')}</td><td>${esc(minsText(r.a))}</td><td><span class="badge green">${esc(pctText(r.percent))}</span></td><td><span class="badge ${r.cls}">${esc(r.st)}</span></td></tr>`; });
+    flush(); body.innerHTML=html;
+    const grand=rows.reduce((a,r)=>a+num(r.a),0); const supCount=new Set(rows.map(r=>sid(r.s))).size;
+    if($('monthlySummary')) $('monthlySummary').innerHTML=`<div class="kpi"><small>إجمالي الساعات الفعلية</small><b>${esc(minsText(grand))}</b></div><div class="kpi"><small>عدد المشرفين</small><b>${supCount}</b></div><div class="kpi"><small>عدد المشاريع</small><b>${rows.length}</b></div><div class="kpi"><small>الشهر</small><b>${esc(month)}</b></div>`;
+  };
+  window.exportMonthlyCSV = async function(){ await window.renderMonthly(); const rows=[...document.querySelectorAll('#monthlyBody tr')].map(tr=>[...tr.children].map(td=>td.textContent.trim())); const csv='\ufeff'+['المشرف,المشروع,أسماء العمال,الساعات الفعلية,نسبة العمل,حالة الأداء',...rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(','))].join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='monthly_time_'+monthVal()+'.csv'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1200); };
+  window.exportSupervisorWorkerDistributionV284 = function(){
+    const projects=(window.data?.projects||[]).slice().sort((a,b)=>String(supName(a.supervisor_id)).localeCompare(String(supName(b.supervisor_id)),'ar')||String(a.name||'').localeCompare(String(b.name||''),'ar'));
+    const rows=[];
+    projects.forEach(p=>{
+      const workers=workersForProject(p.id);
+      rows.push({supervisor:supName(p.supervisor_id), project:p.name||projName(p.id), workers, count: workers==='-'?0:workers.split('،').filter(Boolean).length});
+    });
+    const htmlRows=rows.map(r=>`<tr><td>${esc(r.supervisor)}</td><td>${esc(r.project)}</td><td>${esc(r.workers)}</td><td>${esc(r.count)}</td></tr>`).join('');
+    const html=`<html dir="rtl" lang="ar"><head><meta charset="utf-8"><style>body{font-family:Tahoma,Arial}table{border-collapse:collapse;width:100%}th{background:#0a4033;color:white}td,th{border:1px solid #999;padding:8px;text-align:right}h2{color:#0a4033}</style></head><body><h2>توزيع المشرفين مع المشاريع والعمال</h2><table><thead><tr><th>المشرف</th><th>المشروع</th><th>العمال</th><th>عدد العمال</th></tr></thead><tbody>${htmlRows}</tbody></table></body></html>`;
+    const blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='supervisors_workers_distribution.xls'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1200);
+  };
+  function injectExportButton(){
+    if($('exportSupervisorWorkerDistributionV284')) return;
+    const projectsSection=$('projects') || $('workers') || document.body;
+    const head=projectsSection.querySelector?.('.section-head') || projectsSection;
+    const btn=document.createElement('button'); btn.id='exportSupervisorWorkerDistributionV284'; btn.type='button'; btn.textContent='تنزيل توزيع المشرفين والعمال'; btn.onclick=()=>window.exportSupervisorWorkerDistributionV284(); btn.style.marginInlineStart='8px';
+    head.appendChild(btn);
+  }
+  function bindMonthlyChange(){ const m=$('monthlyMonth'), s=$('monthlySupervisor'); if(m && !m.dataset.v284Bound){ m.dataset.v284Bound='1'; m.addEventListener('change',()=>window.renderMonthly()); } if(s && !s.dataset.v284Bound){ s.dataset.v284Bound='1'; s.addEventListener('change',()=>window.renderMonthly()); } }
+  function showBadge(){ ['tasneefFixBadgeV280','tasneefFixBadgeV281','tasneefFixBadgeV282','tasneefFixBadgeV283','tasneefFixBadgeV284'].forEach(id=>{ const old=$(id); if(old) old.remove(); }); const b=document.createElement('div'); b.id='tasneefFixBadgeV284'; b.textContent='Tasneef '+FIX_VERSION; b.style.cssText='position:fixed;left:10px;bottom:10px;z-index:99999;background:#0a4033;color:white;padding:6px 10px;border-radius:12px;font:12px Arial;box-shadow:0 4px 12px #0002;opacity:.9'; document.body.appendChild(b); }
+  document.addEventListener('DOMContentLoaded',()=>{ injectExportButton(); bindMonthlyChange(); showBadge(); setTimeout(()=>{ injectExportButton(); bindMonthlyChange(); if($('monthlyBody')) window.renderMonthly(); showBadge(); },1200); });
+  window.addEventListener('load',()=>setTimeout(()=>{ injectExportButton(); bindMonthlyChange(); showBadge(); },2200));
+  console.log('Tasneef '+FIX_VERSION+' loaded');
+})();
