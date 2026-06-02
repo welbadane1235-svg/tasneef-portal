@@ -254,7 +254,7 @@
         <div class="services-topbar">
           <div>
             <h2>الخدمات التعاقدية</h2>
-            <p>إضافة الخدمات يدويًا، تسجيل التنفيذ، متابعة الاستحقاقات، والجدولة الذكية للخدمات غير المنفذة.</p>
+            <p>إضافة الخدمات يدويًا، تسجيل التنفيذ، ومتابعة الاستحقاقات.</p>
           </div>
           <div class="service-tabs">
             <button class="light" id="contractsTabBtn" onclick="showContractsSubTab('contracts')">العقود</button>
@@ -291,7 +291,6 @@
             <div class="actions">
               <button onclick="openNewContractService()">إضافة خدمة</button>
               <button class="light" onclick="renderContractServices()">تحديث الخدمات</button>
-              <button class="light" onclick="smartScheduleContractServices()">جدولة ذكية للخدمات غير المنفذة</button>
               <button class="light" onclick="exportContractServicesCSV()">تصدير CSV</button>
             </div>
           </div>
@@ -302,18 +301,6 @@
             </table>
           </div>
 
-          <div class="grid two services-panels">
-            <div class="card inner-card">
-              <div class="table-head"><h2>الجدولة الذكية للخدمات غير المنفذة</h2><button class="light" onclick="smartScheduleContractServices()">اقتراح جدول</button></div>
-              <p class="footer-note">اقتراح مواعيد تنفيذ حسب الأولوية، مع تجاهل الخدمات المنجزة وخارج العقد.</p>
-              <div id="smartServicesList" class="quick-list"></div>
-            </div>
-            <div class="card inner-card">
-              <div class="table-head"><h2>نافذة الخدمات للمشرف</h2><button class="light" onclick="showSupervisorServicesPreview()">عرض</button></div>
-              <p class="footer-note">نفس البيانات ستظهر للمشرف في نافذة الخدمات، كل مشرف يرى خدمات مشاريعه فقط.</p>
-              <div id="supervisorServicesPreview" class="quick-list"></div>
-            </div>
-          </div>
         </div>
       </div>
     </section>
