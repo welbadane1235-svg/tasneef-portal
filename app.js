@@ -17761,3 +17761,224 @@ function financePrintReport(kind){
   window.addEventListener('load',()=>setTimeout(()=>{ injectExportButton(); bindMonthlyChange(); showBadge(); },2200));
   console.log('Tasneef '+FIX_VERSION+' loaded');
 })();
+
+/* V299 - Contract smart window, annual services, client report table */
+(function(){
+  const LS_KEY='tasneef_contract_smart_v299';
+  const CORE_SERVICES=[
+    {key:'elevators', name:'المصاعد'},
+    {key:'civilDefense', name:'الدفاع المدني'},
+    {key:'pools', name:'المسابح'}
+  ];
+  const ANNUAL_OPTIONS=['غسيل الخزانات العلوية','غسيل الخزانات الأرضية','رش المبيدات','غسيل الأسطح','غسيل الممرات بالمكائن','غسيل الممر العام','غسيل المناور','غسيل المكيفات','تنظيف فلاتر المكيفات','تنظيف غرف المصاعد','غسيل المواقف','غسيل الأرصفة','تنظيف عدسات الكاميرات','التعطير','إعادة التشجير','صهريج مياه','صهريج صرف صحي','خدمة أخرى'];
+  let smartCache={};
+  let smartLoaded=false;
+  let currentSmartProjectId=null;
+  let currentSmartReadonly=false;
+
+  function el(id){return document.getElementById(id)}
+  function h(v){return String(v??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[m]))}
+  function todayIso(){return new Date().toISOString().slice(0,10)}
+  function defaultSmart(){
+    const core={}; CORE_SERVICES.forEach(s=>core[s.key]={onUs:false, visits:0, done:[], company:'', phone:'', attachment:'', notes:''});
+    return {association:{name:'', manager:'', phone:''}, core, annual:[], updated_at:null};
+  }
+  function mergeSmart(obj){
+    const d=defaultSmart(); obj=obj||{};
+    d.association={...d.association,...(obj.association||{})};
+    CORE_SERVICES.forEach(s=>{d.core[s.key]={...d.core[s.key],...((obj.core||{})[s.key]||{})}; if(!Array.isArray(d.core[s.key].done)) d.core[s.key].done=[];});
+    d.annual=Array.isArray(obj.annual)?obj.annual.map(a=>({id:a.id||('a'+Date.now()+Math.random().toString(16).slice(2)), name:a.name||'', visits:Number(a.visits)||1, done:Array.isArray(a.done)?a.done:[], notes:a.notes||''})):[];
+    d.updated_at=obj.updated_at||null;
+    return d;
+  }
+  function readLS(){try{return JSON.parse(localStorage.getItem(LS_KEY)||'{}')||{}}catch(e){return {}}}
+  function writeLS(){try{localStorage.setItem(LS_KEY,JSON.stringify(smartCache));}catch(e){}}
+  async function loadSmart(){
+    if(smartLoaded) return;
+    smartCache=readLS();
+    try{
+      if(typeof sb!=='undefined'){
+        const r=await sb.from('project_contract_smart').select('*');
+        if(!r.error && Array.isArray(r.data)){
+          r.data.forEach(x=>{smartCache[String(x.project_id)]=mergeSmart(x.payload||{});});
+          writeLS();
+        }
+      }
+    }catch(e){/* fallback to localStorage */}
+    smartLoaded=true;
+  }
+  async function persistSmart(projectId, payload){
+    const clean=mergeSmart(payload); clean.updated_at=new Date().toISOString();
+    smartCache[String(projectId)]=clean; writeLS();
+    try{
+      if(typeof sb!=='undefined'){
+        const row={project_id:Number(projectId), payload:clean, updated_at:new Date().toISOString()};
+        const r=await sb.from('project_contract_smart').upsert(row,{onConflict:'project_id'});
+        if(r.error) console.warn('project_contract_smart fallback localStorage:',r.error.message);
+      }
+    }catch(e){console.warn(e.message||e)}
+    return clean;
+  }
+  function getSmart(projectId){return mergeSmart(smartCache[String(projectId)]||{})}
+  function projectById(id){return (window.data?.projects||data?.projects||[]).find(p=>String(p.id)===String(id))}
+  function ensureAnnualSelect(){
+    const s=el('csAnnualSelect'); if(!s || s.options.length) return;
+    s.innerHTML=ANNUAL_OPTIONS.map(x=>`<option value="${h(x)}">${h(x)}</option>`).join('');
+  }
+  window.onAnnualServiceSelect=function(){
+    const val=el('csAnnualSelect')?.value||'';
+    if(val==='خدمة أخرى') el('csAnnualCustom')?.focus();
+  };
+  window.contractSmartTab=function(tab,btn){
+    ['main','annual','report'].forEach(t=>el('contractSmart'+t.charAt(0).toUpperCase()+t.slice(1)+'Tab')?.classList.add('hidden'));
+    el('contractSmart'+tab.charAt(0).toUpperCase()+tab.slice(1)+'Tab')?.classList.remove('hidden');
+    document.querySelectorAll('.contract-smart-tabs button').forEach(b=>b.classList.remove('active'));
+    btn?.classList.add('active');
+    if(tab==='report') renderClientReportTable();
+  };
+  window.contractSmartBackdrop=function(e){ if(e.target && e.target.id==='contractSmartModal') closeContractSmartModal(); };
+  window.closeContractSmartModal=function(){ el('contractSmartModal')?.classList.add('hidden'); document.body.style.overflow=''; currentSmartProjectId=null; };
+  window.openContractSmartModal=async function(projectId, mode){
+    await loadSmart(); ensureAnnualSelect();
+    currentSmartProjectId=String(projectId); currentSmartReadonly=(mode==='view');
+    const p=projectById(projectId); const d=getSmart(projectId);
+    el('contractSmartTitle').textContent=(mode==='view'?'عرض العقد: ':'تعديل العقد: ')+(p?.name||'');
+    el('contractSmartSub').textContent=`بداية العقد: ${p?.contract_start||'-'} | نهاية العقد: ${p?.contract_end||'-'}`;
+    el('contractSmartProjectId').value=projectId;
+    el('contractSmartSaveBtn').style.display=currentSmartReadonly?'none':'';
+    el('csAssocName').value=d.association.name||''; el('csAssocManager').value=d.association.manager||''; el('csAssocPhone').value=d.association.phone||'';
+    ['csAssocName','csAssocManager','csAssocPhone','csAnnualSelect','csAnnualCustom','csAnnualVisits'].forEach(id=>{if(el(id)) el(id).disabled=currentSmartReadonly;});
+    renderCoreServices(d); renderAnnualServices(d); renderClientReportTable(d);
+    document.querySelector('.contract-smart-tabs button')?.click();
+    el('contractSmartModal')?.classList.remove('hidden'); document.body.style.overflow='hidden';
+  };
+  function renderCoreServices(d){
+    const box=el('contractCoreServices'); if(!box) return;
+    box.innerHTML=CORE_SERVICES.map(s=>{
+      const x=d.core[s.key]||{}; const visits=Number(x.visits)||0; const done=Array.isArray(x.done)?x.done:[];
+      const boxes=Array.from({length:visits},(_,i)=>`<button type="button" class="visit-chip ${done.includes(i+1)?'done':''}" ${currentSmartReadonly?'disabled':''} onclick="toggleCoreVisit('${s.key}',${i+1})">زيارة ${i+1}</button>`).join('') || '<small class="muted">حدد عدد الزيارات أولًا</small>';
+      const alert=(x.onUs && !String(x.attachment||'').trim())?'<div class="smart-alert danger">تنبيه: هذه الخدمة علينا ولا يوجد مرفق عقد مسجل.</div>':'';
+      return `<div class="core-service-card" data-core="${s.key}">
+        <h3>${h(s.name)} <span class="badge ${x.onUs?'green':'gray'}">${x.onUs?'علينا':'ليست علينا'}</span></h3>
+        <label class="toggle-row"><input type="checkbox" data-field="onUs" ${x.onUs?'checked':''} ${currentSmartReadonly?'disabled':''} onchange="renderCoreServiceVisitsFromInputs('${s.key}')"> الخدمة علينا</label>
+        <label>عدد الزيارات</label><input type="number" min="0" data-field="visits" value="${h(visits)}" ${currentSmartReadonly?'disabled':''} onchange="renderCoreServiceVisitsFromInputs('${s.key}')">
+        <label>مربعات الزيارات</label><div class="visit-boxes" data-visits="${s.key}">${boxes}</div>
+        <label>اسم الشركة</label><input data-field="company" value="${h(x.company||'')}" placeholder="اسم شركة الصيانة / المورد" ${currentSmartReadonly?'disabled':''}>
+        <label>رقم الشركة</label><input data-field="phone" value="${h(x.phone||'')}" placeholder="05xxxxxxxx" ${currentSmartReadonly?'disabled':''}>
+        <label>مرفق العقد</label><input data-field="attachment" value="${h(x.attachment||'')}" placeholder="رابط العقد أو اسم الملف" ${currentSmartReadonly?'disabled':''}>
+        <label>ملاحظات</label><textarea data-field="notes" ${currentSmartReadonly?'disabled':''}>${h(x.notes||'')}</textarea>
+        ${alert}
+      </div>`;
+    }).join('');
+  }
+  function collectSmartFromModal(){
+    const d=defaultSmart();
+    d.association={name:el('csAssocName')?.value||'', manager:el('csAssocManager')?.value||'', phone:el('csAssocPhone')?.value||''};
+    CORE_SERVICES.forEach(s=>{
+      const card=document.querySelector(`[data-core="${s.key}"]`); const old=getSmart(currentSmartProjectId).core[s.key]||{};
+      const visits=Number(card?.querySelector('[data-field="visits"]')?.value||0);
+      const done=(Array.isArray(old.done)?old.done:[]).filter(n=>n<=visits);
+      d.core[s.key]={
+        onUs:!!card?.querySelector('[data-field="onUs"]')?.checked,
+        visits,
+        done,
+        company:card?.querySelector('[data-field="company"]')?.value||'',
+        phone:card?.querySelector('[data-field="phone"]')?.value||'',
+        attachment:card?.querySelector('[data-field="attachment"]')?.value||'',
+        notes:card?.querySelector('[data-field="notes"]')?.value||''
+      };
+    });
+    d.annual=getSmart(currentSmartProjectId).annual||[];
+    return d;
+  }
+  window.renderCoreServiceVisitsFromInputs=function(key){
+    const d=collectSmartFromModal();
+    smartCache[String(currentSmartProjectId)]=d;
+    renderCoreServices(d);
+  };
+  window.toggleCoreVisit=function(key,no){
+    if(currentSmartReadonly) return;
+    const d=collectSmartFromModal();
+    const arr=d.core[key].done||[]; const i=arr.indexOf(no); if(i>=0) arr.splice(i,1); else arr.push(no);
+    d.core[key].done=arr.sort((a,b)=>a-b); smartCache[String(currentSmartProjectId)]=d; writeLS(); renderCoreServices(d); renderClientReportTable(d);
+  };
+  window.addContractAnnualService=function(){
+    if(currentSmartReadonly) return;
+    const d=collectSmartFromModal();
+    let name=el('csAnnualSelect')?.value||''; const custom=(el('csAnnualCustom')?.value||'').trim(); if(name==='خدمة أخرى' || custom) name=custom||name;
+    const visits=Math.max(1, Number(el('csAnnualVisits')?.value||1));
+    if(!name) return msg ? msg('اختر أو اكتب اسم الخدمة','err') : alert('اختر أو اكتب اسم الخدمة');
+    d.annual.push({id:'a'+Date.now()+Math.random().toString(16).slice(2), name, visits, done:[], notes:''});
+    smartCache[String(currentSmartProjectId)]=d; writeLS(); if(el('csAnnualCustom')) el('csAnnualCustom').value=''; if(el('csAnnualVisits')) el('csAnnualVisits').value=1;
+    renderAnnualServices(d); renderClientReportTable(d);
+  };
+  function renderAnnualServices(d){
+    const body=el('csAnnualBody'); if(!body) return;
+    const rows=d.annual||[];
+    body.innerHTML=rows.map(a=>{
+      const done=Array.isArray(a.done)?a.done:[]; const visits=Number(a.visits)||1; const boxes=Array.from({length:visits},(_,i)=>`<button type="button" class="visit-chip ${done.includes(i+1)?'done':''}" ${currentSmartReadonly?'disabled':''} onclick="toggleAnnualVisit('${a.id}',${i+1})">${i+1}</button>`).join('');
+      return `<tr><td><b>${h(a.name)}</b></td><td>${visits}</td><td><div class="visit-boxes">${boxes}</div></td><td>${done.length}</td><td>${Math.max(0,visits-done.length)}</td><td>${currentSmartReadonly?'-':`<button class="danger" onclick="deleteAnnualService('${a.id}')">حذف</button>`}</td></tr>`;
+    }).join('') || '<tr><td colspan="6">لا توجد خدمات سنوية بعد</td></tr>';
+  }
+  window.toggleAnnualVisit=function(id,no){
+    if(currentSmartReadonly) return;
+    const d=collectSmartFromModal(); const a=(d.annual||[]).find(x=>String(x.id)===String(id)); if(!a) return;
+    if(!Array.isArray(a.done)) a.done=[]; const i=a.done.indexOf(no); if(i>=0) a.done.splice(i,1); else a.done.push(no); a.done=a.done.sort((x,y)=>x-y);
+    smartCache[String(currentSmartProjectId)]=d; writeLS(); renderAnnualServices(d); renderClientReportTable(d);
+  };
+  window.deleteAnnualService=function(id){
+    if(currentSmartReadonly) return;
+    if(!confirm('حذف هذه الخدمة السنوية؟')) return;
+    const d=collectSmartFromModal(); d.annual=(d.annual||[]).filter(a=>String(a.id)!==String(id)); smartCache[String(currentSmartProjectId)]=d; writeLS(); renderAnnualServices(d); renderClientReportTable(d);
+  };
+  function contractAlerts(d){
+    const out=[]; CORE_SERVICES.forEach(s=>{const x=d.core[s.key]||{}; if(x.onUs && !String(x.attachment||'').trim()) out.push(`الخدمة ${s.name} علينا ولا يوجد مرفق عقد.`);}); return out;
+  }
+  function reportRows(d){
+    return (d.annual||[]).map(a=>{const visits=Number(a.visits)||0; const done=(a.done||[]).length; return {name:a.name, visits, done, remain:Math.max(0,visits-done), status:done>=visits?'مكتمل':(done>0?'جاري':'لم يبدأ')};});
+  }
+  window.renderClientReportTable=function(optional){
+    const d=optional||getSmart(currentSmartProjectId); const p=projectById(currentSmartProjectId); const alerts=contractAlerts(d);
+    const rows=reportRows(d);
+    const html=`${alerts.map(a=>`<div class="smart-alert danger">${h(a)}</div>`).join('')}
+      <div class="smart-box"><b>المشروع:</b> ${h(p?.name||'-')} &nbsp; | &nbsp; <b>الجمعية:</b> ${h(d.association.name||'-')} &nbsp; | &nbsp; <b>مدير الجمعية:</b> ${h(d.association.manager||'-')} &nbsp; | &nbsp; <b>الجوال:</b> ${h(d.association.phone||'-')}</div>
+      <table class="smart-report-table"><thead><tr><th>اسم الخدمة</th><th>عدد الزيارات السنوية</th><th>المنفذ منها</th><th>المتبقي</th><th>الحالة</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${h(r.name)}</td><td>${r.visits}</td><td>${r.done}</td><td>${r.remain}</td><td>${h(r.status)}</td></tr>`).join('')||'<tr><td colspan="5">لا توجد خدمات سنوية مسجلة</td></tr>'}</tbody></table>`;
+    if(el('csClientReportBox')) el('csClientReportBox').innerHTML=html;
+    return html;
+  };
+  window.copyContractClientTable=async function(){
+    const html=renderClientReportTable(); const text=document.createElement('div'); text.innerHTML=html;
+    try{await navigator.clipboard.writeText(text.innerText); if(typeof msg==='function') msg('تم نسخ جدول تقرير العميل');}
+    catch(e){alert(text.innerText)}
+  };
+  window.printContractClientTable=function(){
+    const p=projectById(currentSmartProjectId); const html=renderClientReportTable();
+    const w=window.open('','_blank'); w.document.write(`<html dir="rtl"><head><title>تقرير خدمات العقد - ${h(p?.name||'')}</title><style>body{font-family:Tahoma,Arial;padding:24px;color:#10231d}h1{color:#0A4033}.smart-box{border:1px solid #dce8e4;border-radius:14px;padding:12px;margin:12px 0}.smart-report-table{width:100%;border-collapse:collapse}.smart-report-table th,.smart-report-table td{border:1px solid #dce8e4;padding:10px;text-align:center}.smart-report-table th{background:#0A4033;color:#fff}.smart-report-table td:first-child,.smart-report-table th:first-child{text-align:right}.smart-alert{background:#fdecec;border:1px solid #f2b7b7;color:#922;border-radius:12px;padding:10px;margin:8px 0}</style></head><body><h1>تقرير خدمات العقد</h1>${html}</body></html>`); w.document.close(); setTimeout(()=>w.print(),400);
+  };
+  window.saveContractSmartModal=async function(){
+    if(!currentSmartProjectId) return;
+    const d=collectSmartFromModal();
+    await persistSmart(currentSmartProjectId,d);
+    if(typeof msg==='function') msg('تم حفظ بيانات العقد والخدمات السنوية');
+    renderContracts();
+  };
+  const oldRenderContractsV299=window.renderContracts;
+  window.renderContracts=function(){
+    const body=el('contractsBody');
+    if(!body || typeof contractInfo!=='function') return oldRenderContractsV299&&oldRenderContractsV299();
+    const q=(el('contractSearch')?.value||'').trim();
+    const st=el('contractFilterStatus')?.value||'';
+    let rows=[...(data.projects||[])];
+    if(q) rows=rows.filter(p=>String(p.name||'').includes(q));
+    if(st) rows=rows.filter(p=>contractInfo(p).key===st);
+    rows.sort((a,b)=>{ const da=daysLeft(a.contract_end); const db=daysLeft(b.contract_end); return (da??999999)-(db??999999); });
+    body.innerHTML=rows.map(p=>{ const c=contractInfo(p); return `<tr><td><b>${h(p.name)}</b></td><td>${p.buildings_count||0}</td><td>${p.units_count||0}</td><td>${h(isoDate(p.contract_start)||'-')}</td><td>${h(isoDate(p.contract_end)||'-')}</td><td>${c.days}</td><td><span class="badge ${c.cls}">${c.text}</span></td><td class="row-actions"><button class="light" onclick="openContractSmartModal(${p.id},'view')">عرض</button><button onclick="openContractSmartModal(${p.id},'edit')">تعديل</button></td></tr>`; }).join('') || '<tr><td colspan="8">لا توجد بيانات</td></tr>';
+    if(el('contractsActiveCount')) el('contractsActiveCount').textContent=(data.projects||[]).filter(p=>contractInfo(p).key==='active').length;
+    if(el('contractsSoonCount')) el('contractsSoonCount').textContent=(data.projects||[]).filter(p=>contractInfo(p).key==='soon').length;
+    if(el('contractsExpiredCount')) el('contractsExpiredCount').textContent=(data.projects||[]).filter(p=>contractInfo(p).key==='expired').length;
+    if(el('contractsMissingCount')) el('contractsMissingCount').textContent=(data.projects||[]).filter(p=>contractInfo(p).key==='missing').length;
+  };
+  const oldRefreshV299=window.refreshAll;
+  if(typeof oldRefreshV299==='function') window.refreshAll=async function(){ const r=await oldRefreshV299.apply(this,arguments); await loadSmart(); return r; };
+  window.__contractSmartV299={loadSmart,getSmart,persistSmart};
+})();

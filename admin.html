@@ -250,59 +250,6 @@
         <div class="filters"><input id="contractSearch" oninput="renderContracts()" placeholder="بحث باسم المشروع"><select id="contractFilterStatus" onchange="renderContracts()"><option value="">كل الحالات</option><option value="active">نشط</option><option value="soon">قريب الانتهاء</option><option value="expired">منتهي</option><option value="missing">بيانات ناقصة</option></select></div>
         <div class="table-wrap"><table><thead><tr><th>المشروع</th><th>العمائر</th><th>الشقق</th><th>بداية العقد</th><th>نهاية العقد</th><th>الأيام المتبقية</th><th>حالة العقد</th><th>إجراء</th></tr></thead><tbody id="contractsBody"></tbody></table></div>
       </div>
-      <div class="card services-console" id="contractServicesCard">
-        <div class="services-topbar">
-          <div>
-            <h2>الخدمات التعاقدية</h2>
-            <p>إضافة الخدمات يدويًا، تسجيل التنفيذ، ومتابعة الاستحقاقات.</p>
-          </div>
-          <div class="service-tabs">
-            <button class="light" id="contractsTabBtn" onclick="showContractsSubTab('contracts')">العقود</button>
-            <button id="servicesTabBtn" onclick="showContractsSubTab('services')">الخدمات</button>
-          </div>
-        </div>
-
-        <div id="contractsSubTab" class="contract-subtab hidden">
-          <p class="footer-note">تبويب العقود بالأعلى يحتوي على تواريخ البداية والنهاية والتنبيهات. استخدم تبويب الخدمات للمتابعة التفصيلية للخدمات.</p>
-        </div>
-
-        <div id="servicesSubTab" class="contract-subtab">
-          <div class="kpis small services-kpis">
-            <div class="kpi"><small>إجمالي الخدمات</small><b id="servicesTotalCount">0</b></div>
-            <div class="kpi"><small>المستحقة الآن</small><b id="servicesDueCount">0</b></div>
-            <div class="kpi"><small>منجزة</small><b id="servicesDoneCount">0</b></div>
-            <div class="kpi"><small>قريبة خلال 7 أيام</small><b id="servicesSoonCount">0</b></div>
-            <div class="kpi"><small>متأخرة</small><b id="servicesLateCount">0</b></div>
-            <div class="kpi"><small>مراجعة / غير منفذة</small><b id="servicesReviewCount">0</b></div>
-          </div>
-
-          <div class="filters services-filters">
-            <input id="serviceSearch" oninput="renderContractServices()" placeholder="بحث باسم المشروع أو الخدمة أو الملاحظات">
-            <select id="serviceFilterProject" onchange="renderContractServices()"><option value="">كل المشاريع</option></select>
-            <select id="serviceFilterSupervisor" onchange="renderContractServices()"><option value="">كل المشرفين</option></select>
-            <select id="serviceFilterStatus" onchange="renderContractServices()"><option value="">كل الحالات</option><option value="due">مستحقة</option><option value="soon">قريبة</option><option value="done">منجزة</option><option value="late">متأخرة</option><option value="review">مراجعة / غير منفذة</option></select>
-            <select id="serviceFilterType" onchange="renderContractServices()"><option value="">كل أنواع الخدمة</option></select>
-            <input id="serviceFilterDate" type="date" onchange="renderContractServices()" title="الاستحقاق القادم">
-            <button class="light" onclick="resetServiceFilters()">إعادة تعيين</button>
-          </div>
-
-          <div class="table-head">
-            <h2>جدول الخدمات</h2>
-            <div class="actions">
-              <button onclick="openNewContractService()">إضافة خدمة</button>
-              <button class="light" onclick="renderContractServices()">تحديث الخدمات</button>
-              <button class="light" onclick="exportContractServicesCSV()">تصدير CSV</button>
-            </div>
-          </div>
-          <div class="table-wrap services-table-wrap">
-            <table>
-              <thead><tr><th>المشروع</th><th>المشرف</th><th>الخدمة</th><th>نوع الخدمة</th><th>التكرار</th><th>عدد الزيارات</th><th>المنفذ</th><th>المنفذ فعليًا</th><th>المتبقي</th><th>آخر تنفيذ</th><th>الاستحقاق القادم</th><th>الحالة</th><th>ملاحظات</th><th>إجراء</th></tr></thead>
-              <tbody id="contractServicesBody"></tbody>
-            </table>
-          </div>
-
-        </div>
-      </div>
     </section>
 
     <section id="workers" class="page hidden">
@@ -843,8 +790,68 @@
     </section>
   </main>
 </div>
-<script src="orders_seed.js?v=294"></script>
-<script src="app.js?v=291"></script>
-<script src="tasneef_patch_v292_orders_smart_cards.js?v=297"></script>
+<!-- V299 Contract Smart Modal -->
+<div id="contractSmartModal" class="contract-smart-modal hidden" onclick="contractSmartBackdrop(event)">
+  <div class="contract-smart-panel" onclick="event.stopPropagation()">
+    <div class="contract-smart-head">
+      <div>
+        <h2 id="contractSmartTitle">تفاصيل العقد</h2>
+        <small id="contractSmartSub">متابعة الخدمات والعقود والزيارات</small>
+      </div>
+      <div class="contract-smart-actions">
+        <button class="light" onclick="printContractClientTable()">طباعة تقرير العميل</button>
+        <button class="light" onclick="copyContractClientTable()">نسخ جدول العميل</button>
+        <button id="contractSmartSaveBtn" onclick="saveContractSmartModal()">حفظ</button>
+        <button class="danger" onclick="closeContractSmartModal()">إغلاق</button>
+      </div>
+    </div>
+    <input type="hidden" id="contractSmartProjectId">
+    <div class="contract-smart-tabs">
+      <button class="active" onclick="contractSmartTab('main',this)">الخدمات والعقود</button>
+      <button onclick="contractSmartTab('annual',this)">الخدمات السنوية</button>
+      <button onclick="contractSmartTab('report',this)">تقرير العميل</button>
+    </div>
+
+    <div id="contractSmartMainTab" class="contract-smart-tab-body">
+      <div class="smart-grid three" id="contractCoreServices"></div>
+    </div>
+
+    <div id="contractSmartAnnualTab" class="contract-smart-tab-body hidden">
+      <div class="smart-box">
+        <h3>بيانات الجمعية</h3>
+        <div class="smart-grid three">
+          <div><label>اسم الجمعية</label><input id="csAssocName" placeholder="مثال: جمعية مشروع ..."></div>
+          <div><label>اسم مدير الجمعية</label><input id="csAssocManager" placeholder="اسم المدير"></div>
+          <div><label>رقم هاتف المدير</label><input id="csAssocPhone" placeholder="05xxxxxxxx"></div>
+        </div>
+      </div>
+      <div class="smart-box">
+        <h3>إضافة خدمة سنوية</h3>
+        <div class="smart-grid four">
+          <div><label>الخدمة</label><select id="csAnnualSelect" onchange="onAnnualServiceSelect()"></select></div>
+          <div><label>خدمة أخرى</label><input id="csAnnualCustom" placeholder="اكتب اسم الخدمة"></div>
+          <div><label>عدد الزيارات السنوية</label><input id="csAnnualVisits" type="number" min="1" value="1"></div>
+          <div class="smart-end"><button onclick="addContractAnnualService()">إضافة الخدمة</button></div>
+        </div>
+      </div>
+      <div class="smart-box">
+        <div class="table-head"><h3>جدول الخدمات السنوية</h3><small>اضغط على مربعات الزيارة لتسجيل التنفيذ</small></div>
+        <div class="table-wrap"><table><thead><tr><th>الخدمة</th><th>عدد الزيارات</th><th>الزيارات</th><th>المنفذ</th><th>المتبقي</th><th>إجراء</th></tr></thead><tbody id="csAnnualBody"></tbody></table></div>
+      </div>
+    </div>
+
+    <div id="contractSmartReportTab" class="contract-smart-tab-body hidden">
+      <div class="smart-box">
+        <h3>جدول تقرير العميل</h3>
+        <p class="muted">هذا الجدول يوضح للعميل اسم الخدمة، عدد الزيارات السنوية، وكم نفذ منها.</p>
+        <div id="csClientReportBox"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="orders_seed.js?v=299"></script>
+<script src="app.js?v=299"></script>
+<script src="tasneef_patch_v292_orders_smart_cards.js?v=299"></script>
 </body>
 </html>
