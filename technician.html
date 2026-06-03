@@ -116,11 +116,11 @@
     </div>
   </section>
 </div>
-<script src="app.js?v=307"></script>
-<script src="tasneef_patch_v292_orders_smart_cards.js?v=297"></script>
+<script src="app.js?v=308"></script>
+<script src="tasneef_patch_v292_orders_smart_cards.js?v=308"></script>
 <script>
 (function(){
-  const ATT_KEY='tasneef_technician_attendance_v307';
+  const ATT_KEY='tasneef_technician_attendance_v308';
   function $id(id){return document.getElementById(id)}
   function pad(n){return String(n).padStart(2,'0')}
   function todayISO(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
@@ -133,19 +133,72 @@
   function techId(){const u=currentTech();return String(u.id||u.username||u.email||'unknown')}
   function techName(){const u=currentTech();return u.full_name||u.username||u.email||'الفني'}
   function getTechRows(month){const store=getStore();const id=techId();return Object.values((store[id]||{})).filter(r=>String(r.date||'').startsWith(month)).sort((a,b)=>String(a.date).localeCompare(String(b.date)))}
-  function saveToday(status){
+  async function persistTechAttendanceToSystem(row){
+    // يربط حضور الفني بجدول الحضور الشهري في الإدارة، وليس تخزينًا محليًا فقط.
+    try{
+      if(!window.sb || !window.sb.from) return;
+      const u=currentTech();
+      const status = row.status === 'absent' ? 'absent' : 'present';
+      const noteParts = ['فني: '+techName()];
+      if(row.check_in) noteParts.push('حضور: '+row.check_in);
+      if(row.check_out) noteParts.push('انصراف: '+row.check_out);
+      if(row.note) noteParts.push(row.note);
+      const attendanceRow={
+        attendance_date: row.date,
+        worker_id: Number(u.id) || Number(row.tech_id) || null,
+        supervisor_id: Number(u.supervisor_id || u.manager_id) || null,
+        project_id: null,
+        status,
+        notes: noteParts.join(' | '),
+        created_by: Number(u.id) || null
+      };
+      if(attendanceRow.worker_id){
+        try{ await sb.from('attendance').upsert(attendanceRow,{onConflict:'attendance_date,worker_id'}); }catch(e){ console.warn('tech attendance upsert failed',e); }
+      }
+      // تسجيل حضور/انصراف الفني أيضًا في time_logs حتى يقرأه جدول الفنيين الشهري.
+      try{
+        const checkInISO = row.check_in ? (row.date+'T'+row.check_in+':00') : null;
+        const checkOutISO = row.check_out ? (row.date+'T'+row.check_out+':00') : null;
+        if(status==='present' && checkInISO){
+          const found = await sb.from('time_logs').select('id,check_in,check_out').eq('user_id', Number(u.id)||0).eq('log_date', row.date).order('id',{ascending:false}).limit(1);
+          const existing = (found && found.data && found.data[0]) || null;
+          const logRow={
+            user_id:Number(u.id)||null,
+            supervisor_id:Number(u.supervisor_id || u.manager_id)||null,
+            project_id:null,
+            check_in:checkInISO,
+            check_out:checkOutISO,
+            log_date:row.date,
+            duration_minutes:0,
+            travel_minutes:0,
+            visit_type:'technician_attendance',
+            required_minutes:0,
+            time_difference_minutes:0,
+            time_status:'ok',
+            notes: noteParts.join(' | ')
+          };
+          if(existing?.id) await sb.from('time_logs').update(logRow).eq('id', existing.id);
+          else await sb.from('time_logs').insert(logRow);
+        }
+      }catch(e){ console.warn('tech time_logs sync failed',e); }
+    }catch(e){ console.warn('persistTechAttendanceToSystem failed',e); }
+  }
+  async function saveToday(status){
     const month=$id('techAttendanceMonth')?.value||monthNow();
     const date=todayISO();
     const store=getStore();const id=techId();store[id]=store[id]||{};
     const old=store[id][date]||{date, tech_id:id, tech_name:techName()};
     const note=$id('techAttendanceNote')?.value||old.note||'';
-    if(status==='present') store[id][date]={...old,date,tech_id:id,tech_name:techName(),status:'present',check_in:old.check_in||timeNow(),note};
-    if(status==='checkout') store[id][date]={...old,date,tech_id:id,tech_name:techName(),status:old.status||'present',check_in:old.check_in||timeNow(),check_out:timeNow(),note};
-    if(status==='absent') store[id][date]={...old,date,tech_id:id,tech_name:techName(),status:'absent',check_in:'',check_out:'',note};
+    let row=old;
+    if(status==='present') row={...old,date,tech_id:id,tech_name:techName(),status:'present',check_in:old.check_in||timeNow(),note};
+    if(status==='checkout') row={...old,date,tech_id:id,tech_name:techName(),status:old.status||'present',check_in:old.check_in||timeNow(),check_out:timeNow(),note};
+    if(status==='absent') row={...old,date,tech_id:id,tech_name:techName(),status:'absent',check_in:'',check_out:'',note};
+    store[id][date]=row;
     setStore(store);
     if($id('techAttendanceMonth')) $id('techAttendanceMonth').value=month;
-    if(typeof msg==='function') msg('تم حفظ حضور الفني');
     renderTechAttendance();
+    await persistTechAttendanceToSystem(row);
+    if(typeof msg==='function') msg(status==='checkout'?'تم حفظ انصراف الفني وظهر في جدول الإدارة':'تم حفظ حضور/غياب الفني وظهر في جدول الإدارة');
   }
   window.showTechMainTab=function(id,btn){
     document.querySelectorAll('.tech-main-page').forEach(p=>p.classList.remove('active'));
