@@ -1603,9 +1603,6 @@ function monthlyReportRowsV58(){return monthlyRowsV60()}
     ['can_edit_time_logs','تعديل السجلات اليومية'],
     ['can_manage_users','إدارة المستخدمين'],
     ['can_manage_workers','إدارة العمال'],
-    ['can_expenses_inventory','المصروفات والمخزون'],
-    ['can_inventory_requests','طلبات صرف المخزون'],
-    ['can_manage_inventory','إدارة المخزون']
   ];
 
   function roleDefaults(role){
@@ -3313,9 +3310,6 @@ function financeResetFilters(){ ['financeSearch','financeProjectFilter','finance
     ['can_tickets','التكتات'],
     ['can_client_reports','تقارير العملاء'],
     ['can_client_ratings','تقييمات العملاء'],
-    ['can_expenses_inventory','المصروفات والمخزون'],
-    ['can_inventory_requests','طلبات صرف المخزون'],
-    ['can_manage_inventory','إدارة المخزون'],
     ['can_alerts','التنبيهات'],
     ['can_assistant','مساعد تصنيف'],
     ['can_export','التصدير']
@@ -3333,7 +3327,6 @@ function financeResetFilters(){ ['financeSearch','financeProjectFilter','finance
     tickets:'can_tickets',
     clientReports:'can_client_reports',
     clientRatings:'can_client_ratings',
-    financeDashboard:'can_expenses_inventory',
     alerts:'can_alerts',
     assistant:'can_assistant',
     export:'can_export'
@@ -3588,9 +3581,6 @@ function financeResetFilters(){ ['financeSearch','financeProjectFilter','finance
     ['can_tickets','التكتات'],
     ['can_client_reports','تقارير العملاء'],
     ['can_client_ratings','تقييمات العملاء'],
-    ['can_expenses_inventory','المصروفات والمخزون'],
-    ['can_inventory_requests','طلبات صرف المخزون'],
-    ['can_manage_inventory','إدارة المخزون'],
     ['can_alerts','التنبيهات'],
     ['can_assistant','مساعد تصنيف'],
     ['can_export','التصدير']
@@ -3608,7 +3598,6 @@ function financeResetFilters(){ ['financeSearch','financeProjectFilter','finance
     tickets:'can_tickets',
     clientReports:'can_client_reports',
     clientRatings:'can_client_ratings',
-    financeDashboard:'can_expenses_inventory',
     alerts:'can_alerts',
     assistant:'can_assistant',
     export:'can_export'
@@ -17972,5 +17961,41 @@ function financePrintReport(kind){
   };
   try{ refreshAll = window.refreshAll; }catch(e){}
 
+  console.log('Tasneef '+FIX_VERSION+' loaded');
+})();
+
+
+/* ===== V306: remove expenses & inventory module, keep app lightweight ===== */
+(function(){
+  const FIX_VERSION='v306-remove-finance-inventory';
+  function removeFinanceInventoryUi(){
+    try{
+      document.querySelectorAll('button[onclick*=\"financeDashboard\"], #financeDashboard, #supInventory, button[onclick*=\"supInventory\"]').forEach(n=>n.remove());
+      document.querySelectorAll('[data-perm=\"can_expenses_inventory\"],[data-perm=\"can_inventory_requests\"],[data-perm=\"can_manage_inventory\"]').forEach(function(inp){
+        const wrap=inp.closest('label')||inp; wrap.remove();
+      });
+    }catch(e){}
+  }
+  removeFinanceInventoryUi();
+  document.addEventListener('DOMContentLoaded', removeFinanceInventoryUi);
+  window.addEventListener('load', removeFinanceInventoryUi);
+  const oldShowPage=window.showPage;
+  window.showPage=function(id,btn){
+    if(id==='financeDashboard'){
+      if(typeof msg==='function') msg('تم حذف قسم المصروفات والمخزون من هذه النسخة');
+      return;
+    }
+    return typeof oldShowPage==='function'?oldShowPage(id,btn):undefined;
+  };
+  try{ showPage=window.showPage; }catch(e){}
+  const oldShowSupervisorWindow=window.showSupervisorWindow;
+  window.showSupervisorWindow=function(id,btn){
+    if(id==='supInventory') return;
+    return typeof oldShowSupervisorWindow==='function'?oldShowSupervisorWindow(id,btn):undefined;
+  };
+  try{ showSupervisorWindow=window.showSupervisorWindow; }catch(e){}
+  window.supervisorInventoryLoad=async function(){ return []; };
+  window.financeLoadAll=async function(){ return; };
+  window.financeRenderAll=function(){};
   console.log('Tasneef '+FIX_VERSION+' loaded');
 })();

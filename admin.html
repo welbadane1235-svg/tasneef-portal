@@ -132,7 +132,6 @@
     <button class="nav" onclick="showPage('orders',this)">الأوردرات</button>
     <button class="nav" onclick="showPage('clientReports',this)">تقارير العملاء</button>
     <button class="nav" onclick="showPage('clientRatings',this)">تقييمات العملاء</button>
-    <button class="nav" onclick="showPage('financeDashboard',this)">المصروفات والمخزون</button>
     <button class="nav" onclick="showPage('alerts',this)">التنبيهات</button>
     <button class="nav" onclick="showPage('assistant',this)">مساعد تصنيف</button>
     <button class="nav" onclick="showPage('export',this)">التصدير والاستيراد</button>
@@ -182,7 +181,7 @@
     </section>
 
     <section id="users" class="page hidden">
-      <div class="grid two"><div class="card"><h2 id="userFormTitle">إضافة مستخدم</h2><input type="hidden" id="userId"><label>الاسم الكامل</label><input id="userFullName"><label>اسم المستخدم</label><input id="userUsername"><label>كلمة المرور</label><input id="userPassword"><label>الدور</label><select id="userRole"><option value="admin">مدير عام</option><option value="financial_manager">مدير مالي</option><option value="operations_manager">مدير تشغيلي</option><option value="warehouse_manager">مدير مخازن</option><option value="technician">فني</option><option value="supervisor">مشرف</option></select><label>الحالة</label><select id="userActive"><option value="true">نشط</option><option value="false">موقوف</option></select><div id="userPermissionsBoxV72" class="perm-box-v72"><label>الصلاحيات</label><div class="perm-grid-v72"><label class="perm-item-v72"><input type="checkbox" id="perm_can_time_logs" data-perm="can_time_logs"> <span>تسجيل دخول / خروج</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_journey" data-perm="can_journey"> <span>رحلة التشغيل اليومية</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_attendance" data-perm="can_attendance"> <span>تسجيل الحضور</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_tickets" data-perm="can_tickets"> <span>التكتات</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_reports" data-perm="can_reports"> <span>الملخص والتقارير</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_monthly" data-perm="can_monthly"> <span>الأوقات الشهرية</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_edit_time_logs" data-perm="can_edit_time_logs"> <span>تعديل السجلات اليومية</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_manage_users" data-perm="can_manage_users"> <span>إدارة المستخدمين</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_manage_workers" data-perm="can_manage_workers"> <span>إدارة العمال</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_expenses_inventory" data-perm="can_expenses_inventory"> <span>المصروفات والمخزون</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_inventory_requests" data-perm="can_inventory_requests"> <span>طلبات صرف المخزون</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_manage_inventory" data-perm="can_manage_inventory"> <span>إدارة المخزون</span></label></div><div class="footer-note">تحدد هذه الصلاحيات ما يظهر للمستخدم داخل التطبيق. مدير عام يحصل على كل الصلاحيات افتراضيًا.</div></div><div class="actions"><button onclick="saveUser()">حفظ</button><button class="light" onclick="clearUserForm()">جديد</button></div></div><div class="card"><h2>المستخدمون</h2><div class="table-wrap"><table><thead><tr><th>الاسم</th><th>المستخدم</th><th>الدور</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="usersBody"></tbody></table></div></div></div>
+      <div class="grid two"><div class="card"><h2 id="userFormTitle">إضافة مستخدم</h2><input type="hidden" id="userId"><label>الاسم الكامل</label><input id="userFullName"><label>اسم المستخدم</label><input id="userUsername"><label>كلمة المرور</label><input id="userPassword"><label>الدور</label><select id="userRole"><option value="admin">مدير عام</option><option value="financial_manager">مدير مالي</option><option value="operations_manager">مدير تشغيلي</option><option value="warehouse_manager">مدير مخازن</option><option value="technician">فني</option><option value="supervisor">مشرف</option></select><label>الحالة</label><select id="userActive"><option value="true">نشط</option><option value="false">موقوف</option></select><div id="userPermissionsBoxV72" class="perm-box-v72"><label>الصلاحيات</label><div class="perm-grid-v72"><label class="perm-item-v72"><input type="checkbox" id="perm_can_time_logs" data-perm="can_time_logs"> <span>تسجيل دخول / خروج</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_journey" data-perm="can_journey"> <span>رحلة التشغيل اليومية</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_attendance" data-perm="can_attendance"> <span>تسجيل الحضور</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_tickets" data-perm="can_tickets"> <span>التكتات</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_reports" data-perm="can_reports"> <span>الملخص والتقارير</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_monthly" data-perm="can_monthly"> <span>الأوقات الشهرية</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_edit_time_logs" data-perm="can_edit_time_logs"> <span>تعديل السجلات اليومية</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_manage_users" data-perm="can_manage_users"> <span>إدارة المستخدمين</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_manage_workers" data-perm="can_manage_workers"> <span>إدارة العمال</span></label></div><div class="footer-note">تحدد هذه الصلاحيات ما يظهر للمستخدم داخل التطبيق. مدير عام يحصل على كل الصلاحيات افتراضيًا.</div></div><div class="actions"><button onclick="saveUser()">حفظ</button><button class="light" onclick="clearUserForm()">جديد</button></div></div><div class="card"><h2>المستخدمون</h2><div class="table-wrap"><table><thead><tr><th>الاسم</th><th>المستخدم</th><th>الدور</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="usersBody"></tbody></table></div></div></div>
     </section>
 
     <section id="projects" class="page hidden">
@@ -516,188 +515,6 @@
       </div>
     </section>
 
-
-    <section id="financeDashboard" class="page hidden">
-      <div class="page-head">
-        <div>
-          <h1>المصروفات والمخزون</h1>
-          <h2>V118 Advanced Inventory Reports</h2>
-          <p>نظام احترافي لإدارة المصروفات والمخزون وطلبات الصرف متعددة الأصناف والتقارير التفصيلية.</p>
-        </div>
-        <div class="actions"><button onclick="financeLoadAll(true)">تحديث</button><button class="light" onclick="financeOpenNewProject()">+ إضافة مشروع</button></div>
-      </div>
-      <div class="report-kpis finance-kpis">
-        <div class="kpi"><small>مصروفات الشهر</small><b id="finKpiExpenses">0</b></div>
-        <div class="kpi"><small>عدد المصروفات</small><b id="finKpiExpenseCount">0</b></div>
-        <div class="kpi"><small>أصناف المخزون</small><b id="finKpiItems">0</b></div>
-        <div class="kpi"><small>أصناف منخفضة</small><b id="finKpiLowStock">0</b></div>
-        <div class="kpi"><small>حركات المخزون</small><b id="finKpiMovements">0</b></div>
-      </div>
-      <div class="card">
-        <div class="finance-tabs">
-          <button class="light finance-tab active" onclick="financeShowTab('overview',this)">الملخص</button>
-          <button class="light finance-tab" onclick="financeShowTab('expenses',this)">المصروفات</button>
-          <button class="light finance-tab" onclick="financeShowTab('inventory',this)">المخزون</button>
-          <button class="light finance-tab" onclick="financeShowTab('movements',this)">حركة المخزون</button>
-          <button class="light finance-tab" onclick="financeShowTab('requests',this)">طلبات الصرف</button>
-          <button class="light finance-tab" onclick="financeShowTab('reports',this)">التقارير</button>
-          <button class="light finance-tab" onclick="financeShowTab('costCenters',this)">مراكز التكلفة</button>
-        </div>
-      </div>
-
-      <div id="financeTabOverview" class="finance-tab-page">
-        <div class="card">
-          <h2>بحث وفلاتر</h2>
-          <div class="report-filters-panel">
-            <input id="financeSearch" oninput="financeRenderAll()" placeholder="بحث بالمشروع أو المورد أو الصنف أو الملاحظة">
-            <select id="financeProjectFilter" onchange="financeRenderAll()"><option value="">كل المشاريع</option></select>
-            <select id="financeMonthFilter" onchange="financeRenderAll()"></select>
-            <select id="financeExpenseTypeFilter" onchange="financeRenderAll()"><option value="">كل المصروفات</option><option>رواتب</option><option>قطع غيار</option><option>مشتريات نظافة</option><option>صيانة</option><option>صهاريج مياه</option><option>صهاريج صرف</option><option>مكافحة حشرات</option><option>معدات</option><option>وقود</option><option>مصروف عام</option><option>مصروف طارئ</option></select>
-            <button class="light" onclick="financeResetFilters()">إعادة تعيين</button>
-          </div>
-        </div>
-        <div class="split">
-          <div class="card"><h2>آخر المصروفات</h2><div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المشروع</th><th>النوع</th><th>الإجمالي</th></tr></thead><tbody id="finRecentExpenses"></tbody></table></div></div>
-          <div class="card"><h2>أصناف منخفضة المخزون</h2><div class="table-wrap"><table><thead><tr><th>الصنف</th><th>التصنيف</th><th>الكمية</th><th>الحد الأدنى</th></tr></thead><tbody id="finLowStockBody"></tbody></table></div></div>
-        </div>
-      </div>
-
-      <div id="financeTabExpenses" class="finance-tab-page hidden">
-        <div class="report-premium-wrap">
-          <div class="card report-form-card">
-            <h2>تسجيل مصروف</h2><input type="hidden" id="financeExpenseId">
-            <label>المشروع</label><select id="financeExpenseProject"></select>
-            <label>مركز التكلفة</label><select id="financeExpenseCostCenter"><option value="">اختر مركز التكلفة</option></select>
-            <div class="split"><div><label>نوع المصروف</label><select id="financeExpenseCategory"><option>رواتب</option><option>قطع غيار</option><option>مشتريات نظافة</option><option>صيانة</option><option>صهاريج مياه</option><option>صهاريج صرف</option><option>مكافحة حشرات</option><option>معدات</option><option>وقود</option><option>مصروف عام</option><option>مصروف طارئ</option></select></div><div><label>التاريخ</label><input type="date" id="financeExpenseDate"></div></div>
-            <div class="split"><div><label>المبلغ قبل الضريبة</label><input type="number" id="financeExpenseSubtotal" step="0.01" oninput="financeCalcExpenseTotal()"></div><div><label>الضريبة الثابتة 15%</label><input type="number" id="financeExpenseVat" step="0.01" readonly></div></div>
-            <label>الإجمالي شامل الضريبة</label><input type="number" id="financeExpenseTotal" step="0.01" readonly>
-            <div class="split"><div><label>المورد</label><input id="financeExpenseSupplier"></div><div><label>طريقة الدفع</label><select id="financeExpenseMethod"><option>تحويل</option><option>نقد</option><option>شبكة</option><option>آجل</option></select></div></div>
-            <label>ملاحظات</label><textarea id="financeExpenseNotes"></textarea>
-            <div class="actions"><button onclick="financeSaveExpense(this)">حفظ المصروف</button><button class="light" onclick="financeClearExpenseForm()">تفريغ</button></div>
-          </div>
-          <div class="card"><h2>المصروفات</h2><div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المشروع</th><th>النوع</th><th>المورد</th><th>الإجمالي</th><th>الدفع</th><th>إجراء</th></tr></thead><tbody id="financeExpensesBody"></tbody></table></div></div>
-        </div>
-      </div>
-
-      <div id="financeTabInventory" class="finance-tab-page hidden">
-        <div class="report-premium-wrap">
-          <div class="card report-form-card">
-            <h2>إضافة / تعديل صنف</h2><input type="hidden" id="inventoryItemId">
-            <div class="split"><div><label>اسم المنتج</label><input id="inventoryItemName" placeholder="مثال: ملمع استيل"></div><div><label>كود المنتج</label><input id="inventoryItemSerial" placeholder="يولد تلقائيًا عند الحفظ"></div></div>
-            <div class="split"><div><label>باركود المورد</label><input id="inventoryItemBarcode" placeholder="الباركود الموجود على المنتج أو المورد"></div><div><label>المورد</label><input id="inventoryItemSupplier" placeholder="اسم المورد"></div></div>
-            <div class="split"><div><label>التصنيف</label><select id="inventoryItemCategory"><option>كهرباء</option><option>سباكة</option><option>نظافة</option><option>مكافحة حشرات</option><option>تكييف</option><option>زراعة</option><option>معدات</option><option>أخرى</option></select></div><div><label>نوع المنتج</label><select id="inventoryItemType"><option>مادة</option><option>أداة</option><option>معدات</option><option>قطعة غيار</option><option>أخرى</option></select></div></div>
-            <div class="split"><div><label>وحدة القياس</label><input id="inventoryItemUnit" placeholder="حبة / كرتون / لتر / متر"></div><div><label>حد إعادة الطلب</label><input type="number" id="inventoryItemMin" step="0.01" value="0"></div></div>
-            <label>صورة المنتج <b style="color:#b42318">إلزامية</b></label><label class="stage-upload">+ اختيار صورة المنتج<input type="file" accept="image/*" onchange="inventoryHandleItemImage(this)"></label><div id="inventoryItemImagePreview" class="img-previews"></div>
-            <div class="split"><div><label>الكمية الحالية</label><input type="number" id="inventoryItemQty" step="0.01"></div><div><label>سعر الوحدة</label><input type="number" id="inventoryItemCost" step="0.01" oninput="inventoryCalcItemVatPreview()"></div></div>
-            <label>حالة الضريبة</label><select id="inventoryItemVatMode" onchange="inventoryCalcItemVatPreview()"><option value="exclusive">غير شامل الضريبة</option><option value="inclusive">شامل الضريبة</option><option value="exempt">خالي الضريبة</option></select>
-            <div class="split"><div><label>ضريبة 15%</label><input id="inventoryItemVatPreview" class="vat-readonly" readonly value="0.00"></div><div><label>سعر الوحدة شامل الضريبة</label><input id="inventoryItemGrossPreview" class="vat-readonly" readonly value="0.00"></div></div>
-            <label>ملاحظات</label><textarea id="inventoryItemNotes"></textarea>
-            <div class="actions"><button onclick="inventorySaveItem(this)">حفظ الصنف</button><button class="light" onclick="inventoryClearItemForm()">تفريغ</button></div>
-          </div>
-          <div class="card"><div class="table-head"><h2>قائمة المخزون</h2></div>
-            <div class="inventory-filter-bar">
-              <input id="inventorySearch" oninput="inventoryRenderItems()" placeholder="بحث: منتج / كود / باركود">
-              <select id="inventorySupplierFilter" onchange="inventoryRenderItems()"><option value="">كل الموردين</option></select>
-              <select id="inventoryCategoryFilter" onchange="inventoryRenderItems()"><option value="">كل التصنيفات</option><option>كهرباء</option><option>سباكة</option><option>نظافة</option><option>مبيدات</option><option>معدات</option><option>أخرى</option></select>
-            </div>
-            <div class="table-wrap"><table class="inventory-main-table"><thead><tr><th>الصورة</th><th>كود المنتج</th><th>الصنف</th><th>الكمية</th><th>الوحدة</th><th>سعر الوحدة</th><th>المورد</th><th>إجراء</th></tr></thead><tbody id="inventoryItemsBody"></tbody></table></div></div>
-        </div>
-      </div>
-
-      <div id="financeTabMovements" class="finance-tab-page hidden">
-        <div class="report-premium-wrap">
-          <div class="card report-form-card">
-            <h2>تسجيل حركة مخزون</h2><input type="hidden" id="inventoryMovementId">
-            <label>الصنف</label><select id="inventoryMovementItem"></select>
-            <div class="split"><div><label>نوع الحركة</label><select id="inventoryMovementType"><option value="in">إدخال</option><option value="out">صرف</option><option value="return">إرجاع</option><option value="consume">استهلاك</option><option value="adjust">تعديل رصيد</option></select></div><div><label>التاريخ</label><input type="date" id="inventoryMovementDate"></div></div>
-            <div class="split"><div><label>الكمية</label><input type="number" id="inventoryMovementQty" step="0.01"></div><div><label>المشروع</label><select id="inventoryMovementProject"><option value="">بدون مشروع</option></select></div></div>
-            <label>مركز التكلفة</label><select id="inventoryMovementCostCenter"><option value="">اختر مركز التكلفة</option></select>
-            <div class="split"><div><label>المستلم / الموظف</label><input id="inventoryMovementReceiver"></div><div><label>سبب الحركة</label><input id="inventoryMovementReason" placeholder="مثال: صرف لمبات للدور الأرضي"></div></div>
-            <label>ملاحظات</label><textarea id="inventoryMovementNotes"></textarea>
-            <div class="actions"><button onclick="inventorySaveMovement(this)">حفظ الحركة</button><button class="light" onclick="inventoryClearMovementForm()">تفريغ</button></div>
-          </div>
-          <div class="card"><h2>حركة المخزون</h2><div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>الصنف</th><th>الحركة</th><th>الكمية</th><th>المشروع</th><th>المستلم</th><th>إجراء</th></tr></thead><tbody id="inventoryMovementsBody"></tbody></table></div></div>
-        </div>
-      </div>
-
-
-      <div id="financeTabRequests" class="finance-tab-page hidden">
-        <div class="card">
-          <h2>إعدادات مسار اعتماد صرف المخزون</h2>
-          <p class="muted">اختر الجهات المطلوبة للموافقة ورتبها بالأرقام. إذا تركت جهة بدون تحديد لن تدخل في المسار.</p>
-          <div class="approval-grid">
-            <label class="approval-step"><input type="checkbox" id="approvalWarehouse" checked> مدير مخازن <input type="number" id="approvalWarehouseOrder" value="1" min="1"></label>
-            <label class="approval-step"><input type="checkbox" id="approvalOps" checked> مدير تشغيلي <input type="number" id="approvalOpsOrder" value="2" min="1"></label>
-            <label class="approval-step"><input type="checkbox" id="approvalFinance" checked> مدير مالي <input type="number" id="approvalFinanceOrder" value="3" min="1"></label>
-            <label class="approval-step"><input type="checkbox" id="approvalGeneral" checked> مدير عام <input type="number" id="approvalGeneralOrder" value="4" min="1"></label>
-          </div>
-          <div class="actions"><button onclick="inventorySaveApprovalSettings()">حفظ مسار الاعتماد</button><button class="light" onclick="inventoryLoadApprovalSettings(true)">استعادة المسار الافتراضي</button></div>
-          <div id="inventoryApprovalPreview" class="sup-help"></div>
-        </div>
-        <div class="report-premium-wrap">
-          <div class="card report-form-card">
-            <h2>طلب صرف من المخزون</h2>
-            <p class="muted">المسار قابل للتحديد من الإدارة: مدير مخازن / مدير تشغيلي / مدير مالي / مدير عام. لا يظهر زر الاعتماد إلا للحساب صاحب المرحلة الحالية فقط.</p>
-            <div class="split"><div><label>تاريخ الطلب</label><input type="date" id="inventoryRequestDate"></div></div>
-            <div class="custody-hidden-v194" style="display:none"><select id="inventoryRequestProject"></select><select id="inventoryRequestCostCenter"><option value="">اختر مركز التكلفة</option></select></div>
-            <label>اسم الطالب (مشرف / فني / إداري)</label><select id="inventoryRequestSupervisor"></select>
-            <div class="card soft-card" style="padding:12px;margin:10px 0">
-              <h3>إضافة أصناف إلى نفس أمر الصرف</h3>
-              <label>الصنف</label><select id="inventoryRequestItem"></select>
-              <div class="split"><div><label>الكمية المطلوبة</label><input type="number" id="inventoryRequestQty" step="0.01"></div><div><label>المتوفر</label><input id="inventoryRequestAvailable" readonly></div></div>
-              <div class="actions"><button type="button" class="light" onclick="inventoryAddRequestLine()">+ إضافة الصنف للطلب</button></div>
-              <div class="table-wrap"><table><thead><tr><th>كود المنتج</th><th>الصنف</th><th>المتوفر</th><th>الكمية</th><th>حذف</th></tr></thead><tbody id="inventoryRequestLinesBody"></tbody></table></div>
-            </div>
-            <label>سبب الصرف / الاستخدام</label><input id="inventoryRequestReason" placeholder="مثال: أعمال صيانة ونظافة في المشروع">
-            <label>ملاحظات</label><textarea id="inventoryRequestNotes"></textarea>
-            <div class="actions"><button onclick="inventorySaveRequest(this)">إرسال طلب الصرف</button><button class="light" onclick="inventoryClearRequestForm()">تفريغ</button></div>
-          </div>
-          <div class="card">
-            <div class="table-head"><h2>طلبات الصرف والاعتمادات</h2><select id="inventoryRequestStatusFilter" onchange="inventoryRenderRequests()"><option value="">كل الحالات</option><option value="pending_warehouse">بانتظار مدير مخازن</option><option value="pending_ops">بانتظار مدير تشغيلي</option><option value="pending_finance">بانتظار مدير مالي</option><option value="pending_general">بانتظار مدير عام</option><option value="approved">معتمد ومصروف</option><option value="rejected">مرفوض</option></select></div>
-            <div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>اسم الطالب</th><th>الأصناف</th><th>الكمية</th><th>سبب الصرف</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="inventoryRequestsBody"></tbody></table></div>
-          </div>
-        </div>
-      </div>
-
-
-      <div id="financeTabCostCenters" class="finance-tab-page hidden">
-        <div class="report-premium-wrap">
-          <div class="card report-form-card">
-            <h2>إضافة / تعديل مركز تكلفة</h2>
-            <input type="hidden" id="costCenterId">
-            <div class="split"><div><label>كود مركز التكلفة</label><input id="costCenterCode" placeholder="مثال: CC-001"></div><div><label>اسم مركز التكلفة</label><input id="costCenterName" placeholder="مثال: تعمير 17"></div></div>
-            <div class="split"><div><label>النوع</label><select id="costCenterType"><option>مشروع</option><option>قسم</option><option>إداري</option><option>عام</option></select></div><div><label>الحالة</label><select id="costCenterStatus"><option value="active">نشط</option><option value="inactive">موقوف</option></select></div></div>
-            <label>ملاحظات</label><textarea id="costCenterNotes"></textarea>
-            <div class="actions"><button onclick="costCenterSave(this)">حفظ مركز التكلفة</button><button class="light" onclick="costCenterClearForm()">تفريغ</button><button class="light" onclick="costCenterCreateFromProjects()">إنشاء من المشاريع</button></div>
-          </div>
-          <div class="card"><h2>قائمة مراكز التكلفة</h2><div class="table-wrap"><table><thead><tr><th>الكود</th><th>مركز التكلفة</th><th>النوع</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="costCentersBody"></tbody></table></div></div>
-        </div>
-      </div>
-
-      <div id="financeTabReports" class="finance-tab-page hidden">
-        <div class="card wide-card"><h2>فلاتر التقارير</h2><div class="report-filters-panel"><input id="financeReportQuickSearch" oninput="financeRenderReports()" placeholder="بحث ذكي في التقارير: منتج / مورد / مشروع / مشرف"><select id="financeReportCostCodeFilter" onchange="financeRenderReports()"><option value="">كل رموز التكلفة</option><option value="FM">FM - مشاريع</option><option value="CN">CN - إداري / كلين</option></select><select id="inventoryReportDateMode" onchange="financeRenderReports()"><option value="all">كل الفترات</option><option value="day">اليوم</option><option value="month">الشهر</option></select><input type="date" id="inventoryReportDay" onchange="financeRenderReports()"><input type="month" id="inventoryReportMonth" onchange="financeRenderReports()"><button class="light" onclick="inventoryClearReportDateFilter()">مسح فلتر التاريخ</button></div></div>
-        <div class="smart-reports-deck" id="smartReportsDeck">
-          <button type="button" class="smart-report-card active" data-report="expensesByProject" onclick="financeShowSmartReport('expensesByProject',this)"><span>مصروفات المشاريع</span><b>عرض التقرير</b><small>إجمالي المصروفات وعدد العمليات حسب المشروع</small></button>
-          <button type="button" class="smart-report-card" data-report="stockOutByProject" onclick="financeShowSmartReport('stockOutByProject',this)"><span>صرف المخزون</span><b>عرض التقرير</b><small>الكميات المصروفة حسب كل مشروع</small></button>
-          <button type="button" class="smart-report-card" data-report="stockOutBySupervisor" onclick="financeShowSmartReport('stockOutBySupervisor',this)"><span>استهلاك المشرفين</span><b>عرض التقرير</b><small>المشرف، المشروع، عدد الطلبات والكمية</small></button>
-          <button type="button" class="smart-report-card" data-report="productDetail" onclick="financeShowSmartReport('productDetail',this)"><span>تفاصيل منتج</span><b>عرض التقرير</b><small>من استهلك المنتج وفي أي مشروع وخلال كم</small></button>
-          <button type="button" class="smart-report-card" data-report="stockReport" onclick="financeShowSmartReport('stockReport',this)"><span>المخزون العام</span><b>عرض التقرير</b><small>الكود، الرصيد، حد الطلب، وقيمة المخزون</small></button>
-          <button type="button" class="smart-report-card" data-report="costCenters" onclick="financeShowSmartReport('costCenters',this)"><span>مراكز التكلفة</span><b>عرض التقرير</b><small>الصادر والمرتجع والمستهلك حسب مركز التكلفة</small></button>
-          <button type="button" class="smart-report-card" data-report="inventoryUsageDetail" onclick="financeShowSmartReport('inventoryUsageDetail',this)"><span>تفصيلي الاستهلاك</span><b>عرض التقرير</b><small>ماذا استُخدم ومتى ولأي مشروع</small></button>
-        </div>
-
-        <div class="smart-report-stage">
-          <div class="card smart-report-panel active" data-report-panel="expensesByProject"><div class="table-head"><h2>مصروفات حسب المشروع</h2><button class="light" onclick="financePrintReport('expensesByProject')">طباعة</button></div><div class="table-wrap"><table><thead><tr><th>المشروع</th><th>إجمالي المصروفات</th><th>عدد العمليات</th></tr></thead><tbody id="expenseByProjectBody"></tbody></table></div></div>
-          <div class="card smart-report-panel" data-report-panel="stockOutByProject"><div class="table-head"><h2>صرف المخزون حسب المشروع</h2><button class="light" onclick="financePrintReport('stockOutByProject')">طباعة</button></div><div class="table-wrap"><table><thead><tr><th>المشروع</th><th>عدد الحركات</th><th>إجمالي الكميات المصروفة</th></tr></thead><tbody id="stockOutByProjectBody"></tbody></table></div></div>
-          <div class="card smart-report-panel" data-report-panel="stockOutBySupervisor"><div class="table-head"><h2>استهلاك المشرفين حسب المشروع</h2><button class="light" onclick="financePrintReport('stockOutBySupervisor')">طباعة</button></div><div class="table-wrap"><table><thead><tr><th>المشرف</th><th>المشروع</th><th>عدد الطلبات</th><th>إجمالي الكمية</th></tr></thead><tbody id="stockOutBySupervisorBody"></tbody></table></div></div>
-
-          <div class="card wide-card smart-report-panel" data-report-panel="productDetail"><div class="table-head"><h2>تقرير تفاصيل منتج</h2><button class="light" onclick="financePrintReport('productDetail')">طباعة</button></div><div class="report-filters-panel"><select id="inventoryReportProduct" onchange="financeRenderReports()"><option value="">اختر المنتج</option></select><select id="inventoryReportSupplier" onchange="financeRenderReports()"><option value="">كل الموردين</option></select><select id="inventoryReportPerson" onchange="financeRenderReports()"><option value="">كل المشرفين/المستلمين</option></select></div><div id="inventoryProductDetailBox" class="product-detail-box"></div></div>
-          <div class="card wide-card smart-report-panel" data-report-panel="stockReport"><div class="table-head"><h2>تقرير المخزون العام</h2><button class="light" onclick="financePrintReport('stockReport')">طباعة</button></div><div class="table-wrap"><table><thead><tr><th>كود المنتج</th><th>اسم المنتج</th><th>إجمالي المخزون</th><th>حد إعادة الطلب</th><th>قيمة المخزون</th></tr></thead><tbody id="stockReportBody"></tbody></table></div><div id="stockReportTotals" class="footer-note"></div></div>
-          <div class="card wide-card smart-report-panel" data-report-panel="costCenters"><div class="table-head"><h2>تقرير مراكز التكلفة</h2><button class="light" onclick="financePrintReport('costCenters')">طباعة</button></div><div class="table-wrap"><table><thead><tr><th>مركز التكلفة</th><th>رمز التكلفة</th><th>عدد العمليات</th><th>إجمالي الصادر</th><th>إجمالي المرتجع</th><th>إجمالي المستهلك</th><th>قيمة الاستهلاك</th><th>الضريبة</th><th>الإجمالي شامل الضريبة</th></tr></thead><tbody id="costCenterReportBody"></tbody></table></div></div>
-          <div class="card wide-card smart-report-panel" data-report-panel="inventoryUsageDetail"><div class="table-head"><h2>تقرير توضيحي للاستهلاك: ماذا استُخدم ومتى ولأي مشروع</h2><button class="light" onclick="financePrintReport('inventoryUsageDetail')">طباعة</button></div><div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المشروع</th><th>المشرف / المستلم</th><th>الصنف</th><th>الكمية</th><th>سبب الاستخدام</th><th>نوع العملية</th><th>منذ كم يوم</th><th>المرجع</th></tr></thead><tbody id="inventoryUsageDetailBody"></tbody></table></div></div>
-        </div>
-      </div>
-    </section>
     <section id="alerts" class="page hidden"><div class="card"><h2>التنبيهات وأخطاء التوزيع</h2><div id="alertsList" class="alerts"></div></div></section>
 
 
@@ -761,7 +578,7 @@
           <article class="export-slide-v222">
             <div class="slide-no-v222">02</div>
             <h3>تصدير ملف اجتماع شامل</h3>
-            <p>ينزل ملف Excel واحد يحتوي على الملخص التنفيذي، المشاريع، المشرفين، العمال، السجلات اليومية، الحضور والغياب، الأوقات الشهرية، التكتات، المخزون، المصروفات، تقارير العملاء، التقييمات والتنبيهات.</p>
+            <p>ينزل ملف Excel واحد يحتوي على الملخص التنفيذي، المشاريع، المشرفين، العمال، السجلات اليومية، الحضور والغياب، الأوقات الشهرية، التكتات، تقارير العملاء، التقييمات والتنبيهات.</p>
             <div class="actions export-actions-v222">
               <button onclick="exportMeetingExcelV229(this)">تنزيل ملف الاجتماع Excel</button>
               <button class="light" onclick="previewMeetingExportV223()">معاينة قبل التنزيل</button>
@@ -771,7 +588,7 @@
           <article class="export-slide-v222 import-slide-v222">
             <div class="slide-no-v222">03</div>
             <h3>نموذج استيراد شامل</h3>
-            <p>ملف Excel واحد فارغ بتبويبات منظمة لتجهيز بيانات المشاريع، المشرفين، العمال، المستخدمين، التكتات، السجلات اليومية، المخزون والمصروفات.</p>
+            <p>ملف Excel واحد فارغ بتبويبات منظمة لتجهيز بيانات المشاريع، المشرفين، العمال، المستخدمين، التكتات، السجلات اليومية.</p>
             <div class="actions export-actions-v222">
               <button class="light" onclick="downloadImportTemplateV223()">تنزيل نموذج الاستيراد</button>
             </div>
