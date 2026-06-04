@@ -20,6 +20,17 @@
   setTimeout(removeLoading, 500);
 })();
 
+/* V358: lightweight performance guard. No stored data is changed. */
+(function(){
+  if(window.__tasneefPerfGuardV358) return;
+  window.__tasneefPerfGuardV358 = true;
+  const nativeSetInterval = window.setInterval.bind(window);
+  window.setInterval = function(fn, delay, ...args){
+    const ms = Number(delay) || 0;
+    return nativeSetInterval(fn, ms > 0 && ms < 5000 ? 5000 : ms, ...args);
+  };
+})();
+
 // Tasneef HTML App V86 - Contract Services Cloud View Fix
 const SUPABASE_URL = "https://zmjdqiswytxlbfgnfjfv.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb";
@@ -19554,4 +19565,56 @@ function financePrintReport(kind){
   document.addEventListener('input',e=>{ if(e.target && ['attendanceMatrixSearch','attendanceSearch'].includes(e.target.id)){ setTimeout(()=>{try{window.renderAttendance(); window.renderAttendanceMonthly();}catch(_){ }},20); } });
   window.TASNEEF_ATTENDANCE_BUILD=BUILD;
   console.log('Tasneef '+BUILD+' loaded');
+})();
+
+/* V358: debounce expensive view refreshes. No stored data is changed. */
+(function(){
+  if(window.__tasneefRenderDebounceV358) return;
+  window.__tasneefRenderDebounceV358 = true;
+
+  function debounceFn(name, wait){
+    const original = window[name];
+    if(typeof original !== 'function' || original.__v358Debounced) return;
+    let timer = null, lastThis = null, lastArgs = null;
+    const wrapped = function(){
+      lastThis = this;
+      lastArgs = arguments;
+      clearTimeout(timer);
+      timer = setTimeout(function(){
+        timer = null;
+        try{ original.apply(lastThis, lastArgs); }catch(e){ console.warn(name + ' debounced render failed', e); }
+      }, wait);
+    };
+    wrapped.__v358Debounced = true;
+    wrapped.__v358Original = original;
+    window[name] = wrapped;
+  }
+
+  function install(){
+    debounceFn('renderAttendance', 70);
+    debounceFn('renderAttendanceMonthly', 70);
+    debounceFn('renderMonthly', 90);
+    debounceFn('renderTickets', 70);
+    debounceFn('financeRenderReports', 90);
+    debounceFn('financeRenderAll', 90);
+
+    const currentShowPage = window.showPage;
+    if(typeof currentShowPage === 'function' && !currentShowPage.__v358Guarded){
+      let lastPage = '', lastAt = 0;
+      const guardedShowPage = function(id, btn){
+        const now = Date.now();
+        if(id === lastPage && now - lastAt < 250) return;
+        lastPage = id;
+        lastAt = now;
+        return currentShowPage.apply(this, arguments);
+      };
+      guardedShowPage.__v358Guarded = true;
+      window.showPage = guardedShowPage;
+    }
+  }
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, {once:true});
+  else install();
+  window.addEventListener('load', install, {once:true});
+  setTimeout(install, 1200);
 })();
