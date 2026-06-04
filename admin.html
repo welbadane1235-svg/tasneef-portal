@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>لوحة الإدارة - تصنيف</title>
+<title>ظ„ظˆط­ط© ط§ظ„ط¥ط¯ط§ط±ط© - طھطµظ†ظٹظپ</title>
 <style>
 :root{--brand:#0A4033;--brand2:#0f5a47;--bg:#f3f6f5;--card:#fff;--line:#dce6e2;--text:#10231d;--muted:#60706a;--red:#b83232;--green:#137a4b;--amber:#9a6b00}*{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}button{font-family:inherit;border:0;background:var(--brand);color:#fff;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer}button.light{background:#eef6f3;color:var(--brand);border:1px solid var(--line)}button.danger,.danger{background:var(--red)!important}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px;background:#fff;font-family:inherit;font-size:14px}textarea{min-height:82px;resize:vertical}label{display:block;margin:10px 0 6px;color:var(--brand);font-weight:700;font-size:13px}.hidden{display:none!important}.login-body{min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at 15% 15%,#e8f3ef,transparent 35%),linear-gradient(180deg,#eef6f3,#f8fbfa)}.login-card{width:min(440px,92vw);background:#fff;border:1px solid var(--line);border-radius:24px;padding:28px;box-shadow:0 18px 44px rgba(10,64,51,.12);text-align:center}.login-card h1{margin:10px 0;color:#071b33}.login-card p{color:var(--muted)}.logo-mark,.brand span{width:64px;height:64px;border-radius:20px;background:var(--brand);display:grid;place-items:center;color:#fff;font-size:28px;font-weight:900;margin:auto}.login-card button{width:100%;margin-top:14px}.login-card small{display:block;margin-top:18px;color:var(--muted)}.app-shell{display:grid;grid-template-columns:240px 1fr;min-height:100vh}.side{background:#101b2f;color:#fff;padding:18px;position:sticky;top:0;height:100vh;overflow:auto}.brand{display:flex;align-items:center;gap:12px;margin-bottom:22px}.brand span{width:46px;height:46px;border-radius:14px;margin:0}.brand small{display:block;color:#b7c2d6;margin-top:4px}.nav{display:block;width:100%;text-align:right;background:transparent;color:#fff;margin:6px 0;border:1px solid transparent}.nav:hover,.nav.active{background:#1d2b46;border-color:#354560}.content{padding:22px;overflow:auto}.hero{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border-radius:24px;padding:24px;display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px;box-shadow:0 12px 34px rgba(10,64,51,.12)}.hero h1{margin:0 0 8px}.hero p{margin:0;color:#e9f5f1;line-height:1.7}.compact{border-radius:0 0 22px 22px}.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:18px;box-shadow:0 8px 24px rgba(10,64,51,.05);margin-bottom:16px}.card h2{margin:0 0 14px;color:var(--brand)}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}.kpis.small{grid-template-columns:repeat(3,1fr)}.kpi{background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px}.kpi small{color:var(--muted)}.kpi b{display:block;font-size:32px;color:var(--brand);margin-top:8px}.grid.two{display:grid;grid-template-columns:390px 1fr;gap:16px}.split{display:grid;grid-template-columns:1fr 1fr;gap:10px}.actions,.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin:12px 0}.filters>*{min-width:160px;flex:1}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:16px;max-height:66vh;background:#fff}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px;border-bottom:1px solid #edf1ef;text-align:right;white-space:nowrap;vertical-align:top}th{position:sticky;top:0;background:#f8fbfa;color:#4c635c;z-index:1}.badge{display:inline-block;padding:5px 9px;border-radius:999px;background:#eef6f3;color:var(--brand);font-size:12px;font-weight:700}.badge.red{background:#fde8e8;color:#9d2222}.badge.green{background:#e8f4ee;color:#137a4b}.badge.amber{background:#fff5da;color:#8a6700}.row-actions{display:flex;gap:6px}.row-actions button{padding:7px 9px;border-radius:9px;font-size:12px}.msg{padding:11px 13px;border-radius:12px;margin:10px 0;background:#eef6f3;color:var(--brand);border:1px solid var(--line)}.msg.err{background:#fde8e8;color:#9d2222}.summary-grid,.alerts{display:grid;gap:10px}.summary-grid{grid-template-columns:repeat(3,1fr)}.summary-item,.alert-item{background:#fbfdfc;border:1px solid var(--line);border-radius:14px;padding:12px;line-height:1.7}.alert-item.warn{background:#fff8e8;border-color:#f0d48d}.alert-item.danger{background:#fde8e8;border-color:#efc3c3}.quick-list{display:grid;gap:8px;margin:12px 0}.quick-item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fbfdfc;border:1px solid var(--line);border-radius:12px;padding:10px}.quick-item select{max-width:140px}.mobile-shell{max-width:760px;margin:0 auto;padding-bottom:24px}.mobile-shell .card{margin:14px}.mobile-shell .hero{margin-bottom:14px}@media(max-width:1000px){.app-shell{grid-template-columns:1fr}.side{position:static;height:auto;display:grid;grid-template-columns:repeat(2,1fr);gap:6px}.brand{grid-column:1/-1}.content{padding:12px}.grid.two,.kpis,.summary-grid{grid-template-columns:1fr}.hero{border-radius:0 0 22px 22px;margin:-12px -12px 14px}.split{grid-template-columns:1fr}.side .nav{text-align:center}}
 
@@ -18,7 +18,7 @@
 .finance-tabs{display:flex;gap:8px;flex-wrap:wrap}.finance-tab.active{background:var(--brand);color:#fff}.finance-kpis .kpi b{font-size:22px}.money-pos{color:#137a4b;font-weight:900}.money-neg{color:#b83232;font-weight:900}.finance-status-paid{background:#dff7ea;color:#137a4b}.finance-status-due{background:#fff1cc;color:#8a5b00}.finance-status-bad{background:#fde8e8;color:#b83232}.finance-status-neutral{background:#edf2f7;color:#334155}@media(max-width:1100px){.finance-tabs{display:grid;grid-template-columns:1fr 1fr}.finance-tabs button{width:100%}}
 
 
-/* V117: ضبط حجم صور المنتجات داخل جدول المخزون */
+/* V117: ط¶ط¨ط· ط­ط¬ظ… طµظˆط± ط§ظ„ظ…ظ†طھط¬ط§طھ ط¯ط§ط®ظ„ ط¬ط¯ظˆظ„ ط§ظ„ظ…ط®ط²ظˆظ† */
 #inventoryItemsBody td:first-child{width:86px!important;min-width:86px!important;max-width:86px!important;text-align:center!important;overflow:hidden!important;vertical-align:middle!important;}
 #inventoryItemsBody .inventory-img-box{width:64px!important;height:64px!important;max-width:64px!important;max-height:64px!important;margin:auto!important;display:flex!important;align-items:center!important;justify-content:center!important;border:1px solid var(--line)!important;border-radius:12px!important;background:#fff!important;overflow:hidden!important;padding:3px!important;}
 #inventoryItemsBody img.inventory-thumb,#inventoryItemsBody img.inventory-product-img{width:58px!important;height:58px!important;min-width:58px!important;min-height:58px!important;max-width:58px!important;max-height:58px!important;object-fit:contain!important;display:block!important;border:0!important;border-radius:9px!important;background:#fff!important;padding:0!important;margin:0!important;cursor:pointer!important;}
@@ -57,7 +57,7 @@
 @media(max-width:760px){.hero{align-items:flex-start;flex-direction:column}.hero-brand-v155{flex-direction:column;align-items:flex-start}.hero-logo-card-v155{width:132px;height:62px}.hero-action-v155{width:100%;justify-content:space-between}}
 
 
-/* V223: شرائح ذكية حقيقية لقسم التصدير والاستيراد */
+/* V223: ط´ط±ط§ط¦ط­ ط°ظƒظٹط© ط­ظ‚ظٹظ‚ظٹط© ظ„ظ‚ط³ظ… ط§ظ„طھطµط¯ظٹط± ظˆط§ظ„ط§ط³طھظٹط±ط§ط¯ */
 .export-smart-v222{max-width:1280px;margin:0 auto;}
 .export-hero-v222{display:flex;align-items:center;justify-content:space-between;gap:18px;background:linear-gradient(135deg,#0a4033,#11624d);color:#fff;border-radius:28px;padding:24px;margin-bottom:18px;box-shadow:0 18px 44px rgba(10,64,51,.16)}
 .export-hero-v222 h2{color:#fff;margin:6px 0;font-size:30px}.export-hero-v222 p{color:#e9f5f1;margin:0;line-height:1.8}.export-kicker-v222{display:inline-flex;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2);padding:6px 12px;border-radius:999px;font-weight:800}.export-hero-badge-v222{min-width:76px;height:76px;border-radius:24px;background:#fff;color:#0a4033;display:grid;place-items:center;font-weight:900;font-size:20px;box-shadow:0 14px 34px rgba(0,0,0,.14)}
@@ -87,7 +87,7 @@
 
 
 <style id="smart-ui-framework-v130-fix">
-/* V130: إصلاح عرض الكروت وحذف شريط الواجهة الذكية */
+/* V130: ط¥طµظ„ط§ط­ ط¹ط±ط¶ ط§ظ„ظƒط±ظˆطھ ظˆط­ط°ظپ ط´ط±ظٹط· ط§ظ„ظˆط§ط¬ظ‡ط© ط§ظ„ط°ظƒظٹط© */
 .smart-hero-v129{display:none!important;}
 .smart-list-table{display:block!important;width:100%!important;table-layout:auto!important;}
 .smart-list-table tbody{display:block!important;width:100%!important;}
@@ -111,7 +111,7 @@
 .hero-logo-card-v155 img{max-width:100%;max-height:100%;object-fit:contain;display:block}
 .hero-title-v155{display:flex;flex-direction:column;align-items:flex-start;min-width:0}
 .hero-title-v155 h1{margin:0 0 8px!important;font-size:32px!important;line-height:1.2;color:#fff}.hero-title-v155 p{margin:0;color:#e9f5f1;line-height:1.7}.hero-app-name-v155{display:inline-flex;align-items:center;gap:8px;font-weight:900;color:#fff;font-size:16px;margin-top:9px;letter-spacing:.2px;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.20);border-radius:999px;padding:7px 12px}
-.hero-app-name-v155:before{content:"✓";width:22px;height:22px;border-radius:50%;background:#fff;color:#0A4033;display:inline-grid;place-items:center;font-size:13px}
+.hero-app-name-v155:before{content:"âœ“";width:22px;height:22px;border-radius:50%;background:#fff;color:#0A4033;display:inline-grid;place-items:center;font-size:13px}
 .hero-action-v155{display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:relative;z-index:1}.hero-action-v155 .status-pill-v155{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:8px 12px;color:#fff;font-size:12px;font-weight:800}
 @media(max-width:760px){.hero{align-items:flex-start;flex-direction:column}.hero-brand-v155{flex-direction:column;align-items:flex-start}.hero-title-v155 h1{font-size:24px!important}.hero-logo-card-v155{width:140px;height:68px}.hero-action-v155{width:100%;justify-content:space-between}}
 </style>
@@ -119,113 +119,113 @@
 <body onload="initAdmin()">
 <div class="app-shell">
   <aside class="side">
-    <div class="brand"><span>ت</span><div><b>شركة تصنيف</b><small>إدارة المرافق</small></div></div>
-    <button class="nav active" onclick="showPage('dashboard',this)">لوحة التحكم</button>
-    <button class="nav" onclick="showPage('daily',this)">التسجيلات اليومية</button>
-    <button class="nav" onclick="showPage('users',this)">إدارة المستخدمين</button>
-    <button class="nav" onclick="showPage('projects',this)">المشاريع</button>
-    <button class="nav" onclick="showPage('contracts',this)">العقود والخدمات</button>
-    <button class="nav" onclick="showPage('workers',this)">العمال</button>
-    <button class="nav" onclick="showPage('attendance',this)">الحضور والغياب</button>
-    <button class="nav" onclick="showPage('monthly',this)">الأوقات الشهرية</button>
-    <button class="nav" onclick="showPage('tickets',this)">التكتات</button>
-    <button class="nav" onclick="showPage('orders',this)">الأوردرات</button>
-    <button class="nav" onclick="showPage('clientReports',this)">تقارير العملاء</button>
-    <button class="nav" onclick="showPage('clientRatings',this)">تقييمات العملاء</button>
-    <button class="nav" onclick="showPage('alerts',this)">التنبيهات</button>
-    <button class="nav" onclick="showPage('assistant',this)">مساعد تصنيف</button>
-    <button class="nav" onclick="showPage('export',this)">التصدير والاستيراد</button>
-    <button class="nav danger" onclick="logout()">تسجيل خروج</button>
+    <div class="brand"><span>طھ</span><div><b>ط´ط±ظƒط© طھطµظ†ظٹظپ</b><small>ط¥ط¯ط§ط±ط© ط§ظ„ظ…ط±ط§ظپظ‚</small></div></div>
+    <button class="nav active" onclick="showPage('dashboard',this)">ظ„ظˆط­ط© ط§ظ„طھط­ظƒظ…</button>
+    <button class="nav" onclick="showPage('daily',this)">ط§ظ„طھط³ط¬ظٹظ„ط§طھ ط§ظ„ظٹظˆظ…ظٹط©</button>
+    <button class="nav" onclick="showPage('users',this)">ط¥ط¯ط§ط±ط© ط§ظ„ظ…ط³طھط®ط¯ظ…ظٹظ†</button>
+    <button class="nav" onclick="showPage('projects',this)">ط§ظ„ظ…ط´ط§ط±ظٹط¹</button>
+    <button class="nav" onclick="showPage('contracts',this)">ط§ظ„ط¹ظ‚ظˆط¯ ظˆط§ظ„ط®ط¯ظ…ط§طھ</button>
+    <button class="nav" onclick="showPage('workers',this)">ط§ظ„ط¹ظ…ط§ظ„</button>
+    <button class="nav" onclick="showPage('attendance',this)">ط§ظ„ط­ط¶ظˆط± ظˆط§ظ„ط؛ظٹط§ط¨</button>
+    <button class="nav" onclick="showPage('monthly',this)">ط§ظ„ط£ظˆظ‚ط§طھ ط§ظ„ط´ظ‡ط±ظٹط©</button>
+    <button class="nav" onclick="showPage('tickets',this)">ط§ظ„طھظƒطھط§طھ</button>
+    <button class="nav" onclick="showPage('orders',this)">ط§ظ„ط£ظˆط±ط¯ط±ط§طھ</button>
+    <button class="nav" onclick="showPage('clientReports',this)">طھظ‚ط§ط±ظٹط± ط§ظ„ط¹ظ…ظ„ط§ط،</button>
+    <button class="nav" onclick="showPage('clientRatings',this)">طھظ‚ظٹظٹظ…ط§طھ ط§ظ„ط¹ظ…ظ„ط§ط،</button>
+    <button class="nav" onclick="showPage('alerts',this)">ط§ظ„طھظ†ط¨ظٹظ‡ط§طھ</button>
+    <button class="nav" onclick="showPage('assistant',this)">ظ…ط³ط§ط¹ط¯ طھطµظ†ظٹظپ</button>
+    <button class="nav" onclick="showPage('export',this)">ط§ظ„طھطµط¯ظٹط± ظˆط§ظ„ط§ط³طھظٹط±ط§ط¯</button>
+    <button class="nav danger" onclick="logout()">طھط³ط¬ظٹظ„ ط®ط±ظˆط¬</button>
   </aside>
   <main class="content">
     <header class="hero">
       <div class="hero-brand-v155">
-        <div class="hero-logo-card-v155"><img src="tasneef_logo_print.png" alt="شركة تصنيف لإدارة المرافق"></div>
-        <div class="hero-title-v155"><h1>لوحة تشغيل يومية احترافية</h1><p>إدارة المستخدمين، المشاريع، العمال، الحضور، التسجيلات اليومية والتقارير.</p><span class="hero-app-name-v155">شركة تصنيف لإدارة المرافق</span></div>
+        <div class="hero-logo-card-v155"><img src="tasneef_logo_print.png" alt="ط´ط±ظƒط© طھطµظ†ظٹظپ ظ„ط¥ط¯ط§ط±ط© ط§ظ„ظ…ط±ط§ظپظ‚"></div>
+        <div class="hero-title-v155"><h1>ظ„ظˆط­ط© طھط´ط؛ظٹظ„ ظٹظˆظ…ظٹط© ط§ط­طھط±ط§ظپظٹط©</h1><p>ط¥ط¯ط§ط±ط© ط§ظ„ظ…ط³طھط®ط¯ظ…ظٹظ†طŒ ط§ظ„ظ…ط´ط§ط±ظٹط¹طŒ ط§ظ„ط¹ظ…ط§ظ„طŒ ط§ظ„ط­ط¶ظˆط±طŒ ط§ظ„طھط³ط¬ظٹظ„ط§طھ ط§ظ„ظٹظˆظ…ظٹط© ظˆط§ظ„طھظ‚ط§ط±ظٹط±.</p><span class="hero-app-name-v155">ط´ط±ظƒط© طھطµظ†ظٹظپ ظ„ط¥ط¯ط§ط±ط© ط§ظ„ظ…ط±ط§ظپظ‚</span></div>
       </div>
-      <div class="hero-action-v155"><span class="status-pill-v155">النظام محدث</span><button onclick="refreshAll()">تحديث البيانات</button></div>
+      <div class="hero-action-v155"><span class="status-pill-v155">ط§ظ„ظ†ط¸ط§ظ… ظ…ط­ط¯ط«</span><button onclick="refreshAll()">طھط­ط¯ظٹط« ط§ظ„ط¨ظٹط§ظ†ط§طھ</button></div>
     </header>
     <div id="globalMsg" class="msg hidden"></div>
 
     <section id="dashboard" class="page">
       <div class="kpis">
-        <div class="kpi"><small>المستخدمون</small><b id="kpiUsers">0</b></div>
-        <div class="kpi"><small>المشاريع</small><b id="kpiProjects">0</b></div>
-        <div class="kpi"><small>العمال</small><b id="kpiWorkers">0</b></div>
-        <div class="kpi"><small>تسجيلات اليوم</small><b id="kpiTodayLogs">0</b></div>
+        <div class="kpi"><small>ط§ظ„ظ…ط³طھط®ط¯ظ…ظˆظ†</small><b id="kpiUsers">0</b></div>
+        <div class="kpi"><small>ط§ظ„ظ…ط´ط§ط±ظٹط¹</small><b id="kpiProjects">0</b></div>
+        <div class="kpi"><small>ط§ظ„ط¹ظ…ط§ظ„</small><b id="kpiWorkers">0</b></div>
+        <div class="kpi"><small>طھط³ط¬ظٹظ„ط§طھ ط§ظ„ظٹظˆظ…</small><b id="kpiTodayLogs">0</b></div>
       </div>
-      <div class="card"><h2>ملخص اليوم</h2><div id="todaySummary" class="summary-grid"></div></div>
-      <div class="card"><h2>تنبيهات العقود</h2><div id="contractDashboardAlerts" class="alerts"></div></div>
+      <div class="card"><h2>ظ…ظ„ط®طµ ط§ظ„ظٹظˆظ…</h2><div id="todaySummary" class="summary-grid"></div></div>
+      <div class="card"><h2>طھظ†ط¨ظٹظ‡ط§طھ ط§ظ„ط¹ظ‚ظˆط¯</h2><div id="contractDashboardAlerts" class="alerts"></div></div>
     </section>
 
     <section id="daily" class="page hidden">
       <div class="grid two">
         <div class="card">
-          <h2 id="logFormTitle">تسجيل دخول / خروج</h2>
+          <h2 id="logFormTitle">طھط³ط¬ظٹظ„ ط¯ط®ظˆظ„ / ط®ط±ظˆط¬</h2>
           <input type="hidden" id="logId">
-          <label>التاريخ</label><input type="date" id="logDate">
-          <label>المشرف</label><select id="logSupervisor"></select>
-          <label>المشروع</label><select id="logProject" onchange="onLogProjectChange()"></select>
-          <label>نوع الزيارة</label><select id="logVisitType"><option value="surface">نظافة سطحية</option><option value="deep">نظافة عميقة</option></select>
-          <div class="split"><div><label>وقت الدخول</label><input type="time" id="logIn"></div><div><label>وقت الخروج</label><input type="time" id="logOut"></div></div>
-          <label>وقت الانتقال / الضائع بالدقائق</label><input type="number" id="logTravel" min="0" value="0">
-          <label>ملاحظات</label><textarea id="logNotes"></textarea>
-          <div class="actions"><button onclick="setNow('logIn')">الدخول الآن</button><button onclick="setNow('logOut')">الخروج الآن</button><button onclick="saveTimeLog()">حفظ</button><button class="light" onclick="clearLogForm()">جديد</button></div>
+          <label>ط§ظ„طھط§ط±ظٹط®</label><input type="date" id="logDate">
+          <label>ط§ظ„ظ…ط´ط±ظپ</label><select id="logSupervisor"></select>
+          <label>ط§ظ„ظ…ط´ط±ظˆط¹</label><select id="logProject" onchange="onLogProjectChange()"></select>
+          <label>ظ†ظˆط¹ ط§ظ„ط²ظٹط§ط±ط©</label><select id="logVisitType"><option value="surface">ظ†ط¸ط§ظپط© ط³ط·ط­ظٹط©</option><option value="deep">ظ†ط¸ط§ظپط© ط¹ظ…ظٹظ‚ط©</option></select>
+          <div class="split"><div><label>ظˆظ‚طھ ط§ظ„ط¯ط®ظˆظ„</label><input type="time" id="logIn"></div><div><label>ظˆظ‚طھ ط§ظ„ط®ط±ظˆط¬</label><input type="time" id="logOut"></div></div>
+          <label>ظˆظ‚طھ ط§ظ„ط§ظ†طھظ‚ط§ظ„ / ط§ظ„ط¶ط§ط¦ط¹ ط¨ط§ظ„ط¯ظ‚ط§ط¦ظ‚</label><input type="number" id="logTravel" min="0" value="0">
+          <label>ظ…ظ„ط§ط­ط¸ط§طھ</label><textarea id="logNotes"></textarea>
+          <div class="actions"><button onclick="setNow('logIn')">ط§ظ„ط¯ط®ظˆظ„ ط§ظ„ط¢ظ†</button><button onclick="setNow('logOut')">ط§ظ„ط®ط±ظˆط¬ ط§ظ„ط¢ظ†</button><button onclick="saveTimeLog()">ط­ظپط¸</button><button class="light" onclick="clearLogForm()">ط¬ط¯ظٹط¯</button></div>
         </div>
         <div class="card">
-          <h2>التسجيلات اليومية</h2>
-          <div class="filters"><input type="date" id="dailyDate" onchange="renderTimeLogs()"><select id="dailySupervisor" onchange="renderTimeLogs()"></select><select id="dailyProject" onchange="renderTimeLogs()"></select><input id="dailySearch" oninput="renderTimeLogs()" placeholder="بحث"><button type="button" class="light" onclick="exportDailyManagerPDF()">طباعة التقرير / PDF</button><button type="button" class="light" onclick="sendDailyManagerWhatsapp()">إرسال واتساب</button></div>
-          <div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المشرف</th><th>المشروع</th><th>نوع الزيارة</th><th>الدخول</th><th>الخروج</th><th>الوقت المطلوب</th><th>المدة الفعلية</th><th>الفرق</th><th>حالة الوقت</th><th>انتقال</th><th>ملاحظات</th><th>واتساب</th><th>إجراء</th></tr></thead><tbody id="logsBody"></tbody></table></div>
+          <h2>ط§ظ„طھط³ط¬ظٹظ„ط§طھ ط§ظ„ظٹظˆظ…ظٹط©</h2>
+          <div class="filters"><input type="date" id="dailyDate" onchange="renderTimeLogs()"><select id="dailySupervisor" onchange="renderTimeLogs()"></select><select id="dailyProject" onchange="renderTimeLogs()"></select><input id="dailySearch" oninput="renderTimeLogs()" placeholder="ط¨ط­ط«"><button type="button" class="light" onclick="exportDailyManagerPDF()">ط·ط¨ط§ط¹ط© ط§ظ„طھظ‚ط±ظٹط± / PDF</button><button type="button" class="light" onclick="sendDailyManagerWhatsapp()">ط¥ط±ط³ط§ظ„ ظˆط§طھط³ط§ط¨</button></div>
+          <div class="table-wrap"><table><thead><tr><th>ط§ظ„طھط§ط±ظٹط®</th><th>ط§ظ„ظ…ط´ط±ظپ</th><th>ط§ظ„ظ…ط´ط±ظˆط¹</th><th>ظ†ظˆط¹ ط§ظ„ط²ظٹط§ط±ط©</th><th>ط§ظ„ط¯ط®ظˆظ„</th><th>ط§ظ„ط®ط±ظˆط¬</th><th>ط§ظ„ظˆظ‚طھ ط§ظ„ظ…ط·ظ„ظˆط¨</th><th>ط§ظ„ظ…ط¯ط© ط§ظ„ظپط¹ظ„ظٹط©</th><th>ط§ظ„ظپط±ظ‚</th><th>ط­ط§ظ„ط© ط§ظ„ظˆظ‚طھ</th><th>ط§ظ†طھظ‚ط§ظ„</th><th>ظ…ظ„ط§ط­ط¸ط§طھ</th><th>ظˆط§طھط³ط§ط¨</th><th>ط¥ط¬ط±ط§ط،</th></tr></thead><tbody id="logsBody"></tbody></table></div>
         </div>
       </div>
     </section>
 
     <section id="users" class="page hidden">
-      <div class="grid two"><div class="card"><h2 id="userFormTitle">إضافة مستخدم</h2><input type="hidden" id="userId"><label>الاسم الكامل</label><input id="userFullName"><label>اسم المستخدم</label><input id="userUsername"><label>كلمة المرور</label><input id="userPassword"><label>الدور</label><select id="userRole"><option value="admin">مدير عام</option><option value="financial_manager">مدير مالي</option><option value="operations_manager">مدير تشغيلي</option><option value="warehouse_manager">مدير مخازن</option><option value="technician">فني</option><option value="supervisor">مشرف</option></select><label>الحالة</label><select id="userActive"><option value="true">نشط</option><option value="false">موقوف</option></select><div id="userPermissionsBoxV72" class="perm-box-v72"><label>الصلاحيات</label><div class="perm-grid-v72"><label class="perm-item-v72"><input type="checkbox" id="perm_can_time_logs" data-perm="can_time_logs"> <span>تسجيل دخول / خروج</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_journey" data-perm="can_journey"> <span>رحلة التشغيل اليومية</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_attendance" data-perm="can_attendance"> <span>تسجيل الحضور</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_tickets" data-perm="can_tickets"> <span>التكتات</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_reports" data-perm="can_reports"> <span>الملخص والتقارير</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_monthly" data-perm="can_monthly"> <span>الأوقات الشهرية</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_edit_time_logs" data-perm="can_edit_time_logs"> <span>تعديل السجلات اليومية</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_manage_users" data-perm="can_manage_users"> <span>إدارة المستخدمين</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_manage_workers" data-perm="can_manage_workers"> <span>إدارة العمال</span></label></div><div class="footer-note">تحدد هذه الصلاحيات ما يظهر للمستخدم داخل التطبيق. مدير عام يحصل على كل الصلاحيات افتراضيًا.</div></div><div class="actions"><button onclick="saveUser()">حفظ</button><button class="light" onclick="clearUserForm()">جديد</button></div></div><div class="card"><h2>المستخدمون</h2><div class="table-wrap"><table><thead><tr><th>الاسم</th><th>المستخدم</th><th>الدور</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="usersBody"></tbody></table></div></div></div>
+      <div class="grid two"><div class="card"><h2 id="userFormTitle">ط¥ط¶ط§ظپط© ظ…ط³طھط®ط¯ظ…</h2><input type="hidden" id="userId"><label>ط§ظ„ط§ط³ظ… ط§ظ„ظƒط§ظ…ظ„</label><input id="userFullName"><label>ط§ط³ظ… ط§ظ„ظ…ط³طھط®ط¯ظ…</label><input id="userUsername"><label>ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±</label><input id="userPassword"><label>ط§ظ„ط¯ظˆط±</label><select id="userRole"><option value="admin">ظ…ط¯ظٹط± ط¹ط§ظ…</option><option value="financial_manager">ظ…ط¯ظٹط± ظ…ط§ظ„ظٹ</option><option value="operations_manager">ظ…ط¯ظٹط± طھط´ط؛ظٹظ„ظٹ</option><option value="warehouse_manager">ظ…ط¯ظٹط± ظ…ط®ط§ط²ظ†</option><option value="technician">ظپظ†ظٹ</option><option value="supervisor">ظ…ط´ط±ظپ</option></select><label>ط§ظ„ط­ط§ظ„ط©</label><select id="userActive"><option value="true">ظ†ط´ط·</option><option value="false">ظ…ظˆظ‚ظˆظپ</option></select><div id="userPermissionsBoxV72" class="perm-box-v72"><label>ط§ظ„طµظ„ط§ط­ظٹط§طھ</label><div class="perm-grid-v72"><label class="perm-item-v72"><input type="checkbox" id="perm_can_time_logs" data-perm="can_time_logs"> <span>طھط³ط¬ظٹظ„ ط¯ط®ظˆظ„ / ط®ط±ظˆط¬</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_journey" data-perm="can_journey"> <span>ط±ط­ظ„ط© ط§ظ„طھط´ط؛ظٹظ„ ط§ظ„ظٹظˆظ…ظٹط©</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_attendance" data-perm="can_attendance"> <span>طھط³ط¬ظٹظ„ ط§ظ„ط­ط¶ظˆط±</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_tickets" data-perm="can_tickets"> <span>ط§ظ„طھظƒطھط§طھ</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_reports" data-perm="can_reports"> <span>ط§ظ„ظ…ظ„ط®طµ ظˆط§ظ„طھظ‚ط§ط±ظٹط±</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_monthly" data-perm="can_monthly"> <span>ط§ظ„ط£ظˆظ‚ط§طھ ط§ظ„ط´ظ‡ط±ظٹط©</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_edit_time_logs" data-perm="can_edit_time_logs"> <span>طھط¹ط¯ظٹظ„ ط§ظ„ط³ط¬ظ„ط§طھ ط§ظ„ظٹظˆظ…ظٹط©</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_manage_users" data-perm="can_manage_users"> <span>ط¥ط¯ط§ط±ط© ط§ظ„ظ…ط³طھط®ط¯ظ…ظٹظ†</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_manage_workers" data-perm="can_manage_workers"> <span>ط¥ط¯ط§ط±ط© ط§ظ„ط¹ظ…ط§ظ„</span></label></div><div class="footer-note">طھط­ط¯ط¯ ظ‡ط°ظ‡ ط§ظ„طµظ„ط§ط­ظٹط§طھ ظ…ط§ ظٹط¸ظ‡ط± ظ„ظ„ظ…ط³طھط®ط¯ظ… ط¯ط§ط®ظ„ ط§ظ„طھط·ط¨ظٹظ‚. ظ…ط¯ظٹط± ط¹ط§ظ… ظٹط­طµظ„ ط¹ظ„ظ‰ ظƒظ„ ط§ظ„طµظ„ط§ط­ظٹط§طھ ط§ظپطھط±ط§ط¶ظٹظ‹ط§.</div></div><div class="actions"><button onclick="saveUser()">ط­ظپط¸</button><button class="light" onclick="clearUserForm()">ط¬ط¯ظٹط¯</button></div></div><div class="card"><h2>ط§ظ„ظ…ط³طھط®ط¯ظ…ظˆظ†</h2><div class="table-wrap"><table><thead><tr><th>ط§ظ„ط§ط³ظ…</th><th>ط§ظ„ظ…ط³طھط®ط¯ظ…</th><th>ط§ظ„ط¯ظˆط±</th><th>ط§ظ„ط­ط§ظ„ط©</th><th>ط¥ط¬ط±ط§ط،</th></tr></thead><tbody id="usersBody"></tbody></table></div></div></div>
     </section>
 
     <section id="projects" class="page hidden">
       <div class="card section-head">
-        <div><h2>إدارة المشاريع</h2><p>إضافة وتعديل المشاريع، تحديد الوقت المطلوب، وربط المشرف والعمال من داخل المشروع.</p></div>
-        <button class="light" onclick="clearProjectForm()">مشروع جديد</button>
+        <div><h2>ط¥ط¯ط§ط±ط© ط§ظ„ظ…ط´ط§ط±ظٹط¹</h2><p>ط¥ط¶ط§ظپط© ظˆطھط¹ط¯ظٹظ„ ط§ظ„ظ…ط´ط§ط±ظٹط¹طŒ طھط­ط¯ظٹط¯ ط§ظ„ظˆظ‚طھ ط§ظ„ظ…ط·ظ„ظˆط¨طŒ ظˆط±ط¨ط· ط§ظ„ظ…ط´ط±ظپ ظˆط§ظ„ط¹ظ…ط§ظ„ ظ…ظ† ط¯ط§ط®ظ„ ط§ظ„ظ…ط´ط±ظˆط¹.</p></div>
+        <button class="light" onclick="clearProjectForm()">ظ…ط´ط±ظˆط¹ ط¬ط¯ظٹط¯</button>
       </div>
       <div class="grid two">
         <div class="card">
-          <h2 id="projectFormTitle">إضافة مشروع</h2>
+          <h2 id="projectFormTitle">ط¥ط¶ط§ظپط© ظ…ط´ط±ظˆط¹</h2>
           <input type="hidden" id="projectId">
-          <label>اسم المشروع</label><input id="projectName" placeholder="مثال: تعمير 17">
-          <label>الموقع</label><input id="projectLocation" placeholder="اختياري">
-          <div class="split"><div><label>عدد العمائر</label><input type="number" id="projectBuildingsCount" min="0" value="0"></div><div><label>عدد الشقق</label><input type="number" id="projectUnitsCount" min="0" value="0"></div></div>
-          <div class="split"><div><label>تاريخ بداية العقد</label><input type="date" id="projectContractStart"></div><div><label>تاريخ نهاية العقد</label><input type="date" id="projectContractEnd"></div></div>
-          <label>المشرف المرتبط</label><select id="projectSupervisor"></select>
+          <label>ط§ط³ظ… ط§ظ„ظ…ط´ط±ظˆط¹</label><input id="projectName" placeholder="ظ…ط«ط§ظ„: طھط¹ظ…ظٹط± 17">
+          <label>ط§ظ„ظ…ظˆظ‚ط¹</label><input id="projectLocation" placeholder="ط§ط®طھظٹط§ط±ظٹ">
+          <div class="split"><div><label>ط¹ط¯ط¯ ط§ظ„ط¹ظ…ط§ط¦ط±</label><input type="number" id="projectBuildingsCount" min="0" value="0"></div><div><label>ط¹ط¯ط¯ ط§ظ„ط´ظ‚ظ‚</label><input type="number" id="projectUnitsCount" min="0" value="0"></div></div>
+          <div class="split"><div><label>طھط§ط±ظٹط® ط¨ط¯ط§ظٹط© ط§ظ„ط¹ظ‚ط¯</label><input type="date" id="projectContractStart"></div><div><label>طھط§ط±ظٹط® ظ†ظ‡ط§ظٹط© ط§ظ„ط¹ظ‚ط¯</label><input type="date" id="projectContractEnd"></div></div>
+          <label>ط§ظ„ظ…ط´ط±ظپ ط§ظ„ظ…ط±طھط¨ط·</label><select id="projectSupervisor"></select>
           <div class="split">
-            <div><label>الوقت المطلوب يوميًا (بالدقائق)</label><input type="number" id="projectRequiredDaily" min="0" value="180"></div>
-            <div><label>وقت الجمعة (بالدقائق)</label><input type="number" id="projectFridayMinutes" min="0" value="90"></div>
+            <div><label>ط§ظ„ظˆظ‚طھ ط§ظ„ظ…ط·ظ„ظˆط¨ ظٹظˆظ…ظٹظ‹ط§ (ط¨ط§ظ„ط¯ظ‚ط§ط¦ظ‚)</label><input type="number" id="projectRequiredDaily" min="0" value="180"></div>
+            <div><label>ظˆظ‚طھ ط§ظ„ط¬ظ…ط¹ط© (ط¨ط§ظ„ط¯ظ‚ط§ط¦ظ‚)</label><input type="number" id="projectFridayMinutes" min="0" value="90"></div>
           </div>
           <div class="split">
-            <div><label>نوع التشغيل</label><select id="projectOperationType"><option value="daily_visit">زيارة يومية</option><option value="full_time">دوام كامل</option><option value="as_needed">حسب الحاجة</option></select></div>
-            <div><label>نوع الزيارة الافتراضي</label><select id="projectVisitDefault"><option value="surface">نظافة سطحية</option><option value="deep">نظافة عميقة</option></select></div>
+            <div><label>ظ†ظˆط¹ ط§ظ„طھط´ط؛ظٹظ„</label><select id="projectOperationType"><option value="daily_visit">ط²ظٹط§ط±ط© ظٹظˆظ…ظٹط©</option><option value="full_time">ط¯ظˆط§ظ… ظƒط§ظ…ظ„</option><option value="as_needed">ط­ط³ط¨ ط§ظ„ط­ط§ط¬ط©</option></select></div>
+            <div><label>ظ†ظˆط¹ ط§ظ„ط²ظٹط§ط±ط© ط§ظ„ط§ظپطھط±ط§ط¶ظٹ</label><select id="projectVisitDefault"><option value="surface">ظ†ط¸ط§ظپط© ط³ط·ط­ظٹط©</option><option value="deep">ظ†ط¸ط§ظپط© ط¹ظ…ظٹظ‚ط©</option></select></div>
           </div>
-          <label>الحالة</label><select id="projectStatus"><option value="active">نشط</option><option value="inactive">متوقف</option></select>
-          <label>ملاحظات</label><textarea id="projectNotes"></textarea>
-          <div class="actions"><button onclick="saveProject()" id="projectSaveBtn">حفظ المشروع</button><button class="light" onclick="clearProjectForm()">إلغاء / جديد</button></div>
+          <label>ط§ظ„ط­ط§ظ„ط©</label><select id="projectStatus"><option value="active">ظ†ط´ط·</option><option value="inactive">ظ…طھظˆظ‚ظپ</option></select>
+          <label>ظ…ظ„ط§ط­ط¸ط§طھ</label><textarea id="projectNotes"></textarea>
+          <div class="actions"><button onclick="saveProject()" id="projectSaveBtn">ط­ظپط¸ ط§ظ„ظ…ط´ط±ظˆط¹</button><button class="light" onclick="clearProjectForm()">ط¥ظ„ط؛ط§ط، / ط¬ط¯ظٹط¯</button></div>
         </div>
         <div class="card">
-          <div class="table-head"><h2>المشاريع</h2><button class="light" onclick="exportTable('projects')">تصدير CSV</button></div>
-          <div class="filters"><input id="projectSearch" oninput="renderProjects()" placeholder="بحث باسم المشروع أو المشرف"><select id="projectFilterSupervisor" onchange="renderProjects()"></select><select id="projectFilterStatus" onchange="renderProjects()"><option value="">كل الحالات</option><option value="active">نشط</option><option value="inactive">متوقف</option></select></div>
-          <div class="table-wrap"><table><thead><tr><th>المشروع</th><th>المشرف</th><th>العمائر</th><th>الشقق</th><th>نهاية العقد</th><th>المتبقي</th><th>حالة العقد</th><th>الوقت اليومي</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="projectsBody"></tbody></table></div>
+          <div class="table-head"><h2>ط§ظ„ظ…ط´ط§ط±ظٹط¹</h2><button class="light" onclick="exportTable('projects')">طھطµط¯ظٹط± CSV</button></div>
+          <div class="filters"><input id="projectSearch" oninput="renderProjects()" placeholder="ط¨ط­ط« ط¨ط§ط³ظ… ط§ظ„ظ…ط´ط±ظˆط¹ ط£ظˆ ط§ظ„ظ…ط´ط±ظپ"><select id="projectFilterSupervisor" onchange="renderProjects()"></select><select id="projectFilterStatus" onchange="renderProjects()"><option value="">ظƒظ„ ط§ظ„ط­ط§ظ„ط§طھ</option><option value="active">ظ†ط´ط·</option><option value="inactive">ظ…طھظˆظ‚ظپ</option></select></div>
+          <div class="table-wrap"><table><thead><tr><th>ط§ظ„ظ…ط´ط±ظˆط¹</th><th>ط§ظ„ظ…ط´ط±ظپ</th><th>ط§ظ„ط¹ظ…ط§ط¦ط±</th><th>ط§ظ„ط´ظ‚ظ‚</th><th>ظ†ظ‡ط§ظٹط© ط§ظ„ط¹ظ‚ط¯</th><th>ط§ظ„ظ…طھط¨ظ‚ظٹ</th><th>ط­ط§ظ„ط© ط§ظ„ط¹ظ‚ط¯</th><th>ط§ظ„ظˆظ‚طھ ط§ظ„ظٹظˆظ…ظٹ</th><th>ط§ظ„ط­ط§ظ„ط©</th><th>ط¥ط¬ط±ط§ط،</th></tr></thead><tbody id="projectsBody"></tbody></table></div>
         </div>
       </div>
       <div id="projectManagerCard" class="card hidden">
-        <div class="table-head"><h2 id="projectManagerTitle">إدارة المشروع</h2><button class="light" onclick="closeProjectManager()">إغلاق</button></div>
+        <div class="table-head"><h2 id="projectManagerTitle">ط¥ط¯ط§ط±ط© ط§ظ„ظ…ط´ط±ظˆط¹</h2><button class="light" onclick="closeProjectManager()">ط¥ط؛ظ„ط§ظ‚</button></div>
         <input type="hidden" id="manageProjectId">
         <div class="grid two">
           <div>
-            <h3>ربط المشرف</h3><label>المشرف المسؤول</label><select id="projectManageSupervisor"></select><div class="actions"><button onclick="saveProjectManagerSupervisor()">حفظ المشرف</button></div><hr>
-            <h3>إضافة عامل موجود للمشروع</h3><label>العامل</label><select id="manageWorkerSelect"></select><label>نوع العامل داخل المشروع</label><select id="manageWorkerType"><option value="primary">أساسي</option><option value="support">بديل / مساند</option></select><div class="actions"><button onclick="addExistingWorkerToProject()">ربط العامل</button></div><hr>
-            <h3>إضافة عامل جديد وربطه بالمشروع</h3><label>اسم العامل</label><input id="manageNewWorkerName"><label>الجوال</label><input id="manageNewWorkerPhone"><label>الراتب</label><input type="number" id="manageNewWorkerSalary" value="1500"><label>نوع العامل</label><select id="manageNewWorkerType"><option value="primary">أساسي</option><option value="support">بديل / مساند</option></select><div class="actions"><button onclick="addWorkerInsideProject()">إضافة وربط</button></div>
+            <h3>ط±ط¨ط· ط§ظ„ظ…ط´ط±ظپ</h3><label>ط§ظ„ظ…ط´ط±ظپ ط§ظ„ظ…ط³ط¤ظˆظ„</label><select id="projectManageSupervisor"></select><div class="actions"><button onclick="saveProjectManagerSupervisor()">ط­ظپط¸ ط§ظ„ظ…ط´ط±ظپ</button></div><hr>
+            <h3>ط¥ط¶ط§ظپط© ط¹ط§ظ…ظ„ ظ…ظˆط¬ظˆط¯ ظ„ظ„ظ…ط´ط±ظˆط¹</h3><label>ط§ظ„ط¹ط§ظ…ظ„</label><select id="manageWorkerSelect"></select><label>ظ†ظˆط¹ ط§ظ„ط¹ط§ظ…ظ„ ط¯ط§ط®ظ„ ط§ظ„ظ…ط´ط±ظˆط¹</label><select id="manageWorkerType"><option value="primary">ط£ط³ط§ط³ظٹ</option><option value="support">ط¨ط¯ظٹظ„ / ظ…ط³ط§ظ†ط¯</option></select><div class="actions"><button onclick="addExistingWorkerToProject()">ط±ط¨ط· ط§ظ„ط¹ط§ظ…ظ„</button></div><hr>
+            <h3>ط¥ط¶ط§ظپط© ط¹ط§ظ…ظ„ ط¬ط¯ظٹط¯ ظˆط±ط¨ط·ظ‡ ط¨ط§ظ„ظ…ط´ط±ظˆط¹</h3><label>ط§ط³ظ… ط§ظ„ط¹ط§ظ…ظ„</label><input id="manageNewWorkerName"><label>ط§ظ„ط¬ظˆط§ظ„</label><input id="manageNewWorkerPhone"><label>ط§ظ„ط±ط§طھط¨</label><input type="number" id="manageNewWorkerSalary" value="1500"><label>ظ†ظˆط¹ ط§ظ„ط¹ط§ظ…ظ„</label><select id="manageNewWorkerType"><option value="primary">ط£ط³ط§ط³ظٹ</option><option value="support">ط¨ط¯ظٹظ„ / ظ…ط³ط§ظ†ط¯</option></select><div class="actions"><button onclick="addWorkerInsideProject()">ط¥ط¶ط§ظپط© ظˆط±ط¨ط·</button></div>
           </div>
-          <div><h3>العمال المرتبطون بالمشروع</h3><div class="table-wrap"><table><thead><tr><th>العامل</th><th>المشرف</th><th>النوع</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="projectWorkersBody"></tbody></table></div></div>
+          <div><h3>ط§ظ„ط¹ظ…ط§ظ„ ط§ظ„ظ…ط±طھط¨ط·ظˆظ† ط¨ط§ظ„ظ…ط´ط±ظˆط¹</h3><div class="table-wrap"><table><thead><tr><th>ط§ظ„ط¹ط§ظ…ظ„</th><th>ط§ظ„ظ…ط´ط±ظپ</th><th>ط§ظ„ظ†ظˆط¹</th><th>ط§ظ„ط­ط§ظ„ط©</th><th>ط¥ط¬ط±ط§ط،</th></tr></thead><tbody id="projectWorkersBody"></tbody></table></div></div>
         </div>
       </div>
     </section>
@@ -234,48 +234,48 @@
 
     <section id="contracts" class="page hidden">
       <div class="card section-head">
-        <div><h2>العقود والخدمات السنوية</h2><p>متابعة تواريخ العقود، الأيام المتبقية، والتنبيه قبل شهر من نهاية العقد.</p></div>
-        <button class="light" onclick="showPage('projects', document.querySelector(`[onclick*=projects]`))">تعديل بيانات مشروع</button>
+        <div><h2>ط§ظ„ط¹ظ‚ظˆط¯ ظˆط§ظ„ط®ط¯ظ…ط§طھ ط§ظ„ط³ظ†ظˆظٹط©</h2><p>ظ…طھط§ط¨ط¹ط© طھظˆط§ط±ظٹط® ط§ظ„ط¹ظ‚ظˆط¯طŒ ط§ظ„ط£ظٹط§ظ… ط§ظ„ظ…طھط¨ظ‚ظٹط©طŒ ظˆط§ظ„طھظ†ط¨ظٹظ‡ ظ‚ط¨ظ„ ط´ظ‡ط± ظ…ظ† ظ†ظ‡ط§ظٹط© ط§ظ„ط¹ظ‚ط¯.</p></div>
+        <button class="light" onclick="showPage('projects', document.querySelector(`[onclick*=projects]`))">طھط¹ط¯ظٹظ„ ط¨ظٹط§ظ†ط§طھ ظ…ط´ط±ظˆط¹</button>
       </div>
       <div class="kpis">
-        <div class="kpi"><small>عقود نشطة</small><b id="contractsActiveCount">0</b></div>
-        <div class="kpi"><small>قريبة الانتهاء</small><b id="contractsSoonCount">0</b></div>
-        <div class="kpi"><small>منتهية</small><b id="contractsExpiredCount">0</b></div>
-        <div class="kpi"><small>بيانات ناقصة</small><b id="contractsMissingCount">0</b></div>
+        <div class="kpi"><small>ط¹ظ‚ظˆط¯ ظ†ط´ط·ط©</small><b id="contractsActiveCount">0</b></div>
+        <div class="kpi"><small>ظ‚ط±ظٹط¨ط© ط§ظ„ط§ظ†طھظ‡ط§ط،</small><b id="contractsSoonCount">0</b></div>
+        <div class="kpi"><small>ظ…ظ†طھظ‡ظٹط©</small><b id="contractsExpiredCount">0</b></div>
+        <div class="kpi"><small>ط¨ظٹط§ظ†ط§طھ ظ†ط§ظ‚طµط©</small><b id="contractsMissingCount">0</b></div>
       </div>
-      <div class="card"><h2>العقود القريبة والمنتهية</h2><div id="contractsAlertsList" class="alerts"></div></div>
+      <div class="card"><h2>ط§ظ„ط¹ظ‚ظˆط¯ ط§ظ„ظ‚ط±ظٹط¨ط© ظˆط§ظ„ظ…ظ†طھظ‡ظٹط©</h2><div id="contractsAlertsList" class="alerts"></div></div>
       <div class="card">
-        <div class="table-head"><h2>كل العقود</h2><button class="light" onclick="exportTable('projects')">تصدير CSV</button></div>
-        <div class="filters"><input id="contractSearch" oninput="renderContracts()" placeholder="بحث باسم المشروع"><select id="contractFilterStatus" onchange="renderContracts()"><option value="">كل الحالات</option><option value="active">نشط</option><option value="soon">قريب الانتهاء</option><option value="expired">منتهي</option><option value="missing">بيانات ناقصة</option></select></div>
-        <div class="table-wrap"><table><thead><tr><th>المشروع</th><th>العمائر</th><th>الشقق</th><th>بداية العقد</th><th>نهاية العقد</th><th>الأيام المتبقية</th><th>حالة العقد</th><th>إجراء</th></tr></thead><tbody id="contractsBody"></tbody></table></div>
+        <div class="table-head"><h2>ظƒظ„ ط§ظ„ط¹ظ‚ظˆط¯</h2><button class="light" onclick="exportTable('projects')">طھطµط¯ظٹط± CSV</button></div>
+        <div class="filters"><input id="contractSearch" oninput="renderContracts()" placeholder="ط¨ط­ط« ط¨ط§ط³ظ… ط§ظ„ظ…ط´ط±ظˆط¹"><select id="contractFilterStatus" onchange="renderContracts()"><option value="">ظƒظ„ ط§ظ„ط­ط§ظ„ط§طھ</option><option value="active">ظ†ط´ط·</option><option value="soon">ظ‚ط±ظٹط¨ ط§ظ„ط§ظ†طھظ‡ط§ط،</option><option value="expired">ظ…ظ†طھظ‡ظٹ</option><option value="missing">ط¨ظٹط§ظ†ط§طھ ظ†ط§ظ‚طµط©</option></select></div>
+        <div class="table-wrap"><table><thead><tr><th>ط§ظ„ظ…ط´ط±ظˆط¹</th><th>ط§ظ„ط¹ظ…ط§ط¦ط±</th><th>ط§ظ„ط´ظ‚ظ‚</th><th>ط¨ط¯ط§ظٹط© ط§ظ„ط¹ظ‚ط¯</th><th>ظ†ظ‡ط§ظٹط© ط§ظ„ط¹ظ‚ط¯</th><th>ط§ظ„ط£ظٹط§ظ… ط§ظ„ظ…طھط¨ظ‚ظٹط©</th><th>ط­ط§ظ„ط© ط§ظ„ط¹ظ‚ط¯</th><th>ط¥ط¬ط±ط§ط،</th></tr></thead><tbody id="contractsBody"></tbody></table></div>
       </div>
 
       <div class="card" id="servicesSubTab">
         <div class="table-head">
-          <h2>الخدمات التعاقدية</h2>
+          <h2>ط§ظ„ط®ط¯ظ…ط§طھ ط§ظ„طھط¹ط§ظ‚ط¯ظٹط©</h2>
           <div class="row-actions">
-            <button class="light" onclick="openNewContractService()">إضافة خدمة</button>
-            <button class="light" onclick="exportContractServicesCSV()">تصدير CSV</button>
+            <button class="light" onclick="openNewContractService()">ط¥ط¶ط§ظپط© ط®ط¯ظ…ط©</button>
+            <button class="light" onclick="exportContractServicesCSV()">طھطµط¯ظٹط± CSV</button>
           </div>
         </div>
         <div class="kpis small">
-          <div class="kpi"><small>إجمالي الخدمات</small><b id="servicesTotalCount">0</b></div>
-          <div class="kpi"><small>مستحقة</small><b id="servicesDueCount">0</b></div>
-          <div class="kpi"><small>قريبة</small><b id="servicesSoonCount">0</b></div>
-          <div class="kpi"><small>متأخرة</small><b id="servicesLateCount">0</b></div>
-          <div class="kpi"><small>منجزة</small><b id="servicesDoneCount">0</b></div>
-          <div class="kpi"><small>مراجعة</small><b id="servicesReviewCount">0</b></div>
+          <div class="kpi"><small>ط¥ط¬ظ…ط§ظ„ظٹ ط§ظ„ط®ط¯ظ…ط§طھ</small><b id="servicesTotalCount">0</b></div>
+          <div class="kpi"><small>ظ…ط³طھط­ظ‚ط©</small><b id="servicesDueCount">0</b></div>
+          <div class="kpi"><small>ظ‚ط±ظٹط¨ط©</small><b id="servicesSoonCount">0</b></div>
+          <div class="kpi"><small>ظ…طھط£ط®ط±ط©</small><b id="servicesLateCount">0</b></div>
+          <div class="kpi"><small>ظ…ظ†ط¬ط²ط©</small><b id="servicesDoneCount">0</b></div>
+          <div class="kpi"><small>ظ…ط±ط§ط¬ط¹ط©</small><b id="servicesReviewCount">0</b></div>
         </div>
         <div class="filters">
-          <input id="serviceSearch" oninput="renderContractServices()" placeholder="بحث بالخدمة أو المشروع">
+          <input id="serviceSearch" oninput="renderContractServices()" placeholder="ط¨ط­ط« ط¨ط§ظ„ط®ط¯ظ…ط© ط£ظˆ ط§ظ„ظ…ط´ط±ظˆط¹">
           <select id="serviceFilterProject" onchange="renderContractServices()"></select>
           <select id="serviceFilterSupervisor" onchange="renderContractServices()"></select>
-          <select id="serviceFilterStatus" onchange="renderContractServices()"><option value="">كل الحالات</option><option value="due">مستحقة</option><option value="soon">قريبة</option><option value="late">متأخرة</option><option value="done">منجزة</option><option value="review">مراجعة</option></select>
+          <select id="serviceFilterStatus" onchange="renderContractServices()"><option value="">ظƒظ„ ط§ظ„ط­ط§ظ„ط§طھ</option><option value="due">ظ…ط³طھط­ظ‚ط©</option><option value="soon">ظ‚ط±ظٹط¨ط©</option><option value="late">ظ…طھط£ط®ط±ط©</option><option value="done">ظ…ظ†ط¬ط²ط©</option><option value="review">ظ…ط±ط§ط¬ط¹ط©</option></select>
           <select id="serviceFilterType" onchange="renderContractServices()"></select>
           <input type="date" id="serviceFilterDate" onchange="renderContractServices()">
-          <button class="light" onclick="resetServiceFilters()">مسح الفلاتر</button>
+          <button class="light" onclick="resetServiceFilters()">ظ…ط³ط­ ط§ظ„ظپظ„ط§طھط±</button>
         </div>
-        <div class="table-wrap"><table><thead><tr><th>المشروع</th><th>المشرف</th><th>الخدمة</th><th>النوع</th><th>التكرار</th><th>عدد الزيارات</th><th>المنفذ</th><th>تم</th><th>المتبقي</th><th>آخر تنفيذ</th><th>الاستحقاق</th><th>الحالة</th><th>ملاحظات</th><th>إجراء</th></tr></thead><tbody id="contractServicesBody"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>ط§ظ„ظ…ط´ط±ظˆط¹</th><th>ط§ظ„ظ…ط´ط±ظپ</th><th>ط§ظ„ط®ط¯ظ…ط©</th><th>ط§ظ„ظ†ظˆط¹</th><th>ط§ظ„طھظƒط±ط§ط±</th><th>ط¹ط¯ط¯ ط§ظ„ط²ظٹط§ط±ط§طھ</th><th>ط§ظ„ظ…ظ†ظپط°</th><th>طھظ…</th><th>ط§ظ„ظ…طھط¨ظ‚ظٹ</th><th>ط¢ط®ط± طھظ†ظپظٹط°</th><th>ط§ظ„ط§ط³طھط­ظ‚ط§ظ‚</th><th>ط§ظ„ط­ط§ظ„ط©</th><th>ظ…ظ„ط§ط­ط¸ط§طھ</th><th>ط¥ط¬ط±ط§ط،</th></tr></thead><tbody id="contractServicesBody"></tbody></table></div>
         <div id="supervisorServicesPreview" class="quick-list"></div>
         <div id="smartServicesList" class="quick-list"></div>
       </div>
@@ -284,41 +284,41 @@
     <section id="workers" class="page hidden">
       <div class="card section-head">
         <div>
-          <h2>إدارة العمال</h2>
-          <p>إضافة وتعديل وربط العمال بالمشرفين والمشاريع، مع تمييز العامل الأساسي والبديل.</p>
+          <h2>ط¥ط¯ط§ط±ط© ط§ظ„ط¹ظ…ط§ظ„</h2>
+          <p>ط¥ط¶ط§ظپط© ظˆطھط¹ط¯ظٹظ„ ظˆط±ط¨ط· ط§ظ„ط¹ظ…ط§ظ„ ط¨ط§ظ„ظ…ط´ط±ظپظٹظ† ظˆط§ظ„ظ…ط´ط§ط±ظٹط¹طŒ ظ…ط¹ طھظ…ظٹظٹط² ط§ظ„ط¹ط§ظ…ظ„ ط§ظ„ط£ط³ط§ط³ظٹ ظˆط§ظ„ط¨ط¯ظٹظ„.</p>
         </div>
-        <button class="light" onclick="clearWorkerForm()">عامل جديد</button>
+        <button class="light" onclick="clearWorkerForm()">ط¹ط§ظ…ظ„ ط¬ط¯ظٹط¯</button>
       </div>
       <div class="grid two">
         <div class="card">
-          <h2 id="workerFormTitle">إضافة عامل</h2>
+          <h2 id="workerFormTitle">ط¥ط¶ط§ظپط© ط¹ط§ظ…ظ„</h2>
           <input type="hidden" id="workerId">
-          <label>اسم العامل</label><input id="workerName" placeholder="مثال: ياسر">
-          <label>الجوال</label><input id="workerPhone" placeholder="اختياري">
-          <label>الراتب</label><input type="number" id="workerSalary" value="1500">
-          <label>المشرف</label><select id="workerSupervisor" onchange="onWorkerSupervisorChange()"></select>
-          <label>المشروع المرتبط</label><select id="workerProject"></select>
-          <label>نوع العامل</label><select id="workerType"><option value="primary">أساسي</option><option value="support">بديل / مساند</option></select>
-          <label>الحالة</label><select id="workerStatus"><option value="active">نشط</option><option value="inactive">موقوف</option></select>
-          <label>ملاحظات</label><textarea id="workerNotes" placeholder="أي ملاحظة تخص العامل أو توزيعه"></textarea>
+          <label>ط§ط³ظ… ط§ظ„ط¹ط§ظ…ظ„</label><input id="workerName" placeholder="ظ…ط«ط§ظ„: ظٹط§ط³ط±">
+          <label>ط§ظ„ط¬ظˆط§ظ„</label><input id="workerPhone" placeholder="ط§ط®طھظٹط§ط±ظٹ">
+          <label>ط§ظ„ط±ط§طھط¨</label><input type="number" id="workerSalary" value="1500">
+          <label>ط§ظ„ظ…ط´ط±ظپ</label><select id="workerSupervisor" onchange="onWorkerSupervisorChange()"></select>
+          <label>ط§ظ„ظ…ط´ط±ظˆط¹ ط§ظ„ظ…ط±طھط¨ط·</label><select id="workerProject"></select>
+          <label>ظ†ظˆط¹ ط§ظ„ط¹ط§ظ…ظ„</label><select id="workerType"><option value="primary">ط£ط³ط§ط³ظٹ</option><option value="support">ط¨ط¯ظٹظ„ / ظ…ط³ط§ظ†ط¯</option></select>
+          <label>ط§ظ„ط­ط§ظ„ط©</label><select id="workerStatus"><option value="active">ظ†ط´ط·</option><option value="inactive">ظ…ظˆظ‚ظˆظپ</option></select>
+          <label>ظ…ظ„ط§ط­ط¸ط§طھ</label><textarea id="workerNotes" placeholder="ط£ظٹ ظ…ظ„ط§ط­ط¸ط© طھط®طµ ط§ظ„ط¹ط§ظ…ظ„ ط£ظˆ طھظˆط²ظٹط¹ظ‡"></textarea>
           <div class="actions">
-            <button id="workerSaveBtn" onclick="saveWorker()">حفظ العامل</button>
-            <button id="workerCancelBtn" class="light hidden" onclick="clearWorkerForm()">إلغاء التعديل</button>
+            <button id="workerSaveBtn" onclick="saveWorker()">ط­ظپط¸ ط§ظ„ط¹ط§ظ…ظ„</button>
+            <button id="workerCancelBtn" class="light hidden" onclick="clearWorkerForm()">ط¥ظ„ط؛ط§ط، ط§ظ„طھط¹ط¯ظٹظ„</button>
           </div>
         </div>
         <div class="card">
           <div class="table-head">
-            <h2>قائمة العمال</h2>
-            <button class="light" onclick="exportTable('workers')">تصدير CSV</button>
+            <h2>ظ‚ط§ط¦ظ…ط© ط§ظ„ط¹ظ…ط§ظ„</h2>
+            <button class="light" onclick="exportTable('workers')">طھطµط¯ظٹط± CSV</button>
           </div>
           <div class="filters">
-            <input id="workerSearch" oninput="renderWorkers()" placeholder="بحث باسم العامل أو المشرف أو المشروع">
+            <input id="workerSearch" oninput="renderWorkers()" placeholder="ط¨ط­ط« ط¨ط§ط³ظ… ط§ظ„ط¹ط§ظ…ظ„ ط£ظˆ ط§ظ„ظ…ط´ط±ظپ ط£ظˆ ط§ظ„ظ…ط´ط±ظˆط¹">
             <select id="workerFilterSupervisor" onchange="renderWorkers()"></select>
             <select id="workerFilterProject" onchange="renderWorkers()"></select>
-            <select id="workerFilterStatus" onchange="renderWorkers()"><option value="">كل الحالات</option><option value="active">نشط</option><option value="inactive">موقوف</option></select>
-            <select id="workerFilterType" onchange="renderWorkers()"><option value="">كل الأنواع</option><option value="primary">أساسي</option><option value="support">بديل / مساند</option></select>
+            <select id="workerFilterStatus" onchange="renderWorkers()"><option value="">ظƒظ„ ط§ظ„ط­ط§ظ„ط§طھ</option><option value="active">ظ†ط´ط·</option><option value="inactive">ظ…ظˆظ‚ظˆظپ</option></select>
+            <select id="workerFilterType" onchange="renderWorkers()"><option value="">ظƒظ„ ط§ظ„ط£ظ†ظˆط§ط¹</option><option value="primary">ط£ط³ط§ط³ظٹ</option><option value="support">ط¨ط¯ظٹظ„ / ظ…ط³ط§ظ†ط¯</option></select>
           </div>
-          <div class="table-wrap"><table><thead><tr><th>العامل</th><th>المشرف</th><th>المشروع</th><th>النوع</th><th>الجوال</th><th>الراتب</th><th>الحالة</th><th>ملاحظات</th><th>واتساب</th><th>إجراء</th></tr></thead><tbody id="workersBody"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>ط§ظ„ط¹ط§ظ…ظ„</th><th>ط§ظ„ظ…ط´ط±ظپ</th><th>ط§ظ„ظ…ط´ط±ظˆط¹</th><th>ط§ظ„ظ†ظˆط¹</th><th>ط§ظ„ط¬ظˆط§ظ„</th><th>ط§ظ„ط±ط§طھط¨</th><th>ط§ظ„ط­ط§ظ„ط©</th><th>ظ…ظ„ط§ط­ط¸ط§طھ</th><th>ظˆط§طھط³ط§ط¨</th><th>ط¥ط¬ط±ط§ط،</th></tr></thead><tbody id="workersBody"></tbody></table></div>
         </div>
       </div>
     </section>
@@ -326,71 +326,71 @@
     <section id="attendance" class="page hidden">
       <div class="grid two">
         <div class="card">
-          <h2 id="attendanceFormTitle">تسجيل حضور / غياب</h2>
+          <h2 id="attendanceFormTitle">طھط³ط¬ظٹظ„ ط­ط¶ظˆط± / ط؛ظٹط§ط¨</h2>
           <input type="hidden" id="attendanceId">
-          <label>التاريخ</label><input type="date" id="attendanceDate">
-          <label>المشرف</label><select id="attendanceSupervisor" onchange="renderAttendanceWorkersQuick()"></select>
+          <label>ط§ظ„طھط§ط±ظٹط®</label><input type="date" id="attendanceDate">
+          <label>ط§ظ„ظ…ط´ط±ظپ</label><select id="attendanceSupervisor" onchange="renderAttendanceWorkersQuick()"></select>
           <input type="hidden" id="attendanceProject" value="">
-          <label>العامل</label><select id="attendanceWorker"></select>
-          <label>الحالة</label><select id="attendanceStatus"><option value="present">حاضر</option><option value="absent">غائب</option></select>
-          <label>ملاحظات</label><textarea id="attendanceNotes"></textarea>
-          <div class="actions"><button onclick="saveAttendance()">حفظ</button><button class="light" onclick="clearAttendanceForm()">جديد</button></div>
+          <label>ط§ظ„ط¹ط§ظ…ظ„</label><select id="attendanceWorker"></select>
+          <label>ط§ظ„ط­ط§ظ„ط©</label><select id="attendanceStatus"><option value="present">ط­ط§ط¶ط±</option><option value="absent">ط؛ط§ط¦ط¨</option></select>
+          <label>ظ…ظ„ط§ط­ط¸ط§طھ</label><textarea id="attendanceNotes"></textarea>
+          <div class="actions"><button onclick="saveAttendance()">ط­ظپط¸</button><button class="light" onclick="clearAttendanceForm()">ط¬ط¯ظٹط¯</button></div>
           <div class="quick-list" id="attendanceQuick"></div>
         </div>
         <div class="card">
-          <h2>سجلات الحضور</h2>
-          <div class="filters"><input type="date" id="attendanceFilterDate" onchange="renderAttendance()"><select id="attendanceFilterSupervisor" onchange="renderAttendance()"></select><input id="attendanceSearch" oninput="renderAttendance()" placeholder="بحث"></div>
-          <div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>العامل</th><th>المشرف</th><th>الحالة</th><th>ملاحظات</th><th>إجراء</th></tr></thead><tbody id="attendanceBody"></tbody></table></div>
+          <h2>ط³ط¬ظ„ط§طھ ط§ظ„ط­ط¶ظˆط±</h2>
+          <div class="filters"><input type="date" id="attendanceFilterDate" onchange="renderAttendance()"><select id="attendanceFilterSupervisor" onchange="renderAttendance()"></select><input id="attendanceSearch" oninput="renderAttendance()" placeholder="ط¨ط­ط«"></div>
+          <div class="table-wrap"><table><thead><tr><th>ط§ظ„طھط§ط±ظٹط®</th><th>ط§ظ„ط¹ط§ظ…ظ„</th><th>ط§ظ„ظ…ط´ط±ظپ</th><th>ط§ظ„ط­ط§ظ„ط©</th><th>ظ…ظ„ط§ط­ط¸ط§طھ</th><th>ط¥ط¬ط±ط§ط،</th></tr></thead><tbody id="attendanceBody"></tbody></table></div>
         </div>
       </div>
 
       <div class="card">
-        <h2>جدول الحضور والغياب الشهري</h2>
+        <h2>ط¬ط¯ظˆظ„ ط§ظ„ط­ط¶ظˆط± ظˆط§ظ„ط؛ظٹط§ط¨ ط§ظ„ط´ظ‡ط±ظٹ</h2>
         <div class="filters">
-          <div><label>الشهر</label><input type="month" id="attendanceMatrixMonth" onchange="renderAttendanceMonthly()"></div>
-          <div><label>المشرف</label><select id="attendanceMatrixSupervisor" onchange="renderAttendanceMonthly()"></select></div>
+          <div><label>ط§ظ„ط´ظ‡ط±</label><input type="month" id="attendanceMatrixMonth" onchange="renderAttendanceMonthly()"></div>
+          <div><label>ط§ظ„ظ…ط´ط±ظپ</label><select id="attendanceMatrixSupervisor" onchange="renderAttendanceMonthly()"></select></div>
           <input type="hidden" id="attendanceMatrixProject" value="">
-          <div><label>بحث العامل</label><input id="attendanceMatrixSearch" oninput="renderAttendanceMonthly()" placeholder="اسم العامل"></div>
+          <div><label>ط¨ط­ط« ط§ظ„ط¹ط§ظ…ظ„</label><input id="attendanceMatrixSearch" oninput="renderAttendanceMonthly()" placeholder="ط§ط³ظ… ط§ظ„ط¹ط§ظ…ظ„"></div>
         </div>
         <div id="attendanceMatrixSummary" class="kpis small"></div>
-        <div class="actions"><button class="light" onclick="exportAttendanceMatrixCSV()">تصدير جدول الحضور CSV</button></div>
+        <div class="actions"><button class="light" onclick="exportAttendanceMatrixCSV()">طھطµط¯ظٹط± ط¬ط¯ظˆظ„ ط§ظ„ط­ط¶ظˆط± CSV</button></div>
         <div class="table-wrap attendance-matrix-wrap"><table class="attendance-matrix"><thead id="attendanceMatrixHead"></thead><tbody id="attendanceMatrixBody"></tbody></table></div>
-        <div class="footer-note">الرموز: <span class="badge green">حاضر</span> <span class="badge red">غائب</span> <span class="badge">لم يسجل</span></div>
+        <div class="footer-note">ط§ظ„ط±ظ…ظˆط²: <span class="badge green">ط­ط§ط¶ط±</span> <span class="badge red">ط؛ط§ط¦ط¨</span> <span class="badge">ظ„ظ… ظٹط³ط¬ظ„</span></div>
       </div>
     </section>
 
-    <section id="monthly" class="page hidden"><div class="card"><h2>الأوقات الشهرية</h2><div class="filters"><input type="month" id="monthlyMonth" onchange="renderMonthly()"><select id="monthlySupervisor" onchange="renderMonthly()"></select><button onclick="exportMonthlyCSV()">تصدير CSV</button><button onclick="printMonthlyReportV57()">طباعة تقرير الأوقات الشهرية</button></div><div id="monthlySummary" class="kpis small"></div><div class="table-wrap"><table><thead><tr><th>المشرف</th><th>المشروع</th><th>عدد السجلات</th><th>الساعات المطلوبة</th><th>الساعات الفعلية</th><th>وقت الانتقال</th><th>نسبة العمل</th><th>حالة الأداء</th></tr></thead><tbody id="monthlyBody"></tbody></table></div></div></section>
+    <section id="monthly" class="page hidden"><div class="card"><h2>ط§ظ„ط£ظˆظ‚ط§طھ ط§ظ„ط´ظ‡ط±ظٹط©</h2><div class="filters"><input type="month" id="monthlyMonth" onchange="renderMonthly()"><select id="monthlySupervisor" onchange="renderMonthly()"></select><button onclick="exportMonthlyCSV()">طھطµط¯ظٹط± CSV</button><button onclick="printMonthlyReportV57()">ط·ط¨ط§ط¹ط© طھظ‚ط±ظٹط± ط§ظ„ط£ظˆظ‚ط§طھ ط§ظ„ط´ظ‡ط±ظٹط©</button></div><div id="monthlySummary" class="kpis small"></div><div class="table-wrap"><table><thead><tr><th>ط§ظ„ظ…ط´ط±ظپ</th><th>ط§ظ„ظ…ط´ط±ظˆط¹</th><th>ط¹ط¯ط¯ ط§ظ„ط³ط¬ظ„ط§طھ</th><th>ط§ظ„ط³ط§ط¹ط§طھ ط§ظ„ظ…ط·ظ„ظˆط¨ط©</th><th>ط§ظ„ط³ط§ط¹ط§طھ ط§ظ„ظپط¹ظ„ظٹط©</th><th>ظˆظ‚طھ ط§ظ„ط§ظ†طھظ‚ط§ظ„</th><th>ظ†ط³ط¨ط© ط§ظ„ط¹ظ…ظ„</th><th>ط­ط§ظ„ط© ط§ظ„ط£ط¯ط§ط،</th></tr></thead><tbody id="monthlyBody"></tbody></table></div></div></section>
 
     <section id="tickets" class="page hidden">
       <div class="grid two">
         <div class="card">
-          <h2 id="ticketFormTitle">إضافة تكت</h2>
+          <h2 id="ticketFormTitle">ط¥ط¶ط§ظپط© طھظƒطھ</h2>
           <input type="hidden" id="ticketId">
-          <label>المشروع</label><select id="ticketProject"></select>
-          <label>المشرف</label><select id="ticketSupervisor"></select>
-          <label>العنوان</label><input id="ticketTitle" placeholder="مثال: عطل إنارة / تسريب / ملاحظة نظافة">
-          <label>الأولوية</label>
-          <select id="ticketPriority"><option value="normal">عادي</option><option value="high">مهم</option><option value="urgent">عاجل</option><option value="low">منخفض</option></select>
-          <label>الحالة</label>
-          <select id="ticketStatus" onchange="toggleTicketClosureBox()"><option value="open">مفتوح</option><option value="processing">تحت المعالجة</option><option value="closed">مغلق</option></select>
-          <label>الوصف</label><textarea id="ticketDescription" placeholder="اكتب وصف التكت بشكل واضح"></textarea>
+          <label>ط§ظ„ظ…ط´ط±ظˆط¹</label><select id="ticketProject"></select>
+          <label>ط§ظ„ظ…ط´ط±ظپ</label><select id="ticketSupervisor"></select>
+          <label>ط§ظ„ط¹ظ†ظˆط§ظ†</label><input id="ticketTitle" placeholder="ظ…ط«ط§ظ„: ط¹ط·ظ„ ط¥ظ†ط§ط±ط© / طھط³ط±ظٹط¨ / ظ…ظ„ط§ط­ط¸ط© ظ†ط¸ط§ظپط©">
+          <label>ط§ظ„ط£ظˆظ„ظˆظٹط©</label>
+          <select id="ticketPriority"><option value="normal">ط¹ط§ط¯ظٹ</option><option value="high">ظ…ظ‡ظ…</option><option value="urgent">ط¹ط§ط¬ظ„</option><option value="low">ظ…ظ†ط®ظپط¶</option></select>
+          <label>ط§ظ„ط­ط§ظ„ط©</label>
+          <select id="ticketStatus" onchange="toggleTicketClosureBox()"><option value="open">ظ…ظپطھظˆط­</option><option value="processing">طھط­طھ ط§ظ„ظ…ط¹ط§ظ„ط¬ط©</option><option value="closed">ظ…ط؛ظ„ظ‚</option></select>
+          <label>ط§ظ„ظˆطµظپ</label><textarea id="ticketDescription" placeholder="ط§ظƒطھط¨ ظˆطµظپ ط§ظ„طھظƒطھ ط¨ط´ظƒظ„ ظˆط§ط¶ط­"></textarea>
           <div id="ticketClosureBox" class="closure-box hidden">
-            <label>أغلق بواسطة / الفني أو المشرف</label>
-            <input id="ticketClosedByName" list="ticketTechniciansList" placeholder="اختر أو اكتب اسم من أغلق التكت">
+            <label>ط£ط؛ظ„ظ‚ ط¨ظˆط§ط³ط·ط© / ط§ظ„ظپظ†ظٹ ط£ظˆ ط§ظ„ظ…ط´ط±ظپ</label>
+            <input id="ticketClosedByName" list="ticketTechniciansList" placeholder="ط§ط®طھط± ط£ظˆ ط§ظƒطھط¨ ط§ط³ظ… ظ…ظ† ط£ط؛ظ„ظ‚ ط§ظ„طھظƒطھ">
             <datalist id="ticketTechniciansList">
-              <option value="مازن الخطيب"><option value="جمال"><option value="شريف"><option value="أسعد"><option value="حسين">
+              <option value="ظ…ط§ط²ظ† ط§ظ„ط®ط·ظٹط¨"><option value="ط¬ظ…ط§ظ„"><option value="ط´ط±ظٹظپ"><option value="ط£ط³ط¹ط¯"><option value="ط­ط³ظٹظ†">
             </datalist>
-            <label>كيف تم الإغلاق؟</label>
-            <textarea id="ticketClosureNote" placeholder="اكتب طريقة الحل أو الإجراء المنفذ"></textarea>
-            <div class="footer-note">لن يتم إغلاق التكت إلا بعد كتابة طريقة الإغلاق واسم من أغلقه.</div>
+            <label>ظƒظٹظپ طھظ… ط§ظ„ط¥ط؛ظ„ط§ظ‚طں</label>
+            <textarea id="ticketClosureNote" placeholder="ط§ظƒطھط¨ ط·ط±ظٹظ‚ط© ط§ظ„ط­ظ„ ط£ظˆ ط§ظ„ط¥ط¬ط±ط§ط، ط§ظ„ظ…ظ†ظپط°"></textarea>
+            <div class="footer-note">ظ„ظ† ظٹطھظ… ط¥ط؛ظ„ط§ظ‚ ط§ظ„طھظƒطھ ط¥ظ„ط§ ط¨ط¹ط¯ ظƒطھط§ط¨ط© ط·ط±ظٹظ‚ط© ط§ظ„ط¥ط؛ظ„ط§ظ‚ ظˆط§ط³ظ… ظ…ظ† ط£ط؛ظ„ظ‚ظ‡.</div>
           </div>
-          <div class="actions"><button onclick="saveTicket()">حفظ التكت</button><button class="light" onclick="clearTicketForm()">جديد</button></div>
+          <div class="actions"><button onclick="saveTicket()">ط­ظپط¸ ط§ظ„طھظƒطھ</button><button class="light" onclick="clearTicketForm()">ط¬ط¯ظٹط¯</button></div>
         </div>
         <div class="card">
-          <h2>التكتات</h2>
+          <h2>ط§ظ„طھظƒطھط§طھ</h2>
           <div class="filters">
-            <select id="ticketFilterStatus" onchange="renderTickets()"><option value="">كل الحالات</option><option value="open">مفتوح</option><option value="processing">تحت المعالجة</option><option value="closed">مغلق</option></select>
-            <input id="ticketSearch" oninput="renderTickets()" placeholder="بحث برقم التكت، المشروع، العنوان أو الوصف">
+            <select id="ticketFilterStatus" onchange="renderTickets()"><option value="">ظƒظ„ ط§ظ„ط­ط§ظ„ط§طھ</option><option value="open">ظ…ظپطھظˆط­</option><option value="processing">طھط­طھ ط§ظ„ظ…ط¹ط§ظ„ط¬ط©</option><option value="closed">ظ…ط؛ظ„ظ‚</option></select>
+            <input id="ticketSearch" oninput="renderTickets()" placeholder="ط¨ط­ط« ط¨ط±ظ‚ظ… ط§ظ„طھظƒطھطŒ ط§ظ„ظ…ط´ط±ظˆط¹طŒ ط§ظ„ط¹ظ†ظˆط§ظ† ط£ظˆ ط§ظ„ظˆطµظپ">
           </div>
           <div id="ticketsSmartSummary" class="smart-ticket-summary"></div><div id="ticketsBody" class="smart-ticket-grid"></div>
         </div>
@@ -404,56 +404,57 @@
     <section id="orders" class="page hidden">
       <div class="card section-head">
         <div>
-          <h2>قسم الأوردرات</h2>
-          <p>إدارة أوردرات الصيانة الخارجية بنفس آلية ملف الإكسل، مع رقم نظام تلقائي ورقم مستقل للأوردر في القروب.</p>
+          <h2>ظ‚ط³ظ… ط§ظ„ط£ظˆط±ط¯ط±ط§طھ</h2>
+          <p>ط¥ط¯ط§ط±ط© ط£ظˆط±ط¯ط±ط§طھ ط§ظ„طµظٹط§ظ†ط© ط§ظ„ط®ط§ط±ط¬ظٹط© ط¨ظ†ظپط³ ط¢ظ„ظٹط© ظ…ظ„ظپ ط§ظ„ط¥ظƒط³ظ„طŒ ظ…ط¹ ط±ظ‚ظ… ظ†ط¸ط§ظ… طھظ„ظ‚ط§ط¦ظٹ ظˆط±ظ‚ظ… ظ…ط³طھظ‚ظ„ ظ„ظ„ط£ظˆط±ط¯ط± ظپظٹ ط§ظ„ظ‚ط±ظˆط¨.</p>
         </div>
         <div class="actions">
-          <button onclick="clearOrderFormV233()">+ أوردر جديد</button>
-          <button class="light" onclick="exportOrdersCSVV233()">تصدير CSV</button>
+          <button onclick="clearOrderFormV233()">+ ط£ظˆط±ط¯ط± ط¬ط¯ظٹط¯</button>
+          <button class="light" onclick="exportOrdersCSVV233()">طھطµط¯ظٹط± CSV</button>
         </div>
       </div>
 
       <div class="kpis orders-kpis-v233">
-        <div class="kpi"><small>إجمالي الأوردرات</small><b id="ordersTotalKpiV233">0</b></div>
-        <div class="kpi"><small>تم التنفيذ</small><b id="ordersDoneKpiV233">0</b></div>
-        <div class="kpi"><small>آجل / غير مسدد</small><b id="ordersDueKpiV233">0</b></div>
-        <div class="kpi"><small>صافي الربح</small><b id="ordersProfitKpiV233">0</b></div>
+        <div class="kpi"><small>ط¥ط¬ظ…ط§ظ„ظٹ ط§ظ„ط£ظˆط±ط¯ط±ط§طھ</small><b id="ordersTotalKpiV233">0</b></div>
+        <div class="kpi"><small>طھظ… ط§ظ„طھظ†ظپظٹط°</small><b id="ordersDoneKpiV233">0</b></div>
+        <div class="kpi"><small>ط¢ط¬ظ„ / ط؛ظٹط± ظ…ط³ط¯ط¯</small><b id="ordersDueKpiV233">0</b></div>
+        <div class="kpi"><small>طµط§ظپظٹ ط§ظ„ط±ط¨ط­</small><b id="ordersProfitKpiV233">0</b></div>
       </div>
 
       <div class="card orders-summary-v233">
-        <h2>ملخص مالي وتنفيذي</h2>
+        <h2>ظ…ظ„ط®طµ ظ…ط§ظ„ظٹ ظˆطھظ†ظپظٹط°ظٹ</h2>
         <div id="ordersSummaryV233" class="summary-grid"></div>
       </div>
 
       <div class="grid two orders-layout-v233">
         <div class="card orders-form-card-v233">
-          <h2 id="orderFormTitleV233">إضافة أوردر</h2>
+          <h2 id="orderFormTitleV233">ط¥ط¶ط§ظپط© ط£ظˆط±ط¯ط±</h2>
           <input type="hidden" id="orderEditIndexV233">
-          <div class="split"><div><label>رقم الطلب / النظام</label><input id="orderNoV233" readonly placeholder="تلقائي عند الحفظ"></div><div><label>رقم الطلب بالجروب</label><input id="orderGroupNoV233"></div></div>
+          <div class="split"><div><label>ط±ظ‚ظ… ط§ظ„ط·ظ„ط¨ / ط§ظ„ظ†ط¸ط§ظ…</label><input id="orderNoV233" readonly placeholder="طھظ„ظ‚ط§ط¦ظٹ ط¹ظ†ط¯ ط§ظ„ط­ظپط¸"></div><div><label>ط±ظ‚ظ… ط§ظ„ط·ظ„ط¨ ط¨ط§ظ„ط¬ط±ظˆط¨</label><input id="orderGroupNoV233"></div></div>
           <div id="orderFormFieldsV233" class="orders-form-grid-v233"></div>
           <div class="actions">
-            <button onclick="saveOrderV233()">حفظ الأوردر</button>
-            <button class="light" onclick="clearOrderFormV233()">جديد</button>
-            <button class="danger" onclick="deleteCurrentOrderV233()">حذف المحدد</button>
+            <button onclick="saveOrderV233()">ط­ظپط¸ ط§ظ„ط£ظˆط±ط¯ط±</button>
+            <button class="light" onclick="clearOrderFormV233()">ط¬ط¯ظٹط¯</button>
+            <button class="danger" onclick="deleteCurrentOrderV233()">ط­ط°ظپ ط§ظ„ظ…ط­ط¯ط¯</button>
           </div>
-          <div class="footer-note">رقم النظام يتم توليده تلقائيًا ولا يتكرر. رقم القروب يكتب يدويًا من قروب الأوردرات.</div>
+          <div class="footer-note">ط±ظ‚ظ… ط§ظ„ظ†ط¸ط§ظ… ظٹطھظ… طھظˆظ„ظٹط¯ظ‡ طھظ„ظ‚ط§ط¦ظٹظ‹ط§ ظˆظ„ط§ ظٹطھظƒط±ط±. ط±ظ‚ظ… ط§ظ„ظ‚ط±ظˆط¨ ظٹظƒطھط¨ ظٹط¯ظˆظٹظ‹ط§ ظ…ظ† ظ‚ط±ظˆط¨ ط§ظ„ط£ظˆط±ط¯ط±ط§طھ.</div>
         </div>
 
         <div class="card orders-list-card-v233">
-          <div class="table-head"><h2>سجل الأوردرات من الإكسل</h2><button class="light" onclick="renderOrdersV233()">تحديث</button></div>
+          <div class="table-head"><h2>ط³ط¬ظ„ ط§ظ„ط£ظˆط±ط¯ط±ط§طھ ظ…ظ† ط§ظ„ط¥ظƒط³ظ„</h2><button class="light" onclick="renderOrdersFirstPageV360()">طھط­ط¯ظٹط«</button></div>
           <div class="filters orders-filters-v233">
-            <input id="orderSearchV233" oninput="renderOrdersV233()" placeholder="بحث برقم النظام، رقم القروب، المشروع، العميل، الجوال، التفاصيل">
-            <select id="orderProjectFilterV233" onchange="renderOrdersV233()"><option value="">كل المشاريع</option></select>
-            <select id="orderExecutorFilterV233" onchange="renderOrdersV233()"><option value="">كل المنفذين</option></select>
-            <select id="orderSenderFilterV233" onchange="renderOrdersV233()"><option value="">كل مرسلي الطلب</option></select>
-            <select id="orderStatusFilterV233" onchange="renderOrdersV233()"><option value="">كل حالات التنفيذ</option></select>
-            <select id="orderPaymentFilterV233" onchange="renderOrdersV233()"><option value="">كل حالات السداد</option></select>
-            <select id="orderBillingFilterV233" onchange="renderOrdersV233()"><option value="">كل حالات الفوترة</option></select>
-            <input id="orderFromDateV233" type="date" onchange="renderOrdersV233()" title="من تاريخ الطلب">
-            <input id="orderToDateV233" type="date" onchange="renderOrdersV233()" title="إلى تاريخ الطلب">
-            <button class="light" onclick="resetOrdersFiltersV233()">إعادة تعيين</button>
+            <input id="orderSearchV233" oninput="renderOrdersFirstPageV360()" placeholder="ط¨ط­ط« ط¨ط±ظ‚ظ… ط§ظ„ظ†ط¸ط§ظ…طŒ ط±ظ‚ظ… ط§ظ„ظ‚ط±ظˆط¨طŒ ط§ظ„ظ…ط´ط±ظˆط¹طŒ ط§ظ„ط¹ظ…ظٹظ„طŒ ط§ظ„ط¬ظˆط§ظ„طŒ ط§ظ„طھظپط§طµظٹظ„">
+            <select id="orderProjectFilterV233" onchange="renderOrdersFirstPageV360()"><option value="">ظƒظ„ ط§ظ„ظ…ط´ط§ط±ظٹط¹</option></select>
+            <select id="orderExecutorFilterV233" onchange="renderOrdersFirstPageV360()"><option value="">ظƒظ„ ط§ظ„ظ…ظ†ظپط°ظٹظ†</option></select>
+            <select id="orderSenderFilterV233" onchange="renderOrdersFirstPageV360()"><option value="">ظƒظ„ ظ…ط±ط³ظ„ظٹ ط§ظ„ط·ظ„ط¨</option></select>
+            <select id="orderStatusFilterV233" onchange="renderOrdersFirstPageV360()"><option value="">ظƒظ„ ط­ط§ظ„ط§طھ ط§ظ„طھظ†ظپظٹط°</option></select>
+            <select id="orderPaymentFilterV233" onchange="renderOrdersFirstPageV360()"><option value="">ظƒظ„ ط­ط§ظ„ط§طھ ط§ظ„ط³ط¯ط§ط¯</option></select>
+            <select id="orderBillingFilterV233" onchange="renderOrdersFirstPageV360()"><option value="">ظƒظ„ ط­ط§ظ„ط§طھ ط§ظ„ظپظˆطھط±ط©</option></select>
+            <input id="orderFromDateV233" type="date" onchange="renderOrdersFirstPageV360()" title="ظ…ظ† طھط§ط±ظٹط® ط§ظ„ط·ظ„ط¨">
+            <input id="orderToDateV233" type="date" onchange="renderOrdersFirstPageV360()" title="ط¥ظ„ظ‰ طھط§ط±ظٹط® ط§ظ„ط·ظ„ط¨">
+            <button class="light" onclick="resetOrdersFiltersV233()">ط¥ط¹ط§ط¯ط© طھط¹ظٹظٹظ†</button>
           </div>
-          <div class="table-wrap orders-table-wrap-v233"><table><thead id="ordersHeadV233"></thead><tbody id="ordersBodyV233"></tbody></table></div>
+          <div id="ordersCardsV360" class="orders-cards-v360"></div>
+          <div id="ordersPagerV360" class="orders-pager-v360"></div>
         </div>
       </div>
     </section>
@@ -462,115 +463,115 @@
     <section id="clientReports" class="page hidden">
       <div class="card section-head">
         <div>
-          <h2>بوابة تقارير العملاء - شرائح ذكية</h2>
-          <p>نظام شرائح ذكية: المشرف يرفع الصور، والإدارة تتحكم في النص والترتيب والإضافة والاعتماد والنشر.</p>
+          <h2>ط¨ظˆط§ط¨ط© طھظ‚ط§ط±ظٹط± ط§ظ„ط¹ظ…ظ„ط§ط، - ط´ط±ط§ط¦ط­ ط°ظƒظٹط©</h2>
+          <p>ظ†ط¸ط§ظ… ط´ط±ط§ط¦ط­ ط°ظƒظٹط©: ط§ظ„ظ…ط´ط±ظپ ظٹط±ظپط¹ ط§ظ„طµظˆط±طŒ ظˆط§ظ„ط¥ط¯ط§ط±ط© طھطھط­ظƒظ… ظپظٹ ط§ظ„ظ†طµ ظˆط§ظ„طھط±طھظٹط¨ ظˆط§ظ„ط¥ط¶ط§ظپط© ظˆط§ظ„ط§ط¹طھظ…ط§ط¯ ظˆط§ظ„ظ†ط´ط±.</p>
         </div>
-        <button class="light" onclick="clearPremiumReportForm(); document.getElementById('premiumReportFormCard')?.scrollIntoView({behavior:'smooth'})">تقرير جديد</button>
+        <button class="light" onclick="clearPremiumReportForm(); document.getElementById('premiumReportFormCard')?.scrollIntoView({behavior:'smooth'})">طھظ‚ط±ظٹط± ط¬ط¯ظٹط¯</button>
       </div>
 
       <div class="report-kpis">
-        <div class="kpi"><small>إجمالي التقارير</small><b id="reportsTotalKpi">0</b></div>
-        <div class="kpi"><small>هذا الشهر</small><b id="reportsMonthKpi">0</b></div>
-        <div class="kpi"><small>مسودات</small><b id="reportsDraftKpi">0</b></div>
-        <div class="kpi"><small>منشورة</small><b id="reportsPublishedKpi">0</b></div>
-        <div class="kpi"><small>تحتاج متابعة</small><b id="reportsFollowKpi">0</b></div>
+        <div class="kpi"><small>ط¥ط¬ظ…ط§ظ„ظٹ ط§ظ„طھظ‚ط§ط±ظٹط±</small><b id="reportsTotalKpi">0</b></div>
+        <div class="kpi"><small>ظ‡ط°ط§ ط§ظ„ط´ظ‡ط±</small><b id="reportsMonthKpi">0</b></div>
+        <div class="kpi"><small>ظ…ط³ظˆط¯ط§طھ</small><b id="reportsDraftKpi">0</b></div>
+        <div class="kpi"><small>ظ…ظ†ط´ظˆط±ط©</small><b id="reportsPublishedKpi">0</b></div>
+        <div class="kpi"><small>طھط­طھط§ط¬ ظ…طھط§ط¨ط¹ط©</small><b id="reportsFollowKpi">0</b></div>
       </div>
 
       <div class="report-premium-wrap">
         <div class="card report-form-card" id="premiumReportFormCard">
-          <h2 id="premiumReportFormTitle">إنشاء تقرير جديد</h2>
+          <h2 id="premiumReportFormTitle">ط¥ظ†ط´ط§ط، طھظ‚ط±ظٹط± ط¬ط¯ظٹط¯</h2>
           <input type="hidden" id="premiumReportId">
-          <div class="split"><div><label>المشروع</label><select id="premiumReportProject" onchange="syncPremiumProjectInfo()"></select></div><div><label>تاريخ التنفيذ</label><input type="date" id="premiumReportDate"></div></div>
-          <label>عنوان التقرير</label><input id="premiumReportTitle" placeholder="مثال: تقرير مكافحة الحشرات وتنظيف المرافق">
-          <div class="split"><div><label>نوع التقرير العام</label><select id="premiumReportType"><option>تقرير خدمات</option><option>مكافحة الحشرات</option><option>غسيل خزانات</option><option>نظافة عامة</option><option>صيانة</option><option>تقرير شهري</option></select></div><div><label>رئيس الجمعية / المستلم</label><input id="premiumChairmanName" placeholder="اختياري"></div></div>
-          <label>رقم واتساب رئيس الجمعية</label><input id="premiumChairmanPhone" placeholder="9665xxxxxxxx">
-          <label>الملخص التنفيذي</label><textarea id="premiumSummary" placeholder="اكتب ملخص مختصر يظهر في أول التقرير"></textarea>
+          <div class="split"><div><label>ط§ظ„ظ…ط´ط±ظˆط¹</label><select id="premiumReportProject" onchange="syncPremiumProjectInfo()"></select></div><div><label>طھط§ط±ظٹط® ط§ظ„طھظ†ظپظٹط°</label><input type="date" id="premiumReportDate"></div></div>
+          <label>ط¹ظ†ظˆط§ظ† ط§ظ„طھظ‚ط±ظٹط±</label><input id="premiumReportTitle" placeholder="ظ…ط«ط§ظ„: طھظ‚ط±ظٹط± ظ…ظƒط§ظپط­ط© ط§ظ„ط­ط´ط±ط§طھ ظˆطھظ†ط¸ظٹظپ ط§ظ„ظ…ط±ط§ظپظ‚">
+          <div class="split"><div><label>ظ†ظˆط¹ ط§ظ„طھظ‚ط±ظٹط± ط§ظ„ط¹ط§ظ…</label><select id="premiumReportType"><option>طھظ‚ط±ظٹط± ط®ط¯ظ…ط§طھ</option><option>ظ…ظƒط§ظپط­ط© ط§ظ„ط­ط´ط±ط§طھ</option><option>ط؛ط³ظٹظ„ ط®ط²ط§ظ†ط§طھ</option><option>ظ†ط¸ط§ظپط© ط¹ط§ظ…ط©</option><option>طµظٹط§ظ†ط©</option><option>طھظ‚ط±ظٹط± ط´ظ‡ط±ظٹ</option></select></div><div><label>ط±ط¦ظٹط³ ط§ظ„ط¬ظ…ط¹ظٹط© / ط§ظ„ظ…ط³طھظ„ظ…</label><input id="premiumChairmanName" placeholder="ط§ط®طھظٹط§ط±ظٹ"></div></div>
+          <label>ط±ظ‚ظ… ظˆط§طھط³ط§ط¨ ط±ط¦ظٹط³ ط§ظ„ط¬ظ…ط¹ظٹط©</label><input id="premiumChairmanPhone" placeholder="9665xxxxxxxx">
+          <label>ط§ظ„ظ…ظ„ط®طµ ط§ظ„طھظ†ظپظٹط°ظٹ</label><textarea id="premiumSummary" placeholder="ط§ظƒطھط¨ ظ…ظ„ط®طµ ظ…ط®طھطµط± ظٹط¸ظ‡ط± ظپظٹ ط£ظˆظ„ ط§ظ„طھظ‚ط±ظٹط±"></textarea>
           <div class="add-service-panel">
             <div>
-              <label>إضافة خدمة داخل التقرير</label>
+              <label>ط¥ط¶ط§ظپط© ط®ط¯ظ…ط© ط¯ط§ط®ظ„ ط§ظ„طھظ‚ط±ظٹط±</label>
               <select id="premiumAddServiceType">
-                <option>مكافحة الحشرات</option><option>غسيل الخزانات</option><option>تنظيف الأسطح</option><option>تنظيف البيسمنت</option><option>تنظيف المناور</option><option>تنظيف المكيفات</option><option>صيانة كهرباء</option><option>صيانة سباكة</option><option>صيانة مصعد</option><option>أعمال زراعة</option><option>شريحة مخصصة</option><option>أخرى</option>
+                <option>ظ…ظƒط§ظپط­ط© ط§ظ„ط­ط´ط±ط§طھ</option><option>ط؛ط³ظٹظ„ ط§ظ„ط®ط²ط§ظ†ط§طھ</option><option>طھظ†ط¸ظٹظپ ط§ظ„ط£ط³ط·ط­</option><option>طھظ†ط¸ظٹظپ ط§ظ„ط¨ظٹط³ظ…ظ†طھ</option><option>طھظ†ط¸ظٹظپ ط§ظ„ظ…ظ†ط§ظˆط±</option><option>طھظ†ط¸ظٹظپ ط§ظ„ظ…ظƒظٹظپط§طھ</option><option>طµظٹط§ظ†ط© ظƒظ‡ط±ط¨ط§ط،</option><option>طµظٹط§ظ†ط© ط³ط¨ط§ظƒط©</option><option>طµظٹط§ظ†ط© ظ…طµط¹ط¯</option><option>ط£ط¹ظ…ط§ظ„ ط²ط±ط§ط¹ط©</option><option>ط´ط±ظٹط­ط© ظ…ط®طµطµط©</option><option>ط£ط®ط±ظ‰</option>
               </select>
             </div>
-            <button onclick="addSelectedPremiumService()">+ إضافة الشريحة المختارة</button><button type="button" class="light" onclick="addCustomPremiumSlide()">+ شريحة من الإدارة</button>
+            <button onclick="addSelectedPremiumService()">+ ط¥ط¶ط§ظپط© ط§ظ„ط´ط±ظٹط­ط© ط§ظ„ظ…ط®طھط§ط±ط©</button><button type="button" class="light" onclick="addCustomPremiumSlide()">+ ط´ط±ظٹط­ط© ظ…ظ† ط§ظ„ط¥ط¯ط§ط±ط©</button>
           </div>
           <div class="quick-service-row">
-            <button class="light" onclick="addPremiumService('مكافحة الحشرات')">+ مكافحة</button>
-            <button class="light" onclick="addPremiumService('تنظيف الأسطح')">+ أسطح</button>
-            <button class="light" onclick="addPremiumService('تنظيف البيسمنت')">+ بيسمنت</button>
-            <button class="light" onclick="addPremiumService('غسيل الخزانات')">+ خزانات</button>
+            <button class="light" onclick="addPremiumService('ظ…ظƒط§ظپط­ط© ط§ظ„ط­ط´ط±ط§طھ')">+ ظ…ظƒط§ظپط­ط©</button>
+            <button class="light" onclick="addPremiumService('طھظ†ط¸ظٹظپ ط§ظ„ط£ط³ط·ط­')">+ ط£ط³ط·ط­</button>
+            <button class="light" onclick="addPremiumService('طھظ†ط¸ظٹظپ ط§ظ„ط¨ظٹط³ظ…ظ†طھ')">+ ط¨ظٹط³ظ…ظ†طھ</button>
+            <button class="light" onclick="addPremiumService('ط؛ط³ظٹظ„ ط§ظ„ط®ط²ط§ظ†ط§طھ')">+ ط®ط²ط§ظ†ط§طھ</button>
           </div>
-          <div class="footer-note">كل خدمة لها صورها الخاصة. إذا تركت قبل/أثناء/بعد بدون صور فلن يظهر هذا القسم للعميل.</div>
+          <div class="footer-note">ظƒظ„ ط®ط¯ظ…ط© ظ„ظ‡ط§ طµظˆط±ظ‡ط§ ط§ظ„ط®ط§طµط©. ط¥ط°ط§ طھط±ظƒطھ ظ‚ط¨ظ„/ط£ط«ظ†ط§ط،/ط¨ط¹ط¯ ط¨ط¯ظˆظ† طµظˆط± ظپظ„ظ† ظٹط¸ظ‡ط± ظ‡ط°ط§ ط§ظ„ظ‚ط³ظ… ظ„ظ„ط¹ظ…ظٹظ„.</div>
           <div id="premiumServicesEditor" class="service-builder"></div>
           <div class="actions">
-            <button class="light" onclick="savePremiumReport('draft')">حفظ كمسودة</button>
-            <button onclick="savePremiumReport('published')">اعتماد ونشر</button>
-            <button class="light" onclick="previewPremiumReport()">معاينة</button>
-            <button class="danger" onclick="clearPremiumReportForm()">تفريغ</button>
+            <button class="light" onclick="savePremiumReport('draft')">ط­ظپط¸ ظƒظ…ط³ظˆط¯ط©</button>
+            <button onclick="savePremiumReport('published')">ط§ط¹طھظ…ط§ط¯ ظˆظ†ط´ط±</button>
+            <button class="light" onclick="previewPremiumReport()">ظ…ط¹ط§ظٹظ†ط©</button>
+            <button class="danger" onclick="clearPremiumReportForm()">طھظپط±ظٹط؛</button>
           </div>
-          <div class="footer-note">لن يظهر التقرير لرئيس الجمعية إلا بعد حالة: معتمد ومنشور.</div>
+          <div class="footer-note">ظ„ظ† ظٹط¸ظ‡ط± ط§ظ„طھظ‚ط±ظٹط± ظ„ط±ط¦ظٹط³ ط§ظ„ط¬ظ…ط¹ظٹط© ط¥ظ„ط§ ط¨ط¹ط¯ ط­ط§ظ„ط©: ظ…ط¹طھظ…ط¯ ظˆظ…ظ†ط´ظˆط±.</div>
         </div>
 
         <div>
           <div class="card">
-            <h2>البحث والفلاتر</h2>
+            <h2>ط§ظ„ط¨ط­ط« ظˆط§ظ„ظپظ„ط§طھط±</h2>
             <div class="report-filters-panel">
-              <input id="premiumReportSearch" oninput="renderPremiumReports()" placeholder="بحث باسم المشروع، رقم التقرير، العنوان أو الخدمة">
-              <select id="premiumReportFilterProject" onchange="renderPremiumReports()"><option value="">كل المشاريع</option></select>
-              <select id="premiumReportFilterService" onchange="renderPremiumReports()"><option value="">كل الخدمات</option><option>مكافحة الحشرات</option><option>غسيل الخزانات</option><option>تنظيف الأسطح</option><option>تنظيف البيسمنت</option><option>تنظيف المناور</option><option>تنظيف المكيفات</option><option>صيانة كهرباء</option><option>صيانة سباكة</option><option>صيانة مصعد</option><option>أعمال زراعة</option><option>شريحة مخصصة</option><option>أخرى</option></select>
-              <select id="premiumReportFilterStatus" onchange="renderPremiumReports()"><option value="">كل الحالات</option><option value="draft">مسودة</option><option value="published">معتمد ومنشور</option><option value="unpublished">غير منشور</option></select>
-              <select id="premiumReportFilterRating" onchange="renderPremiumReports()"><option value="">كل التقييمات</option><option value="ممتاز">ممتاز</option><option value="جيد جدًا">جيد جدًا</option><option value="جيد">جيد</option><option value="يحتاج تحسين">يحتاج تحسين</option><option value="none">لم يتم التقييم</option></select>
-              <input type="month" id="premiumReportFilterMonth" onchange="renderPremiumReports()"><input id="premiumServiceSmartSearch" list="premiumServiceSmartList" oninput="renderPremiumReports()" placeholder="بحث ذكي: خدمة / مشروع"><datalist id="premiumServiceSmartList"></datalist>
+              <input id="premiumReportSearch" oninput="renderPremiumReports()" placeholder="ط¨ط­ط« ط¨ط§ط³ظ… ط§ظ„ظ…ط´ط±ظˆط¹طŒ ط±ظ‚ظ… ط§ظ„طھظ‚ط±ظٹط±طŒ ط§ظ„ط¹ظ†ظˆط§ظ† ط£ظˆ ط§ظ„ط®ط¯ظ…ط©">
+              <select id="premiumReportFilterProject" onchange="renderPremiumReports()"><option value="">ظƒظ„ ط§ظ„ظ…ط´ط§ط±ظٹط¹</option></select>
+              <select id="premiumReportFilterService" onchange="renderPremiumReports()"><option value="">ظƒظ„ ط§ظ„ط®ط¯ظ…ط§طھ</option><option>ظ…ظƒط§ظپط­ط© ط§ظ„ط­ط´ط±ط§طھ</option><option>ط؛ط³ظٹظ„ ط§ظ„ط®ط²ط§ظ†ط§طھ</option><option>طھظ†ط¸ظٹظپ ط§ظ„ط£ط³ط·ط­</option><option>طھظ†ط¸ظٹظپ ط§ظ„ط¨ظٹط³ظ…ظ†طھ</option><option>طھظ†ط¸ظٹظپ ط§ظ„ظ…ظ†ط§ظˆط±</option><option>طھظ†ط¸ظٹظپ ط§ظ„ظ…ظƒظٹظپط§طھ</option><option>طµظٹط§ظ†ط© ظƒظ‡ط±ط¨ط§ط،</option><option>طµظٹط§ظ†ط© ط³ط¨ط§ظƒط©</option><option>طµظٹط§ظ†ط© ظ…طµط¹ط¯</option><option>ط£ط¹ظ…ط§ظ„ ط²ط±ط§ط¹ط©</option><option>ط´ط±ظٹط­ط© ظ…ط®طµطµط©</option><option>ط£ط®ط±ظ‰</option></select>
+              <select id="premiumReportFilterStatus" onchange="renderPremiumReports()"><option value="">ظƒظ„ ط§ظ„ط­ط§ظ„ط§طھ</option><option value="draft">ظ…ط³ظˆط¯ط©</option><option value="published">ظ…ط¹طھظ…ط¯ ظˆظ…ظ†ط´ظˆط±</option><option value="unpublished">ط؛ظٹط± ظ…ظ†ط´ظˆط±</option></select>
+              <select id="premiumReportFilterRating" onchange="renderPremiumReports()"><option value="">ظƒظ„ ط§ظ„طھظ‚ظٹظٹظ…ط§طھ</option><option value="ظ…ظ…طھط§ط²">ظ…ظ…طھط§ط²</option><option value="ط¬ظٹط¯ ط¬ط¯ظ‹ط§">ط¬ظٹط¯ ط¬ط¯ظ‹ط§</option><option value="ط¬ظٹط¯">ط¬ظٹط¯</option><option value="ظٹط­طھط§ط¬ طھط­ط³ظٹظ†">ظٹط­طھط§ط¬ طھط­ط³ظٹظ†</option><option value="none">ظ„ظ… ظٹطھظ… ط§ظ„طھظ‚ظٹظٹظ…</option></select>
+              <input type="month" id="premiumReportFilterMonth" onchange="renderPremiumReports()"><input id="premiumServiceSmartSearch" list="premiumServiceSmartList" oninput="renderPremiumReports()" placeholder="ط¨ط­ط« ط°ظƒظٹ: ط®ط¯ظ…ط© / ظ…ط´ط±ظˆط¹"><datalist id="premiumServiceSmartList"></datalist>
             </div>
             <div class="actions">
-              <button class="light" onclick="toggleProjectsWithoutReports()">المشاريع بدون تقارير هذا الشهر</button>
-              <button class="light" onclick="resetPremiumReportFilters()">إعادة تعيين</button>
-              <button class="light" onclick="exportPremiumReportsCSV()">تصدير CSV</button>
+              <button class="light" onclick="toggleProjectsWithoutReports()">ط§ظ„ظ…ط´ط§ط±ظٹط¹ ط¨ط¯ظˆظ† طھظ‚ط§ط±ظٹط± ظ‡ط°ط§ ط§ظ„ط´ظ‡ط±</button>
+              <button class="light" onclick="resetPremiumReportFilters()">ط¥ط¹ط§ط¯ط© طھط¹ظٹظٹظ†</button>
+              <button class="light" onclick="exportPremiumReportsCSV()">طھطµط¯ظٹط± CSV</button>
             </div>
             <div id="projectsWithoutReportsBox" class="hidden"></div>
           </div>
           <div class="card">
-            <div class="table-head"><h2>سجل التقارير</h2><button class="light" onclick="loadPremiumReportsOnly()">تحديث التقارير</button></div>
-            <div class="table-wrap"><table><thead><tr><th>رقم التقرير</th><th>التاريخ</th><th>المشروع</th><th>الخدمات</th><th>الحالة</th><th>التقييم</th><th>رابط العميل</th><th>إجراء</th></tr></thead><tbody id="premiumReportsBody"></tbody></table></div>
+            <div class="table-head"><h2>ط³ط¬ظ„ ط§ظ„طھظ‚ط§ط±ظٹط±</h2><button class="light" onclick="loadPremiumReportsOnly()">طھط­ط¯ظٹط« ط§ظ„طھظ‚ط§ط±ظٹط±</button></div>
+            <div class="table-wrap"><table><thead><tr><th>ط±ظ‚ظ… ط§ظ„طھظ‚ط±ظٹط±</th><th>ط§ظ„طھط§ط±ظٹط®</th><th>ط§ظ„ظ…ط´ط±ظˆط¹</th><th>ط§ظ„ط®ط¯ظ…ط§طھ</th><th>ط§ظ„ط­ط§ظ„ط©</th><th>ط§ظ„طھظ‚ظٹظٹظ…</th><th>ط±ط§ط¨ط· ط§ظ„ط¹ظ…ظٹظ„</th><th>ط¥ط¬ط±ط§ط،</th></tr></thead><tbody id="premiumReportsBody"></tbody></table></div>
           </div>
         </div>
       </div>
     </section>
 
     <section id="clientRatings" class="page hidden">
-      <div class="card section-head"><div><h2>تقييمات العملاء</h2><p>متابعة رضا رؤساء الجمعيات عن كل خدمة وإظهار التقييمات التي تحتاج متابعة.</p></div><button class="light" onclick="loadPremiumReportsOnly()">تحديث</button></div>
+      <div class="card section-head"><div><h2>طھظ‚ظٹظٹظ…ط§طھ ط§ظ„ط¹ظ…ظ„ط§ط،</h2><p>ظ…طھط§ط¨ط¹ط© ط±ط¶ط§ ط±ط¤ط³ط§ط، ط§ظ„ط¬ظ…ط¹ظٹط§طھ ط¹ظ† ظƒظ„ ط®ط¯ظ…ط© ظˆط¥ط¸ظ‡ط§ط± ط§ظ„طھظ‚ظٹظٹظ…ط§طھ ط§ظ„طھظٹ طھط­طھط§ط¬ ظ…طھط§ط¨ط¹ط©.</p></div><button class="light" onclick="loadPremiumReportsOnly()">طھط­ط¯ظٹط«</button></div>
       <div class="card">
-        <div class="filters"><input id="ratingSearch" oninput="renderClientRatings()" placeholder="بحث بالمشروع أو الخدمة أو الملاحظة"><select id="ratingFilterValue" onchange="renderClientRatings()"><option value="">كل التقييمات</option><option>ممتاز</option><option>جيد جدًا</option><option>جيد</option><option>يحتاج تحسين</option></select><select id="ratingFilterFollow" onchange="renderClientRatings()"><option value="">كل الحالات</option><option value="yes">يريد زيارة متابعة</option><option value="low">تحتاج تحسين</option></select></div>
-        <div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المشروع</th><th>التقرير</th><th>الخدمة</th><th>التقييم</th><th>ملاحظة العميل</th><th>زيارة متابعة</th></tr></thead><tbody id="clientRatingsBody"></tbody></table></div>
+        <div class="filters"><input id="ratingSearch" oninput="renderClientRatings()" placeholder="ط¨ط­ط« ط¨ط§ظ„ظ…ط´ط±ظˆط¹ ط£ظˆ ط§ظ„ط®ط¯ظ…ط© ط£ظˆ ط§ظ„ظ…ظ„ط§ط­ط¸ط©"><select id="ratingFilterValue" onchange="renderClientRatings()"><option value="">ظƒظ„ ط§ظ„طھظ‚ظٹظٹظ…ط§طھ</option><option>ظ…ظ…طھط§ط²</option><option>ط¬ظٹط¯ ط¬ط¯ظ‹ط§</option><option>ط¬ظٹط¯</option><option>ظٹط­طھط§ط¬ طھط­ط³ظٹظ†</option></select><select id="ratingFilterFollow" onchange="renderClientRatings()"><option value="">ظƒظ„ ط§ظ„ط­ط§ظ„ط§طھ</option><option value="yes">ظٹط±ظٹط¯ ط²ظٹط§ط±ط© ظ…طھط§ط¨ط¹ط©</option><option value="low">طھط­طھط§ط¬ طھط­ط³ظٹظ†</option></select></div>
+        <div class="table-wrap"><table><thead><tr><th>ط§ظ„طھط§ط±ظٹط®</th><th>ط§ظ„ظ…ط´ط±ظˆط¹</th><th>ط§ظ„طھظ‚ط±ظٹط±</th><th>ط§ظ„ط®ط¯ظ…ط©</th><th>ط§ظ„طھظ‚ظٹظٹظ…</th><th>ظ…ظ„ط§ط­ط¸ط© ط§ظ„ط¹ظ…ظٹظ„</th><th>ط²ظٹط§ط±ط© ظ…طھط§ط¨ط¹ط©</th></tr></thead><tbody id="clientRatingsBody"></tbody></table></div>
       </div>
     </section>
 
-    <section id="alerts" class="page hidden"><div class="card"><h2>التنبيهات وأخطاء التوزيع</h2><div id="alertsList" class="alerts"></div></div></section>
+    <section id="alerts" class="page hidden"><div class="card"><h2>ط§ظ„طھظ†ط¨ظٹظ‡ط§طھ ظˆط£ط®ط·ط§ط، ط§ظ„طھظˆط²ظٹط¹</h2><div id="alertsList" class="alerts"></div></div></section>
 
 
     <section id="assistant" class="page hidden">
       <div class="card tasneef-assistant-card">
-        <h2>مساعد تصنيف</h2>
-        <p style="color:var(--muted);line-height:1.8;margin-top:-6px">مساعد داخلي مجاني للتقارير والرسائل والتحليل السريع. يعمل بالقوالب وبيانات التطبيق بدون API.</p>
+        <h2>ظ…ط³ط§ط¹ط¯ طھطµظ†ظٹظپ</h2>
+        <p style="color:var(--muted);line-height:1.8;margin-top:-6px">ظ…ط³ط§ط¹ط¯ ط¯ط§ط®ظ„ظٹ ظ…ط¬ط§ظ†ظٹ ظ„ظ„طھظ‚ط§ط±ظٹط± ظˆط§ظ„ط±ط³ط§ط¦ظ„ ظˆط§ظ„طھط­ظ„ظٹظ„ ط§ظ„ط³ط±ظٹط¹. ظٹط¹ظ…ظ„ ط¨ط§ظ„ظ‚ظˆط§ظ„ط¨ ظˆط¨ظٹط§ظ†ط§طھ ط§ظ„طھط·ط¨ظٹظ‚ ط¨ط¯ظˆظ† API.</p>
         <div class="actions">
-          <button class="light" onclick="assistantQuick('اكتب تقرير مكافحة حشرات لمشروع صفاء 50')">تقرير مكافحة حشرات</button>
-          <button class="light" onclick="assistantQuick('اكتب تقرير تنظيف خزانات لمشروع صفاء 65')">تقرير خزانات</button>
-          <button class="light" onclick="assistantQuick('اكتب رسالة واتساب لرئيس الجمعية عن غسيل الخزانات غداً الساعة 8 صباحاً')">رسالة واتساب</button>
-          <button class="light" onclick="assistantQuick('ما السجلات المفتوحة اليوم؟')">السجلات المفتوحة</button>
-          <button class="light" onclick="assistantQuick('ما المشاريع الناقصة وقت هذا الشهر؟')">ناقص وقت</button>
+          <button class="light" onclick="assistantQuick('ط§ظƒطھط¨ طھظ‚ط±ظٹط± ظ…ظƒط§ظپط­ط© ط­ط´ط±ط§طھ ظ„ظ…ط´ط±ظˆط¹ طµظپط§ط، 50')">طھظ‚ط±ظٹط± ظ…ظƒط§ظپط­ط© ط­ط´ط±ط§طھ</button>
+          <button class="light" onclick="assistantQuick('ط§ظƒطھط¨ طھظ‚ط±ظٹط± طھظ†ط¸ظٹظپ ط®ط²ط§ظ†ط§طھ ظ„ظ…ط´ط±ظˆط¹ طµظپط§ط، 65')">طھظ‚ط±ظٹط± ط®ط²ط§ظ†ط§طھ</button>
+          <button class="light" onclick="assistantQuick('ط§ظƒطھط¨ ط±ط³ط§ظ„ط© ظˆط§طھط³ط§ط¨ ظ„ط±ط¦ظٹط³ ط§ظ„ط¬ظ…ط¹ظٹط© ط¹ظ† ط؛ط³ظٹظ„ ط§ظ„ط®ط²ط§ظ†ط§طھ ط؛ط¯ط§ظ‹ ط§ظ„ط³ط§ط¹ط© 8 طµط¨ط§ط­ط§ظ‹')">ط±ط³ط§ظ„ط© ظˆط§طھط³ط§ط¨</button>
+          <button class="light" onclick="assistantQuick('ظ…ط§ ط§ظ„ط³ط¬ظ„ط§طھ ط§ظ„ظ…ظپطھظˆط­ط© ط§ظ„ظٹظˆظ…طں')">ط§ظ„ط³ط¬ظ„ط§طھ ط§ظ„ظ…ظپطھظˆط­ط©</button>
+          <button class="light" onclick="assistantQuick('ظ…ط§ ط§ظ„ظ…ط´ط§ط±ظٹط¹ ط§ظ„ظ†ط§ظ‚طµط© ظˆظ‚طھ ظ‡ط°ط§ ط§ظ„ط´ظ‡ط±طں')">ظ†ط§ظ‚طµ ظˆظ‚طھ</button>
         </div>
         <div id="assistantChat" class="assistant-chat"></div>
         <div class="split" style="align-items:end;margin-top:12px">
           <div>
-            <label>اكتب طلبك</label>
-            <textarea id="assistantInput" placeholder="مثال: اكتب تقرير تنظيف بيسمنت لمشروع اتحاد العاصمة"></textarea>
+            <label>ط§ظƒطھط¨ ط·ظ„ط¨ظƒ</label>
+            <textarea id="assistantInput" placeholder="ظ…ط«ط§ظ„: ط§ظƒطھط¨ طھظ‚ط±ظٹط± طھظ†ط¸ظٹظپ ط¨ظٹط³ظ…ظ†طھ ظ„ظ…ط´ط±ظˆط¹ ط§طھط­ط§ط¯ ط§ظ„ط¹ط§طµظ…ط©"></textarea>
           </div>
           <div class="actions" style="margin:0">
-            <button onclick="assistantSend()">إرسال</button>
-            <button class="light" onclick="assistantCopyLast()">نسخ آخر رد</button>
-            <button class="light" onclick="assistantWhatsappLast()">واتساب</button>
-            <button class="light" onclick="assistantPrintLast()">طباعة</button>
-            <button class="danger" onclick="assistantClear()">مسح</button>
+            <button onclick="assistantSend()">ط¥ط±ط³ط§ظ„</button>
+            <button class="light" onclick="assistantCopyLast()">ظ†ط³ط® ط¢ط®ط± ط±ط¯</button>
+            <button class="light" onclick="assistantWhatsappLast()">ظˆط§طھط³ط§ط¨</button>
+            <button class="light" onclick="assistantPrintLast()">ط·ط¨ط§ط¹ط©</button>
+            <button class="danger" onclick="assistantClear()">ظ…ط³ط­</button>
           </div>
         </div>
       </div>
@@ -580,49 +581,49 @@
       <div class="export-smart-v222">
         <div class="export-hero-v222">
           <div>
-            <span class="export-kicker-v222">مركز ذكي</span>
-            <h2>التصدير والاستيراد</h2>
-            <p>ملف اجتماع Excel واحد، منظم على شكل تبويبات واضحة وجاهز للعرض على الإدارة، مع نموذج استيراد منظم للبيانات.</p>
+            <span class="export-kicker-v222">ظ…ط±ظƒط² ط°ظƒظٹ</span>
+            <h2>ط§ظ„طھطµط¯ظٹط± ظˆط§ظ„ط§ط³طھظٹط±ط§ط¯</h2>
+            <p>ظ…ظ„ظپ ط§ط¬طھظ…ط§ط¹ Excel ظˆط§ط­ط¯طŒ ظ…ظ†ط¸ظ… ط¹ظ„ظ‰ ط´ظƒظ„ طھط¨ظˆظٹط¨ط§طھ ظˆط§ط¶ط­ط© ظˆط¬ط§ظ‡ط² ظ„ظ„ط¹ط±ط¶ ط¹ظ„ظ‰ ط§ظ„ط¥ط¯ط§ط±ط©طŒ ظ…ط¹ ظ†ظ…ظˆط°ط¬ ط§ط³طھظٹط±ط§ط¯ ظ…ظ†ط¸ظ… ظ„ظ„ط¨ظٹط§ظ†ط§طھ.</p>
           </div>
           <div class="export-hero-badge-v222">V224</div>
         </div>
 
         <div class="export-nav-v223">
-          <button class="active" onclick="showExportSlideV223(0,this)">01 الفلتر</button>
-          <button onclick="showExportSlideV223(1,this)">02 ملف الاجتماع</button>
-          <button onclick="showExportSlideV223(2,this)">03 نموذج الاستيراد</button>
+          <button class="active" onclick="showExportSlideV223(0,this)">01 ط§ظ„ظپظ„طھط±</button>
+          <button onclick="showExportSlideV223(1,this)">02 ظ…ظ„ظپ ط§ظ„ط§ط¬طھظ…ط§ط¹</button>
+          <button onclick="showExportSlideV223(2,this)">03 ظ†ظ…ظˆط°ط¬ ط§ظ„ط§ط³طھظٹط±ط§ط¯</button>
         </div>
 
         <div class="export-slides-v222">
           <article class="export-slide-v222 active">
             <div class="slide-no-v222">01</div>
-            <h3>فلتر ملف الاجتماع</h3>
-            <p>اختر الشهر أو المشرف أو المشروع قبل التصدير. إذا تركت الفلاتر فارغة يتم تصدير البيانات حسب الشهر الحالي.</p>
+            <h3>ظپظ„طھط± ظ…ظ„ظپ ط§ظ„ط§ط¬طھظ…ط§ط¹</h3>
+            <p>ط§ط®طھط± ط§ظ„ط´ظ‡ط± ط£ظˆ ط§ظ„ظ…ط´ط±ظپ ط£ظˆ ط§ظ„ظ…ط´ط±ظˆط¹ ظ‚ط¨ظ„ ط§ظ„طھطµط¯ظٹط±. ط¥ط°ط§ طھط±ظƒطھ ط§ظ„ظپظ„ط§طھط± ظپط§ط±ط؛ط© ظٹطھظ… طھطµط¯ظٹط± ط§ظ„ط¨ظٹط§ظ†ط§طھ ط­ط³ط¨ ط§ظ„ط´ظ‡ط± ط§ظ„ط­ط§ظ„ظٹ.</p>
             <div class="export-filter-grid-v222">
-              <div><label>الشهر</label><input type="month" id="meetingExportMonth"></div>
-              <div><label>المشرف</label><select id="meetingExportSupervisor"></select></div>
-              <div><label>المشروع</label><select id="meetingExportProject"></select></div>
+              <div><label>ط§ظ„ط´ظ‡ط±</label><input type="month" id="meetingExportMonth"></div>
+              <div><label>ط§ظ„ظ…ط´ط±ظپ</label><select id="meetingExportSupervisor"></select></div>
+              <div><label>ط§ظ„ظ…ط´ط±ظˆط¹</label><select id="meetingExportProject"></select></div>
             </div>
           </article>
 
           <article class="export-slide-v222">
             <div class="slide-no-v222">02</div>
-            <h3>تصدير ملف اجتماع شامل</h3>
-            <p>ينزل ملف Excel واحد يحتوي على الملخص التنفيذي، المشاريع، المشرفين، العمال، السجلات اليومية، الحضور والغياب، الأوقات الشهرية، التكتات، تقارير العملاء، التقييمات والتنبيهات.</p>
+            <h3>طھطµط¯ظٹط± ظ…ظ„ظپ ط§ط¬طھظ…ط§ط¹ ط´ط§ظ…ظ„</h3>
+            <p>ظٹظ†ط²ظ„ ظ…ظ„ظپ Excel ظˆط§ط­ط¯ ظٹط­طھظˆظٹ ط¹ظ„ظ‰ ط§ظ„ظ…ظ„ط®طµ ط§ظ„طھظ†ظپظٹط°ظٹطŒ ط§ظ„ظ…ط´ط§ط±ظٹط¹طŒ ط§ظ„ظ…ط´ط±ظپظٹظ†طŒ ط§ظ„ط¹ظ…ط§ظ„طŒ ط§ظ„ط³ط¬ظ„ط§طھ ط§ظ„ظٹظˆظ…ظٹط©طŒ ط§ظ„ط­ط¶ظˆط± ظˆط§ظ„ط؛ظٹط§ط¨طŒ ط§ظ„ط£ظˆظ‚ط§طھ ط§ظ„ط´ظ‡ط±ظٹط©طŒ ط§ظ„طھظƒطھط§طھطŒ طھظ‚ط§ط±ظٹط± ط§ظ„ط¹ظ…ظ„ط§ط،طŒ ط§ظ„طھظ‚ظٹظٹظ…ط§طھ ظˆط§ظ„طھظ†ط¨ظٹظ‡ط§طھ.</p>
             <div class="actions export-actions-v222">
-              <button onclick="exportMeetingExcelV229(this)">تنزيل ملف الاجتماع Excel</button>
-              <button class="light" onclick="previewMeetingExportV223()">معاينة قبل التنزيل</button>
+              <button onclick="exportMeetingExcelV229(this)">طھظ†ط²ظٹظ„ ظ…ظ„ظپ ط§ظ„ط§ط¬طھظ…ط§ط¹ Excel</button>
+              <button class="light" onclick="previewMeetingExportV223()">ظ…ط¹ط§ظٹظ†ط© ظ‚ط¨ظ„ ط§ظ„طھظ†ط²ظٹظ„</button>
             </div>
           </article>
 
           <article class="export-slide-v222 import-slide-v222">
             <div class="slide-no-v222">03</div>
-            <h3>نموذج استيراد شامل</h3>
-            <p>ملف Excel واحد فارغ بتبويبات منظمة لتجهيز بيانات المشاريع، المشرفين، العمال، المستخدمين، التكتات، السجلات اليومية.</p>
+            <h3>ظ†ظ…ظˆط°ط¬ ط§ط³طھظٹط±ط§ط¯ ط´ط§ظ…ظ„</h3>
+            <p>ظ…ظ„ظپ Excel ظˆط§ط­ط¯ ظپط§ط±ط؛ ط¨طھط¨ظˆظٹط¨ط§طھ ظ…ظ†ط¸ظ…ط© ظ„طھط¬ظ‡ظٹط² ط¨ظٹط§ظ†ط§طھ ط§ظ„ظ…ط´ط§ط±ظٹط¹طŒ ط§ظ„ظ…ط´ط±ظپظٹظ†طŒ ط§ظ„ط¹ظ…ط§ظ„طŒ ط§ظ„ظ…ط³طھط®ط¯ظ…ظٹظ†طŒ ط§ظ„طھظƒطھط§طھطŒ ط§ظ„ط³ط¬ظ„ط§طھ ط§ظ„ظٹظˆظ…ظٹط©.</p>
             <div class="actions export-actions-v222">
-              <button class="light" onclick="downloadImportTemplateV223()">تنزيل نموذج الاستيراد</button>
+              <button class="light" onclick="downloadImportTemplateV223()">طھظ†ط²ظٹظ„ ظ†ظ…ظˆط°ط¬ ط§ظ„ط§ط³طھظٹط±ط§ط¯</button>
             </div>
-            <div class="mini-note-v222">الاستيراد الفعلي لا يعتمد إلا بعد المعاينة وفحص الأخطاء في مرحلة لاحقة.</div>
+            <div class="mini-note-v222">ط§ظ„ط§ط³طھظٹط±ط§ط¯ ط§ظ„ظپط¹ظ„ظٹ ظ„ط§ ظٹط¹طھظ…ط¯ ط¥ظ„ط§ ط¨ط¹ط¯ ط§ظ„ظ…ط¹ط§ظٹظ†ط© ظˆظپط­طµ ط§ظ„ط£ط®ط·ط§ط، ظپظٹ ظ…ط±ط­ظ„ط© ظ„ط§ط­ظ‚ط©.</div>
           </article>
         </div>
 
@@ -630,9 +631,9 @@
       </div>
 
       <div class="card export-quick-v222">
-        <h3>تصدير CSV سريع</h3>
-        <p class="muted">للاستخدام السريع فقط. ملف الاجتماع Excel هو الأفضل للعرض الرسمي.</p>
-        <div class="actions"><button onclick="exportTable('app_users')">المستخدمين</button><button onclick="exportTable('projects')">المشاريع</button><button onclick="exportTable('workers')">العمال</button><button onclick="exportTable('attendance')">الحضور</button><button onclick="exportTable('time_logs')">التسجيلات اليومية</button><button onclick="exportTable('tickets')">التكتات</button></div>
+        <h3>طھطµط¯ظٹط± CSV ط³ط±ظٹط¹</h3>
+        <p class="muted">ظ„ظ„ط§ط³طھط®ط¯ط§ظ… ط§ظ„ط³ط±ظٹط¹ ظپظ‚ط·. ظ…ظ„ظپ ط§ظ„ط§ط¬طھظ…ط§ط¹ Excel ظ‡ظˆ ط§ظ„ط£ظپط¶ظ„ ظ„ظ„ط¹ط±ط¶ ط§ظ„ط±ط³ظ…ظٹ.</p>
+        <div class="actions"><button onclick="exportTable('app_users')">ط§ظ„ظ…ط³طھط®ط¯ظ…ظٹظ†</button><button onclick="exportTable('projects')">ط§ظ„ظ…ط´ط§ط±ظٹط¹</button><button onclick="exportTable('workers')">ط§ظ„ط¹ظ…ط§ظ„</button><button onclick="exportTable('attendance')">ط§ظ„ط­ط¶ظˆط±</button><button onclick="exportTable('time_logs')">ط§ظ„طھط³ط¬ظٹظ„ط§طھ ط§ظ„ظٹظˆظ…ظٹط©</button><button onclick="exportTable('tickets')">ط§ظ„طھظƒطھط§طھ</button></div>
       </div>
     </section>
   </main>
@@ -642,21 +643,21 @@
   <div class="contract-smart-panel" onclick="event.stopPropagation()">
     <div class="contract-smart-head">
       <div>
-        <h2 id="contractSmartTitle">تفاصيل العقد</h2>
-        <small id="contractSmartSub">متابعة الخدمات والعقود والزيارات</small>
+        <h2 id="contractSmartTitle">طھظپط§طµظٹظ„ ط§ظ„ط¹ظ‚ط¯</h2>
+        <small id="contractSmartSub">ظ…طھط§ط¨ط¹ط© ط§ظ„ط®ط¯ظ…ط§طھ ظˆط§ظ„ط¹ظ‚ظˆط¯ ظˆط§ظ„ط²ظٹط§ط±ط§طھ</small>
       </div>
       <div class="contract-smart-actions">
-        <button class="light" onclick="printContractClientTable()">طباعة تقرير العميل</button>
-        <button class="light" onclick="copyContractClientTable()">نسخ جدول العميل</button>
-        <button id="contractSmartSaveBtn" onclick="saveContractSmartModal()">حفظ</button>
-        <button class="danger" onclick="closeContractSmartModal()">إغلاق</button>
+        <button class="light" onclick="printContractClientTable()">ط·ط¨ط§ط¹ط© طھظ‚ط±ظٹط± ط§ظ„ط¹ظ…ظٹظ„</button>
+        <button class="light" onclick="copyContractClientTable()">ظ†ط³ط® ط¬ط¯ظˆظ„ ط§ظ„ط¹ظ…ظٹظ„</button>
+        <button id="contractSmartSaveBtn" onclick="saveContractSmartModal()">ط­ظپط¸</button>
+        <button class="danger" onclick="closeContractSmartModal()">ط¥ط؛ظ„ط§ظ‚</button>
       </div>
     </div>
     <input type="hidden" id="contractSmartProjectId">
     <div class="contract-smart-tabs">
-      <button class="active" onclick="contractSmartTab('main',this)">الخدمات والعقود</button>
-      <button onclick="contractSmartTab('annual',this)">الخدمات السنوية</button>
-      <button onclick="contractSmartTab('report',this)">تقرير العميل</button>
+      <button class="active" onclick="contractSmartTab('main',this)">ط§ظ„ط®ط¯ظ…ط§طھ ظˆط§ظ„ط¹ظ‚ظˆط¯</button>
+      <button onclick="contractSmartTab('annual',this)">ط§ظ„ط®ط¯ظ…ط§طھ ط§ظ„ط³ظ†ظˆظٹط©</button>
+      <button onclick="contractSmartTab('report',this)">طھظ‚ط±ظٹط± ط§ظ„ط¹ظ…ظٹظ„</button>
     </div>
 
     <div id="contractSmartMainTab" class="contract-smart-tab-body">
@@ -665,32 +666,32 @@
 
     <div id="contractSmartAnnualTab" class="contract-smart-tab-body hidden">
       <div class="smart-box">
-        <h3>بيانات الجمعية</h3>
+        <h3>ط¨ظٹط§ظ†ط§طھ ط§ظ„ط¬ظ…ط¹ظٹط©</h3>
         <div class="smart-grid three">
-          <div><label>اسم الجمعية</label><input id="csAssocName" placeholder="مثال: جمعية مشروع ..."></div>
-          <div><label>اسم مدير الجمعية</label><input id="csAssocManager" placeholder="اسم المدير"></div>
-          <div><label>رقم هاتف المدير</label><input id="csAssocPhone" placeholder="05xxxxxxxx"></div>
+          <div><label>ط§ط³ظ… ط§ظ„ط¬ظ…ط¹ظٹط©</label><input id="csAssocName" placeholder="ظ…ط«ط§ظ„: ط¬ظ…ط¹ظٹط© ظ…ط´ط±ظˆط¹ ..."></div>
+          <div><label>ط§ط³ظ… ظ…ط¯ظٹط± ط§ظ„ط¬ظ…ط¹ظٹط©</label><input id="csAssocManager" placeholder="ط§ط³ظ… ط§ظ„ظ…ط¯ظٹط±"></div>
+          <div><label>ط±ظ‚ظ… ظ‡ط§طھظپ ط§ظ„ظ…ط¯ظٹط±</label><input id="csAssocPhone" placeholder="05xxxxxxxx"></div>
         </div>
       </div>
       <div class="smart-box">
-        <h3>إضافة خدمة سنوية</h3>
+        <h3>ط¥ط¶ط§ظپط© ط®ط¯ظ…ط© ط³ظ†ظˆظٹط©</h3>
         <div class="smart-grid four">
-          <div><label>الخدمة</label><select id="csAnnualSelect" onchange="onAnnualServiceSelect()"></select></div>
-          <div><label>خدمة أخرى</label><input id="csAnnualCustom" placeholder="اكتب اسم الخدمة"></div>
-          <div><label>عدد الزيارات السنوية</label><input id="csAnnualVisits" type="number" min="1" value="1"></div>
-          <div class="smart-end"><button onclick="addContractAnnualService()">إضافة الخدمة</button></div>
+          <div><label>ط§ظ„ط®ط¯ظ…ط©</label><select id="csAnnualSelect" onchange="onAnnualServiceSelect()"></select></div>
+          <div><label>ط®ط¯ظ…ط© ط£ط®ط±ظ‰</label><input id="csAnnualCustom" placeholder="ط§ظƒطھط¨ ط§ط³ظ… ط§ظ„ط®ط¯ظ…ط©"></div>
+          <div><label>ط¹ط¯ط¯ ط§ظ„ط²ظٹط§ط±ط§طھ ط§ظ„ط³ظ†ظˆظٹط©</label><input id="csAnnualVisits" type="number" min="1" value="1"></div>
+          <div class="smart-end"><button onclick="addContractAnnualService()">ط¥ط¶ط§ظپط© ط§ظ„ط®ط¯ظ…ط©</button></div>
         </div>
       </div>
       <div class="smart-box">
-        <div class="table-head"><h3>جدول الخدمات السنوية</h3><small>اضغط على مربعات الزيارة لتسجيل التنفيذ</small></div>
-        <div class="table-wrap"><table><thead><tr><th>الخدمة</th><th>عدد الزيارات</th><th>الزيارات</th><th>المنفذ</th><th>المتبقي</th><th>إجراء</th></tr></thead><tbody id="csAnnualBody"></tbody></table></div>
+        <div class="table-head"><h3>ط¬ط¯ظˆظ„ ط§ظ„ط®ط¯ظ…ط§طھ ط§ظ„ط³ظ†ظˆظٹط©</h3><small>ط§ط¶ط؛ط· ط¹ظ„ظ‰ ظ…ط±ط¨ط¹ط§طھ ط§ظ„ط²ظٹط§ط±ط© ظ„طھط³ط¬ظٹظ„ ط§ظ„طھظ†ظپظٹط°</small></div>
+        <div class="table-wrap"><table><thead><tr><th>ط§ظ„ط®ط¯ظ…ط©</th><th>ط¹ط¯ط¯ ط§ظ„ط²ظٹط§ط±ط§طھ</th><th>ط§ظ„ط²ظٹط§ط±ط§طھ</th><th>ط§ظ„ظ…ظ†ظپط°</th><th>ط§ظ„ظ…طھط¨ظ‚ظٹ</th><th>ط¥ط¬ط±ط§ط،</th></tr></thead><tbody id="csAnnualBody"></tbody></table></div>
       </div>
     </div>
 
     <div id="contractSmartReportTab" class="contract-smart-tab-body hidden">
       <div class="smart-box">
-        <h3>جدول تقرير العميل</h3>
-        <p class="muted">هذا الجدول يوضح للعميل اسم الخدمة، عدد الزيارات السنوية، وكم نفذ منها.</p>
+        <h3>ط¬ط¯ظˆظ„ طھظ‚ط±ظٹط± ط§ظ„ط¹ظ…ظٹظ„</h3>
+        <p class="muted">ظ‡ط°ط§ ط§ظ„ط¬ط¯ظˆظ„ ظٹظˆط¶ط­ ظ„ظ„ط¹ظ…ظٹظ„ ط§ط³ظ… ط§ظ„ط®ط¯ظ…ط©طŒ ط¹ط¯ط¯ ط§ظ„ط²ظٹط§ط±ط§طھ ط§ظ„ط³ظ†ظˆظٹط©طŒ ظˆظƒظ… ظ†ظپط° ظ…ظ†ظ‡ط§.</p>
         <div id="csClientReportBox"></div>
       </div>
     </div>
@@ -702,3 +703,4 @@
 <script src="tasneef_patch_v357_inventory_balance_image_fix.js?v=357" defer></script>
 </body>
 </html>
+
