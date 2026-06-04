@@ -10,12 +10,20 @@
   const sid = v => S(v);
   const esc = v => S(v).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const monthNow = () => new Date().toISOString().slice(0, 7);
+  const loadedMonths = new Set();
 
   function ds(){ return window.data || {}; }
   function users(){ return A(ds().users || ds().appUsers); }
   function workers(){ return A(ds().workers); }
   function attendance(){ return A(ds().attendance); }
   function projects(){ return A(ds().projects); }
+  function setDataKey(key, rows){
+    window.data = window.data || {};
+    const current = A(window.data[key]);
+    const map = new Map(current.map(r => [sid(r.id), r]));
+    A(rows).forEach(r => { if (r && r.id !== undefined && r.id !== null) map.set(sid(r.id), r); });
+    window.data[key] = [...map.values()];
+  }
 
   function roleOf(user){ return S(user.role).toLowerCase(); }
   function isTechnician(user){ return ['technician','فني'].includes(roleOf(user)); }
@@ -43,6 +51,33 @@
     const y = Number(month.slice(0,4));
     const m = Number(month.slice(5,7));
     return new Date(y, m, 0).getDate();
+  }
+  function monthEnd(month){
+    const days = daysInMonth(month);
+    return month + '-' + String(days).padStart(2, '0');
+  }
+  async function ensureMonthData(month){
+    if (!window.sb || loadedMonths.has(month)) return;
+    const hasRecords = attendance().some(r => recMonth(r) === month);
+    if (hasRecords && workers().length && users().length) {
+      loadedMonths.add(month);
+      return;
+    }
+    try {
+      const [att, wrk, usr, prj] = await Promise.all([
+        window.sb.from('attendance').select('*').gte('attendance_date', month + '-01').lte('attendance_date', monthEnd(month)).limit(5000),
+        window.sb.from('workers').select('*').limit(3000),
+        window.sb.from('app_users').select('*').limit(1000),
+        window.sb.from('projects').select('*').limit(1000)
+      ]);
+      if (!att.error) setDataKey('attendance', att.data || []);
+      if (!wrk.error) setDataKey('workers', wrk.data || []);
+      if (!usr.error) setDataKey('users', usr.data || []);
+      if (!prj.error) setDataKey('projects', prj.data || []);
+      loadedMonths.add(month);
+    } catch (error) {
+      console.warn('attendance month load failed', error);
+    }
   }
   function statusOf(r){
     const st = S(r && r.status).toLowerCase();
@@ -133,7 +168,7 @@
         type: asTech ? 'technician' : 'worker',
         label: asTech ? 'فني' : 'عامل',
         id: wid,
-        name: asTech ? fullName(asTech) : (fullName(workers().find(w => sid(w.id) === wid)) || '-'),
+        name: asTech ? fullName(asTech) : (fullName(workers().find(w => sid(w.id) === wid)) || S(r.worker_name || r.employee_name || r.name || r.technician_name || wid)),
         supervisor_id: recSupervisorId(r),
         supervisor_name: supervisorName(recSupervisorId(r)),
         project_id: recProjectId(r),
@@ -167,13 +202,18 @@
     return true;
   }
 
-  window.renderAttendanceMonthly = function(){
+  window.renderAttendanceMonthly = async function(){
     const body = $('attendanceMatrixBody');
     const head = $('attendanceMatrixHead');
     if (!body || !head) return;
     ensureFilters();
 
     const month = $('attendanceMatrixMonth')?.value || monthNow();
+    if (!loadedMonths.has(month) && window.sb) {
+      body.innerHTML = '<tr><td>جاري تحميل سجلات الشهر...</td></tr>';
+      await ensureMonthData(month);
+      ensureFilters();
+    }
     const selected = $('attendanceMatrixSupervisor')?.value || '';
     const type = $('attendanceMatrixTypeV13')?.value || '';
     const q = S($('attendanceMatrixSearch')?.value);
