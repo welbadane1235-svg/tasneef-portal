@@ -18595,3 +18595,180 @@ function financePrintReport(kind){
   setTimeout(initV338,1800);
   console.log('Tasneef V338 loaded');
 })();
+
+/* ===== V339: Contracts role buttons + visit-number save workflow ===== */
+(function(){
+  'use strict';
+  if(window.__tasneefV339ContractsRoleVisits) return;
+  window.__tasneefV339ContractsRoleVisits = true;
+  const $ = id => document.getElementById(id);
+  const S = v => String(v ?? '').trim();
+  const N = v => { const n=Number(v||0); return Number.isFinite(n)?n:0; };
+  const esc = s => S(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const ds = () => window.data || data || {};
+  const current = () => { try{return (typeof session==='function' ? (session()||{}) : JSON.parse(localStorage.getItem('tasneef_user')||'null')) || {}; }catch(_){return {}; } };
+  const role = () => S(current().role);
+  const isAdminArea = () => ['admin','general_manager','financial_manager','operations_manager','warehouse_manager'].includes(role());
+  const isSystemAdmin = () => role()==='admin';
+  const msgx = (t,k) => { try{return msg(t,k)}catch(_){ alert(t); } };
+  const today = () => { try{return window.today()}catch(_){return new Date().toISOString().slice(0,10)} };
+  const hProject = id => { try{return projectName(id)}catch(_){ return (ds().projects||[]).find(p=>S(p.id)===S(id))?.name || '-'; } };
+  const hSupervisor = id => { try{return supervisorName(id)}catch(_){ return (ds().users||[]).find(u=>S(u.id)===S(id))?.full_name || '-'; } };
+  function ensureStyle(){
+    if($('tasneefV339Style')) return;
+    const st=document.createElement('style'); st.id='tasneefV339Style';
+    st.textContent=`.visit-chip-v339{border:1px solid #bcd9d0;background:#f3faf8;color:#0a4033;border-radius:999px;padding:8px 14px;margin:3px;font-weight:900;cursor:pointer}.visit-chip-v339.done{background:#0a5a49;color:#fff;border-color:#0a5a49}.visit-chip-v339.selected{outline:3px solid #f0c66b}.visit-save-panel-v339{border:1px solid #dce8e4;border-radius:14px;padding:12px;background:#fbfdfc;margin-top:12px}.visit-save-panel-v339 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.visit-save-panel-v339 input{width:100%;box-sizing:border-box}.muted-v339{color:#68766e;font-size:12px}.sys-only-v339{display:inline-flex}`;
+    document.head.appendChild(st);
+  }
+
+  /* عقود المشاريع: الإداري عرض فقط، مدير النظام عرض وتعديل */
+  const oldRenderContracts = window.renderContracts;
+  window.renderContracts = function(){
+    const body=$('contractsBody');
+    if(!body || typeof contractInfo!=='function') return oldRenderContracts && oldRenderContracts.apply(this,arguments);
+    const q=S($('contractSearch')?.value);
+    const st=S($('contractFilterStatus')?.value);
+    let rows=[...(ds().projects||[])];
+    if(q) rows=rows.filter(p=>S(p.name).includes(q));
+    if(st) rows=rows.filter(p=>contractInfo(p).key===st);
+    rows.sort((a,b)=>{ const da=typeof daysLeft==='function'?daysLeft(a.contract_end):999999; const db=typeof daysLeft==='function'?daysLeft(b.contract_end):999999; return (da??999999)-(db??999999); });
+    body.innerHTML=rows.map(p=>{ const c=contractInfo(p); const view=`<button class="light" onclick="openContractSmartModal(${Number(p.id)||0},'view')">عرض</button>`; const edit=isSystemAdmin()?`<button onclick="openContractSmartModal(${Number(p.id)||0},'edit')">تعديل</button>`:''; return `<tr><td><b>${esc(p.name)}</b></td><td>${p.buildings_count||0}</td><td>${p.units_count||0}</td><td>${esc((typeof isoDate==='function'?isoDate(p.contract_start):p.contract_start)||'-')}</td><td>${esc((typeof isoDate==='function'?isoDate(p.contract_end):p.contract_end)||'-')}</td><td>${c.days}</td><td><span class="badge ${c.cls}">${c.text}</span></td><td class="row-actions">${isAdminArea()?view+edit:'-'}</td></tr>`; }).join('') || '<tr><td colspan="8">لا توجد بيانات</td></tr>';
+    if($('contractsActiveCount')) $('contractsActiveCount').textContent=(ds().projects||[]).filter(p=>contractInfo(p).key==='active').length;
+    if($('contractsSoonCount')) $('contractsSoonCount').textContent=(ds().projects||[]).filter(p=>contractInfo(p).key==='soon').length;
+    if($('contractsExpiredCount')) $('contractsExpiredCount').textContent=(ds().projects||[]).filter(p=>contractInfo(p).key==='expired').length;
+    if($('contractsMissingCount')) $('contractsMissingCount').textContent=(ds().projects||[]).filter(p=>contractInfo(p).key==='missing').length;
+  };
+
+  /* عند الإداريين: فتح العقد للعرض مع السماح فقط بتحديد أرقام الزيارات ثم حفظ */
+  const originalOpenSmart = window.openContractSmartModal;
+  window.openContractSmartModal = async function(projectId, mode){
+    if(!isSystemAdmin()) mode='view';
+    const r = await originalOpenSmart.apply(this,[projectId,mode]);
+    if(isAdminArea() && !isSystemAdmin()) setTimeout(()=>enableContractVisitSaveOnlyV339(projectId),120);
+    return r;
+  };
+  window.enableContractVisitSaveOnlyV339 = function(projectId){
+    ensureStyle();
+    const api=window.__contractSmartV299; if(!api || !$('contractSmartModal')) return;
+    const original=api.getSmart(projectId);
+    const draft=JSON.parse(JSON.stringify(original||{}));
+    window.__contractVisitDraftV339={projectId:String(projectId),payload:draft};
+    const save=$('contractSmartSaveBtn');
+    if(save){ save.style.display=''; save.textContent='حفظ تنفيذ الزيارات'; save.onclick=saveContractVisitsOnlyV339; }
+    document.querySelectorAll('#contractSmartModal input:not([type="checkbox"]),#contractSmartModal textarea,#contractSmartModal select').forEach(el=>{ el.disabled=true; });
+    document.querySelectorAll('#contractSmartModal input[type="checkbox"]').forEach(el=>{ el.disabled=true; });
+    document.querySelectorAll('#contractSmartModal button').forEach(btn=>{
+      const oc=btn.getAttribute('onclick')||'';
+      let m=oc.match(/toggleAnnualVisit\('([^']+)'\s*,\s*(\d+)\)/);
+      if(m){ btn.disabled=false; btn.onclick=function(){ toggleAnnualDraftV339(m[1], Number(m[2]), this); }; btn.classList.add('visit-chip-v339'); return; }
+      m=oc.match(/toggleCoreVisit\('([^']+)'\s*,\s*(\d+)\)/);
+      if(m){ btn.disabled=false; btn.onclick=function(){ toggleCoreDraftV339(m[1], Number(m[2]), this); }; btn.classList.add('visit-chip-v339'); return; }
+    });
+    const note=document.createElement('div'); note.className='visit-save-panel-v339'; note.innerHTML='<b>وضع الإداري:</b> يمكنك فقط الضغط على أرقام الزيارات المنفذة ثم الضغط على <b>حفظ تنفيذ الزيارات</b>. لا يمكن تعديل بيانات العقد.';
+    const target=$('contractSmartAnnualTab') || $('contractSmartMainTab'); if(target && !target.querySelector('.visit-save-panel-v339')) target.prepend(note);
+  };
+  window.toggleAnnualDraftV339=function(id,no,btn){
+    const d=window.__contractVisitDraftV339?.payload; if(!d) return;
+    const a=(d.annual||[]).find(x=>S(x.id)===S(id)); if(!a) return;
+    if(!Array.isArray(a.done)) a.done=[];
+    const i=a.done.indexOf(no); if(i>=0){ a.done.splice(i,1); btn?.classList.remove('done'); } else { a.done.push(no); btn?.classList.add('done'); }
+    a.done=a.done.sort((x,y)=>x-y); btn?.classList.add('selected');
+  };
+  window.toggleCoreDraftV339=function(key,no,btn){
+    const d=window.__contractVisitDraftV339?.payload; if(!d || !d.core || !d.core[key]) return;
+    const a=d.core[key]; if(!Array.isArray(a.done)) a.done=[];
+    const i=a.done.indexOf(no); if(i>=0){ a.done.splice(i,1); btn?.classList.remove('done'); } else { a.done.push(no); btn?.classList.add('done'); }
+    a.done=a.done.sort((x,y)=>x-y); btn?.classList.add('selected');
+  };
+  window.saveContractVisitsOnlyV339=async function(){
+    const d=window.__contractVisitDraftV339; if(!d) return msgx('لا توجد زيارات للحفظ','err');
+    const api=window.__contractSmartV299; if(!api) return msgx('تعذر الوصول لبيانات العقد','err');
+    await api.persistSmart(d.projectId,d.payload);
+    msgx('تم حفظ تنفيذ الزيارات');
+    if(typeof renderContracts==='function') renderContracts();
+  };
+
+  /* خدمات العقود العامة: الإداري عرض فقط، مدير النظام عرض وتعديل */
+  function svcById(id){ try{return serviceById(id)}catch(_){return (ds().contractServices||[]).find(s=>S(s.id)===S(id));} }
+  function svcProjectName(s){ try{return csProjectName(s)}catch(_){return s.project_name || hProject(s.project_id);} }
+  function svcSupervisorName(s){ try{return csSupervisorName(s)}catch(_){return s.supervisor_name || hSupervisor(s.supervisor_id);} }
+  function svcName(s){ try{return csServiceName(s)}catch(_){return s.service_name||'-';} }
+  function svcType(s){ try{return csServiceType(s)}catch(_){return s.service_type||s.service_name||'-';} }
+  function svcFreq(s){ try{return csFrequency(s)}catch(_){return s.frequency||'-';} }
+  function svcVisits(s){ try{return csVisits(s)}catch(_){return N(s.visit_count||1)||1;} }
+  function svcDone(s){ try{return csDone(s)}catch(_){return N(s.executed_count||0);} }
+  function svcRemaining(s){ try{return csRemaining(s)}catch(_){return Math.max(svcVisits(s)-svcDone(s),0);} }
+  function svcLast(s){ try{return csLastDate(s)}catch(_){return S(s.last_execution_date);} }
+  function svcDue(s){ try{return csDueDate(s)}catch(_){return S(s.next_due_date);} }
+  function svcNotes(s){ try{return csNotes(s)}catch(_){return S(s.notes);} }
+  function svcStatusKey(s){ try{return csStatusKey(s)}catch(_){return svcRemaining(s)<=0?'done':'due';} }
+  function svcStatusText(s){ try{return csStatusText(svcStatusKey(s))}catch(_){return S(s.status||'مستحقة');} }
+  function svcBadge(s){ try{return csBadgeClass(svcStatusKey(s))}catch(_){return svcRemaining(s)<=0?'green':'amber';} }
+
+  window.renderContractServices = function(){
+    const body=$('contractServicesBody'); if(!body) return;
+    try{ hydrateServiceTypes && hydrateServiceTypes(); }catch(_){ }
+    try{ financeHydrateForms && financeHydrateForms(); }catch(_){ }
+    const rows=(typeof getFilteredContractServices==='function'?getFilteredContractServices():(ds().contractServices||[]));
+    const all=ds().contractServices||[]; const counts={total:all.length,due:0,soon:0,done:0,late:0,review:0};
+    all.forEach(s=>{const k=svcStatusKey(s); if(k==='done')counts.done++; else if(k==='late')counts.late++; else if(k==='soon')counts.soon++; else if(k==='review')counts.review++; else counts.due++;});
+    [['Total','total'],['Due','due'],['Done','done'],['Soon','soon'],['Late','late'],['Review','review']].forEach(([a,b])=>{const el=$('services'+a+'Count'); if(el) el.textContent=counts[b]||0;});
+    const emptyMsg=ds().contractServicesError?('تعذر تحميل الخدمات: '+esc(ds().contractServicesError)):'لا توجد خدمات مسجلة.';
+    body.innerHTML=rows.slice(0,500).map(s=>{ const id=Number(s.id)||0; const actions=isAdminArea()?`<button class="light" onclick="openContractServiceViewV339(${id})">عرض</button>${isSystemAdmin()?`<button onclick="editContractService(${id})">تعديل</button>`:''}`:'-'; return `<tr><td><b>${esc(svcProjectName(s))}</b></td><td>${esc(svcSupervisorName(s))}</td><td><b>${esc(svcName(s))}</b></td><td>${esc(svcType(s))}</td><td>${esc(svcFreq(s))}</td><td>${svcVisits(s)}</td><td>${esc(s.executor_name||'-')}</td><td>${svcDone(s)}</td><td>${svcRemaining(s)}</td><td>${esc(svcLast(s)||'-')}</td><td>${esc(svcDue(s)||'-')}</td><td><span class="badge ${svcBadge(s)}">${esc(svcStatusText(s))}</span></td><td>${esc(svcNotes(s)||'-')}</td><td class="row-actions">${actions}</td></tr>`; }).join('') || `<tr><td colspan="14">${emptyMsg}</td></tr>`;
+    try{ renderSmartServicesList && renderSmartServicesList(); }catch(_){ }
+    try{ showSupervisorServicesPreview && showSupervisorServicesPreview(false); }catch(_){ }
+  };
+
+  window.openContractServiceViewV339=function(id){
+    ensureStyle();
+    const s=svcById(id); if(!s) return msgx('الخدمة غير موجودة','err');
+    let modal=$('contractServiceModalV339'); if(!modal){ modal=document.createElement('div'); modal.id='contractServiceModalV339'; modal.className='modal-v338 hidden'; document.body.appendChild(modal); }
+    const visits=Math.max(1,svcVisits(s)), done=svcDone(s);
+    const chips=Array.from({length:visits},(_,i)=>{ const no=i+1; return `<button type="button" class="visit-chip-v339 ${no<=done?'done':''}" data-no="${no}" onclick="selectServiceVisitV339(${id},${no},this)">${no}</button>`; }).join('');
+    modal.innerHTML=`<div class="modal-card-v338"><div class="modal-head-v338"><h2>عرض الخدمة التعاقدية</h2><button class="light" onclick="closeContractServiceViewV339()">إغلاق</button></div><div class="modal-body-v338">
+      <h2>${esc(svcName(s))}</h2>
+      <div class="service-view-grid-v338">
+        <div class="service-box-v338"><small>المشروع</small><b>${esc(svcProjectName(s))}</b></div>
+        <div class="service-box-v338"><small>المشرف</small><b>${esc(svcSupervisorName(s))}</b></div>
+        <div class="service-box-v338"><small>نوع الخدمة</small><b>${esc(svcType(s))}</b></div>
+        <div class="service-box-v338"><small>التكرار</small><b>${esc(svcFreq(s))}</b></div>
+        <div class="service-box-v338"><small>عدد الزيارات</small><b>${visits}</b></div>
+        <div class="service-box-v338"><small>المنفذ حاليًا</small><b id="svcDonePreviewV339">${done}</b></div>
+        <div class="service-box-v338"><small>المتبقي</small><b>${svcRemaining(s)}</b></div>
+        <div class="service-box-v338"><small>الحالة</small><b>${esc(svcStatusText(s))}</b></div>
+        <div class="service-box-v338"><small>آخر تنفيذ</small><b>${esc(svcLast(s)||'-')}</b></div>
+        <div class="service-box-v338"><small>الاستحقاق القادم</small><b>${esc(svcDue(s)||'-')}</b></div>
+      </div>
+      <div class="visit-save-panel-v339">
+        <b>أرقام الزيارات:</b><div style="margin:8px 0">${chips}</div>
+        <div class="grid"><label>تاريخ التنفيذ<input id="svcExecDateV339" type="date" value="${today()}"></label><label>اسم المنفذ<input id="svcExecutorV339" value="${esc(s.executor_name||'')}"></label><label>ملاحظة<input id="svcNoteV339" value=""></label></div>
+        <p class="muted-v339">اضغط رقم الزيارة المنفذة ثم اضغط حفظ. الإداري لا يظهر له تعديل بيانات الخدمة.</p>
+        <button onclick="saveServiceVisitV339(${id})">حفظ</button>
+      </div>
+    </div></div>`;
+    window.__serviceVisitDraftV339={id,done};
+    modal.classList.remove('hidden');
+  };
+  window.closeContractServiceViewV339=function(){ $('contractServiceModalV339')?.classList.add('hidden'); };
+  window.selectServiceVisitV339=function(id,no,btn){
+    const d=window.__serviceVisitDraftV339||{id,done:0}; d.id=id; d.done=Math.max(N(d.done),N(no)); window.__serviceVisitDraftV339=d;
+    document.querySelectorAll('#contractServiceModalV339 .visit-chip-v339').forEach(b=>{ const n=N(b.dataset.no); b.classList.toggle('done',n<=d.done); b.classList.toggle('selected',n===N(no)); });
+    const pr=$('svcDonePreviewV339'); if(pr) pr.textContent=d.done;
+  };
+  window.saveServiceVisitV339=async function(id){
+    if(!isAdminArea()) return msgx('غير مسموح','err');
+    const s=svcById(id); if(!s) return msgx('الخدمة غير موجودة','err');
+    const done=Math.max(N(window.__serviceVisitDraftV339?.done), svcDone(s));
+    const visits=Math.max(svcVisits(s), done); const remaining=Math.max(visits-done,0);
+    const d=$('svcExecDateV339')?.value || today(); const executor=$('svcExecutorV339')?.value || S(s.executor_name||''); const note=$('svcNoteV339')?.value || '';
+    const notes=[svcNotes(s), note].filter(Boolean).join(' / '); const status=remaining>0?'مستحقة':'منجزة';
+    const {error}=await sb.from('contract_services').update({last_execution_date:d,executed_count:done,remaining_count:remaining,visit_count:visits,executor_name:executor,notes,status,next_due_date:remaining>0?svcDue(s)||null:null,updated_at:new Date().toISOString()}).eq('id',id);
+    if(error) return msgx(error.message,'err');
+    msgx('تم حفظ تنفيذ الزيارة');
+    try{ await refreshAll(); }catch(_){ }
+    setTimeout(()=>openContractServiceViewV339(id),150);
+  };
+
+  window.TASNEEF_BUILD='V339_CONTRACT_ROLE_VISITS_2026_06_04';
+  console.log('Tasneef V339 contract role/visit workflow loaded');
+})();
