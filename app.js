@@ -12300,6 +12300,7 @@ function financePrintReport(kind){
 =============================================================================================== */
 (function(){
   'use strict';
+  if(window.__tasneefFinanceProExclusive) return;
   window.TASNEEF_BUILD = 'V205_SAFE_TABS_REPORTS_FIX_2026_05_20';
   const $ = id => document.getElementById(id);
   const S = v => String(v ?? '').trim();
@@ -18090,6 +18091,7 @@ function financePrintReport(kind){
 
 /* ===== V306: remove expenses & inventory module, keep app lightweight ===== */
 (function(){
+  if(window.__tasneefFinanceProExclusive) return;
   const FIX_VERSION='v306-remove-finance-inventory';
   function removeFinanceInventoryUi(){
     try{
