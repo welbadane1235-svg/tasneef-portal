@@ -86,6 +86,7 @@
   function ensurePage(){
     ensureStyle();
     ensureNav();
+    removeLegacyFinanceShortcuts();
     let page=$('financeDashboard');
     if(page) return page;
     page=document.createElement('section');
@@ -96,7 +97,22 @@
     return page;
   }
 
+  function removeLegacyFinanceShortcuts(){
+    try{
+      const blocked = ['الأصناف', 'الموردين', 'تعديل التكلفة'];
+      document.querySelectorAll('button,a').forEach(el => {
+        const text = S(el.textContent).replace(/\s+/g, ' ');
+        if(blocked.some(word => text === word || text.includes(word))){
+          el.style.display = 'none';
+          el.setAttribute('aria-hidden', 'true');
+          el.dataset.financeProHiddenV15 = '1';
+        }
+      });
+    }catch(e){}
+  }
+
   function renderShell(){
+    removeLegacyFinanceShortcuts();
     const page=ensurePage();
     page.innerHTML = `
       <div class="fin-shell" dir="rtl">
@@ -503,6 +519,7 @@
     window.showPage=function(id,btn){
       if(id==='financeDashboard'){
         ensurePage();
+        removeLegacyFinanceShortcuts();
         document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden'));
         $('financeDashboard')?.classList.remove('hidden');
         document.querySelectorAll('.nav').forEach(n=>n.classList.remove('active'));
