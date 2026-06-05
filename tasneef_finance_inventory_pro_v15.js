@@ -502,7 +502,7 @@
   function renderMovement(body){
     const selectedMovementType=S($('finMovementListTypeV15')?.value);
     const editMove=state.editMovementId ? state.movements.find(m=>String(m.id)===String(state.editMovementId)) : null;
-    const movementItems=state.items.filter(i=>computedItemQtyV15(i)>0 || (editMove && String(i.id)===String(editMove.item_id)));
+    const movementItems=state.items.filter(i=>computedItemQtyV15(i)>0 || isWarehouseOnlyV15() || (editMove && String(i.id)===String(editMove.item_id)));
     const movementRows=state.movements
       .filter(m=>!selectedMovementType || S(m.movement_type)===selectedMovementType)
       .slice()
