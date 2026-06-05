@@ -18,6 +18,10 @@
     const st=document.createElement('style');
     st.id='financeRolesStyleV29';
     st.textContent=`
+      #financeDashboard.finance-pro:not(.hidden){display:block!important;visibility:visible!important;opacity:1!important}
+      #financeDashboard.finance-pro .fin-shell{display:grid!important;visibility:visible!important;opacity:1!important}
+      body.finance-pro-exclusive-v29 #financeDashboard .finance-tabs,
+      body.finance-pro-exclusive-v29 #financeDashboard .finance-tab-page{display:none!important}
       body.finance-warehouse-role-v29 .fin-money-hidden-v29{display:none!important}
       body.finance-warehouse-role-v29 #finBodyV15 .fin-grid .fin-kpi:has(.fin-money-hidden-v29){display:none!important}
     `;
@@ -30,8 +34,18 @@
   }
   function normalizeTabs(){
     const warehouse=isWarehouse();
+    document.body.classList.add('finance-pro-exclusive-v29');
     document.body.classList.toggle('finance-warehouse-role-v29', warehouse);
-    document.body.classList.remove('finance-warehouse-role-v28');
+    document.body.classList.remove(
+      'finance-warehouse-role-v28',
+      'warehouse-manager-view-v151',
+      'warehouse-manager-view-v162',
+      'warehouse-manager-view-v163',
+      'warehouse-manager-view-v164',
+      'warehouse-manager-view-v178',
+      'warehouse-manager-view-v179',
+      'warehouse-manager-view-v180'
+    );
     document.querySelectorAll('#finTabsV15 button').forEach(btn=>{
       const id=tabId(btn);
       btn.style.display=(!warehouse || allowed.includes(id)) ? '' : 'none';
@@ -94,10 +108,9 @@
   }
   document.addEventListener('DOMContentLoaded',()=>setTimeout(install,500));
   setTimeout(install,1100);
-  let busy=false;
-  new MutationObserver(()=>{
-    if(busy) return;
-    busy=true;
-    setTimeout(()=>{ busy=false; apply(); },80);
-  }).observe(document.documentElement,{childList:true,subtree:true});
+  window.addEventListener('load',()=>setTimeout(install,1600));
+  setInterval(()=>{
+    const page=document.getElementById('financeDashboard');
+    if(page && !page.classList.contains('hidden')) apply();
+  },2500);
 })();

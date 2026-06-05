@@ -29,7 +29,7 @@
   }
   function financeVisible(){
     const el = page();
-    return !!el && !el.classList.contains('hidden') && el.offsetParent !== null;
+    return !!el && !el.classList.contains('hidden');
   }
   function hasProShell(){
     const el = page();
@@ -56,6 +56,10 @@
   }
   function renderPro(forceLoad){
     if(!shouldLockFinance()) return;
+    if(!forceLoad && hasProShell()) {
+      removeLegacyBits();
+      return;
+    }
     if(typeof window.financeProLoadV15 === 'function'){
       window.financeProLoadV15(!!forceLoad);
     }else if(typeof window.financeProRenderCurrentV15 === 'function'){
@@ -71,6 +75,9 @@
     document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden'));
     el.classList.remove('hidden');
     el.classList.add('finance-pro');
+    el.style.display = 'block';
+    el.style.visibility = 'visible';
+    el.style.opacity = '1';
     document.querySelectorAll('.nav').forEach(n=>n.classList.remove('active'));
     if(btn && btn.classList) btn.classList.add('active');
     setTimeout(()=>renderPro(false), 0);
@@ -113,6 +120,7 @@
         if(financeVisible()) removeLegacyBits();
       };
     });
+    document.body.classList.add('finance-pro-exclusive-v31');
   }
   function guardVisibleFinance(){
     if(!shouldLockFinance()) return;
@@ -139,7 +147,7 @@
     busy = true;
     setTimeout(()=>{
       busy = false;
-      guardVisibleFinance();
+      if(financeVisible() && (!hasProShell() || page().querySelector('.finance-tabs,.finance-tab-page'))) guardVisibleFinance();
     }, 90);
   }).observe(document.documentElement, {childList:true, subtree:true});
 
