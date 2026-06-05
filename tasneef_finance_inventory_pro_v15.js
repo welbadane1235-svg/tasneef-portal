@@ -72,6 +72,14 @@
     if(['out','consume','waste','damaged'].includes(type)) return -N(m?.quantity);
     return 0;
   }
+  function computedItemQtyV15(item){
+    if(!item) return 0;
+    const rows=productMovements(item).flatMap(m=>movementDistributionRowsV15(m));
+    const distributionReturnToStock=rows
+      .filter(m=>S(m.movement_type)==='return' && m.is_distribution_row && S(m.base_movement_type)!=='return')
+      .reduce((a,m)=>a+N(m.quantity),0);
+    return N(item.quantity)+distributionReturnToStock;
+  }
   async function table(name, select='*', limit=3000){
     try{
       if(!window.sb) return [];
@@ -317,17 +325,19 @@
     const type=S($('finProductTypeV15')?.value);
     let rows=state.items.filter(i=>{
       const hay=[i.name,itemCode(i),i.category,i.supplier].map(S).join(' ').toLowerCase();
+      const qty=computedItemQtyV15(i);
       if(q && !hay.includes(q)) return false;
-      if(st==='available' && N(i.quantity)<=N(i.min_quantity || i.reorder_level || 1)) return false;
-      if(st==='low' && !(N(i.quantity)>0 && N(i.quantity)<=N(i.min_quantity || i.reorder_level || 1))) return false;
-      if(st==='zero' && N(i.quantity)!==0) return false;
+      if(st==='available' && qty<=N(i.min_quantity || i.reorder_level || 1)) return false;
+      if(st==='low' && !(qty>0 && qty<=N(i.min_quantity || i.reorder_level || 1))) return false;
+      if(st==='zero' && qty!==0) return false;
       if(unit && S(i.unit)!==unit) return false;
       if(type && productType(i)!==type) return false;
       return true;
     });
     box.innerHTML=`<div class="fin-report-cards">${rows.map(i=>{
-      const low=N(i.quantity)>0 && N(i.quantity)<=N(i.min_quantity || i.reorder_level || 1);
-      const zero=N(i.quantity)===0;
+      const qty=computedItemQtyV15(i);
+      const low=qty>0 && qty<=N(i.min_quantity || i.reorder_level || 1);
+      const zero=qty===0;
       return `<div class="fin-product-card">
         ${i.image_url ? `<img class="fin-thumb" src="${esc(i.image_url)}" alt="">` : ''}
         <h4>${esc(i.name || '-')}</h4>
@@ -336,7 +346,7 @@
           <div><small>الكود</small><b>${esc(itemCode(i)||'-')}</b></div>
           <div><small>الوحدة</small><b>${esc(i.unit||'-')}</b></div>
           <div><small>النوع</small><b>${esc(productType(i))}</b></div>
-          <div><small>الكمية</small><b>${N(i.quantity)}</b></div>
+          <div><small>الكمية</small><b>${N(qty)}</b></div>
           <div><small>سعر قبل الضريبة</small><b>${money(itemCost(i))}</b></div>
           <div><small>الضريبة للوحدة</small><b>${money(itemCost(i)*VAT_RATE)}</b></div>
           <div><small>بعد الضريبة للوحدة</small><b>${money(itemCost(i)*(1+VAT_RATE))}</b></div>
@@ -427,6 +437,7 @@
         <div class="fin-line">
           <div><label>اسم المنتج</label><input id="finLineNameV15" placeholder="اسم المنتج"></div>
           <div><label>الكود الداخلي</label><input id="finLineCodeV15" value="${esc(nextInternalCode())}" readonly></div>
+          <div><label>كود الموزع</label><input id="finLineDistributorCodeV15" placeholder="اكتب كود الموزع"></div>
           <div><label>الكمية</label><input id="finLineQtyV15" type="number" min="0" step="0.01"></div>
           <div><label>السعر</label><input id="finLinePriceV15" type="number" min="0" step="0.01"></div>
           <div><label>طريقة الضريبة</label><select id="finLineTaxModeV15"><option value="before">قبل الضريبة</option><option value="after">بعد الضريبة</option><option value="none">بدون ضريبة</option></select></div>
@@ -449,8 +460,8 @@
     const box=$('finInvoiceLinesV15'); if(!box) return;
     const total=state.invoiceLines.reduce((a,l)=>{ const c=rowVat(l.qty,l.price,l.tax_mode); a.net+=c.net; a.vat+=c.vat; a.gross+=c.gross; return a; },{net:0,vat:0,gross:0});
     box.innerHTML=`
-      <div class="fin-table"><table><thead><tr><th>المنتج</th><th>الكود</th><th>النوع</th><th>الكمية</th><th>الوحدة</th><th>طريقة الضريبة</th><th>قبل الضريبة</th><th>الضريبة</th><th>بعد الضريبة</th><th>إجراء</th></tr></thead><tbody>
-      ${state.invoiceLines.map((l,idx)=>{ const c=rowVat(l.qty,l.price,l.tax_mode); const modeLabel={before:'قبل الضريبة',after:'بعد الضريبة',none:'بدون ضريبة'}[S(l.tax_mode||'before')]||'قبل الضريبة'; return `<tr><td>${l.image?`<img src="${esc(l.image)}" style="width:34px;height:34px;object-fit:contain;border-radius:8px;border:1px solid #d9e7e2;background:#fff;margin-left:6px">`:''}${esc(l.name)}</td><td>${esc(l.code)}</td><td>${esc(l.item_type||'مادة')}</td><td>${N(l.qty)}</td><td>${esc(l.unit||'حبة')}</td><td>${esc(modeLabel)}</td><td>${money(c.net)}</td><td>${money(c.vat)}</td><td>${money(c.gross)}</td><td><button class="danger" onclick="financeProRemoveInvoiceLineV15(${idx})">حذف</button></td></tr>`; }).join('') || '<tr><td colspan="10">أضف منتجات الفاتورة هنا.</td></tr>'}
+      <div class="fin-table"><table><thead><tr><th>المنتج</th><th>الكود الداخلي</th><th>كود الموزع</th><th>النوع</th><th>الكمية</th><th>الوحدة</th><th>طريقة الضريبة</th><th>قبل الضريبة</th><th>الضريبة</th><th>بعد الضريبة</th><th>إجراء</th></tr></thead><tbody>
+      ${state.invoiceLines.map((l,idx)=>{ const c=rowVat(l.qty,l.price,l.tax_mode); const modeLabel={before:'قبل الضريبة',after:'بعد الضريبة',none:'بدون ضريبة'}[S(l.tax_mode||'before')]||'قبل الضريبة'; return `<tr><td>${l.image?`<img src="${esc(l.image)}" style="width:34px;height:34px;object-fit:contain;border-radius:8px;border:1px solid #d9e7e2;background:#fff;margin-left:6px">`:''}${esc(l.name)}</td><td>${esc(l.code)}</td><td>${esc(l.distributor_code||'-')}</td><td>${esc(l.item_type||'مادة')}</td><td>${N(l.qty)}</td><td>${esc(l.unit||'حبة')}</td><td>${esc(modeLabel)}</td><td>${money(c.net)}</td><td>${money(c.vat)}</td><td>${money(c.gross)}</td><td><button class="danger" onclick="financeProRemoveInvoiceLineV15(${idx})">حذف</button></td></tr>`; }).join('') || '<tr><td colspan="11">أضف منتجات الفاتورة هنا.</td></tr>'}
       </tbody></table></div>
       <div class="fin-grid three" style="margin-top:10px"><div class="fin-soft">قبل الضريبة: <b>${money(total.net)}</b></div><div class="fin-soft">الضريبة: <b>${money(total.vat)}</b></div><div class="fin-soft">بعد الضريبة: <b>${money(total.gross)}</b></div></div>`;
   }
@@ -632,7 +643,7 @@
   function reportProducts(){
     const f=reportFilters();
     return state.items.filter(i=>{
-      if(N(i.quantity)<=0) return false;
+      if(computedItemQtyV15(i)<=0) return false;
       if(f.product && S(i.id)!==f.product) return false;
       if(f.q && ![i.name,itemCode(i),i.unit,productType(i)].map(S).join(' ').toLowerCase().includes(f.q)) return false;
       return true;
@@ -645,7 +656,7 @@
   function reportInventory(){
     const f=reportFilters();
     return state.items.filter(i=>{
-      if(N(i.quantity)<=0) return false;
+      if(computedItemQtyV15(i)<=0) return false;
       if(f.product && S(i.id)!==f.product) return false;
       if(f.q && ![i.name,itemCode(i),i.unit,productType(i),i.supplier].map(S).join(' ').toLowerCase().includes(f.q)) return false;
       return true;
@@ -661,8 +672,8 @@
   }
   function reportTotalsForTab(tab){
     let rows=[];
-    if(tab==='products') rows=reportProducts().map(i=>({net:N(i.quantity)*itemCost(i)}));
-    else if(tab==='inventory') rows=reportInventory().map(i=>({net:N(i.quantity)*itemCost(i)}));
+    if(tab==='products') rows=reportProducts().map(i=>({net:computedItemQtyV15(i)*itemCost(i)}));
+    else if(tab==='inventory') rows=reportInventory().map(i=>({net:computedItemQtyV15(i)*itemCost(i)}));
     else if(tab==='cost') rows=reportCostRows().map(m=>({net:N(m.quantity)*N(m.unit_cost)}));
     else rows=reportMovements().map(m=>({net:N(m.quantity)*N(m.unit_cost)}));
     const net=rows.reduce((a,r)=>a+N(r.net),0);
@@ -676,24 +687,26 @@
   }
   function productsReportHtml(){
     const rows=reportProducts();
-    return `<div class="fin-card"><h3>نافذة تقرير المنتجات</h3><div class="fin-table"><table><thead><tr><th>المنتج</th><th>الكود</th><th>الوحدة</th><th>النوع</th><th>الكمية</th><th>قبل الضريبة</th><th>الضريبة</th><th>بعد الضريبة</th><th>إجراء</th></tr></thead><tbody>${rows.map(i=>{const net=N(i.quantity)*itemCost(i);return `<tr><td>${esc(i.name)}</td><td>${esc(itemCode(i)||'-')}</td><td>${esc(i.unit||'-')}</td><td>${esc(productType(i))}</td><td>${N(i.quantity)}</td><td>${money(net)}</td><td>${money(net*VAT_RATE)}</td><td>${money(net*(1+VAT_RATE))}</td><td class="fin-actions"><button class="light" onclick="financeProShowProductV15('${esc(i.id)}')">عرض</button><button class="danger" onclick="financeProDeleteProductV15('${esc(i.id)}')">حذف</button></td></tr>`;}).join('') || '<tr><td colspan="9">لا توجد منتجات حسب الفلتر</td></tr>'}</tbody></table></div></div>`;
+    return `<div class="fin-card"><h3>نافذة تقرير المنتجات</h3><div class="fin-table"><table><thead><tr><th>المنتج</th><th>الكود</th><th>الوحدة</th><th>النوع</th><th>الكمية</th><th>قبل الضريبة</th><th>الضريبة</th><th>بعد الضريبة</th></tr></thead><tbody>${rows.map(i=>{const qty=computedItemQtyV15(i); const net=qty*itemCost(i);return `<tr><td>${esc(i.name)}</td><td>${esc(itemCode(i)||'-')}</td><td>${esc(i.unit||'-')}</td><td>${esc(productType(i))}</td><td>${N(qty)}</td><td>${money(net)}</td><td>${money(net*VAT_RATE)}</td><td>${money(net*(1+VAT_RATE))}</td></tr>`;}).join('') || '<tr><td colspan="8">لا توجد منتجات حسب الفلتر</td></tr>'}</tbody></table></div></div>`;
   }
   function movementReportHtml(){
     const rows=reportMovements();
-    return `<div class="fin-card"><h3>نافذة حركة المخزون: الداخل والخارج</h3><div class="fin-table"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>المنتج</th><th>الكمية</th><th>المستلم/المورد</th><th>المشروع</th><th>قبل الضريبة</th><th>بعد الضريبة</th><th>إجراء</th></tr></thead><tbody>${rows.map(m=>{const net=N(m.quantity)*N(m.unit_cost);return `<tr><td>${esc(movementDate(m)||'-')}</td><td>${esc(movementTypeLabelV15(m.movement_type))}</td><td>${esc(m.item_name||'-')}</td><td>${N(m.quantity)}</td><td>${esc(m.receiver||'-')}</td><td>${esc(m.project_name||'-')}</td><td>${money(net)}</td><td>${money(net*(1+VAT_RATE))}</td><td class="fin-actions"><button onclick="financeProEditMovementV15(${Number(m.id)||0})">تعديل</button><button class="light" onclick="financeProShowMovementV15(${Number(m.id)||0})">عرض</button><button class="danger" onclick="financeProDeleteMovementV15(${Number(m.id)||0})">حذف</button></td></tr>`;}).join('') || '<tr><td colspan="9">لا توجد حركات حسب الفلتر</td></tr>'}</tbody></table></div></div>`;
+    return `<div class="fin-card"><h3>نافذة حركة المخزون: الداخل والخارج</h3><div class="fin-table"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>المنتج</th><th>الكمية</th><th>المستلم/المورد</th><th>المشروع</th><th>قبل الضريبة</th><th>بعد الضريبة</th></tr></thead><tbody>${rows.map(m=>{const net=N(m.quantity)*N(m.unit_cost);return `<tr><td>${esc(movementDate(m)||'-')}</td><td>${esc(movementTypeLabelV15(m.movement_type))}</td><td>${esc(m.item_name||'-')}</td><td>${N(m.quantity)}</td><td>${esc(m.receiver||'-')}</td><td>${esc(m.project_name||'-')}</td><td>${money(net)}</td><td>${money(net*(1+VAT_RATE))}</td></tr>`;}).join('') || '<tr><td colspan="8">لا توجد حركات حسب الفلتر</td></tr>'}</tbody></table></div></div>`;
   }
   function inventoryReportHtml(){
     const rows=reportInventory();
-    return `<div class="fin-card"><h3>نافذة جرد المخزن</h3><p class="fin-soft">أي منتج رصيده صفر لا يظهر في الجرد.</p><div class="fin-table"><table><thead><tr><th>المنتج</th><th>الكود</th><th>الوحدة</th><th>النوع</th><th>الرصيد</th><th>قيمة قبل الضريبة</th><th>الضريبة</th><th>بعد الضريبة</th><th>إجراء</th></tr></thead><tbody>${rows.map(i=>{const net=N(i.quantity)*itemCost(i);return `<tr><td>${esc(i.name)}</td><td>${esc(itemCode(i)||'-')}</td><td>${esc(i.unit||'-')}</td><td>${esc(productType(i))}</td><td>${N(i.quantity)}</td><td>${money(net)}</td><td>${money(net*VAT_RATE)}</td><td>${money(net*(1+VAT_RATE))}</td><td class="fin-actions"><button class="light" onclick="financeProShowProductV15('${esc(i.id)}')">عرض</button><button class="danger" onclick="financeProDeleteProductV15('${esc(i.id)}')">حذف</button></td></tr>`;}).join('') || '<tr><td colspan="9">لا توجد منتجات برصيد متاح</td></tr>'}</tbody></table></div></div>`;
+    return `<div class="fin-card"><h3>نافذة جرد المخزن</h3><p class="fin-soft">أي منتج رصيده صفر لا يظهر في الجرد.</p><div class="fin-table"><table><thead><tr><th>المنتج</th><th>الكود</th><th>الوحدة</th><th>النوع</th><th>الرصيد</th><th>قيمة قبل الضريبة</th><th>الضريبة</th><th>بعد الضريبة</th></tr></thead><tbody>${rows.map(i=>{const qty=computedItemQtyV15(i); const net=qty*itemCost(i);return `<tr><td>${esc(i.name)}</td><td>${esc(itemCode(i)||'-')}</td><td>${esc(i.unit||'-')}</td><td>${esc(productType(i))}</td><td>${N(qty)}</td><td>${money(net)}</td><td>${money(net*VAT_RATE)}</td><td>${money(net*(1+VAT_RATE))}</td></tr>`;}).join('') || '<tr><td colspan="8">لا توجد منتجات برصيد متاح</td></tr>'}</tbody></table></div></div>`;
   }
   function costReportHtml(){
     const rows=reportCostRows();
-    return `<div class="fin-card"><h3>نافذة تقرير مراكز التكلفة</h3><p class="fin-soft">يعرض التقرير كل سطر توزيع بالتفصيل، والمرتجع لا يدخل في إجمالي التكلفة.</p><div class="fin-table"><table><thead><tr><th>التاريخ</th><th>المنتج</th><th>نوع التوزيع</th><th>الكمية</th><th>المستلم</th><th>مركز التكلفة</th><th>المشروع</th><th>الأوردر</th><th>ملاحظة التوزيع</th><th>قبل الضريبة</th><th>الضريبة</th><th>بعد الضريبة</th><th>إجراء</th></tr></thead><tbody>${rows.map(m=>{const net=N(m.quantity)*N(m.unit_cost);return `<tr><td>${esc(movementDate(m)||'-')}</td><td>${esc(m.item_name||'-')}</td><td>${esc(movementTypeLabelV15(m.movement_type))}</td><td>${N(m.quantity)}</td><td>${esc(m.receiver||'-')}</td><td>${esc(movementCenter(m)||'-')}</td><td>${esc(m.project_name||'-')}</td><td>${esc(m.order_no||'-')}</td><td>${esc(m.distribution_note||'-')}</td><td>${money(net)}</td><td>${money(net*VAT_RATE)}</td><td>${money(net*(1+VAT_RATE))}</td><td class="fin-actions"><button onclick="financeProEditMovementV15(${Number(m.parent_id||m.id)||0})">تعديل</button><button class="light" onclick="financeProShowMovementV15(${Number(m.parent_id||m.id)||0})">عرض</button><button class="danger" onclick="financeProDeleteMovementV15(${Number(m.parent_id||m.id)||0})">حذف</button></td></tr>`;}).join('') || '<tr><td colspan="13">لا توجد بيانات مراكز تكلفة حسب الفلتر</td></tr>'}</tbody></table></div></div>`;
+    return `<div class="fin-card"><h3>نافذة تقرير مراكز التكلفة</h3><p class="fin-soft">يعرض التقرير كل سطر توزيع بالتفصيل، والمرتجع لا يدخل في إجمالي التكلفة.</p><div class="fin-table"><table><thead><tr><th>التاريخ</th><th>المنتج</th><th>نوع التوزيع</th><th>الكمية</th><th>المستلم</th><th>مركز التكلفة</th><th>المشروع</th><th>الأوردر</th><th>ملاحظة التوزيع</th><th>قبل الضريبة</th><th>الضريبة</th><th>بعد الضريبة</th></tr></thead><tbody>${rows.map(m=>{const net=N(m.quantity)*N(m.unit_cost);return `<tr><td>${esc(movementDate(m)||'-')}</td><td>${esc(m.item_name||'-')}</td><td>${esc(movementTypeLabelV15(m.movement_type))}</td><td>${N(m.quantity)}</td><td>${esc(m.receiver||'-')}</td><td>${esc(movementCenter(m)||'-')}</td><td>${esc(m.project_name||'-')}</td><td>${esc(m.order_no||'-')}</td><td>${esc(m.distribution_note||'-')}</td><td>${money(net)}</td><td>${money(net*VAT_RATE)}</td><td>${money(net*(1+VAT_RATE))}</td></tr>`;}).join('') || '<tr><td colspan="12">لا توجد بيانات مراكز تكلفة حسب الفلتر</td></tr>'}</tbody></table></div></div>`;
   }
 
   function findItem(line){
     const code=S(line.code);
-    return state.items.find(i=>code && [i.product_code,i.serial_number,i.barcode,i.supplier_barcode,i.code].map(S).includes(code))
+    const distCode=S(line.distributor_code);
+    return state.items.find(i=>code && [i.product_code,i.serial_number,i.barcode,i.code].map(S).includes(code))
+      || state.items.find(i=>distCode && [i.supplier_barcode,i.distributor_code].map(S).includes(distCode))
       || state.items.find(i=>S(i.name).toLowerCase()===S(line.name).toLowerCase());
   }
 
@@ -740,12 +753,12 @@
   };
 
   window.financeProAddInvoiceLineV15 = function(){
-    const line={ name:S($('finLineNameV15')?.value), code:S($('finLineCodeV15')?.value), qty:N($('finLineQtyV15')?.value), price:N($('finLinePriceV15')?.value), tax_mode:S($('finLineTaxModeV15')?.value)||'before', unit:S($('finLineUnitV15')?.value)||'حبة', item_type:S($('finLineTypeV15')?.value)||'مادة', image:S(window.__financeProLineImageV15||'') };
+    const line={ name:S($('finLineNameV15')?.value), code:S($('finLineCodeV15')?.value), distributor_code:S($('finLineDistributorCodeV15')?.value), qty:N($('finLineQtyV15')?.value), price:N($('finLinePriceV15')?.value), tax_mode:S($('finLineTaxModeV15')?.value)||'before', unit:S($('finLineUnitV15')?.value)||'حبة', item_type:S($('finLineTypeV15')?.value)||'مادة', image:S(window.__financeProLineImageV15||'') };
     if(!line.name) return alert('اسم المنتج مطلوب');
     if(line.qty<=0) return alert('الكمية مطلوبة');
     if(line.price<0) return alert('السعر غير صحيح');
     state.invoiceLines.push(line);
-    ['finLineNameV15','finLineQtyV15','finLinePriceV15'].forEach(id=>{ if($(id)) $(id).value=''; });
+    ['finLineNameV15','finLineDistributorCodeV15','finLineQtyV15','finLinePriceV15'].forEach(id=>{ if($(id)) $(id).value=''; });
     if($('finLineCodeV15')) $('finLineCodeV15').value=nextInternalCode();
     if($('finLineImageV15')) $('finLineImageV15').value='';
     if($('finLineImageNameV15')) $('finLineImageNameV15').textContent='لم يتم اختيار صورة';
@@ -770,20 +783,20 @@
         if(old){
           const oldQty=N(old.quantity), oldCost=itemCost(old), newQty=oldQty+q;
           const avg=newQty>0 ? ((oldQty*oldCost)+(q*cost))/newQty : cost;
-          const upd={quantity:newQty, unit_cost:+avg.toFixed(4), supplier:supplier||old.supplier, unit:l.unit||old.unit, item_type:l.item_type||old.item_type, type:l.item_type||old.type, product_code:l.code||old.product_code, serial_number:l.code||old.serial_number, barcode:l.code||old.barcode};
+          const upd={quantity:newQty, unit_cost:+avg.toFixed(4), supplier:supplier||old.supplier, unit:l.unit||old.unit, item_type:l.item_type||old.item_type, type:l.item_type||old.type, product_code:l.code||old.product_code, serial_number:l.code||old.serial_number, barcode:l.code||old.barcode, supplier_barcode:l.distributor_code||old.supplier_barcode};
           if(l.image) upd.image_url = l.image;
           const res=await sb.from('inventory_items').update(upd).eq('id',old.id).select('*').single();
           if(res.error) throw res.error;
           item=res.data;
         }else{
-          const ins={name:l.name, product_code:l.code, serial_number:l.code, barcode:l.code, supplier_barcode:l.code, image_url:l.image||'', unit:l.unit||'حبة', item_type:l.item_type||'مادة', type:l.item_type||'مادة', quantity:q, min_quantity:1, unit_cost:+cost.toFixed(4), supplier, category:l.item_type||'عام', notes:'تمت الإضافة من فاتورة '+invoiceNo};
+          const ins={name:l.name, product_code:l.code, serial_number:l.code, barcode:l.code, supplier_barcode:l.distributor_code||l.code, image_url:l.image||'', unit:l.unit||'حبة', item_type:l.item_type||'مادة', type:l.item_type||'مادة', quantity:q, min_quantity:1, unit_cost:+cost.toFixed(4), supplier, category:l.item_type||'عام', notes:'تمت الإضافة من فاتورة '+invoiceNo};
           const res=await sb.from('inventory_items').insert(ins).select('*').single();
           if(res.error) throw res.error;
           item=res.data;
         }
         const c=rowVat(q,l.price,l.tax_mode);
         const meta={module:VERSION, invoiceNo, supplier, taxMode:S(l.tax_mode||'before'), beforeVat:c.net, vat:c.vat, afterVat:c.gross};
-        const mv={item_id:item.id,item_name:item.name,movement_type:'in',quantity:q,movement_date:date,receiver:supplier,reason:'إضافة مخزون - فاتورة '+invoiceNo,notes:'finance_pro_v15:'+JSON.stringify(meta),product_code:l.code,barcode:l.code,unit_cost:+cost.toFixed(4)};
+        const mv={item_id:item.id,item_name:item.name,movement_type:'in',quantity:q,movement_date:date,receiver:supplier,reason:'إضافة مخزون - فاتورة '+invoiceNo,notes:'finance_pro_v15:'+JSON.stringify(meta),product_code:l.code,barcode:l.distributor_code||l.code,unit_cost:+cost.toFixed(4)};
         const mr=await sb.from('inventory_movements').insert(mv);
         if(mr.error) throw mr.error;
       }
@@ -814,7 +827,7 @@
       const meta=safeJson(m.notes)||{};
       const mode=S(meta.taxMode||'before');
       const price=mode==='after' && N(m.quantity)>0 ? N(meta.afterVat)/N(m.quantity) : N(m.unit_cost);
-      return {name:S(m.item_name), code:S(m.product_code||m.barcode), qty:N(m.quantity), price, tax_mode:mode, unit:'حبة', item_type:'مادة', image:''};
+      return {name:S(m.item_name), code:S(m.product_code), distributor_code:S(m.barcode), qty:N(m.quantity), price, tax_mode:mode, unit:'حبة', item_type:'مادة', image:''};
     });
     renderShell();
     if($('finInvSupplierV15')) $('finInvSupplierV15').value=inv.supplier||'';
@@ -962,7 +975,7 @@
     const item=state.items.find(i=>String(i.id)===String(id)); if(!item) return;
     const moves=productActivityRowsV15(item);
     const ins=moves.filter(m=>S(m.movement_type)==='in');
-    const outs=moves.filter(m=>['out','waste','damaged'].includes(S(m.movement_type)));
+    const outs=moves.filter(m=>['out','consume','waste','damaged'].includes(S(m.movement_type)));
     const consumedRows=moves.filter(m=>S(m.movement_type)==='consume');
     const returns=moves.filter(m=>S(m.movement_type)==='return');
     const inQty=ins.reduce((a,m)=>a+N(m.quantity),0);
