@@ -11,7 +11,8 @@
     users: [],
     tickets: [],
     invoiceLines: [],
-    distribution: []
+    distribution: [],
+    reportTab: 'products'
   };
 
   const $ = (id)=>document.getElementById(id);
@@ -101,14 +102,13 @@
 
   function removeLegacyFinanceShortcuts(){
     try{
-      const blocked = ['الأصناف', 'الموردين', 'تعديل التكلفة', 'ط§ظ„ط£طµظ†ط§ظپ', 'ط§ظ„ظ…ظˆط±ط¯ظٹظ†', 'طھط¹ط¯ظٹظ„ ط§ظ„طھظƒظ„ظپط©'];
+      const blocked = ['الأصناف', 'الموردين', 'تعديل التكلفة', 'تقليل التكلفة', 'ط§ظ„ط£طµظ†ط§ظپ', 'ط§ظ„ظ…ظˆط±ط¯ظٹظ†', 'طھط¹ط¯ظٹظ„ ط§ظ„طھظƒظ„ظپط©'];
       document.querySelectorAll('button,a').forEach(el => {
         if(el.closest('.fin-shell')) return;
         const text = S(el.textContent).replace(/\s+/g, ' ');
         if(blocked.some(word => text === word || text.includes(word))){
-          el.style.display = 'none';
-          el.setAttribute('aria-hidden', 'true');
-          el.dataset.financeProHiddenV15 = '1';
+          const wrap = el.closest('.actions,.filters,.finance-tabs,.smart-quick-v129,.card') || el;
+          wrap.remove();
         }
       });
     }catch(e){}
@@ -427,24 +427,121 @@
   }
 
   function renderReports(body){
-    const products=state.items.filter(i=>N(i.quantity)>0);
-    const outs=state.movements.filter(m=>S(m.movement_type)!=='return' && N(m.quantity)>0);
+    const products=reportProducts();
+    const moves=reportMovements();
+    const inventory=reportInventory();
+    const costs=reportCostRows();
+    const totals=reportTotalsForTab(state.reportTab);
     body.innerHTML=`
-      <div class="fin-grid three">
-        <div class="fin-card fin-kpi"><small>منتجات تظهر في التقرير</small><b>${products.length}</b></div>
-        <div class="fin-card fin-kpi"><small>حركات بدون مرتجعات</small><b>${outs.length}</b></div>
-        <div class="fin-card fin-kpi"><small>قيمة المنتجات بعد الضريبة</small><b>${money(stockValue()*(1+VAT_RATE))}</b></div>
-      </div>
       <div class="fin-card">
-        <h3>تقرير المنتجات</h3>
-        <p class="fin-soft">المنتج المرتجع لا يظهر في تقرير الصرف، والمنتج الذي رصيده صفر لا يظهر في تقرير المنتجات.</p>
-        <div class="fin-table"><table><thead><tr><th>المنتج</th><th>الكود</th><th>الكمية</th><th>قبل الضريبة</th><th>الضريبة</th><th>بعد الضريبة</th><th>إجراء</th></tr></thead><tbody>
-        ${products.map(i=>{ const net=N(i.quantity)*itemCost(i); return `<tr><td>${esc(i.name)}</td><td>${esc(itemCode(i)||'-')}</td><td>${N(i.quantity)}</td><td>${money(net)}</td><td>${money(net*VAT_RATE)}</td><td>${money(net*(1+VAT_RATE))}</td><td class="fin-actions"><button class="light" onclick="financeProShowProductV15('${esc(i.id)}')">عرض</button><button class="danger" onclick="financeProDeleteProductV15('${esc(i.id)}')">حذف</button></td></tr>`; }).join('') || '<tr><td colspan="7">لا توجد منتجات برصيد متاح</td></tr>'}
-        </tbody></table></div>
-      </div>
-      <div class="fin-card"><h3>تقرير حركات الصرف حسب مركز التكلفة</h3><div class="fin-table"><table><thead><tr><th>التاريخ</th><th>المنتج</th><th>الكمية</th><th>المستلم</th><th>مركز التكلفة</th><th>قبل الضريبة</th><th>الضريبة</th><th>بعد الضريبة</th><th>إجراء</th></tr></thead><tbody>
-      ${outs.map(m=>{ const meta=safeJson(m.notes)||{}; const centers=A(meta.distribution).map(d=>d.center).join(', ') || '-'; const net=N(m.quantity)*N(m.unit_cost); return `<tr><td>${esc(m.movement_date||'')}</td><td>${esc(m.item_name||'')}</td><td>${N(m.quantity)}</td><td>${esc(m.receiver||'')}</td><td>${esc(centers)}</td><td>${money(net)}</td><td>${money(net*VAT_RATE)}</td><td>${money(net*(1+VAT_RATE))}</td><td class="fin-actions"><button class="light" onclick="financeProShowMovementV15(${Number(m.id)||0})">عرض</button><button class="danger" onclick="financeProDeleteMovementV15(${Number(m.id)||0})">حذف</button></td></tr>`; }).join('') || '<tr><td colspan="9">لا توجد حركات صرف</td></tr>'}
-      </tbody></table></div></div>`;
+        <h3>التقارير</h3>
+        <div class="fin-tabs" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
+          ${[
+            ['products','تقرير المنتجات'],
+            ['movement','حركة المخزون'],
+            ['inventory','جرد المخزن'],
+            ['cost','مراكز التكلفة']
+          ].map(([id,label])=>`<button class="${state.reportTab===id?'active':''}" onclick="financeProReportTabV15('${id}')">${label}</button>`).join('')}
+        </div>
+        <div class="fin-actions">
+          <div style="flex:1"><label>بحث</label><input id="finReportSearchV15" value="${esc(S($('finReportSearchV15')?.value))}" placeholder="بحث حسب المنتج أو الكود أو المستلم" oninput="financeProRenderReportsV15()"></div>
+          <div><label>من تاريخ</label><input id="finReportFromV15" type="date" value="${esc(S($('finReportFromV15')?.value))}" onchange="financeProRenderReportsV15()"></div>
+          <div><label>إلى تاريخ</label><input id="finReportToV15" type="date" value="${esc(S($('finReportToV15')?.value))}" onchange="financeProRenderReportsV15()"></div>
+          <div><label>مركز التكلفة</label><select id="finReportCenterV15" onchange="financeProRenderReportsV15()"><option value="">الكل</option>${['FM','CN','GENERAL'].map(c=>`<option value="${c}" ${S($('finReportCenterV15')?.value)===c?'selected':''}>${c}</option>`).join('')}</select></div>
+          <div><label>النوع</label><select id="finReportTypeV15" onchange="financeProRenderReportsV15()"><option value="">الكل</option><option value="in" ${S($('finReportTypeV15')?.value)==='in'?'selected':''}>داخل</option><option value="out" ${S($('finReportTypeV15')?.value)==='out'?'selected':''}>خارج</option></select></div>
+          <button class="light" onclick="financeProPrintReportV15()">طباعة</button>
+        </div>
+        <div id="finReportWindowV15">${reportWindowHtml()}</div>
+        <div class="fin-grid three" style="margin-top:12px">
+          <div class="fin-card fin-kpi"><small>الإجمالي قبل الضريبة</small><b>${money(totals.net)}</b></div>
+          <div class="fin-card fin-kpi"><small>الضريبة 15%</small><b>${money(totals.vat)}</b></div>
+          <div class="fin-card fin-kpi"><small>الإجمالي بعد الضريبة</small><b>${money(totals.gross)}</b></div>
+        </div>
+      </div>`;
+  }
+
+  function reportFilters(){
+    return {
+      q:S($('finReportSearchV15')?.value).toLowerCase(),
+      from:S($('finReportFromV15')?.value),
+      to:S($('finReportToV15')?.value),
+      center:S($('finReportCenterV15')?.value),
+      type:S($('finReportTypeV15')?.value)
+    };
+  }
+  function movementDate(m){ return S(m.movement_date || m.created_at).slice(0,10); }
+  function movementCenter(m){
+    const meta=safeJson(m.notes)||{};
+    return A(meta.distribution).map(d=>S(d.center)).filter(Boolean).join(', ') || S(m.cost_center || '');
+  }
+  function movementPass(m, f){
+    const dt=movementDate(m);
+    if(f.from && dt < f.from) return false;
+    if(f.to && dt > f.to) return false;
+    if(f.type==='in' && S(m.movement_type)!=='in') return false;
+    if(f.type==='out' && !['out','consume'].includes(S(m.movement_type))) return false;
+    if(f.center && !movementCenter(m).split(',').map(x=>S(x)).includes(f.center)) return false;
+    if(f.q && ![m.item_name,m.product_code,m.barcode,m.receiver,m.reason,m.project_name,movementCenter(m)].map(S).join(' ').toLowerCase().includes(f.q)) return false;
+    return true;
+  }
+  function reportProducts(){
+    const f=reportFilters();
+    return state.items.filter(i=>{
+      if(N(i.quantity)<=0) return false;
+      if(f.q && ![i.name,itemCode(i),i.unit,productType(i)].map(S).join(' ').toLowerCase().includes(f.q)) return false;
+      return true;
+    });
+  }
+  function reportMovements(){
+    const f=reportFilters();
+    return state.movements.filter(m=>S(m.movement_type)!=='return' && N(m.quantity)>0 && movementPass(m,f));
+  }
+  function reportInventory(){
+    const f=reportFilters();
+    return state.items.filter(i=>{
+      if(N(i.quantity)<=0) return false;
+      if(f.q && ![i.name,itemCode(i),i.unit,productType(i),i.supplier].map(S).join(' ').toLowerCase().includes(f.q)) return false;
+      return true;
+    });
+  }
+  function reportCostRows(){
+    const f=reportFilters();
+    return state.movements.filter(m=>{
+      if(S(m.movement_type)==='return') return false;
+      if(!['out','consume'].includes(S(m.movement_type))) return false;
+      return movementPass(m,f);
+    });
+  }
+  function reportTotalsForTab(tab){
+    let rows=[];
+    if(tab==='products') rows=reportProducts().map(i=>({net:N(i.quantity)*itemCost(i)}));
+    else if(tab==='inventory') rows=reportInventory().map(i=>({net:N(i.quantity)*itemCost(i)}));
+    else if(tab==='cost') rows=reportCostRows().map(m=>({net:N(m.quantity)*N(m.unit_cost)}));
+    else rows=reportMovements().map(m=>({net:N(m.quantity)*N(m.unit_cost)}));
+    const net=rows.reduce((a,r)=>a+N(r.net),0);
+    return {net, vat:net*VAT_RATE, gross:net*(1+VAT_RATE)};
+  }
+  function reportWindowHtml(){
+    if(state.reportTab==='products') return productsReportHtml();
+    if(state.reportTab==='movement') return movementReportHtml();
+    if(state.reportTab==='inventory') return inventoryReportHtml();
+    return costReportHtml();
+  }
+  function productsReportHtml(){
+    const rows=reportProducts();
+    return `<div class="fin-card"><h3>نافذة تقرير المنتجات</h3><div class="fin-table"><table><thead><tr><th>المنتج</th><th>الكود</th><th>الوحدة</th><th>النوع</th><th>الكمية</th><th>قبل الضريبة</th><th>الضريبة</th><th>بعد الضريبة</th><th>إجراء</th></tr></thead><tbody>${rows.map(i=>{const net=N(i.quantity)*itemCost(i);return `<tr><td>${esc(i.name)}</td><td>${esc(itemCode(i)||'-')}</td><td>${esc(i.unit||'-')}</td><td>${esc(productType(i))}</td><td>${N(i.quantity)}</td><td>${money(net)}</td><td>${money(net*VAT_RATE)}</td><td>${money(net*(1+VAT_RATE))}</td><td class="fin-actions"><button class="light" onclick="financeProShowProductV15('${esc(i.id)}')">عرض</button><button class="danger" onclick="financeProDeleteProductV15('${esc(i.id)}')">حذف</button></td></tr>`;}).join('') || '<tr><td colspan="9">لا توجد منتجات حسب الفلتر</td></tr>'}</tbody></table></div></div>`;
+  }
+  function movementReportHtml(){
+    const rows=reportMovements();
+    return `<div class="fin-card"><h3>نافذة حركة المخزون: الداخل والخارج</h3><div class="fin-table"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>المنتج</th><th>الكمية</th><th>المستلم/المورد</th><th>المشروع</th><th>قبل الضريبة</th><th>بعد الضريبة</th><th>إجراء</th></tr></thead><tbody>${rows.map(m=>{const net=N(m.quantity)*N(m.unit_cost);return `<tr><td>${esc(movementDate(m)||'-')}</td><td>${S(m.movement_type)==='in'?'داخل':'خارج'}</td><td>${esc(m.item_name||'-')}</td><td>${N(m.quantity)}</td><td>${esc(m.receiver||'-')}</td><td>${esc(m.project_name||'-')}</td><td>${money(net)}</td><td>${money(net*(1+VAT_RATE))}</td><td class="fin-actions"><button class="light" onclick="financeProShowMovementV15(${Number(m.id)||0})">عرض</button><button class="danger" onclick="financeProDeleteMovementV15(${Number(m.id)||0})">حذف</button></td></tr>`;}).join('') || '<tr><td colspan="9">لا توجد حركات حسب الفلتر</td></tr>'}</tbody></table></div></div>`;
+  }
+  function inventoryReportHtml(){
+    const rows=reportInventory();
+    return `<div class="fin-card"><h3>نافذة جرد المخزن</h3><p class="fin-soft">أي منتج رصيده صفر لا يظهر في الجرد.</p><div class="fin-table"><table><thead><tr><th>المنتج</th><th>الكود</th><th>الوحدة</th><th>النوع</th><th>الرصيد</th><th>قيمة قبل الضريبة</th><th>الضريبة</th><th>بعد الضريبة</th><th>إجراء</th></tr></thead><tbody>${rows.map(i=>{const net=N(i.quantity)*itemCost(i);return `<tr><td>${esc(i.name)}</td><td>${esc(itemCode(i)||'-')}</td><td>${esc(i.unit||'-')}</td><td>${esc(productType(i))}</td><td>${N(i.quantity)}</td><td>${money(net)}</td><td>${money(net*VAT_RATE)}</td><td>${money(net*(1+VAT_RATE))}</td><td class="fin-actions"><button class="light" onclick="financeProShowProductV15('${esc(i.id)}')">عرض</button><button class="danger" onclick="financeProDeleteProductV15('${esc(i.id)}')">حذف</button></td></tr>`;}).join('') || '<tr><td colspan="9">لا توجد منتجات برصيد متاح</td></tr>'}</tbody></table></div></div>`;
+  }
+  function costReportHtml(){
+    const rows=reportCostRows();
+    return `<div class="fin-card"><h3>نافذة تقرير مراكز التكلفة</h3><p class="fin-soft">أي صنف أصبح مرتجعًا لا يظهر في هذا التقرير.</p><div class="fin-table"><table><thead><tr><th>التاريخ</th><th>المنتج</th><th>الكمية</th><th>المستلم</th><th>مركز التكلفة</th><th>قبل الضريبة</th><th>الضريبة</th><th>بعد الضريبة</th><th>إجراء</th></tr></thead><tbody>${rows.map(m=>{const net=N(m.quantity)*N(m.unit_cost);return `<tr><td>${esc(movementDate(m)||'-')}</td><td>${esc(m.item_name||'-')}</td><td>${N(m.quantity)}</td><td>${esc(m.receiver||'-')}</td><td>${esc(movementCenter(m)||'-')}</td><td>${money(net)}</td><td>${money(net*VAT_RATE)}</td><td>${money(net*(1+VAT_RATE))}</td><td class="fin-actions"><button class="light" onclick="financeProShowMovementV15(${Number(m.id)||0})">عرض</button><button class="danger" onclick="financeProDeleteMovementV15(${Number(m.id)||0})">حذف</button></td></tr>`;}).join('') || '<tr><td colspan="9">لا توجد بيانات مراكز تكلفة حسب الفلتر</td></tr>'}</tbody></table></div></div>`;
   }
 
   function findItem(line){
@@ -456,6 +553,23 @@
   window.financeProTabV15 = async function(tab){
     state.tab=tab;
     renderShell();
+  };
+  window.financeProReportTabV15 = function(tab){
+    state.reportTab = tab || 'products';
+    renderBody();
+  };
+  window.financeProRenderReportsV15 = function(){
+    renderBody();
+  };
+  window.financeProPrintReportV15 = function(){
+    const titleMap={products:'تقرير المنتجات',movement:'حركة المخزون',inventory:'جرد المخزن',cost:'تقرير مراكز التكلفة'};
+    const totals=reportTotalsForTab(state.reportTab);
+    const content=$('finReportWindowV15')?.innerHTML || '';
+    const html=`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(titleMap[state.reportTab]||'تقرير')}</title><style>
+      body{font-family:Tahoma,Arial,sans-serif;margin:18px;color:#073d31}h1{margin:0 0 14px}.fin-card{border:1px solid #d9e7e2;border-radius:14px;padding:14px;margin-bottom:12px}.fin-soft{background:#f4faf7;border:1px solid #d8ebe3;border-radius:12px;padding:10px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #d9e7e2;padding:8px;text-align:right}th{background:#f4faf7}.fin-actions,button{display:none!important}.totals{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}.box{border:1px solid #d9e7e2;border-radius:12px;padding:12px}.box b{font-size:18px}@media print{body{margin:8mm}}
+    </style></head><body><h1>${esc(titleMap[state.reportTab]||'تقرير')}</h1>${content}<div class="totals"><div class="box">قبل الضريبة<br><b>${money(totals.net)}</b></div><div class="box">الضريبة<br><b>${money(totals.vat)}</b></div><div class="box">بعد الضريبة<br><b>${money(totals.gross)}</b></div></div><script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>`;
+    const w=window.open('', '_blank');
+    if(w){ w.document.write(html); w.document.close(); }
   };
   window.financeProLoadV15 = async function(force){
     await loadAll(force);
