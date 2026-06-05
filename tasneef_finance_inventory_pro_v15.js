@@ -587,8 +587,26 @@
   }
   function movementDate(m){ return S(m.movement_date || m.created_at).slice(0,10); }
   function movementCenter(m){
+    if(S(m.center)) return S(m.center);
     const meta=safeJson(m.notes)||{};
     return A(meta.distribution).map(d=>S(d.center)).filter(Boolean).join(', ') || S(m.cost_center || '');
+  }
+  function movementDistributionRowsV15(m){
+    const meta=safeJson(m.notes)||{};
+    const rows=A(meta.distribution);
+    if(!rows.length) return [m];
+    return rows.map((d,idx)=>({
+      ...m,
+      parent_id:m.id,
+      distribution_index:idx,
+      movement_type:S(d.type||m.movement_type)||S(m.movement_type),
+      quantity:N(d.qty),
+      center:S(d.center||m.cost_center),
+      project_id:d.projectId||m.project_id||null,
+      project_name:S(d.projectName||m.project_name||''),
+      order_no:S(d.orderNo||m.order_no||''),
+      distribution_note:S(d.note||'')
+    })).filter(r=>N(r.quantity)>0);
   }
   function movementPass(m, f){
     const dt=movementDate(m);
@@ -600,7 +618,7 @@
     if(f.project && S(m.project_id)!==f.project && !A((safeJson(m.notes)||{}).distribution).some(d=>S(d.projectId)===f.project)) return false;
     if(f.product && S(m.item_id)!==f.product) return false;
     if(f.supervisor && S((safeJson(m.notes)||{}).staffId)!==f.supervisor) return false;
-    if(f.q && ![m.item_name,m.product_code,m.barcode,m.receiver,m.reason,m.project_name,movementCenter(m)].map(S).join(' ').toLowerCase().includes(f.q)) return false;
+    if(f.q && ![m.item_name,m.product_code,m.barcode,m.receiver,m.reason,m.project_name,m.order_no,m.distribution_note,movementCenter(m)].map(S).join(' ').toLowerCase().includes(f.q)) return false;
     return true;
   }
   function reportProducts(){
@@ -627,7 +645,7 @@
   }
   function reportCostRows(){
     const f=reportFilters();
-    return state.movements.filter(m=>{
+    return state.movements.flatMap(m=>movementDistributionRowsV15(m)).filter(m=>{
       if(S(m.movement_type)==='return') return false;
       if(!['out','consume','waste','damaged'].includes(S(m.movement_type))) return false;
       return movementPass(m,f);
@@ -662,7 +680,7 @@
   }
   function costReportHtml(){
     const rows=reportCostRows();
-    return `<div class="fin-card"><h3>نافذة تقرير مراكز التكلفة</h3><p class="fin-soft">أي صنف أصبح مرتجعًا لا يظهر في هذا التقرير.</p><div class="fin-table"><table><thead><tr><th>التاريخ</th><th>المنتج</th><th>النوع</th><th>الكمية</th><th>المستلم</th><th>مركز التكلفة</th><th>قبل الضريبة</th><th>الضريبة</th><th>بعد الضريبة</th><th>إجراء</th></tr></thead><tbody>${rows.map(m=>{const net=N(m.quantity)*N(m.unit_cost);return `<tr><td>${esc(movementDate(m)||'-')}</td><td>${esc(m.item_name||'-')}</td><td>${esc(movementTypeLabelV15(m.movement_type))}</td><td>${N(m.quantity)}</td><td>${esc(m.receiver||'-')}</td><td>${esc(movementCenter(m)||'-')}</td><td>${money(net)}</td><td>${money(net*VAT_RATE)}</td><td>${money(net*(1+VAT_RATE))}</td><td class="fin-actions"><button onclick="financeProEditMovementV15(${Number(m.id)||0})">تعديل</button><button class="light" onclick="financeProShowMovementV15(${Number(m.id)||0})">عرض</button><button class="danger" onclick="financeProDeleteMovementV15(${Number(m.id)||0})">حذف</button></td></tr>`;}).join('') || '<tr><td colspan="10">لا توجد بيانات مراكز تكلفة حسب الفلتر</td></tr>'}</tbody></table></div></div>`;
+    return `<div class="fin-card"><h3>نافذة تقرير مراكز التكلفة</h3><p class="fin-soft">يعرض التقرير كل سطر توزيع بالتفصيل، والمرتجع لا يدخل في إجمالي التكلفة.</p><div class="fin-table"><table><thead><tr><th>التاريخ</th><th>المنتج</th><th>نوع التوزيع</th><th>الكمية</th><th>المستلم</th><th>مركز التكلفة</th><th>المشروع</th><th>الأوردر</th><th>ملاحظة التوزيع</th><th>قبل الضريبة</th><th>الضريبة</th><th>بعد الضريبة</th><th>إجراء</th></tr></thead><tbody>${rows.map(m=>{const net=N(m.quantity)*N(m.unit_cost);return `<tr><td>${esc(movementDate(m)||'-')}</td><td>${esc(m.item_name||'-')}</td><td>${esc(movementTypeLabelV15(m.movement_type))}</td><td>${N(m.quantity)}</td><td>${esc(m.receiver||'-')}</td><td>${esc(movementCenter(m)||'-')}</td><td>${esc(m.project_name||'-')}</td><td>${esc(m.order_no||'-')}</td><td>${esc(m.distribution_note||'-')}</td><td>${money(net)}</td><td>${money(net*VAT_RATE)}</td><td>${money(net*(1+VAT_RATE))}</td><td class="fin-actions"><button onclick="financeProEditMovementV15(${Number(m.parent_id||m.id)||0})">تعديل</button><button class="light" onclick="financeProShowMovementV15(${Number(m.parent_id||m.id)||0})">عرض</button><button class="danger" onclick="financeProDeleteMovementV15(${Number(m.parent_id||m.id)||0})">حذف</button></td></tr>`;}).join('') || '<tr><td colspan="13">لا توجد بيانات مراكز تكلفة حسب الفلتر</td></tr>'}</tbody></table></div></div>`;
   }
 
   function findItem(line){
@@ -923,15 +941,18 @@
       (!m.item_id && S(m.item_name)===S(item.name))
     );
   }
+  function productActivityRowsV15(item){
+    return productMovements(item).flatMap(m=>movementDistributionRowsV15(m));
+  }
   function movementRowsHtml(rows){
     return rows.map(m=>{
       const net=N(m.quantity)*N(m.unit_cost || itemCost(state.items.find(i=>String(i.id)===String(m.item_id))));
-      return `<tr><td>${esc(m.movement_date||S(m.created_at).slice(0,10)||'-')}</td><td>${esc(movementTypeLabelV15(m.movement_type))}</td><td>${N(m.quantity)}</td><td>${esc(m.receiver||'-')}</td><td>${esc(m.project_name||'-')}</td><td>${esc(m.reason||'-')}</td><td>${money(net)}</td></tr>`;
-    }).join('') || '<tr><td colspan="7">لا توجد بيانات</td></tr>';
+      return `<tr><td>${esc(m.movement_date||S(m.created_at).slice(0,10)||'-')}</td><td>${esc(movementTypeLabelV15(m.movement_type))}</td><td>${N(m.quantity)}</td><td>${esc(m.receiver||'-')}</td><td>${esc(movementCenter(m)||'-')}</td><td>${esc(m.project_name||'-')}</td><td>${esc(m.order_no||'-')}</td><td>${esc(m.distribution_note||m.reason||'-')}</td><td>${money(net)}</td></tr>`;
+    }).join('') || '<tr><td colspan="9">لا توجد بيانات</td></tr>';
   }
   window.financeProShowProductV15 = function(id){
     const item=state.items.find(i=>String(i.id)===String(id)); if(!item) return;
-    const moves=productMovements(item);
+    const moves=productActivityRowsV15(item);
     const ins=moves.filter(m=>S(m.movement_type)==='in');
     const outs=moves.filter(m=>['out','waste','damaged'].includes(S(m.movement_type)));
     const consumedRows=moves.filter(m=>S(m.movement_type)==='consume');
@@ -942,11 +963,11 @@
     const consumed=consumedRows.reduce((a,m)=>a+N(m.quantity),0);
     const img=item.image_url?`<img src="${esc(item.image_url)}" style="width:96px;height:96px;object-fit:contain;border:1px solid #d9e7e2;border-radius:16px;background:#fff;padding:4px">`:'';
     openPagedModalV15('بيانات المنتج: '+(item.name||'-'), [
-      {title:'الملخص', html:`<div class="fin-grid">${img?`<div class="fin-card">${img}</div>`:''}<div class="fin-card fin-kpi"><small>الداخل</small><b>${N(inQty)}</b></div><div class="fin-card fin-kpi"><small>الخارج</small><b>${N(outQty)}</b></div><div class="fin-card fin-kpi"><small>المستهلك</small><b>${N(consumed)}</b></div><div class="fin-card fin-kpi"><small>الرصيد الحالي</small><b>${N(item.quantity)}</b></div></div><div class="fin-soft">الكود: <b>${esc(itemCode(item)||'-')}</b> | الوحدة: <b>${esc(item.unit||'-')}</b> | النوع: <b>${esc(productType(item))}</b></div>`},
-      {title:'الداخل', html:`<div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية</th><th>المورد</th><th>المشروع</th><th>السبب</th><th>القيمة</th></tr></thead><tbody>${movementRowsHtml(ins)}</tbody></table></div>`},
-      {title:'الخارج', html:`<div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية</th><th>المستلم</th><th>المشروع</th><th>السبب</th><th>القيمة</th></tr></thead><tbody>${movementRowsHtml(outs)}</tbody></table></div>`},
-      {title:'المستهلك', html:`<div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية</th><th>المستلم</th><th>المشروع</th><th>السبب</th><th>القيمة</th></tr></thead><tbody>${movementRowsHtml(consumedRows)}</tbody></table></div>`},
-      {title:'المرتجع', html:`<div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية</th><th>المستلم</th><th>المشروع</th><th>السبب</th><th>القيمة</th></tr></thead><tbody>${movementRowsHtml(returns)}</tbody></table></div>`}
+      {title:'الملخص', html:`<div class="fin-grid">${img?`<div class="fin-card">${img}</div>`:''}<div class="fin-card fin-kpi"><small>الداخل</small><b>${N(inQty)}</b></div><div class="fin-card fin-kpi"><small>الخارج</small><b>${N(outQty)}</b></div><div class="fin-card fin-kpi"><small>المستهلك</small><b>${N(consumed)}</b></div><div class="fin-card fin-kpi"><small>المرتجع</small><b>${N(returnQty)}</b></div><div class="fin-card fin-kpi"><small>الرصيد الحالي</small><b>${N(item.quantity)}</b></div></div><div class="fin-soft">الكود: <b>${esc(itemCode(item)||'-')}</b> | الوحدة: <b>${esc(item.unit||'-')}</b> | النوع: <b>${esc(productType(item))}</b></div>`},
+      {title:'الداخل', html:`<div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية</th><th>المورد</th><th>المركز</th><th>المشروع</th><th>الأوردر</th><th>البيان</th><th>القيمة</th></tr></thead><tbody>${movementRowsHtml(ins)}</tbody></table></div>`},
+      {title:'الخارج', html:`<div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية</th><th>المستلم</th><th>المركز</th><th>المشروع</th><th>الأوردر</th><th>البيان</th><th>القيمة</th></tr></thead><tbody>${movementRowsHtml(outs)}</tbody></table></div>`},
+      {title:'المستهلك', html:`<div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية</th><th>المستلم</th><th>المركز</th><th>المشروع</th><th>الأوردر</th><th>البيان</th><th>القيمة</th></tr></thead><tbody>${movementRowsHtml(consumedRows)}</tbody></table></div>`},
+      {title:'المرتجع', html:`<div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية</th><th>المستلم</th><th>المركز</th><th>المشروع</th><th>الأوردر</th><th>البيان</th><th>القيمة</th></tr></thead><tbody>${movementRowsHtml(returns)}</tbody></table></div>`}
     ]);
     return;
     const html=`<div class="modal-backdrop" onclick="if(event.target===this)this.remove()" style="position:fixed;inset:0;background:rgba(0,35,28,.45);z-index:99999;display:grid;place-items:center;padding:18px"><div class="card" style="width:min(1100px,96vw);max-height:92vh;overflow:auto">
