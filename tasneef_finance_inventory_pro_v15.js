@@ -599,6 +599,8 @@
       ...m,
       parent_id:m.id,
       distribution_index:idx,
+      is_distribution_row:true,
+      base_movement_type:S(m.movement_type),
       movement_type:S(d.type||m.movement_type)||S(m.movement_type),
       quantity:N(d.qty),
       center:S(d.center||m.cost_center),
@@ -614,8 +616,14 @@
     if(f.to && dt > f.to) return false;
     if(f.type==='in' && S(m.movement_type)!=='in') return false;
     if(f.type==='out' && !['out','consume','waste','damaged'].includes(S(m.movement_type))) return false;
-    if(f.center && !movementCenter(m).split(',').map(x=>S(x)).includes(f.center)) return false;
-    if(f.project && S(m.project_id)!==f.project && !A((safeJson(m.notes)||{}).distribution).some(d=>S(d.projectId)===f.project)) return false;
+    if(f.center){
+      if(m.is_distribution_row && movementCenter(m)!==f.center) return false;
+      if(!m.is_distribution_row && !movementCenter(m).split(',').map(x=>S(x)).includes(f.center)) return false;
+    }
+    if(f.project){
+      if(m.is_distribution_row && S(m.project_id)!==f.project) return false;
+      if(!m.is_distribution_row && S(m.project_id)!==f.project && !A((safeJson(m.notes)||{}).distribution).some(d=>S(d.projectId)===f.project)) return false;
+    }
     if(f.product && S(m.item_id)!==f.product) return false;
     if(f.supervisor && S((safeJson(m.notes)||{}).staffId)!==f.supervisor) return false;
     if(f.q && ![m.item_name,m.product_code,m.barcode,m.receiver,m.reason,m.project_name,m.order_no,m.distribution_note,movementCenter(m)].map(S).join(' ').toLowerCase().includes(f.q)) return false;
@@ -961,9 +969,11 @@
     const outQty=outs.reduce((a,m)=>a+N(m.quantity),0);
     const returnQty=returns.reduce((a,m)=>a+N(m.quantity),0);
     const consumed=consumedRows.reduce((a,m)=>a+N(m.quantity),0);
+    const distributionReturnToStock=returns.filter(m=>m.is_distribution_row && S(m.base_movement_type)!=='return').reduce((a,m)=>a+N(m.quantity),0);
+    const displayBalance=N(item.quantity)+distributionReturnToStock;
     const img=item.image_url?`<img src="${esc(item.image_url)}" style="width:96px;height:96px;object-fit:contain;border:1px solid #d9e7e2;border-radius:16px;background:#fff;padding:4px">`:'';
     openPagedModalV15('بيانات المنتج: '+(item.name||'-'), [
-      {title:'الملخص', html:`<div class="fin-grid">${img?`<div class="fin-card">${img}</div>`:''}<div class="fin-card fin-kpi"><small>الداخل</small><b>${N(inQty)}</b></div><div class="fin-card fin-kpi"><small>الخارج</small><b>${N(outQty)}</b></div><div class="fin-card fin-kpi"><small>المستهلك</small><b>${N(consumed)}</b></div><div class="fin-card fin-kpi"><small>المرتجع</small><b>${N(returnQty)}</b></div><div class="fin-card fin-kpi"><small>الرصيد الحالي</small><b>${N(item.quantity)}</b></div></div><div class="fin-soft">الكود: <b>${esc(itemCode(item)||'-')}</b> | الوحدة: <b>${esc(item.unit||'-')}</b> | النوع: <b>${esc(productType(item))}</b></div>`},
+      {title:'الملخص', html:`<div class="fin-grid">${img?`<div class="fin-card">${img}</div>`:''}<div class="fin-card fin-kpi"><small>الداخل</small><b>${N(inQty)}</b></div><div class="fin-card fin-kpi"><small>الخارج</small><b>${N(outQty)}</b></div><div class="fin-card fin-kpi"><small>المستهلك</small><b>${N(consumed)}</b></div><div class="fin-card fin-kpi"><small>المرتجع</small><b>${N(returnQty)}</b></div><div class="fin-card fin-kpi"><small>الرصيد الحالي</small><b>${N(displayBalance)}</b></div></div><div class="fin-soft">الكود: <b>${esc(itemCode(item)||'-')}</b> | الوحدة: <b>${esc(item.unit||'-')}</b> | النوع: <b>${esc(productType(item))}</b></div>`},
       {title:'الداخل', html:`<div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية</th><th>المورد</th><th>المركز</th><th>المشروع</th><th>الأوردر</th><th>البيان</th><th>القيمة</th></tr></thead><tbody>${movementRowsHtml(ins)}</tbody></table></div>`},
       {title:'الخارج', html:`<div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية</th><th>المستلم</th><th>المركز</th><th>المشروع</th><th>الأوردر</th><th>البيان</th><th>القيمة</th></tr></thead><tbody>${movementRowsHtml(outs)}</tbody></table></div>`},
       {title:'المستهلك', html:`<div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية</th><th>المستلم</th><th>المركز</th><th>المشروع</th><th>الأوردر</th><th>البيان</th><th>القيمة</th></tr></thead><tbody>${movementRowsHtml(consumedRows)}</tbody></table></div>`},
