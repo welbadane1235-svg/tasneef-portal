@@ -72,6 +72,13 @@
     if(['out','consume','waste','damaged'].includes(type)) return -N(m?.quantity);
     return 0;
   }
+  function movementComputedDeltaV15(m){
+    const meta=safeJson(m?.notes)||{};
+    const returned=A(meta.distribution)
+      .filter(d=>S(d.type)==='return' && S(m?.movement_type)!=='return')
+      .reduce((a,d)=>a+N(d.qty),0);
+    return movementStockDeltaV15(m)+returned;
+  }
   function computedItemQtyV15(item){
     if(!item) return 0;
     const rows=productMovements(item).flatMap(m=>movementDistributionRowsV15(m));
@@ -221,10 +228,13 @@
   }
 
   function lowItems(){
-    return state.items.filter(i=>N(i.quantity)>0 && N(i.quantity)<=N(i.min_quantity || i.reorder_level || 1));
+    return state.items.filter(i=>{
+      const qty=computedItemQtyV15(i);
+      return qty>0 && qty<=N(i.min_quantity || i.reorder_level || 1);
+    });
   }
   function stockValue(){
-    return state.items.reduce((s,i)=>s + Math.max(0,N(i.quantity))*itemCost(i),0);
+    return state.items.reduce((s,i)=>s + Math.max(0,computedItemQtyV15(i))*itemCost(i),0);
   }
   function productType(i){
     const raw = S(i.item_type || i.type || i.category || '');
@@ -293,7 +303,7 @@
       <div class="fin-card">
         <h3>الأصناف التي سوف تنتهي</h3>
         <div class="fin-table"><table><thead><tr><th>المنتج</th><th>الكود</th><th>المتوفر</th><th>الحد الأدنى</th><th>التكلفة</th><th>الحالة</th></tr></thead><tbody>
-          ${lowItems().map(i=>`<tr><td><b>${esc(i.name)}</b></td><td>${esc(itemCode(i)||'-')}</td><td>${N(i.quantity)}</td><td>${N(i.min_quantity || i.reorder_level || 1)}</td><td>${money(itemCost(i))}</td><td><span class="fin-badge warn">قارب الانتهاء</span></td></tr>`).join('') || '<tr><td colspan="6">لا توجد أصناف قاربت الانتهاء</td></tr>'}
+          ${lowItems().map(i=>`<tr><td><b>${esc(i.name)}</b></td><td>${esc(itemCode(i)||'-')}</td><td>${N(computedItemQtyV15(i))}</td><td>${N(i.min_quantity || i.reorder_level || 1)}</td><td>${money(itemCost(i))}</td><td><span class="fin-badge warn">قارب الانتهاء</span></td></tr>`).join('') || '<tr><td colspan="6">لا توجد أصناف قاربت الانتهاء</td></tr>'}
         </tbody></table></div>
       </div>
       <div class="fin-grid three">
@@ -469,7 +479,7 @@
   function renderMovement(body){
     const selectedMovementType=S($('finMovementListTypeV15')?.value);
     const editMove=state.editMovementId ? state.movements.find(m=>String(m.id)===String(state.editMovementId)) : null;
-    const movementItems=state.items.filter(i=>N(i.quantity)>0 || (editMove && String(i.id)===String(editMove.item_id)));
+    const movementItems=state.items.filter(i=>computedItemQtyV15(i)>0 || (editMove && String(i.id)===String(editMove.item_id)));
     const movementRows=state.movements
       .filter(m=>!selectedMovementType || S(m.movement_type)===selectedMovementType)
       .slice()
@@ -479,7 +489,7 @@
       <div class="fin-card">
         <h3>صرف منتج وتوزيع استهلاكه</h3>
         <div class="fin-grid three">
-          <div><label>المنتج</label><select id="finMoveItemV15">${movementItems.map(i=>`<option value="${esc(i.id)}">${esc(i.name)} - المتوفر ${N(i.quantity)}</option>`).join('')}</select></div>
+          <div><label>المنتج</label><select id="finMoveItemV15">${movementItems.map(i=>`<option value="${esc(i.id)}">${esc(i.name)} - المتوفر ${N(computedItemQtyV15(i))}</option>`).join('')}</select></div>
           <div><label>نوع الحركة المطلوبة</label><select id="finMoveTypeV15"><option value="out">صرف</option><option value="consume">مستهلك</option><option value="waste">هدر</option><option value="damaged">تالف</option><option value="return">مرتجع</option></select></div>
           <div><label>المستلم</label><select id="finMoveStaffV15">${staff().map(u=>`<option value="${esc(u.id)}">${esc(u.full_name||u.name||u.username)} - ${esc(u.role||'')}</option>`).join('')}</select></div>
           <div><label>الكمية</label><input id="finMoveQtyV15" type="number" min="0" step="0.01"></div>
@@ -863,7 +873,7 @@
       const oldMove=state.editMovementId ? state.movements.find(m=>String(m.id)===String(state.editMovementId)) : null;
       const oldSameItem = oldMove && String(oldMove.item_id)===String(item.id) ? oldMove : null;
       const oldDifferentItem = oldMove && String(oldMove.item_id)!==String(item.id) ? state.items.find(i=>String(i.id)===String(oldMove.item_id)) : null;
-      const availableForEdit = N(item.quantity) + (oldSameItem && stockOutTypes.includes(S(oldSameItem.movement_type)) ? N(oldSameItem.quantity) : 0) - (oldSameItem && S(oldSameItem.movement_type)==='return' ? N(oldSameItem.quantity) : 0);
+      const availableForEdit = computedItemQtyV15(item) - (oldSameItem ? movementComputedDeltaV15(oldSameItem) : 0);
       if(stockOutTypes.includes(type) && availableForEdit<qty) throw new Error('الكمية المتوفرة لا تكفي');
       const distTotal=state.distribution.reduce((s,d)=>s+N(d.qty),0);
       if(stockOutTypes.includes(type) && state.distribution.length && Math.abs(distTotal-qty)>.001) throw new Error('إجمالي التوزيع يجب أن يساوي كمية الحركة');
@@ -876,11 +886,11 @@
       const res=oldMove ? await sb.from('inventory_movements').update(mv).eq('id', oldMove.id) : await sb.from('inventory_movements').insert(mv);
       if(res.error) throw res.error;
       if(oldDifferentItem){
-        const oldQty=N(oldDifferentItem.quantity)-movementStockDeltaV15(oldMove);
+        const oldQty=computedItemQtyV15(oldDifferentItem)-movementComputedDeltaV15(oldMove);
         const oldUpdate=await sb.from('inventory_items').update({quantity:oldQty}).eq('id',oldDifferentItem.id);
         if(oldUpdate.error) throw oldUpdate.error;
       }
-      const currentQty=N(item.quantity) - (oldSameItem ? movementStockDeltaV15(oldSameItem) : 0);
+      const currentQty=computedItemQtyV15(item) - (oldSameItem ? movementComputedDeltaV15(oldSameItem) : 0);
       const newDelta = neutralReturnEdit ? 0 : (type==='return' ? qty : -qty);
       const newQty=currentQty+newDelta;
       const ur=await sb.from('inventory_items').update({quantity:newQty}).eq('id',item.id);
