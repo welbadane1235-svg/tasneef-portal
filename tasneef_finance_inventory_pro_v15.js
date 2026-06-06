@@ -556,8 +556,26 @@
   function renderDistribution(){
     const box=$('finDistributionBoxV15'); if(!box) return;
     const total=state.distribution.reduce((s,d)=>s+N(d.qty),0);
+    const centerOptions = value => ['FM','CN','GENERAL'].map(v=>`<option value="${v}" ${S(value)===v?'selected':''}>${v}</option>`).join('');
+    const typeOptions = value => [
+      ['out','صرف'],
+      ['consume','مستهلك'],
+      ['waste','مهدور'],
+      ['damaged','تالف'],
+      ['scrap','سكراب'],
+      ['return','مرتجع']
+    ].map(([v,label])=>`<option value="${v}" ${S(value||'out')===v?'selected':''}>${label}</option>`).join('');
+    const projectOptions = value => `<option value="">بدون مشروع</option>${state.projects.map(p=>`<option value="${esc(p.id)}" ${S(value)===S(p.id)?'selected':''}>${esc(p.name||p.project_name)}</option>`).join('')}`;
     box.innerHTML=`<div class="fin-table"><table><thead><tr><th>مركز التكلفة</th><th>نوع التوزيع</th><th>المشروع</th><th>الأوردر</th><th>الكمية</th><th>ملاحظة</th><th>إجراء</th></tr></thead><tbody>
-      ${state.distribution.map((d,idx)=>`<tr><td>${esc(d.center)}</td><td>${esc(movementTypeLabelV15(d.type||'out'))}</td><td>${esc(d.projectName||'-')}</td><td>${esc(d.orderNo||'-')}</td><td>${N(d.qty)}</td><td>${esc(d.note||'')}</td><td><button class="danger" onclick="financeProRemoveDistributionV15(${idx})">حذف</button></td></tr>`).join('') || '<tr><td colspan="7">يمكنك توزيع الكمية المصروفة على أكثر من مشروع أو أوردر.</td></tr>'}
+      ${state.distribution.map((d,idx)=>`<tr>
+        <td><select onchange="financeProUpdateDistributionV15(${idx},'center',this.value)">${centerOptions(d.center)}</select></td>
+        <td><select onchange="financeProUpdateDistributionV15(${idx},'type',this.value)">${typeOptions(d.type||'out')}</select></td>
+        <td><select onchange="financeProUpdateDistributionV15(${idx},'projectId',this.value)">${projectOptions(d.projectId)}</select></td>
+        <td><input value="${esc(d.orderNo||'')}" placeholder="اختياري" oninput="financeProUpdateDistributionV15(${idx},'orderNo',this.value)"></td>
+        <td><input type="number" min="0" step="0.01" value="${N(d.qty)}" oninput="financeProUpdateDistributionV15(${idx},'qty',this.value)"></td>
+        <td><input value="${esc(d.note||'')}" placeholder="ملاحظة" oninput="financeProUpdateDistributionV15(${idx},'note',this.value)"></td>
+        <td><button class="danger" onclick="financeProRemoveDistributionV15(${idx})">حذف</button></td>
+      </tr>`).join('') || '<tr><td colspan="7">يمكنك توزيع الكمية المصروفة على أكثر من مشروع أو أوردر.</td></tr>'}
     </tbody></table></div><div class="fin-soft" style="margin-top:8px">إجمالي التوزيع: <b>${N(total)}</b></div>`;
   }
 
@@ -905,6 +923,20 @@
     state.distribution.push({center, type, projectId:pid||null, projectName:pid?projectName(pid):'', orderNo:S($('finDistOrderV15')?.value), qty, note:S($('finDistNoteV15')?.value)});
     ['finDistOrderV15','finDistQtyV15','finDistNoteV15'].forEach(id=>{ if($(id)) $(id).value=''; });
     renderDistribution();
+  };
+  window.financeProUpdateDistributionV15 = function(idx, field, value){
+    const row = state.distribution[Number(idx)];
+    if(!row) return;
+    if(field === 'qty'){
+      row.qty = N(value);
+    }else if(field === 'projectId'){
+      row.projectId = S(value) || null;
+      row.projectName = row.projectId ? projectName(row.projectId) : '';
+    }else if(['center','type','orderNo','note'].includes(field)){
+      row[field] = S(value);
+    }
+    const totalBox = $('finDistributionBoxV15')?.querySelector('.fin-soft b');
+    if(totalBox) totalBox.textContent = N(state.distribution.reduce((s,d)=>s+N(d.qty),0));
   };
   window.financeProRemoveDistributionV15 = function(idx){ state.distribution.splice(idx,1); renderDistribution(); };
   window.financeProClearDistributionV15 = function(){ state.distribution=[]; renderDistribution(); };
