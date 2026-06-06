@@ -115,6 +115,11 @@
 .hero-action-v155{display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:relative;z-index:1}.hero-action-v155 .status-pill-v155{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:8px 12px;color:#fff;font-size:12px;font-weight:800}
 @media(max-width:760px){.hero{align-items:flex-start;flex-direction:column}.hero-brand-v155{flex-direction:column;align-items:flex-start}.hero-title-v155 h1{font-size:24px!important}.hero-logo-card-v155{width:140px;height:68px}.hero-action-v155{width:100%;justify-content:space-between}}
 </style>
+<style id="permissionsPreHideV43">
+#userPermissionsBoxV72:not(:has(.perm-u-grid)) > *{display:none!important}
+#userPermissionsBoxV72:not(:has(.perm-u-grid)){min-height:140px}
+#v201PermMatrix,.perm-grid-v72{display:none!important}
+</style>
 </head>
 <body onload="initAdmin()">
 <div class="app-shell">
@@ -699,7 +704,11 @@
 </div>
 
 <script src="orders_seed.js?v=337" defer></script>
-<script>window.__tasneefFinanceProExclusive=true;</script>
+<script>
+window.__tasneefFinanceProExclusive=true;
+window.__tasneefUnifiedPermissionsOnly=true;
+window.__tasneefV201Loaded=true;
+</script>
 <script src="app.js?v=360" defer></script>
 <script src="tasneef_patch_v357_inventory_balance_image_fix.js?v=357" defer></script>
 <script src="tasneef_orders_cards_v6.js?v=6" defer></script>
@@ -714,6 +723,6 @@
 <script src="tasneef_finance_pro_lock_v31.js?v=35" defer></script>
 <script src="tasneef_finance_manager_stable_v35.js?v=36" defer></script>
 <script src="tasneef_warehouse_manager_stable_v37.js?v=37" defer></script>
-<script src="tasneef_permissions_unified_v42.js?v=42" defer></script>
+<script src="tasneef_permissions_unified_v43.js?v=43" defer></script>
 </body>
 </html>

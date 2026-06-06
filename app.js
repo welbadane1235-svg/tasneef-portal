@@ -1650,6 +1650,7 @@ function monthlyReportRowsV58(){return monthlyRowsV60()}
   window.getUserPermissionsV72 = getPerms;
 
   function injectPermissionsBox(){
+    if(window.__tasneefUnifiedPermissionsOnly) return;
     const formTitle = document.getElementById('userFormTitle');
     if(!formTitle) return;
     const active = document.getElementById('userActive');
@@ -3443,6 +3444,7 @@ function financeResetFilters(){ ['financeSearch','financeProjectFilter','finance
   }
 
   function injectPermissionsBoxV113(){
+    if(window.__tasneefUnifiedPermissionsOnly) return;
     const active = document.getElementById('userActive');
     if(!active) return;
     let box = document.getElementById('userPermissionsBoxV72');
@@ -3700,6 +3702,7 @@ function financeResetFilters(){ ['financeSearch','financeProjectFilter','finance
   }
 
   function injectPermissionsBoxV114(){
+    if(window.__tasneefUnifiedPermissionsOnly) return;
     const active = document.getElementById('userActive');
     if(!active) return;
     let box = document.getElementById('userPermissionsBoxV72');
@@ -11740,6 +11743,7 @@ function financePrintReport(kind){
 
   // صلاحيات تعديل/حذف طلبات الصرف في إدارة المستخدمين
   function addRequestPermissionCheckboxes(){
+    if(window.__tasneefUnifiedPermissionsOnly) return;
     const box=document.getElementById('userPermissionsBoxV72'); if(!box) return;
     const grid=box.querySelector('.perm-grid-v72') || box;
     [['can_edit_inventory_requests','تعديل طلبات الصرف'],['can_delete_inventory_requests','حذف طلبات الصرف']].forEach(([key,label])=>{
