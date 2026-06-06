@@ -14,6 +14,29 @@
   var text = function(v,n){ var s=String(v == null ? '' : v).trim(); return s.length > n ? s.slice(0,n) + '...' : s; };
   var clone = function(rows){ try{return JSON.parse(JSON.stringify(rows || []));}catch(e){return [];} };
   var field = function(row, idx){ var h=headers()[idx]; return h ? row[h] : ''; };
+  var ORDER_INV_COST_KEY = 'tasneef_order_inventory_cost_v8';
+  var normalizeOrderNo = function(v){ return String(v == null ? '' : v).replace(/\s+/g,'').toUpperCase(); };
+
+  function orderNoForRow(row){
+    return String(field(row,0) || (row && (row.order_no || row.orderNo || row.order_id || row.id)) || '').trim();
+  }
+
+  function readOrderInventoryCosts(){
+    try{
+      var saved = JSON.parse(localStorage.getItem(ORDER_INV_COST_KEY) || '{}');
+      return saved && typeof saved === 'object' ? saved : {};
+    }catch(e){ return {}; }
+  }
+
+  function writeOrderInventoryCosts(data){
+    localStorage.setItem(ORDER_INV_COST_KEY, JSON.stringify(data || {}));
+  }
+
+  function inventoryCostForOrder(orderNo){
+    var key = normalizeOrderNo(orderNo);
+    var row = readOrderInventoryCosts()[key];
+    return row ? num(row.amount) : 0;
+  }
 
   function getOrders(){
     try{
@@ -83,10 +106,11 @@
   function card(r,i){
     var cls=cardClass(r);
     var price=field(r,18), profit=field(r,22);
+    var invCost=inventoryCostForOrder(orderNoForRow(r));
     return '<article class="order-card-v6 '+cls+'">' +
       '<div class="order-card-head-v6"><div><h3>'+esc(field(r,0)||'-')+'</h3><small>رقم القروب: '+esc(field(r,1)||'-')+' | '+esc(dateForDisplay(field(r,2)))+'</small></div><span>'+esc(field(r,5)||'-')+'</span></div>' +
       '<div class="order-chip-row-v6"><b class="'+(cls==='cancel'?'bad':'ops')+'">التشغيل: '+esc(field(r,16)||'-')+'</b><b class="'+(cls==='due'?'finance':'')+'">المالية: '+esc(field(r,23)||'-')+'</b><b>الفوترة: '+esc(field(r,25)||'-')+'</b></div>' +
-      '<div class="order-meta-v6"><div><small>العميل</small><strong>'+esc(field(r,8)||'-')+'</strong></div><div><small>الجوال</small><strong>'+esc(field(r,9)||'-')+'</strong></div><div><small>المنفذ</small><strong>'+esc(field(r,10)||'-')+'</strong></div><div><small>مرسل الطلب</small><strong>'+esc(field(r,4)||'-')+'</strong></div><div><small>السعر شامل الضريبة</small><strong>'+esc(price!==''&&price!=null?money(price):'-')+'</strong></div><div><small>الربح</small><strong>'+esc(profit!==''&&profit!=null?money(profit):'-')+'</strong></div></div>' +
+      '<div class="order-meta-v6"><div><small>العميل</small><strong>'+esc(field(r,8)||'-')+'</strong></div><div><small>الجوال</small><strong>'+esc(field(r,9)||'-')+'</strong></div><div><small>المنفذ</small><strong>'+esc(field(r,10)||'-')+'</strong></div><div><small>مرسل الطلب</small><strong>'+esc(field(r,4)||'-')+'</strong></div><div><small>السعر شامل الضريبة</small><strong>'+esc(price!==''&&price!=null?money(price):'-')+'</strong></div><div><small>الربح</small><strong>'+esc(profit!==''&&profit!=null?money(profit):'-')+'</strong></div><div><small>تكلفة المخزن</small><strong>'+esc(invCost>0?money(invCost):'-')+'</strong></div></div>' +
       '<p class="order-details-v6">'+(esc(text(field(r,11),160)) || 'لا توجد تفاصيل')+'</p>' +
 '<div class="order-actions-v6"><button class="light" onclick="showOrderDetailsV6('+i+')">عرض</button><button onclick="editOrderV233('+i+')">تعديل</button><button class="light" onclick="sendOrderWhatsappV233('+i+')">واتساب</button><button class="danger" onclick="deleteOrderV233('+i+')">حذف</button></div>' +
     '</article>';
@@ -156,7 +180,48 @@ window.showOrderDetailsV6=function(idx){
     if([13,14,15,17,18].indexOf(x[1])>-1 && val!=='' && val!=null) val=money(val);
     return '<div><small>'+esc(x[0])+'</small><strong>'+esc(val||'-')+'</strong></div>';
   }).join('');
+  body += '<div><small>تكلفة المخزن</small><strong>'+esc(inventoryCostForOrder(orderNoForRow(r))>0?money(inventoryCostForOrder(orderNoForRow(r))):'-')+'</strong></div>';
   document.body.insertAdjacentHTML('beforeend','<div class="modal-backdrop" onclick="if(event.target===this)this.remove()" style="position:fixed;inset:0;background:rgba(0,35,28,.45);z-index:99999;display:grid;place-items:center;padding:18px"><div class="card" style="width:min(920px,96vw);max-height:92vh;overflow:auto"><div class="fin-actions" style="justify-content:space-between"><h2>عرض الأوردر: '+esc(field(r,0)||'-')+'</h2><button class="danger" onclick="this.closest(&quot;.modal-backdrop&quot;).remove()">إغلاق</button></div><div class="order-meta-v6" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:12px">'+body+'</div></div></div>');
+};
+
+window.tasneefOrdersFindV8=function(orderNo){
+  var target=normalizeOrderNo(orderNo);
+  if(!target) return null;
+  var rows=getOrders();
+  for(var i=0;i<rows.length;i++){
+    var r=rows[i], no=orderNoForRow(r);
+    if(normalizeOrderNo(no)===target){
+      return {
+        index:i,
+        row:r,
+        orderNo:no,
+        project:field(r,5)||'',
+        client:field(r,8)||'',
+        details:field(r,11)||'',
+        total:field(r,13)||field(r,18)||''
+      };
+    }
+  }
+  return null;
+};
+
+window.tasneefOrdersAddInventoryCostV8=function(orderNo, amount, meta){
+  var key=normalizeOrderNo(orderNo);
+  var value=num(amount);
+  if(!key || value<=0) return false;
+  var data=readOrderInventoryCosts();
+  if(!data[key]) data[key]={amount:0, lines:[]};
+  if(meta && meta.key && (data[key].lines||[]).some(function(line){ return line && line.key === meta.key; })) return true;
+  data[key].amount=+(num(data[key].amount)+value).toFixed(2);
+  data[key].updatedAt=new Date().toISOString();
+  data[key].lines=(data[key].lines||[]).concat([Object.assign({amount:value, at:new Date().toISOString()}, meta||{})]).slice(-200);
+  writeOrderInventoryCosts(data);
+  if(typeof window.renderOrdersV233 === 'function') setTimeout(window.renderOrdersV233,0);
+  return true;
+};
+
+window.tasneefOrdersInventoryCostV8=function(orderNo){
+  return inventoryCostForOrder(orderNo);
 };
 
 window.renderOrdersV233=function(){

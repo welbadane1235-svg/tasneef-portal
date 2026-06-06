@@ -610,7 +610,7 @@
       ['return','مرتجع']
     ].map(([v,label])=>`<option value="${v}" ${S(value||'out')===v?'selected':''}>${label}</option>`).join('');
     const projectOptions = value => `<option value="">بدون مشروع</option>${state.projects.map(p=>`<option value="${esc(p.id)}" ${S(value)===S(p.id)?'selected':''}>${esc(p.name||p.project_name)}</option>`).join('')}`;
-    box.innerHTML=`<div class="fin-table"><table><thead><tr><th>مركز التكلفة</th><th>نوع التوزيع</th><th>المشروع</th><th>الأوردر</th><th>الكمية</th><th>ملاحظة</th><th>إجراء</th></tr></thead><tbody>
+    box.innerHTML=`<div class="fin-table"><table><thead><tr><th>مركز التكلفة</th><th>نوع التوزيع</th><th>المشروع</th><th>الأوردر</th><th>الكمية</th><th>ملاحظة</th><th>ربط الأوردر</th><th>إجراء</th></tr></thead><tbody>
       ${state.distribution.map((d,idx)=>`<tr>
         <td><select onchange="financeProUpdateDistributionV15(${idx},'center',this.value)">${centerOptions(d.center)}</select></td>
         <td><select onchange="financeProUpdateDistributionV15(${idx},'type',this.value)">${typeOptions(d.type||'out')}</select></td>
@@ -618,8 +618,9 @@
         <td><input value="${esc(d.orderNo||'')}" placeholder="اختياري" oninput="financeProUpdateDistributionV15(${idx},'orderNo',this.value)"></td>
         <td><input type="number" min="0" step="0.01" value="${N(d.qty)}" oninput="financeProUpdateDistributionV15(${idx},'qty',this.value)"></td>
         <td><input value="${esc(d.note||'')}" placeholder="ملاحظة" oninput="financeProUpdateDistributionV15(${idx},'note',this.value)"></td>
+        <td>${d.orderConfirmed ? `<span class="fin-badge ok">مؤكد</span><br><small>${money(d.orderInventoryCost)}</small>` : '<span class="fin-badge">غير مربوط</span>'}</td>
         <td><button class="danger" onclick="financeProRemoveDistributionV15(${idx})">حذف</button></td>
-      </tr>`).join('') || '<tr><td colspan="7">يمكنك توزيع الكمية المصروفة على أكثر من مشروع أو أوردر.</td></tr>'}
+      </tr>`).join('') || '<tr><td colspan="8">يمكنك توزيع الكمية المصروفة على أكثر من مشروع أو أوردر.</td></tr>'}
     </tbody></table></div><div class="fin-soft" style="margin-top:8px">إجمالي التوزيع: <b>${N(total)}</b></div>`;
   }
 
@@ -1023,13 +1024,86 @@
     if(typeof msg==='function') msg('تم تحميل الفاتورة للتعديل. عند الحفظ ستضيف نسخة حركة جديدة، ويمكن حذف القديمة من سجل الحركة عند الحاجة.');
   };
 
+  function selectedMoveItemV15(){
+    return state.items.find(i=>String(i.id)===String($('finMoveItemV15')?.value)) || null;
+  }
+  function orderInventoryCostAmountV15(item, qty){
+    return +(N(qty) * (item ? itemUnitCostV15(item) : 0)).toFixed(2);
+  }
+  function confirmOrderForDistributionV15(orderNo, item, qty, type, projectNameText){
+    const finder = typeof window.tasneefOrdersFindV8 === 'function' ? window.tasneefOrdersFindV8 : null;
+    const found = finder ? finder(orderNo) : null;
+    if(!found){
+      alert('لم أجد أوردر بهذا الرقم: '+orderNo);
+      return null;
+    }
+    const amount = orderInventoryCostAmountV15(item, qty);
+    const ok = confirm(
+      'هل هذا هو الأوردر؟\n\n' +
+      'رقم الأوردر: '+found.orderNo+'\n' +
+      'المشروع: '+(found.project || '-')+'\n' +
+      'العميل: '+(found.client || '-')+'\n' +
+      'التفاصيل: '+(found.details || '-')+'\n\n' +
+      'المنتج: '+(item ? item.name : '-')+'\n' +
+      'نوع التوزيع: '+movementTypeLabelV15(type)+'\n' +
+      'الكمية: '+N(qty)+'\n' +
+      'تكلفة المخزن التي ستضاف للأوردر: '+money(amount)
+    );
+    if(!ok) return null;
+    return {
+      orderConfirmed:true,
+      orderNo:found.orderNo,
+      orderProject:found.project || projectNameText || '',
+      orderInventoryCost:amount,
+      orderItemName:item ? item.name : '',
+      orderItemCode:item ? itemCode(item) : '',
+      orderCostUnit:item ? itemUnitCostV15(item) : 0
+    };
+  }
+  function applyOrderInventoryCostsFromDistributionV15(distribution, item, movementDate, movementType){
+    const addCost = typeof window.tasneefOrdersAddInventoryCostV8 === 'function' ? window.tasneefOrdersAddInventoryCostV8 : null;
+    if(!addCost) return;
+    A(distribution).forEach((d,idx)=>{
+      if(!d || !d.orderConfirmed || !S(d.orderNo) || N(d.orderInventoryCost)<=0) return;
+      const key=[
+        'inv-order-cost-v15',
+        movementDate || today(),
+        item ? item.id : '',
+        S(d.orderNo),
+        idx,
+        S(d.type || movementType),
+        N(d.qty)
+      ].join('|');
+      addCost(d.orderNo, N(d.orderInventoryCost), {
+        key,
+        source:'inventory_movement',
+        date:movementDate || today(),
+        product:item ? item.name : S(d.orderItemName),
+        productCode:item ? itemCode(item) : S(d.orderItemCode),
+        qty:N(d.qty),
+        unitCost:N(d.orderCostUnit) || (item ? itemUnitCostV15(item) : 0),
+        movementType:S(d.type || movementType),
+        center:S(d.center),
+        projectName:S(d.projectName || d.orderProject),
+        note:S(d.note)
+      });
+    });
+  }
+
   window.financeProAddDistributionV15 = function(){
     const center=S($('finDistCenterV15')?.value)||'FM';
     const type=S($('finDistTypeV15')?.value)||'out';
     const pid=S($('finDistProjectV15')?.value);
     const qty=N($('finDistQtyV15')?.value);
     if(qty<=0) return alert('كمية التوزيع مطلوبة');
-    state.distribution.push({center, type, projectId:pid||null, projectName:pid?projectName(pid):'', orderNo:S($('finDistOrderV15')?.value), qty, note:S($('finDistNoteV15')?.value)});
+    const orderNo=S($('finDistOrderV15')?.value);
+    const item=selectedMoveItemV15();
+    let orderLink=null;
+    if(orderNo && type !== 'return'){
+      if(!item) return alert('اختر المنتج أولاً حتى يتم حساب تكلفة المخزن للأوردر');
+      orderLink = confirmOrderForDistributionV15(orderNo, item, qty, type, pid?projectName(pid):'');
+    }
+    state.distribution.push(Object.assign({center, type, projectId:pid||null, projectName:pid?projectName(pid):'', orderNo, qty, note:S($('finDistNoteV15')?.value)}, orderLink||{}));
     ['finDistOrderV15','finDistQtyV15','finDistNoteV15'].forEach(id=>{ if($(id)) $(id).value=''; });
     renderDistribution();
   };
@@ -1043,6 +1117,12 @@
       row.projectName = row.projectId ? projectName(row.projectId) : '';
     }else if(['center','type','orderNo','note'].includes(field)){
       row[field] = S(value);
+    }
+    if(['qty','type','orderNo'].includes(field)){
+      delete row.orderConfirmed;
+      delete row.orderInventoryCost;
+      delete row.orderProject;
+      delete row.orderCostUnit;
     }
     const totalBox = $('finDistributionBoxV15')?.querySelector('.fin-soft b');
     if(totalBox) totalBox.textContent = N(state.distribution.reduce((s,d)=>s+N(d.qty),0));
@@ -1075,6 +1155,7 @@
       const mv={item_id:item.id,item_name:item.name,movement_type:type,quantity:qty,movement_date:S($('finMoveDateV15')?.value)||today(),receiver:staffName(staffId),reason:reasonMap[type]||'صرف مخزون',notes:'finance_pro_v15:'+JSON.stringify(meta),product_code:itemCode(item),barcode:itemCode(item),unit_cost:+itemCost(item).toFixed(4)};
       const res=oldMove ? await sb.from('inventory_movements').update(mv).eq('id', oldMove.id) : await sb.from('inventory_movements').insert(mv);
       if(res.error) throw res.error;
+      applyOrderInventoryCostsFromDistributionV15(state.distribution, item, mv.movement_date, type);
       if(oldDifferentItem){
         const oldQty=computedItemQtyV15(oldDifferentItem)-movementComputedDeltaV15(oldMove);
         const oldUpdate=await sb.from('inventory_items').update({quantity:oldQty}).eq('id',oldDifferentItem.id);
