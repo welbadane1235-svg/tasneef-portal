@@ -1,4 +1,4 @@
-(function(){
+﻿(function(){
   const VERSION = 'v15-finance-inventory-pro';
   const VAT_RATE = 0.15;
   const state = {
@@ -78,6 +78,8 @@
   }
   function movementTypeLabelV15(type){
     const map={in:'داخل',out:'صرف',consume:'مستهلك',waste:'هدر',damaged:'تالف',return:'مرتجع'};
+    map.scrap='سكراب';
+    map.waste='مهدور';
     return map[S(type)] || S(type) || '-';
   }
   function cleanMovementNoteV15(m){
@@ -92,7 +94,7 @@
     if(S(meta.stockEffect)==='none') return 0;
     const type=S(m?.movement_type);
     if(type==='in' || type==='return') return N(m?.quantity);
-    if(['out','consume','waste','damaged'].includes(type)) return -N(m?.quantity);
+    if(['out','consume','waste','damaged','scrap'].includes(type)) return -N(m?.quantity);
     return 0;
   }
   function movementComputedDeltaV15(m){
@@ -520,7 +522,7 @@
         <h3>صرف منتج وتوزيع استهلاكه</h3>
         <div class="fin-grid three">
           <div><label>المنتج</label><select id="finMoveItemV15">${movementItems.map(i=>`<option value="${esc(i.id)}">${esc(i.name)} - المتوفر ${N(computedItemQtyV15(i))}</option>`).join('')}</select></div>
-          <div><label>نوع الحركة المطلوبة</label><select id="finMoveTypeV15"><option value="out">صرف</option><option value="consume">مستهلك</option><option value="waste">هدر</option><option value="damaged">تالف</option><option value="return">مرتجع</option></select></div>
+          <div><label>نوع الحركة المطلوبة</label><select id="finMoveTypeV15"><option value="out">صرف</option><option value="consume">مستهلك</option><option value="waste">مهدور</option><option value="damaged">تالف</option><option value="scrap">سكراب</option><option value="return">مرتجع</option></select></div>
           <div><label>المستلم</label><select id="finMoveStaffV15">${staff().map(u=>`<option value="${esc(u.id)}">${esc(u.full_name||u.name||u.username)} - ${esc(u.role||'')}</option>`).join('')}</select></div>
           <div><label>الكمية</label><input id="finMoveQtyV15" type="number" min="0" step="0.01"></div>
           <div><label>التاريخ</label><input id="finMoveDateV15" type="date" value="${today()}"></div>
@@ -529,7 +531,7 @@
         <h3 style="margin-top:16px">توزيع الاستهلاك على المشاريع / الأوردرات</h3>
         <div class="fin-line dist">
           <div><label>مركز التكلفة</label><select id="finDistCenterV15"><option value="FM">FM - مشاريع وأوردرات</option><option value="CN">CN - أوردرات</option><option value="GENERAL">GENERAL - إداري</option></select></div>
-          <div><label>نوع التوزيع</label><select id="finDistTypeV15"><option value="out">صرف</option><option value="consume">مستهلك</option><option value="return">مرتجع</option></select></div>
+          <div><label>نوع التوزيع</label><select id="finDistTypeV15"><option value="out">صرف</option><option value="consume">مستهلك</option><option value="waste">مهدور</option><option value="damaged">تالف</option><option value="scrap">سكراب</option><option value="return">مرتجع</option></select></div>
           <div><label>المشروع</label><select id="finDistProjectV15"><option value="">بدون مشروع</option>${state.projects.map(p=>`<option value="${esc(p.id)}">${esc(p.name||p.project_name)}</option>`).join('')}</select></div>
           <div><label>رقم الأوردر</label><input id="finDistOrderV15" placeholder="اختياري"></div>
           <div><label>الكمية</label><input id="finDistQtyV15" type="number" min="0" step="0.01"></div>
@@ -542,7 +544,7 @@
       <div class="fin-card">
         <div class="fin-actions" style="justify-content:space-between">
           <h3>حركات المخزون</h3>
-          <div><label>فلتر نوع الحركة</label><select id="finMovementListTypeV15" onchange="financeProRenderCurrentV15()"><option value="">كل الحركات</option><option value="out" ${selectedMovementType==='out'?'selected':''}>صرف</option><option value="consume" ${selectedMovementType==='consume'?'selected':''}>مستهلك</option><option value="waste" ${selectedMovementType==='waste'?'selected':''}>هدر</option><option value="damaged" ${selectedMovementType==='damaged'?'selected':''}>تالف</option><option value="return" ${selectedMovementType==='return'?'selected':''}>مرتجع</option><option value="in" ${selectedMovementType==='in'?'selected':''}>داخل</option></select></div>
+          <div><label>فلتر نوع الحركة</label><select id="finMovementListTypeV15" onchange="financeProRenderCurrentV15()"><option value="">كل الحركات</option><option value="out" ${selectedMovementType==='out'?'selected':''}>صرف</option><option value="consume" ${selectedMovementType==='consume'?'selected':''}>مستهلك</option><option value="waste" ${selectedMovementType==='waste'?'selected':''}>مهدور</option><option value="damaged" ${selectedMovementType==='damaged'?'selected':''}>تالف</option><option value="scrap" ${selectedMovementType==='scrap'?'selected':''}>سكراب</option><option value="return" ${selectedMovementType==='return'?'selected':''}>مرتجع</option><option value="in" ${selectedMovementType==='in'?'selected':''}>داخل</option></select></div>
         </div>
         <div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>المنتج</th><th>الكمية</th><th>المستلم</th><th>مركز التكلفة</th><th>إجراء</th></tr></thead><tbody>
         ${movementRows.map(m=>{ const meta=safeJson(m.notes)||{}; return `<tr><td>${esc(m.movement_date||'')}</td><td>${esc(movementTypeLabelV15(m.movement_type))}</td><td>${esc(m.item_name||'')}</td><td>${N(m.quantity)}</td><td>${esc(m.receiver||'')}</td><td>${esc(A(meta.distribution).map(d=>d.center).filter(Boolean).join(', ')||'-')}</td><td class="fin-actions"><button onclick="financeProEditMovementV15(${Number(m.id)||0})">تعديل</button><button class="light" onclick="financeProShowMovementV15(${Number(m.id)||0})">عرض</button><button class="danger" onclick="financeProDeleteMovementV15(${Number(m.id)||0})">حذف</button></td></tr>`; }).join('') || '<tr><td colspan="7">لا توجد حركات حسب الفلتر</td></tr>'}
@@ -661,12 +663,21 @@
       distribution_note:S(d.note||'')
     })).filter(r=>N(r.quantity)>0);
   }
+  function movementFinancialTypesV15(){
+    return ['consume','waste','damaged','scrap'];
+  }
+  function movementOutTypesV15(){
+    return ['out','consume','waste','damaged','scrap'];
+  }
+  function movementReportNetV15(m){
+    return movementFinancialTypesV15().includes(S(m.movement_type)) ? N(m.quantity)*N(m.unit_cost) : 0;
+  }
   function movementPass(m, f){
     const dt=movementDate(m);
     if(f.from && dt < f.from) return false;
     if(f.to && dt > f.to) return false;
     if(f.type==='in' && S(m.movement_type)!=='in') return false;
-    if(f.type==='out' && !['out','consume','waste','damaged'].includes(S(m.movement_type))) return false;
+    if(f.type==='out' && !movementOutTypesV15().includes(S(m.movement_type))) return false;
     if(f.center){
       if(m.is_distribution_row && movementCenter(m)!==f.center) return false;
       if(!m.is_distribution_row && !movementCenter(m).split(',').map(x=>S(x)).includes(f.center)) return false;
@@ -706,7 +717,7 @@
     const f=reportFilters();
     return state.movements.flatMap(m=>movementDistributionRowsV15(m)).filter(m=>{
       if(S(m.movement_type)==='return') return false;
-      if(!['out','consume','waste','damaged'].includes(S(m.movement_type))) return false;
+      if(!movementFinancialTypesV15().includes(S(m.movement_type))) return false;
       return movementPass(m,f);
     });
   }
@@ -714,8 +725,8 @@
     let rows=[];
     if(tab==='products') rows=reportProducts().map(i=>({net:computedItemQtyV15(i)*itemCost(i)}));
     else if(tab==='inventory') rows=reportInventory().map(i=>({net:computedItemQtyV15(i)*itemCost(i)}));
-    else if(tab==='cost') rows=reportCostRows().map(m=>({net:N(m.quantity)*N(m.unit_cost)}));
-    else rows=reportMovements().map(m=>({net:N(m.quantity)*N(m.unit_cost)}));
+    else if(tab==='cost') rows=reportCostRows().map(m=>({net:movementReportNetV15(m)}));
+    else rows=reportMovements().map(m=>({net:movementReportNetV15(m)}));
     const net=rows.reduce((a,r)=>a+N(r.net),0);
     return {net, vat:net*VAT_RATE, gross:net*(1+VAT_RATE)};
   }
@@ -731,7 +742,7 @@
   }
   function movementReportHtml(){
     const rows=reportMovements();
-    return `<div class="fin-card"><h3>نافذة حركة المخزون: الداخل والخارج</h3><div class="fin-table"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>المنتج</th><th>الكمية</th><th>المستلم/المورد</th><th>المشروع</th><th>قبل الضريبة</th><th>بعد الضريبة</th></tr></thead><tbody>${rows.map(m=>{const net=N(m.quantity)*N(m.unit_cost);return `<tr><td>${esc(movementDate(m)||'-')}</td><td>${esc(movementTypeLabelV15(m.movement_type))}</td><td>${esc(m.item_name||'-')}</td><td>${N(m.quantity)}</td><td>${esc(m.receiver||'-')}</td><td>${esc(m.project_name||'-')}</td><td>${money(net)}</td><td>${money(net*(1+VAT_RATE))}</td></tr>`;}).join('') || '<tr><td colspan="8">لا توجد حركات حسب الفلتر</td></tr>'}</tbody></table></div></div>`;
+    return `<div class="fin-card"><h3>نافذة حركة المخزون: الداخل والخارج</h3><p class="fin-soft">الصرف يظهر كخروج من المخزون ولا يدخل في القيمة المالية. القيمة المالية تظهر عند مستهلك أو تالف أو مهدور أو سكراب.</p><div class="fin-table"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>المنتج</th><th>الكمية</th><th>المستلم/المورد</th><th>المشروع</th><th>قبل الضريبة</th><th>بعد الضريبة</th></tr></thead><tbody>${rows.map(m=>{const net=movementReportNetV15(m);return `<tr><td>${esc(movementDate(m)||'-')}</td><td>${esc(movementTypeLabelV15(m.movement_type))}</td><td>${esc(m.item_name||'-')}</td><td>${N(m.quantity)}</td><td>${esc(m.receiver||'-')}</td><td>${esc(m.project_name||'-')}</td><td>${money(net)}</td><td>${money(net*(1+VAT_RATE))}</td></tr>`;}).join('') || '<tr><td colspan="8">لا توجد حركات حسب الفلتر</td></tr>'}</tbody></table></div></div>`;
   }
   function inventoryReportHtml(){
     const rows=reportInventory();
@@ -739,7 +750,7 @@
   }
   function costReportHtml(){
     const rows=reportCostRows();
-    return `<div class="fin-card"><h3>نافذة تقرير مراكز التكلفة</h3><p class="fin-soft">يعرض التقرير كل سطر توزيع بالتفصيل، والمرتجع لا يدخل في إجمالي التكلفة.</p><div class="fin-table"><table><thead><tr><th>التاريخ</th><th>المنتج</th><th>نوع التوزيع</th><th>الكمية</th><th>المستلم</th><th>مركز التكلفة</th><th>المشروع</th><th>الأوردر</th><th>ملاحظة التوزيع</th><th>قبل الضريبة</th><th>الضريبة</th><th>بعد الضريبة</th></tr></thead><tbody>${rows.map(m=>{const net=N(m.quantity)*N(m.unit_cost);return `<tr><td>${esc(movementDate(m)||'-')}</td><td>${esc(m.item_name||'-')}</td><td>${esc(movementTypeLabelV15(m.movement_type))}</td><td>${N(m.quantity)}</td><td>${esc(m.receiver||'-')}</td><td>${esc(movementCenter(m)||'-')}</td><td>${esc(m.project_name||'-')}</td><td>${esc(m.order_no||'-')}</td><td>${esc(m.distribution_note||'-')}</td><td>${money(net)}</td><td>${money(net*VAT_RATE)}</td><td>${money(net*(1+VAT_RATE))}</td></tr>`;}).join('') || '<tr><td colspan="12">لا توجد بيانات مراكز تكلفة حسب الفلتر</td></tr>'}</tbody></table></div></div>`;
+    return `<div class="fin-card"><h3>نافذة تقرير مراكز التكلفة</h3><p class="fin-soft">يعرض التقرير الاستهلاك والتالف والمهدور والسكراب فقط. الصرف العادي لا يدخل في تكلفة التقرير حتى يتم تحويله إلى استهلاك.</p><div class="fin-table"><table><thead><tr><th>التاريخ</th><th>المنتج</th><th>نوع التوزيع</th><th>الكمية</th><th>المستلم</th><th>مركز التكلفة</th><th>المشروع</th><th>الأوردر</th><th>ملاحظة التوزيع</th><th>قبل الضريبة</th><th>الضريبة</th><th>بعد الضريبة</th></tr></thead><tbody>${rows.map(m=>{const net=movementReportNetV15(m);return `<tr><td>${esc(movementDate(m)||'-')}</td><td>${esc(m.item_name||'-')}</td><td>${esc(movementTypeLabelV15(m.movement_type))}</td><td>${N(m.quantity)}</td><td>${esc(m.receiver||'-')}</td><td>${esc(movementCenter(m)||'-')}</td><td>${esc(m.project_name||'-')}</td><td>${esc(m.order_no||'-')}</td><td>${esc(m.distribution_note||'-')}</td><td>${money(net)}</td><td>${money(net*VAT_RATE)}</td><td>${money(net*(1+VAT_RATE))}</td></tr>`;}).join('') || '<tr><td colspan="12">لا توجد بيانات مراكز تكلفة حسب الفلتر</td></tr>'}</tbody></table></div></div>`;
   }
 
   function findItem(line){
@@ -907,7 +918,7 @@
       const qty=N($('finMoveQtyV15')?.value);
       if(qty<=0) throw new Error('الكمية مطلوبة');
       const type=S($('finMoveTypeV15')?.value)||'out';
-      const stockOutTypes=['out','consume','waste','damaged'];
+      const stockOutTypes=movementOutTypesV15();
       const oldMove=state.editMovementId ? state.movements.find(m=>String(m.id)===String(state.editMovementId)) : null;
       const oldSameItem = oldMove && String(oldMove.item_id)===String(item.id) ? oldMove : null;
       const oldDifferentItem = oldMove && String(oldMove.item_id)!==String(item.id) ? state.items.find(i=>String(i.id)===String(oldMove.item_id)) : null;
@@ -919,7 +930,7 @@
       const oldType=S(oldMove?.movement_type);
       const neutralReturnEdit = oldSameItem && stockOutTypes.includes(oldType) && type==='return';
       const meta={module:VERSION, staffId, note:S($('finMoveNoteV15')?.value), distribution:state.distribution, stockEffect: neutralReturnEdit ? 'none' : 'normal'};
-      const reasonMap={return:'مرتجع مخزون',consume:'مستهلك',waste:'هدر',damaged:'تالف',out:'صرف مخزون'};
+      const reasonMap={return:'مرتجع مخزون',consume:'مستهلك',waste:'مهدور',damaged:'تالف',scrap:'سكراب',out:'صرف مخزون'};
       const mv={item_id:item.id,item_name:item.name,movement_type:type,quantity:qty,movement_date:S($('finMoveDateV15')?.value)||today(),receiver:staffName(staffId),reason:reasonMap[type]||'صرف مخزون',notes:'finance_pro_v15:'+JSON.stringify(meta),product_code:itemCode(item),barcode:itemCode(item),unit_cost:+itemCost(item).toFixed(4)};
       const res=oldMove ? await sb.from('inventory_movements').update(mv).eq('id', oldMove.id) : await sb.from('inventory_movements').insert(mv);
       if(res.error) throw res.error;
@@ -1015,7 +1026,7 @@
   }
   function movementRowsHtml(rows){
     return rows.map(m=>{
-      const net=N(m.quantity)*N(m.unit_cost || itemCost(state.items.find(i=>String(i.id)===String(m.item_id))));
+      const net=movementReportNetV15(m);
       return `<tr><td>${esc(m.movement_date||S(m.created_at).slice(0,10)||'-')}</td><td>${esc(movementTypeLabelV15(m.movement_type))}</td><td>${N(m.quantity)}</td><td>${esc(m.receiver||'-')}</td><td>${esc(movementCenter(m)||'-')}</td><td>${esc(m.project_name||'-')}</td><td>${esc(m.order_no||'-')}</td><td>${esc(m.distribution_note||m.reason||'-')}</td><td>${money(net)}</td></tr>`;
     }).join('') || '<tr><td colspan="9">لا توجد بيانات</td></tr>';
   }
@@ -1023,8 +1034,9 @@
     const item=state.items.find(i=>String(i.id)===String(id)); if(!item) return;
     const moves=productActivityRowsV15(item);
     const ins=moves.filter(m=>S(m.movement_type)==='in');
-    const outs=moves.filter(m=>['out','consume','waste','damaged'].includes(S(m.movement_type)));
+    const outs=moves.filter(m=>movementOutTypesV15().includes(S(m.movement_type)));
     const consumedRows=moves.filter(m=>S(m.movement_type)==='consume');
+    const financialRows=moves.filter(m=>movementFinancialTypesV15().includes(S(m.movement_type)));
     const returns=moves.filter(m=>S(m.movement_type)==='return');
     const inQty=ins.reduce((a,m)=>a+N(m.quantity),0);
     const outQty=outs.reduce((a,m)=>a+N(m.quantity),0);
@@ -1038,6 +1050,7 @@
       {title:'الداخل', html:`<div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية</th><th>المورد</th><th>المركز</th><th>المشروع</th><th>الأوردر</th><th>البيان</th><th>القيمة</th></tr></thead><tbody>${movementRowsHtml(ins)}</tbody></table></div>`},
       {title:'الخارج', html:`<div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية</th><th>المستلم</th><th>المركز</th><th>المشروع</th><th>الأوردر</th><th>البيان</th><th>القيمة</th></tr></thead><tbody>${movementRowsHtml(outs)}</tbody></table></div>`},
       {title:'المستهلك', html:`<div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية</th><th>المستلم</th><th>المركز</th><th>المشروع</th><th>الأوردر</th><th>البيان</th><th>القيمة</th></tr></thead><tbody>${movementRowsHtml(consumedRows)}</tbody></table></div>`},
+      {title:'تقرير المنتج', html:`<div class="fin-card"><h3>تقرير خاص بالمنتج</h3><p class="fin-soft">يوضح عدد مرات الدخول والخروج، وأين تم الاستهلاك، ومن استلم المنتج. الصرف العادي يظهر كخروج وقيمته صفر حتى يتحول إلى مستهلك أو تالف أو مهدور أو سكراب.</p><div class="fin-grid three"><div class="fin-card fin-kpi"><small>مرات الدخول</small><b>${ins.length}</b></div><div class="fin-card fin-kpi"><small>مرات الخروج</small><b>${outs.length}</b></div><div class="fin-card fin-kpi"><small>مرات الاستهلاك المالي</small><b>${financialRows.length}</b></div></div></div><div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية</th><th>المستلم</th><th>مركز التكلفة</th><th>المشروع</th><th>الأوردر</th><th>البيان</th><th>القيمة</th></tr></thead><tbody>${movementRowsHtml(financialRows)}</tbody></table></div>`},
       {title:'المرتجع', html:`<div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية</th><th>المستلم</th><th>المركز</th><th>المشروع</th><th>الأوردر</th><th>البيان</th><th>القيمة</th></tr></thead><tbody>${movementRowsHtml(returns)}</tbody></table></div>`}
     ]);
     return;
@@ -1217,3 +1230,4 @@
   window.addEventListener('load', boot);
   console.log('Tasneef '+VERSION+' loaded');
 })();
+
