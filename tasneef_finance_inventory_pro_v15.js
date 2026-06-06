@@ -1113,10 +1113,10 @@
     const financialRows=moves.filter(m=>movementFinancialTypesV15().includes(S(m.movement_type)));
     const returns=moves.filter(m=>S(m.movement_type)==='return');
     const inQty=ins.reduce((a,m)=>a+N(m.quantity),0);
-    const outQty=outs.reduce((a,m)=>a+N(m.quantity),0);
+    const outQty=financialRows.reduce((a,m)=>a+N(m.quantity),0);
     const returnQty=returns.reduce((a,m)=>a+N(m.quantity),0);
     const consumed=consumedRows.reduce((a,m)=>a+N(m.quantity),0);
-    const displayBalance=N(item.quantity);
+    const displayBalance=Math.max(0, inQty - outQty);
     const img=item.image_url?`<img src="${esc(item.image_url)}" style="width:96px;height:96px;object-fit:contain;border:1px solid #d9e7e2;border-radius:16px;background:#fff;padding:4px">`:'';
     openPagedModalV15('بيانات المنتج: '+(item.name||'-'), [
       {title:'الملخص', html:`<div class="fin-grid">${img?`<div class="fin-card">${img}</div>`:''}<div class="fin-card fin-kpi"><small>الداخل</small><b>${N(inQty)}</b></div><div class="fin-card fin-kpi"><small>الخارج</small><b>${N(outQty)}</b></div><div class="fin-card fin-kpi"><small>المستهلك</small><b>${N(consumed)}</b></div><div class="fin-card fin-kpi"><small>المرتجع</small><b>${N(returnQty)}</b></div><div class="fin-card fin-kpi"><small>الرصيد الحالي</small><b>${N(displayBalance)}</b></div></div><div class="fin-soft">الكود: <b>${esc(itemCode(item)||'-')}</b> | الوحدة: <b>${esc(item.unit||'-')}</b> | النوع: <b>${esc(productType(item))}</b></div>`},
