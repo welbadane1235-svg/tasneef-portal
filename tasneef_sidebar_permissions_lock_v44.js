@@ -117,6 +117,29 @@
   function showMessage(text){
     try{ if(typeof msg==='function') msg(text,'err'); else console.warn(text); }catch(_){}
   }
+  function directOpenPage(id, btn){
+    const target=$(id);
+    if(!target) return false;
+    document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden'));
+    target.classList.remove('hidden');
+    target.style.display='';
+    target.style.visibility='';
+    target.style.opacity='';
+    document.querySelectorAll('.side .nav').forEach(n=>n.classList.remove('active'));
+    const activeBtn=btn || [...document.querySelectorAll('.side .nav')].find(b=>pageFromButton(b)===id);
+    if(activeBtn && activeBtn.classList) activeBtn.classList.add('active');
+    try{ if(typeof renderAll === 'function') renderAll(); }catch(_){}
+    try{ if(id==='contracts' && typeof showContractsSubTab === 'function') showContractsSubTab('services'); }catch(_){}
+    try{
+      if(id==='financeDashboard'){
+        target.classList.add('finance-pro');
+        if(typeof window.financeProLoadV15 === 'function' && !target.querySelector('.fin-shell,#finTabsV15,#finBodyV15')) window.financeProLoadV15(false);
+        if(typeof window.financeProRenderAll === 'function') window.financeProRenderAll();
+      }
+    }catch(_){}
+    setTimeout(()=>{ rebuildSidebar(); enforceExistingButtons(); },30);
+    return true;
+  }
   function pageFromButton(btn){
     const m=S(btn && btn.getAttribute('onclick')).match(/showPage\(['"]([^'"]+)['"]/);
     return m ? m[1] : S(btn && btn.dataset && btn.dataset.page);
@@ -184,8 +207,7 @@
     if(active && active.id && !canPage(active.id)){
       const next=firstAllowed();
       const btn=[...document.querySelectorAll('.side .nav')].find(b=>pageFromButton(b)===next);
-      if(typeof originalShowPage === 'function') originalShowPage(next, btn);
-      else if(typeof window.__sidebarOldShowPageV44 === 'function') window.__sidebarOldShowPageV44(next, btn);
+      directOpenPage(next, btn);
     }
     enforceExistingButtons();
   }
@@ -202,14 +224,21 @@
         rebuildSidebar();
         return;
       }
-      const r=originalShowPage.apply(this, arguments);
-      setTimeout(()=>{ rebuildSidebar(); enforceExistingButtons(); },40);
+      let r;
+      try{ if(typeof originalShowPage === 'function') r=originalShowPage.apply(this, arguments); }catch(_){}
+      setTimeout(()=>{
+        const target=$(id);
+        if(target && target.classList.contains('hidden')) directOpenPage(id, btn);
+        rebuildSidebar();
+        enforceExistingButtons();
+      },40);
       return r;
     };
     wrapped.__sidebarLockV44=true;
     wrapped.__sidebarOriginalV44=originalShowPage;
     window.__sidebarOldShowPageV44=originalShowPage;
     window.showPage=wrapped;
+    window.__tasneefDirectOpenPageV45=directOpenPage;
     try{ showPage=wrapped; }catch(_){}
   }
   function refreshSessionFromData(){
