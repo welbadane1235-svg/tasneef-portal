@@ -32,6 +32,13 @@
   };
   const currentRoleV15 = ()=>S(currentUserV15().role);
   const isWarehouseOnlyV15 = ()=>currentRoleV15()==='warehouse_manager';
+  const isAdminRoleV15 = ()=>{
+    const u=currentUserV15();
+    const r=currentRoleV15();
+    return ['admin','general_manager','system_admin','مدير عام','مدير النظام'].includes(r) || S(u.username).toLowerCase()==='admin';
+  };
+  const canDeleteProductsV15 = ()=>isAdminRoleV15();
+  const canEditInvoicesV15 = ()=>isAdminRoleV15();
   const canSeeFinancePricesV15 = ()=>!isWarehouseOnlyV15();
   function financeTabsV15(){
     const all = [
@@ -432,7 +439,7 @@
           <div><small>الضريبة للوحدة</small><b>${money(itemCost(i)*VAT_RATE)}</b></div>
           <div><small>بعد الضريبة للوحدة</small><b>${money(itemCost(i)*(1+VAT_RATE))}</b></div>
         </div>
-        <div class="fin-card-actions"><button class="light" onclick="financeProShowProductV15('${esc(i.id)}')">عرض البيانات</button><button class="danger" onclick="financeProDeleteProductV15('${esc(i.id)}')">حذف</button></div>
+        <div class="fin-card-actions"><button class="light" onclick="financeProShowProductV15('${esc(i.id)}')">عرض البيانات</button>${canDeleteProductsV15()?`<button class="danger" onclick="financeProDeleteProductV15('${esc(i.id)}')">حذف</button>`:''}</div>
       </div>`;
     }).join('') || '<div class="fin-soft">لا توجد منتجات حسب الفلتر.</div>'}</div>`;
   }
@@ -505,7 +512,7 @@
   function renderInvoicesList(){
     const box=$('finInvoicesListV15'); if(!box) return;
     const rows=invoicesFromMovements();
-    box.innerHTML=`<div class="fin-card"><h3>الفواتير المسجلة</h3><div class="fin-table"><table><thead><tr><th>رقم الفاتورة</th><th>المورد</th><th>التاريخ</th><th>عدد المنتجات</th><th>قبل الضريبة</th><th>بعد الضريبة</th><th>إجراء</th></tr></thead><tbody>${rows.map(inv=>`<tr><td><b>${esc(inv.invoiceNo)}</b></td><td>${esc(inv.supplier||'-')}</td><td>${esc(inv.date||'-')}</td><td>${inv.lines.length}</td><td>${money(inv.net)}</td><td>${money(inv.gross||inv.net)}</td><td class="fin-actions"><button class="light" onclick="financeProShowInvoiceV15('${encodeURIComponent(inv.invoiceNo)}')">عرض</button><button onclick="financeProEditInvoiceV15('${encodeURIComponent(inv.invoiceNo)}')">تعديل</button></td></tr>`).join('') || '<tr><td colspan="7">لا توجد فواتير مخزون مسجلة</td></tr>'}</tbody></table></div></div>`;
+    box.innerHTML=`<div class="fin-card"><h3>الفواتير المسجلة</h3><div class="fin-table"><table><thead><tr><th>رقم الفاتورة</th><th>المورد</th><th>التاريخ</th><th>عدد المنتجات</th><th>قبل الضريبة</th><th>بعد الضريبة</th><th>إجراء</th></tr></thead><tbody>${rows.map(inv=>`<tr><td><b>${esc(inv.invoiceNo)}</b></td><td>${esc(inv.supplier||'-')}</td><td>${esc(inv.date||'-')}</td><td>${inv.lines.length}</td><td>${money(inv.net)}</td><td>${money(inv.gross||inv.net)}</td><td class="fin-actions"><button class="light" onclick="financeProShowInvoiceV15('${encodeURIComponent(inv.invoiceNo)}')">عرض</button>${canEditInvoicesV15()?`<button onclick="financeProEditInvoiceV15('${encodeURIComponent(inv.invoiceNo)}')">تعديل</button>`:''}</td></tr>`).join('') || '<tr><td colspan="7">لا توجد فواتير مخزون مسجلة</td></tr>'}</tbody></table></div></div>`;
   }
 
   function renderAddStock(body){
@@ -940,9 +947,11 @@
 
   window.financeProAddInvoiceLineV15 = function(){
     const line={ name:S($('finLineNameV15')?.value), code:S($('finLineCodeV15')?.value), distributor_code:S($('finLineDistributorCodeV15')?.value), supplier_invoice_no:S($('finLineSupplierInvoiceV15')?.value), qty:N($('finLineQtyV15')?.value), min_quantity:N($('finLineMinQtyV15')?.value)||1, price:N($('finLinePriceV15')?.value), tax_mode:S($('finLineTaxModeV15')?.value)||'before', unit:S($('finLineUnitV15')?.value)||'حبة', item_type:S($('finLineTypeV15')?.value)||'مادة', image:S(window.__financeProLineImageV15||'') };
+    const existingItem=state.items.find(i=>String(i.id)===String($('finExistingProductV15')?.value));
     if(!line.name) return alert('اسم المنتج مطلوب');
     if(line.qty<=0) return alert('الكمية مطلوبة');
     if(line.price<0) return alert('السعر غير صحيح');
+    if(!line.image && !(existingItem && S(existingItem.image_url))) return alert('يجب إرفاق صورة للمنتج قبل إضافته للمخزون');
     state.invoiceLines.push(line);
     ['finLineNameV15','finLineDistributorCodeV15','finLineSupplierInvoiceV15','finLineQtyV15','finLineMinQtyV15','finLinePriceV15'].forEach(id=>{ if($(id)) $(id).value=''; });
     if($('finExistingProductV15')) $('finExistingProductV15').value='';
@@ -1006,6 +1015,7 @@
     ]);
   };
   window.financeProEditInvoiceV15 = function(encoded){
+    if(!canEditInvoicesV15()) return alert('تعديل الفاتورة متاح لمدير النظام فقط');
     const invoiceNo=decodeURIComponent(encoded);
     const inv=invoicesFromMovements().find(x=>S(x.invoiceNo)===S(invoiceNo));
     if(!inv) return;
@@ -1291,6 +1301,7 @@
 
   window.financeProDeleteProductV15 = async function(id){
     try{
+      if(!canDeleteProductsV15()) return alert('حذف المنتج متاح لمدير النظام فقط');
       const item=state.items.find(i=>String(i.id)===String(id));
       if(!item) return;
       if(!confirm('حذف المنتج من قائمة المنتجات؟ لن يتم حذف حركاته القديمة.')) return;
@@ -1310,7 +1321,7 @@
     const items=state.items.filter(i=>S(i.supplier)===supplier);
     const moves=state.movements.filter(m=>S(m.receiver)===supplier);
     const expenses=state.expenses.filter(e=>S(e.supplier)===supplier || S(e.description)===supplier);
-    const itemRows=items.map(i=>`<tr><td>${esc(i.name)}</td><td>${esc(itemCode(i)||'-')}</td><td>${N(i.quantity)}</td><td>${esc(i.unit||'-')}</td><td>${money(itemCost(i))}</td><td class="fin-actions"><button class="light" onclick="financeProShowProductV15('${esc(i.id)}')">عرض</button><button class="danger" onclick="financeProDeleteProductV15('${esc(i.id)}')">حذف</button></td></tr>`).join('') || '<tr><td colspan="6">لا توجد منتجات لهذا المورد</td></tr>';
+    const itemRows=items.map(i=>`<tr><td>${esc(i.name)}</td><td>${esc(itemCode(i)||'-')}</td><td>${N(i.quantity)}</td><td>${esc(i.unit||'-')}</td><td>${money(itemCost(i))}</td><td class="fin-actions"><button class="light" onclick="financeProShowProductV15('${esc(i.id)}')">عرض</button>${canDeleteProductsV15()?`<button class="danger" onclick="financeProDeleteProductV15('${esc(i.id)}')">حذف</button>`:''}</td></tr>`).join('') || '<tr><td colspan="6">لا توجد منتجات لهذا المورد</td></tr>';
     const moveRows=moves.map(m=>`<tr><td>${esc(m.movement_date||S(m.created_at).slice(0,10)||'-')}</td><td>${esc(m.item_name||'-')}</td><td>${esc(movementTypeLabelV15(m.movement_type))}</td><td>${N(m.quantity)}</td><td>${money(N(m.quantity)*N(m.unit_cost))}</td><td class="fin-actions"><button onclick="financeProEditMovementV15(${Number(m.id)||0})">تعديل</button><button class="light" onclick="financeProShowMovementV15(${Number(m.id)||0})">عرض</button><button class="danger" onclick="financeProDeleteMovementV15(${Number(m.id)||0})">حذف</button></td></tr>`).join('') || '<tr><td colspan="6">لا توجد حركات لهذا المورد</td></tr>';
     const expenseRows=expenses.map(e=>`<tr><td>${esc(e.expense_date||e.date||'-')}</td><td>${esc(e.description||'-')}</td><td>${money(e.total||e.amount)}</td><td class="fin-actions"><button class="light" onclick="financeProShowExpenseV15(${Number(e.id)||0})">عرض</button><button class="danger" onclick="financeProDeleteExpenseV15(${Number(e.id)||0})">حذف</button></td></tr>`).join('') || '<tr><td colspan="4">لا توجد مصروفات لهذا المورد</td></tr>';
     openPagedModalV15('بيانات المورد: '+supplier, [
