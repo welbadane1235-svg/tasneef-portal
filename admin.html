@@ -66,7 +66,7 @@
 @media(max-width:900px){.export-hero-v222{flex-direction:column;align-items:flex-start}.export-nav-v223,.export-filter-grid-v222{grid-template-columns:1fr}.export-slide-v222{min-height:auto}}
 
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
 
 <style id="smart-ui-framework-v129">
 /* V130 Smart UI Framework Fix */
@@ -120,118 +120,6 @@
 #userPermissionsBoxV72:not(:has(.perm-u-grid)){min-height:140px}
 #v201PermMatrix,.perm-grid-v72{display:none!important}
 </style>
-
-<style id="financeReportsStableV7201">
-/* V7201 - تثبيت صفحة تقارير المالية والمخزون بدون إخفاء أي قسم */
-body.tasneef-finance-stable .finance-tabs,
-body.tasneef-finance-stable .finance-report-tabs,
-body.tasneef-finance-stable .inventory-report-tabs{
-  display:grid!important;
-  grid-template-columns:repeat(4,minmax(160px,1fr))!important;
-  gap:10px!important;
-  align-items:stretch!important;
-  margin:12px 0 18px!important;
-}
-body.tasneef-finance-stable .finance-tabs button,
-body.tasneef-finance-stable .finance-tab,
-body.tasneef-finance-stable .finance-report-tabs button,
-body.tasneef-finance-stable .inventory-report-tabs button{
-  width:100%!important;
-  min-height:44px!important;
-  border-radius:14px!important;
-  writing-mode:horizontal-tb!important;
-  white-space:nowrap!important;
-  text-align:center!important;
-}
-body.tasneef-finance-stable .finance-tabs button.active,
-body.tasneef-finance-stable .finance-tab.active,
-body.tasneef-finance-stable .finance-report-tabs button.active,
-body.tasneef-finance-stable .inventory-report-tabs button.active{
-  background:#0A4033!important;
-  color:#fff!important;
-  border-color:#0A4033!important;
-}
-body.tasneef-finance-stable #financeInventory .filters,
-body.tasneef-finance-stable #finance .filters,
-body.tasneef-finance-stable .finance-filters,
-body.tasneef-finance-stable .inventory-filter-bar{
-  display:grid!important;
-  grid-template-columns:2fr repeat(5,minmax(120px,1fr)) auto!important;
-  gap:10px!important;
-  align-items:end!important;
-}
-body.tasneef-finance-stable #financeInventory .filters input,
-body.tasneef-finance-stable #financeInventory .filters select,
-body.tasneef-finance-stable #finance .filters input,
-body.tasneef-finance-stable #finance .filters select,
-body.tasneef-finance-stable .finance-filters input,
-body.tasneef-finance-stable .finance-filters select{
-  min-width:0!important;
-  max-width:none!important;
-}
-body.tasneef-finance-stable #financeInventory .table-wrap,
-body.tasneef-finance-stable #finance .table-wrap,
-body.tasneef-finance-stable .finance-report-table,
-body.tasneef-finance-stable .inventory-report-table{
-  max-height:none!important;
-  overflow:auto!important;
-  border-radius:18px!important;
-}
-body.tasneef-finance-stable #financeInventory table,
-body.tasneef-finance-stable #finance table,
-body.tasneef-finance-stable .finance-report-table table,
-body.tasneef-finance-stable .inventory-report-table table{
-  table-layout:auto!important;
-  width:100%!important;
-}
-body.tasneef-finance-stable #financeInventory th,
-body.tasneef-finance-stable #financeInventory td,
-body.tasneef-finance-stable #finance th,
-body.tasneef-finance-stable #finance td{
-  writing-mode:horizontal-tb!important;
-  vertical-align:middle!important;
-  white-space:nowrap!important;
-}
-body.tasneef-finance-stable .finance-kpis,
-body.tasneef-finance-stable .finance-report-kpis{
-  display:grid!important;
-  grid-template-columns:repeat(3,minmax(220px,1fr))!important;
-  gap:12px!important;
-  margin-top:14px!important;
-}
-body.tasneef-finance-stable .finance-kpis .kpi,
-body.tasneef-finance-stable .finance-report-kpis .kpi{
-  min-height:86px!important;
-}
-body.tasneef-finance-stable .finance-kpis .kpi b,
-body.tasneef-finance-stable .finance-report-kpis .kpi b{
-  font-size:28px!important;
-  direction:rtl!important;
-}
-@media(max-width:1100px){
-  body.tasneef-finance-stable .finance-tabs,
-  body.tasneef-finance-stable .finance-report-tabs,
-  body.tasneef-finance-stable .inventory-report-tabs,
-  body.tasneef-finance-stable .finance-kpis,
-  body.tasneef-finance-stable .finance-report-kpis{grid-template-columns:1fr 1fr!important;}
-  body.tasneef-finance-stable #financeInventory .filters,
-  body.tasneef-finance-stable #finance .filters,
-  body.tasneef-finance-stable .finance-filters,
-  body.tasneef-finance-stable .inventory-filter-bar{grid-template-columns:1fr 1fr!important;}
-}
-@media(max-width:700px){
-  body.tasneef-finance-stable .finance-tabs,
-  body.tasneef-finance-stable .finance-report-tabs,
-  body.tasneef-finance-stable .inventory-report-tabs,
-  body.tasneef-finance-stable .finance-kpis,
-  body.tasneef-finance-stable .finance-report-kpis,
-  body.tasneef-finance-stable #financeInventory .filters,
-  body.tasneef-finance-stable #finance .filters,
-  body.tasneef-finance-stable .finance-filters,
-  body.tasneef-finance-stable .inventory-filter-bar{grid-template-columns:1fr!important;}
-}
-</style>
-
 </head>
 <body onload="initAdmin()">
 <div class="app-shell">
@@ -821,7 +709,7 @@ window.__tasneefFinanceProExclusive=true;
 window.__tasneefUnifiedPermissionsOnly=true;
 window.__tasneefV201Loaded=true;
 </script>
-<script src="app.js?v=7301" defer></script>
+<script src="app.js?v=360" defer></script>
 <script src="tasneef_patch_v357_inventory_balance_image_fix.js?v=357" defer></script>
 <script src="tasneef_orders_cards_v6.js?v=9" defer></script>
 <script src="tasneef_orders_workflow_v8.js?v=8" defer></script>
@@ -830,68 +718,19 @@ window.__tasneefV201Loaded=true;
 <script src="tasneef_contracts_workflow_v10.js?v=10" defer></script>
 <script src="tasneef_contracts_pro_v11.js?v=12" defer></script>
 <script src="tasneef_attendance_technicians_v13.js?v=14" defer></script>
-<script src="tasneef_finance_inventory_pro_v15.js?v=7201" defer></script>
-<script src="tasneef_finance_supplier_qty_fix_v57.js?v=7201" defer></script>
-<script src="tasneef_finance_inventory_actions_v58.js?v=7201" defer></script>
+<script src="tasneef_finance_inventory_pro_v15.js?v=63" defer></script>
+<script src="tasneef_finance_supplier_qty_fix_v57.js?v=57" defer></script>
+<script src="tasneef_finance_inventory_actions_v58.js?v=63" defer></script>
 <script src="tasneef_attendance_status_fix_v16.js?v=16" defer></script>
 <script src="tasneef_attendance_bulk_report_v49.js?v=50" defer></script>
 <script src="tasneef_worker_distribution_unified_v51.js?v=51" defer></script>
-<script src="tasneef_finance_roles_v29.js?v=7201" defer></script>
-<script src="tasneef_finance_pro_lock_v31.js?v=7201" defer></script>
-<script src="tasneef_finance_manager_stable_v35.js?v=7201" defer></script>
+<script src="tasneef_finance_roles_v29.js?v=35" defer></script>
+<script src="tasneef_finance_pro_lock_v31.js?v=35" defer></script>
+<script src="tasneef_finance_manager_stable_v35.js?v=37" defer></script>
 <script src="tasneef_permissions_unified_v43.js?v=44" defer></script>
-<script src="tasneef_warehouse_manager_stable_v46.js?v=7301" defer></script>
+<script src="tasneef_warehouse_manager_stable_v46.js?v=63" defer></script>
 <script src="tasneef_sidebar_permissions_lock_v44.js?v=47" defer></script>
-<script src="tasneef_inventory_product_warehouse_fix_v65.js?v=7201" defer></script>
-
-<script id="financeReportsStablePatchV7201">
-(function(){
-  'use strict';
-  const VERSION='V7201';
-  function mark(){ document.body && document.body.classList.add('tasneef-finance-stable'); }
-  function txt(el){ return (el && (el.textContent||el.value)||'').replace(/\s+/g,' ').trim(); }
-  function stabilizeFinanceReports(){
-    try{
-      mark();
-      document.querySelectorAll('button').forEach(function(btn){
-        const t=txt(btn);
-        if(/تقرير المنتجات|حركة المخزون|جرد المخزن|مراكز التكلفة|طباعة/.test(t)){
-          btn.type='button';
-          btn.style.writingMode='horizontal-tb';
-          btn.style.whiteSpace='nowrap';
-        }
-      });
-      document.querySelectorAll('table').forEach(function(table){
-        const parentText=txt(table.closest('.card')||table.parentElement||table);
-        if(/تقرير المنتجات|حركة المخزون|جرد المخزن|مراكز التكلفة|الدخول للمخزن|استهلاك المشرفين|الإجمالي قبل الضريبة|الضريبة/.test(parentText)){
-          table.classList.add('tasneef-finance-report-table-v7201');
-          const wrap=table.closest('.table-wrap');
-          if(wrap){ wrap.style.maxHeight='none'; wrap.style.overflow='auto'; }
-        }
-      });
-      const financeNavExists=[...document.querySelectorAll('.nav')].some(b=>txt(b).includes('المالية والمخزون'));
-      if(!financeNavExists){
-        const exportBtn=[...document.querySelectorAll('.nav')].find(b=>txt(b).includes('التصدير والاستيراد'));
-        const financeSection=document.getElementById('financeInventory')||document.getElementById('finance');
-        if(exportBtn && financeSection){
-          const btn=document.createElement('button');
-          btn.className='nav';
-          btn.textContent='المالية والمخزون';
-          btn.type='button';
-          btn.onclick=function(){ if(typeof showPage==='function') showPage(financeSection.id, btn); };
-          exportBtn.parentNode.insertBefore(btn, exportBtn);
-        }
-      }
-      window.__tasneefFinanceStablePatch=VERSION;
-    }catch(e){ console.warn('finance stable patch failed',e); }
-  }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', stabilizeFinanceReports); else stabilizeFinanceReports();
-  window.addEventListener('load', stabilizeFinanceReports);
-  setTimeout(stabilizeFinanceReports, 700);
-  setTimeout(stabilizeFinanceReports, 1800);
-  new MutationObserver(function(){ clearTimeout(window.__tasneefFinanceStableTimer); window.__tasneefFinanceStableTimer=setTimeout(stabilizeFinanceReports,120); }).observe(document.documentElement,{childList:true,subtree:true});
-})();
-</script>
-
+<script src="tasneef_inventory_product_warehouse_fix_v65.js?v=65" defer></script>
+<script src="tasneef_warehouse_reports_lock_v7402.js?v=7402" defer></script>
 </body>
 </html>
