@@ -9,7 +9,8 @@
     'can_edit_inventory_requests','can_delete_inventory_requests',
     'tab_financeDashboard_view','tab_financeDashboard_add','tab_financeDashboard_edit','tab_financeDashboard_delete','tab_financeDashboard_print',
     'tab_products_view','tab_products_add','tab_products_edit','tab_products_delete','tab_products_print',
-    'tab_movement_view','tab_movement_add','tab_movement_edit','tab_movement_delete','tab_movement_print'
+    'tab_movement_view','tab_movement_add','tab_movement_edit','tab_movement_delete','tab_movement_print',
+    'tab_reports_view','tab_reports_add','tab_reports_edit','tab_reports_delete','tab_reports_print'
   ];
 
   function user(){
@@ -59,10 +60,11 @@
       body.warehouse-manager-stable-v46 #financeDashboard > .finance-tabs,
       body.warehouse-manager-stable-v46 #financeDashboard > .finance-tab-page,
       body.warehouse-manager-stable-v46 #financeDashboard > [id^="financeTab"]{display:none!important}
-      body.warehouse-manager-stable-v46 #finTabsV15{display:grid!important;grid-template-columns:repeat(2,minmax(160px,1fr))!important;gap:8px!important}
+      body.warehouse-manager-stable-v46 #finTabsV15{display:grid!important;grid-template-columns:repeat(3,minmax(160px,1fr))!important;gap:8px!important}
       body.warehouse-manager-stable-v46 #finTabsV15 button{display:none!important;visibility:hidden!important}
       body.warehouse-manager-stable-v46 #finTabsV15 button[data-fin-tab-v15="products"],
-      body.warehouse-manager-stable-v46 #finTabsV15 button[data-fin-tab-v15="movement"]{display:inline-flex!important;visibility:visible!important;opacity:1!important;justify-content:center}
+      body.warehouse-manager-stable-v46 #finTabsV15 button[data-fin-tab-v15="movement"],
+      body.warehouse-manager-stable-v46 #finTabsV15 button[data-fin-tab-v15="reports"]{display:inline-flex!important;visibility:visible!important;opacity:1!important;justify-content:center}
       body.warehouse-manager-stable-v46 #finBodyV15{display:block!important;visibility:visible!important;opacity:1!important;min-height:260px}
       body.warehouse-manager-stable-v46 #financeDashboard .fin-card,
       body.warehouse-manager-stable-v46 #financeDashboard .fin-table{visibility:visible!important;opacity:1!important}
@@ -71,10 +73,11 @@
       body.warehouse-manager-stable-v44 #financeDashboard > .finance-tabs,
       body.warehouse-manager-stable-v44 #financeDashboard > .finance-tab-page,
       body.warehouse-manager-stable-v44 #financeDashboard > [id^="financeTab"]{display:none!important}
-      body.warehouse-manager-stable-v44 #finTabsV15{display:grid!important;grid-template-columns:repeat(2,minmax(160px,1fr))!important;gap:8px!important}
+      body.warehouse-manager-stable-v44 #finTabsV15{display:grid!important;grid-template-columns:repeat(3,minmax(160px,1fr))!important;gap:8px!important}
       body.warehouse-manager-stable-v44 #finTabsV15 button{display:none!important;visibility:hidden!important}
       body.warehouse-manager-stable-v44 #finTabsV15 button[data-fin-tab-v15="products"],
-      body.warehouse-manager-stable-v44 #finTabsV15 button[data-fin-tab-v15="movement"]{display:inline-flex!important;visibility:visible!important;opacity:1!important;justify-content:center}
+      body.warehouse-manager-stable-v44 #finTabsV15 button[data-fin-tab-v15="movement"],
+      body.warehouse-manager-stable-v44 #finTabsV15 button[data-fin-tab-v15="reports"]{display:inline-flex!important;visibility:visible!important;opacity:1!important;justify-content:center}
       body.warehouse-manager-stable-v44 #finBodyV15{display:block!important;visibility:visible!important;opacity:1!important;min-height:260px}
       body.warehouse-manager-stable-v44 #financeDashboard .fin-card,
       body.warehouse-manager-stable-v44 #financeDashboard .fin-table{visibility:visible!important;opacity:1!important}
@@ -106,7 +109,7 @@
   }
   function wantedTab(){
     const saved = S(sessionStorage.getItem('tasneef_warehouse_fin_tab_v44'));
-    return ['products','movement'].includes(saved) ? saved : 'products';
+    return ['products','movement','reports'].includes(saved) ? saved : 'products';
   }
   function removeLegacyFinance(){
     const p = page();
@@ -125,14 +128,14 @@
   function normalizeTabs(){
     document.querySelectorAll('#finTabsV15 button[data-fin-tab-v15]').forEach(btn => {
       const id = S(btn.getAttribute('data-fin-tab-v15'));
-      const ok = id === 'products' || id === 'movement';
+      const ok = id === 'products' || id === 'movement' || id === 'reports';
       btn.hidden = false;
       btn.style.display = ok ? '' : 'none';
       btn.style.visibility = ok ? 'visible' : 'hidden';
       btn.classList.remove('v205-hidden-perm');
     });
     const current = activeTab();
-    if(current && !['products','movement'].includes(current) && typeof window.financeProTabV15 === 'function'){
+    if(current && !['products','movement','reports'].includes(current) && typeof window.financeProTabV15 === 'function'){
       window.financeProTabV15(wantedTab());
     }
   }
@@ -193,7 +196,7 @@
     if(typeof old !== 'function' || old.__warehouseStableV44) return;
     const wrapped = async function(tab){
       if(isWarehouse()){
-        const target = ['products','movement'].includes(S(tab)) ? S(tab) : 'products';
+        const target = ['products','movement','reports'].includes(S(tab)) ? S(tab) : 'products';
         sessionStorage.setItem('tasneef_warehouse_fin_tab_v44', target);
         const result = await old.call(this, target);
         setTimeout(() => {
@@ -251,7 +254,7 @@
       ev.preventDefault();
       ev.stopPropagation();
       ev.stopImmediatePropagation();
-      if(!['products','movement'].includes(id)) return;
+      if(!['products','movement','reports'].includes(id)) return;
       sessionStorage.setItem('tasneef_warehouse_fin_tab_v44', id);
       if(typeof window.financeProTabV15 === 'function') window.financeProTabV15(id);
       setTimeout(clean, 70);
@@ -269,7 +272,7 @@
     const allow = key => {
       const k = S(key);
       return k === 'can_expenses_inventory' || k === 'can_manage_inventory' || k === 'can_inventory_requests' ||
-        k.startsWith('tab_products_') || k.startsWith('tab_movement_') || k.startsWith('tab_financeDashboard_');
+        k.startsWith('tab_products_') || k.startsWith('tab_movement_') || k.startsWith('tab_reports_') || k.startsWith('tab_financeDashboard_');
     };
     window.tasneefCanV201 = function(key){
       if(isWarehouse() && allow(key)) return true;

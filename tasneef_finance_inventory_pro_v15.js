@@ -50,7 +50,7 @@
       ['cost','مركز تكلفة'],
       ['reports','تقارير']
     ];
-    return isWarehouseOnlyV15() ? all.filter(t=>['products','movement'].includes(t[0])) : all;
+    return isWarehouseOnlyV15() ? all.filter(t=>['products','movement','reports'].includes(t[0])) : all;
   }
   function ensureAllowedFinanceTabV15(){
     const ids=financeTabsV15().map(t=>t[0]);
