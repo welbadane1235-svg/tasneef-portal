@@ -17109,7 +17109,7 @@ function financePrintReport(kind){
   async function loadAllV280(){
     const r = monthRange();
     const [users, projects, workers, attendance, logs, tickets] = await Promise.all([
-      safeSelect('app_users', sb.from('app_users').select('id,full_name,username,password,role,is_active').order('id')),
+      safeSelect('app_users', sb.from('app_users').select('id,full_name,username,password,role,is_active,permissions').order('id')),
       safeSelect('projects', sb.from('projects').select('*').order('id')),
       safeSelect('workers', sb.from('workers').select('*').order('id')),
       selectAllPaged(sb.from('attendance').select('*').gte('attendance_date', r.start).lt('attendance_date', r.end).order('attendance_date',{ascending:false})),
@@ -17288,7 +17288,7 @@ function financePrintReport(kind){
   async function loadAllV281(){
     const r = monthRange();
     const [users, projects, workers, attendance, logs, tickets] = await Promise.all([
-      safe('app_users', sb.from('app_users').select('id,full_name,username,password,role,is_active').order('id')),
+      safe('app_users', sb.from('app_users').select('id,full_name,username,password,role,is_active,permissions').order('id')),
       safe('projects', sb.from('projects').select('*').order('id')),
       safe('workers', sb.from('workers').select('*').order('id')),
       pageAll(sb.from('attendance').select('*').gte('attendance_date', r.start).lt('attendance_date', r.end).order('attendance_date',{ascending:false})),
