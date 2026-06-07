@@ -1,4 +1,4 @@
-﻿(function(){
+(function(){
   'use strict';
   if(window.__tasneefWarehouseManagerStableV46) return;
   window.__tasneefWarehouseManagerStableV46 = true;
@@ -86,6 +86,24 @@
       body.warehouse-manager-stable-v44 #financeDashboard .fin-product-card .fin-meta div:nth-child(7){display:none!important}
       body.warehouse-manager-stable-v44 .fin-money-hidden-v44{display:none!important}
       body.warehouse-manager-stable-v44 #financeDashboard .fin-hero p::after{content:"";display:block}
+      body.warehouse-manager-stable-v46 .wm-report-shell-v7301{display:grid;gap:14px}
+      body.warehouse-manager-stable-v46 .wm-report-tabs-v7301{display:grid;grid-template-columns:repeat(4,minmax(160px,1fr));gap:10px;margin:8px 0 14px}
+      body.warehouse-manager-stable-v46 .wm-report-tabs-v7301 button{background:#eef6f3!important;color:#0A4033!important;border:1px solid #cfe2da!important;border-radius:16px!important;min-height:44px!important;text-align:center!important;white-space:nowrap!important}
+      body.warehouse-manager-stable-v46 .wm-report-tabs-v7301 button.active{background:#0A4033!important;color:#fff!important;border-color:#0A4033!important}
+      body.warehouse-manager-stable-v46 .wm-filters-v7301{display:grid;grid-template-columns:2fr repeat(5,minmax(120px,1fr)) auto;gap:9px;align-items:end}
+      body.warehouse-manager-stable-v46 .wm-filters-v7301 input,body.warehouse-manager-stable-v46 .wm-filters-v7301 select{max-width:none!important;min-width:0!important}
+      body.warehouse-manager-stable-v46 .wm-kpis-v7301{display:grid;grid-template-columns:repeat(4,minmax(160px,1fr));gap:10px}
+      body.warehouse-manager-stable-v46 .wm-kpi-v7301{background:#fff;border:1px solid #dce6e2;border-radius:18px;padding:15px;box-shadow:0 8px 22px rgba(10,64,51,.05)}
+      body.warehouse-manager-stable-v46 .wm-kpi-v7301 small{display:block;color:#60706a;margin-bottom:8px}.wm-kpi-v7301 b{font-size:26px;color:#0A4033}
+      body.warehouse-manager-stable-v46 .wm-report-card-v7301{background:#fff;border:1px solid #dce6e2;border-radius:22px;padding:16px;box-shadow:0 8px 24px rgba(10,64,51,.05)}
+      body.warehouse-manager-stable-v46 .wm-report-card-v7301 h3{margin:0 0 12px;color:#0A4033}
+      body.warehouse-manager-stable-v46 .wm-table-v7301{overflow:auto;border:1px solid #dce6e2;border-radius:16px;background:#fff;max-height:none!important}
+      body.warehouse-manager-stable-v46 .wm-table-v7301 table{width:100%;border-collapse:collapse;table-layout:auto!important}
+      body.warehouse-manager-stable-v46 .wm-table-v7301 th,body.warehouse-manager-stable-v46 .wm-table-v7301 td{padding:10px;border-bottom:1px solid #edf1ef;text-align:right;white-space:nowrap;writing-mode:horizontal-tb!important}
+      body.warehouse-manager-stable-v46 .wm-table-v7301 th{background:#f8fbfa;color:#4c635c;position:sticky;top:0;z-index:1}
+      body.warehouse-manager-stable-v46 .wm-total-row-v7301{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.wm-total-row-v7301 .wm-kpi-v7301 b{font-size:24px}
+      @media(max-width:1100px){body.warehouse-manager-stable-v46 .wm-report-tabs-v7301,body.warehouse-manager-stable-v46 .wm-kpis-v7301{grid-template-columns:1fr 1fr}body.warehouse-manager-stable-v46 .wm-filters-v7301{grid-template-columns:1fr 1fr}}
+      @media(max-width:700px){body.warehouse-manager-stable-v46 .wm-report-tabs-v7301,body.warehouse-manager-stable-v46 .wm-kpis-v7301,body.warehouse-manager-stable-v46 .wm-filters-v7301,body.warehouse-manager-stable-v46 .wm-total-row-v7301{grid-template-columns:1fr}}
     `;
     document.head.appendChild(st);
   }
@@ -214,6 +232,108 @@
     });
     return rows;
   }
+  function esc(v){
+    return String(v ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+  }
+  function money(n){
+    const x=Number(n)||0;
+    return x.toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2})+' ر.س';
+  }
+  function reportUnitPrice(r){
+    try{
+      const raw = window.financeProStateV15 || {};
+      const items = Array.isArray(raw.items) ? raw.items : [];
+      const it = items.find(x => S(x.name||x.item_name) === S(r.item));
+      return Number(it?.unit_price || it?.price || it?.cost || it?.avg_cost || 0) || 0;
+    }catch(_){ return 0; }
+  }
+  function reportRowsFiltered(){
+    const rows=(window.__wmRowsV7301 || reportRows()).slice();
+    const q=S(document.getElementById('wmRepSearchV7301')?.value).toLowerCase();
+    const type=S(document.getElementById('wmRepTypeV7301')?.value);
+    const project=S(document.getElementById('wmRepProjectV7301')?.value);
+    const product=S(document.getElementById('wmRepProductV7301')?.value);
+    const from=S(document.getElementById('wmRepFromV7301')?.value);
+    const to=S(document.getElementById('wmRepToV7301')?.value);
+    return rows.filter(r=>{
+      const t=rowType(r.type);
+      if(type && t!==type) return false;
+      if(project && S(r.project)!==project) return false;
+      if(product && S(r.item)!==product) return false;
+      if(from && S(r.date)<from) return false;
+      if(to && S(r.date)>to) return false;
+      if(q){
+        const hay=[r.date,r.type,r.item,r.qty,r.receiver,r.project,r.order].map(S).join(' ').toLowerCase();
+        if(!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }
+  function wmProjectsOptions(rows){
+    return [...new Set(rows.map(r=>S(r.project)).filter(Boolean).filter(x=>x!=='-'))].sort().map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
+  }
+  function wmProductsOptions(rows){
+    return [...new Set(rows.map(r=>S(r.item)).filter(Boolean).filter(x=>x!=='-'))].sort().map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
+  }
+  function wmTypeLabel(t){
+    t=rowType(t);
+    return t==='in'?'داخل':t==='consume'?'مستهلك':t==='return'?'مرتجع':t==='waste'?'هدر':t==='damaged'?'تالف':t==='scrap'?'سكراب':t||'-';
+  }
+  function wmCurrentTab(){ return S(sessionStorage.getItem('tasneef_warehouse_report_inner_v7301')) || 'products'; }
+  window.wmReportTabV7301=function(tab){
+    sessionStorage.setItem('tasneef_warehouse_report_inner_v7301', tab || 'products');
+    wmRenderReportContentV7301();
+  };
+  window.wmRenderReportsV7301=function(){ wmRenderReportContentV7301(); };
+  window.wmPrintReportsV7301=function(){
+    const box=document.getElementById('wmReportPrintAreaV7301');
+    if(!box) return window.print();
+    const w=window.open('','_blank');
+    w.document.write('<html dir="rtl" lang="ar"><head><title>تقرير المخزون</title><style>body{font-family:Tahoma,Arial;padding:20px;color:#10231d}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #999;padding:8px;text-align:right}th{background:#f1f5f3}h2,h3{color:#0A4033}.kpi{display:inline-block;border:1px solid #ccc;border-radius:12px;padding:12px;margin:6px;min-width:150px}</style></head><body>'+box.innerHTML+'</body></html>');
+    w.document.close(); w.focus(); setTimeout(()=>w.print(),300);
+  };
+  function wmRenderReportContentV7301(){
+    const body=document.getElementById('finBodyV15');
+    const content=document.getElementById('wmReportContentV7301');
+    if(!body || !content) return;
+    const rows=reportRowsFiltered();
+    const tab=wmCurrentTab();
+    document.querySelectorAll('.wm-report-tabs-v7301 button').forEach(b=>b.classList.toggle('active', b.dataset.wmTab===tab));
+    const totalIn=rows.filter(r=>rowType(r.type)==='in').reduce((a,r)=>a+qty(r.qty),0);
+    const totalConsume=rows.filter(r=>rowType(r.type)==='consume').reduce((a,r)=>a+qty(r.qty),0);
+    const totalReturn=rows.filter(r=>rowType(r.type)==='return').reduce((a,r)=>a+qty(r.qty),0);
+    const totalValue=rows.reduce((a,r)=>a+(qty(r.qty)*reportUnitPrice(r)),0);
+    const vat=totalValue*0.15;
+    const productMap={};
+    rows.forEach(r=>{
+      const k=S(r.item)||'-';
+      productMap[k]=productMap[k]||{in:0,consume:0,return:0,waste:0,balance:0,value:0};
+      const t=rowType(r.type), q=qty(r.qty), price=reportUnitPrice(r);
+      if(t==='in'){ productMap[k].in+=q; productMap[k].balance+=q; }
+      else if(t==='return'){ productMap[k].return+=q; productMap[k].balance+=q; }
+      else if(t==='consume'){ productMap[k].consume+=q; productMap[k].balance-=q; }
+      else { productMap[k].waste+=q; productMap[k].balance-=q; }
+      productMap[k].value += Math.max(0,q*price);
+    });
+    let html='';
+    if(tab==='products'){
+      const trs=Object.keys(productMap).map(name=>`<tr><td>${esc(name)}</td><td>${productMap[name].in}</td><td>${productMap[name].consume}</td><td>${productMap[name].return}</td><td>${productMap[name].waste}</td><td>${productMap[name].balance}</td><td>${money(productMap[name].value)}</td></tr>`).join('') || '<tr><td colspan="7">لا توجد بيانات</td></tr>';
+      html=`<div class="wm-report-card-v7301" id="wmReportPrintAreaV7301"><h3>تقرير المنتجات</h3><div class="wm-kpis-v7301"><div class="wm-kpi-v7301"><small>منتجات في التقرير</small><b>${Object.keys(productMap).length}</b></div><div class="wm-kpi-v7301"><small>كمية الدخول</small><b>${totalIn}</b></div><div class="wm-kpi-v7301"><small>المستهلك</small><b>${totalConsume}</b></div><div class="wm-kpi-v7301"><small>المرتجع</small><b>${totalReturn}</b></div></div><div class="wm-table-v7301"><table><thead><tr><th>المنتج</th><th>داخل</th><th>مستهلك</th><th>مرتجع</th><th>تالف/هدر</th><th>الرصيد الحالي</th><th>إجمالي تقديري</th></tr></thead><tbody>${trs}</tbody></table></div><div class="wm-total-row-v7301"><div class="wm-kpi-v7301"><small>الإجمالي قبل الضريبة</small><b>${money(totalValue)}</b></div><div class="wm-kpi-v7301"><small>الضريبة 15%</small><b>${money(vat)}</b></div><div class="wm-kpi-v7301"><small>الإجمالي بعد الضريبة</small><b>${money(totalValue+vat)}</b></div></div></div>`;
+    }else if(tab==='movement'){
+      const trs=rows.map(r=>`<tr><td>${esc(r.date)}</td><td>${esc(wmTypeLabel(r.type))}</td><td>${esc(r.item)}</td><td>${qty(r.qty)}</td><td>${esc(r.receiver)}</td><td>${esc(r.project)}</td><td>${esc(r.order)}</td><td>${money(qty(r.qty)*reportUnitPrice(r))}</td></tr>`).join('') || '<tr><td colspan="8">لا توجد حركات</td></tr>';
+      html=`<div class="wm-report-card-v7301" id="wmReportPrintAreaV7301"><h3>حركة المخزون</h3><div class="wm-kpis-v7301"><div class="wm-kpi-v7301"><small>حركات ظاهرة</small><b>${rows.length}</b></div><div class="wm-kpi-v7301"><small>داخل</small><b>${totalIn}</b></div><div class="wm-kpi-v7301"><small>مستهلك</small><b>${totalConsume}</b></div><div class="wm-kpi-v7301"><small>مرتجع</small><b>${totalReturn}</b></div></div><div class="wm-table-v7301"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>المنتج</th><th>الكمية</th><th>المستلم/المورد</th><th>المشروع/الخدمة</th><th>الأوردر</th><th>الإجمالي</th></tr></thead><tbody>${trs}</tbody></table></div></div>`;
+    }else if(tab==='stock'){
+      const trs=Object.keys(productMap).filter(k=>productMap[k].balance!==0).map(name=>`<tr><td>${esc(name)}</td><td>${productMap[name].balance}</td><td>${productMap[name].in}</td><td>${productMap[name].consume}</td><td>${productMap[name].return}</td></tr>`).join('') || '<tr><td colspan="5">لا توجد منتجات برصيد حالي</td></tr>';
+      html=`<div class="wm-report-card-v7301" id="wmReportPrintAreaV7301"><h3>جرد المخزون</h3><p style="color:#60706a">لا تظهر المنتجات ذات الرصيد صفر.</p><div class="wm-table-v7301"><table><thead><tr><th>المنتج</th><th>الرصيد الحالي</th><th>إجمالي الدخول</th><th>إجمالي الاستهلاك</th><th>المرتجع</th></tr></thead><tbody>${trs}</tbody></table></div></div>`;
+    }else{
+      const map={};
+      rows.filter(r=>rowType(r.type)==='consume').forEach(r=>{const k=S(r.project)||'-'; map[k]=map[k]||{qty:0,value:0,count:0}; map[k].qty+=qty(r.qty); map[k].value+=qty(r.qty)*reportUnitPrice(r); map[k].count++;});
+      const trs=Object.keys(map).map(k=>`<tr><td>${esc(k)}</td><td>${map[k].count}</td><td>${map[k].qty}</td><td>${money(map[k].value)}</td><td>${money(map[k].value*0.15)}</td><td>${money(map[k].value*1.15)}</td></tr>`).join('') || '<tr><td colspan="6">لا توجد مراكز تكلفة</td></tr>';
+      const subtotal=Object.values(map).reduce((a,x)=>a+x.value,0);
+      html=`<div class="wm-report-card-v7301" id="wmReportPrintAreaV7301"><h3>مراكز التكلفة</h3><div class="wm-table-v7301"><table><thead><tr><th>المشروع / مركز التكلفة</th><th>عدد العمليات</th><th>الكمية</th><th>قبل الضريبة</th><th>الضريبة</th><th>بعد الضريبة</th></tr></thead><tbody>${trs}</tbody></table></div><div class="wm-total-row-v7301"><div class="wm-kpi-v7301"><small>الإجمالي قبل الضريبة</small><b>${money(subtotal)}</b></div><div class="wm-kpi-v7301"><small>الضريبة 15%</small><b>${money(subtotal*0.15)}</b></div><div class="wm-kpi-v7301"><small>الإجمالي بعد الضريبة</small><b>${money(subtotal*1.15)}</b></div></div></div>`;
+    }
+    content.innerHTML=html;
+  }
   function renderWarehouseReports(){
     if(!isWarehouse() || !visible()) return false;
     const body=document.getElementById('finBodyV15');
@@ -222,19 +342,11 @@
       btn.classList.toggle('active', S(btn.getAttribute('data-fin-tab-v15'))==='reports');
     });
     const rows=reportRows().filter(r=>['in','consume','return','waste','damaged','scrap'].includes(rowType(r.type)));
-    const productMap={};
-    rows.forEach(r=>{
-      const k=S(r.item)||'-';
-      productMap[k]=productMap[k]||{in:0,consume:0,return:0,waste:0};
-      const t=rowType(r.type);
-      if(t==='in') productMap[k].in+=qty(r.qty);
-      else if(t==='consume') productMap[k].consume+=qty(r.qty);
-      else if(t==='return') productMap[k].return+=qty(r.qty);
-      else productMap[k].waste+=qty(r.qty);
-    });
-    const productRows=Object.keys(productMap).map(name=>`<tr><td>${name}</td><td>${productMap[name].in}</td><td>${productMap[name].consume}</td><td>${productMap[name].return}</td><td>${productMap[name].waste}</td></tr>`).join('');
-    const moveRows=rows.map(r=>`<tr><td>${r.date}</td><td>${r.type==='in'?'داخل':r.type==='consume'?'مستهلك':r.type==='return'?'مرتجع':r.type}</td><td>${r.item}</td><td>${r.qty}</td><td>${r.receiver}</td><td>${r.project}</td><td>${r.order}</td></tr>`).join('');
-    body.innerHTML=`<div class="fin-card"><h3>تقارير مدير المخزون</h3><div class="fin-grid three"><div class="fin-card fin-kpi"><small>حركات ظاهرة</small><b>${rows.length}</b></div><div class="fin-card fin-kpi"><small>منتجات في التقرير</small><b>${Object.keys(productMap).length}</b></div><div class="fin-card fin-kpi"><small>المرتجع</small><b>${rows.filter(r=>rowType(r.type)==='return').reduce((a,r)=>a+qty(r.qty),0)}</b></div></div><h3>تقرير المنتجات</h3><div class="fin-table"><table><thead><tr><th>المنتج</th><th>داخل</th><th>مستهلك</th><th>مرتجع</th><th>تالف/هدر/سكراب</th></tr></thead><tbody>${productRows||'<tr><td colspan="5">لا توجد بيانات</td></tr>'}</tbody></table></div><h3>حركة المخزون</h3><div class="fin-table"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>المنتج</th><th>الكمية</th><th>المستلم/المورد</th><th>المشروع/الخدمة</th><th>الأوردر</th></tr></thead><tbody>${moveRows||'<tr><td colspan="7">لا توجد حركات</td></tr>'}</tbody></table></div></div>`;
+    window.__wmRowsV7301 = rows;
+    const projects=wmProjectsOptions(rows), products=wmProductsOptions(rows);
+    body.innerHTML=`<div class="wm-report-shell-v7301">
+      <div class="wm-report-card-v7301"><h3>تقارير مدير المخزون</h3><div class="wm-report-tabs-v7301"><button type="button" data-wm-tab="products" onclick="wmReportTabV7301('products')">تقرير المنتجات</button><button type="button" data-wm-tab="movement" onclick="wmReportTabV7301('movement')">حركة المخزون</button><button type="button" data-wm-tab="stock" onclick="wmReportTabV7301('stock')">جرد المخزون</button><button type="button" data-wm-tab="cost" onclick="wmReportTabV7301('cost')">مراكز التكلفة</button></div><div class="wm-filters-v7301"><input id="wmRepSearchV7301" oninput="wmRenderReportsV7301()" placeholder="بحث حسب المنتج أو الكود أو المستلم"><select id="wmRepProductV7301" onchange="wmRenderReportsV7301()"><option value="">كل المنتجات</option>${products}</select><select id="wmRepProjectV7301" onchange="wmRenderReportsV7301()"><option value="">كل المشاريع</option>${projects}</select><select id="wmRepTypeV7301" onchange="wmRenderReportsV7301()"><option value="">كل الحركات</option><option value="in">داخل</option><option value="consume">مستهلك</option><option value="return">مرتجع</option><option value="waste">هدر/تالف</option></select><input id="wmRepFromV7301" type="date" onchange="wmRenderReportsV7301()"><input id="wmRepToV7301" type="date" onchange="wmRenderReportsV7301()"><button type="button" class="light" onclick="wmPrintReportsV7301()">طباعة</button></div></div><div id="wmReportContentV7301"></div></div>`;
+    wmRenderReportContentV7301();
     return false;
   }
   function ensurePro(tab){
