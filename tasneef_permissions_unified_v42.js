@@ -264,7 +264,6 @@
     return !sec || canCore(sec[1]);
   }
   function applyPermissions(){
-    if(window.__tasneefSidebarFastLockV47) return;
     document.querySelectorAll('.side .nav[onclick*="showPage"]').forEach(btn => {
       const page = pageFromButton(btn);
       if(page) btn.style.display = canPage(page) ? '' : 'none';
@@ -307,5 +306,5 @@
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(boot, 250));
   else setTimeout(boot, 80);
   window.addEventListener('load', () => { setTimeout(boot, 800); setTimeout(applyPermissions, 1600); });
-  setInterval(() => { forceUnifiedBox(); if(!window.__tasneefSidebarFastLockV47) applyPermissions(); }, 1800);
+  setInterval(() => { forceUnifiedBox(); applyPermissions(); }, 700);
 })();

@@ -1,132 +1,69 @@
 (function(){
   'use strict';
 
-  if (window.__tasneefContractsWorkflowV10) return;
-  window.__tasneefContractsWorkflowV10 = true;
+  if (window.__tasneefContractsProV11) return;
+  window.__tasneefContractsProV11 = true;
 
   const LS_KEY = 'tasneef_contract_smart_v299';
-  const CORE = [
-    { key: 'elevators', label: 'مصاعد' },
-    { key: 'pools', label: 'مسابح' },
-    { key: 'civilDefense', label: 'دفاع مدني' }
+  const CONTRACTS = [
+    { key: 'elevators', label: 'مصاعد', icon: '↕' },
+    { key: 'pools', label: 'مسابح', icon: '≈' },
+    { key: 'civilDefense', label: 'دفاع مدني', icon: '!' }
   ];
-  const ANNUAL_OPTIONS = [
-    'غسيل خزانات علوية',
-    'غسيل خزانات أرضية',
-    'رش مبيدات',
-    'غسيل الأسطح',
-    'تنظيف الممرات',
-    'تنظيف المناور',
-    'تنظيف المكيفات',
-    'تنظيف غرفة المصاعد',
-    'غسيل المواقف',
-    'تنظيف عدسات الكاميرات',
-    'التعطير',
-    'خدمة أخرى'
-  ];
+  const ANNUAL_OPTIONS = ['غسيل خزانات علوية','غسيل خزانات أرضية','رش مبيدات','غسيل الأسطح','تنظيف الممرات','تنظيف المناور','تنظيف المكيفات','غسيل المواقف','تنظيف عدسات الكاميرات','التعطير','خدمة أخرى'];
 
   let cache = {};
   let loaded = false;
   let currentProjectId = '';
-  let readonlyMode = false;
+  let currentMode = 'view';
 
   const $ = id => document.getElementById(id);
   const A = v => Array.isArray(v) ? v : [];
   const S = v => String(v ?? '').trim();
-  const N = v => {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : 0;
-  };
+  const N = v => Number.isFinite(Number(v)) ? Number(v) : 0;
   const esc = v => S(v).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  const today = () => new Date().toISOString().slice(0, 10);
-  function parseDate(value){
-    const text = S(value);
-    if (!text) return null;
-    const match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (match) return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-    const date = new Date(text);
-    return Number.isNaN(date.getTime()) ? null : new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  }
-  function daysLeftLocal(end){
-    const endDate = parseDate(end);
-    if (!endDate) return null;
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    return Math.ceil((endDate - start) / 86400000);
-  }
-  function contractInfoLocal(project){
-    const days = daysLeftLocal(project && project.contract_end);
-    if (days === null) return { key: 'missing', text: 'بيانات ناقصة', cls: 'amber', days: '-' };
-    if (days < 0) return { key: 'expired', text: 'منتهي', cls: 'red', days };
-    if (days <= 30) return { key: 'soon', text: 'قريب الانتهاء', cls: 'amber', days };
-    return { key: 'active', text: 'نشط', cls: 'green', days };
-  }
-  function isoDateLocal(value){
-    const text = S(value);
-    return text ? text.slice(0, 10) : '';
-  }
-  const say = (text, type) => {
-    try {
-      if (typeof window.msg === 'function') window.msg(text, type);
-      else alert(text);
-    } catch (_) {
-      alert(text);
-    }
-  };
+  const say = (t,k) => { try { typeof msg === 'function' ? msg(t,k) : alert(t); } catch(_) { alert(t); } };
 
-  function projects(){
-    return A((window.data && window.data.projects) || []);
+  function projects(){ return A(window.data && window.data.projects); }
+  function projectById(id){ return projects().find(p => S(p.id) === S(id)) || null; }
+  function dateOnly(v){ return S(v).slice(0,10); }
+  function parseDate(v){
+    const s = dateOnly(v); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return null;
+    return new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
+  }
+  function daysLeft(end){
+    const e = parseDate(end); if (!e) return null;
+    const n = new Date(); const t = new Date(n.getFullYear(), n.getMonth(), n.getDate());
+    return Math.ceil((e - t) / 86400000);
+  }
+  function contractInfo(p){
+    const d = daysLeft(p && p.contract_end);
+    if (d === null) return {key:'missing', text:'بيانات ناقصة', cls:'warn', days:'-'};
+    if (d < 0) return {key:'expired', text:'منتهي', cls:'bad', days:d};
+    if (d <= 30) return {key:'soon', text:'قريب الانتهاء', cls:'warn', days:d};
+    return {key:'active', text:'نشط', cls:'good', days:d};
   }
 
-  function projectById(id){
-    return projects().find(p => S(p.id) === S(id)) || null;
-  }
-
-  function readLS(){
-    try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; }
-    catch (_) { return {}; }
-  }
-
-  function writeLS(){
-    try { localStorage.setItem(LS_KEY, JSON.stringify(cache)); } catch (_) {}
-  }
-
-  function defaultRecord(){
+  function emptyRecord(){
     const contracts = {};
-    CORE.forEach(item => {
-      contracts[item.key] = {
-        onUs: false,
-        company: '',
-        phone: '',
-        start: '',
-        end: '',
-        visits: 0,
-        done: [],
-        notes: ''
-      };
-    });
-    return {
-      contracts,
-      annual: [],
-      updated_at: null
-    };
+    CONTRACTS.forEach(c => contracts[c.key] = { onUs:false, company:'', phone:'', start:'', end:'', visits:0, done:[], notes:'' });
+    return { contracts, annual:[], updated_at:null };
   }
-
   function normalize(raw){
-    const out = defaultRecord();
-    raw = raw || {};
-    const oldCore = raw.contracts || raw.core || {};
-    CORE.forEach(item => {
-      const old = oldCore[item.key] || {};
-      out.contracts[item.key] = {
-        onUs: !!(old.onUs ?? old.on_us),
-        company: S(old.company || old.company_name),
-        phone: S(old.phone || old.company_phone),
-        start: S(old.start || old.from || old.contract_start),
-        end: S(old.end || old.to || old.contract_end),
-        visits: N(old.visits || old.visit_count),
-        done: A(old.done).map(Number).filter(Boolean),
-        notes: S(old.notes)
+    const out = emptyRecord(); raw = raw || {};
+    const source = raw.contracts || raw.core || {};
+    CONTRACTS.forEach(c => {
+      const x = source[c.key] || {};
+      out.contracts[c.key] = {
+        onUs: !!(x.onUs ?? x.on_us),
+        company: S(x.company || x.company_name),
+        phone: S(x.phone || x.company_phone),
+        start: S(x.start || x.contract_start || x.from),
+        end: S(x.end || x.contract_end || x.to),
+        visits: N(x.visits || x.visit_count),
+        done: A(x.done).map(Number).filter(Boolean),
+        notes: S(x.notes)
       };
     });
     out.annual = A(raw.annual).map(a => ({
@@ -139,59 +76,61 @@
     out.updated_at = raw.updated_at || null;
     return out;
   }
-
-  async function loadSmart(){
+  function readLS(){ try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; } catch(_) { return {}; } }
+  function writeLS(){ try { localStorage.setItem(LS_KEY, JSON.stringify(cache)); } catch(_) {} }
+  async function loadAll(){
     if (loaded) return;
     cache = readLS();
     try {
       if (window.sb) {
-        const query = window.sb.from('project_contract_smart').select('*');
         const res = await Promise.race([
-          query,
-          new Promise(resolve => setTimeout(() => resolve({ error: { message: 'timeout' }, data: null }), 1800))
+          window.sb.from('project_contract_smart').select('*'),
+          new Promise(resolve => setTimeout(() => resolve({error:{message:'timeout'}, data:null}), 1500))
         ]);
         if (!res.error && Array.isArray(res.data)) {
-          res.data.forEach(row => { cache[S(row.project_id)] = normalize(row.payload); });
+          res.data.forEach(row => cache[S(row.project_id)] = normalize(row.payload));
           writeLS();
         }
       }
-    } catch (error) {
-      console.warn('contract smart load fallback', error);
-    }
+    } catch(_) {}
     loaded = true;
   }
-
-  function getRecord(projectId){
-    return normalize(cache[S(projectId)] || {});
-  }
-
-  async function persist(projectId, payload){
-    const clean = normalize(payload);
-    clean.updated_at = new Date().toISOString();
-    cache[S(projectId)] = clean;
-    writeLS();
+  function getRecord(id){ return normalize(cache[S(id)]); }
+  async function saveRecord(id, record){
+    const clean = normalize(record); clean.updated_at = new Date().toISOString();
+    cache[S(id)] = clean; writeLS();
     try {
       if (window.sb) {
-        const res = await window.sb.from('project_contract_smart').upsert({
-          project_id: Number(projectId) || projectId,
-          payload: clean,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'project_id' });
-        if (res.error) console.warn('project_contract_smart fallback localStorage:', res.error.message);
+        const res = await window.sb.from('project_contract_smart').upsert({ project_id:Number(id)||id, payload:clean, updated_at:new Date().toISOString() }, { onConflict:'project_id' });
+        if (res.error) console.warn(res.error.message);
       }
-    } catch (error) {
-      console.warn(error);
-    }
+    } catch(e) { console.warn(e); }
     return clean;
   }
 
-  function collectFromModal(){
-    const record = defaultRecord();
-    CORE.forEach(item => {
-      const card = document.querySelector(`[data-v10-contract="${item.key}"]`);
-      const old = getRecord(currentProjectId).contracts[item.key] || {};
+  function missingFields(x){
+    const miss = [];
+    if (!x.company) miss.push('اسم الشركة');
+    if (!x.phone) miss.push('رقم الشركة');
+    if (!x.start) miss.push('من تاريخ');
+    if (!x.end) miss.push('إلى تاريخ');
+    if (!N(x.visits)) miss.push('عدد الزيارات');
+    return miss;
+  }
+  function statusFor(x){
+    if (!x.onUs) return {text:'غير مفعل', cls:'idle'};
+    const miss = missingFields(x);
+    if (miss.length) return {text:'العقد علينا - ناقص', cls:'warn'};
+    if (A(x.done).length >= N(x.visits)) return {text:'مكتمل', cls:'good'};
+    return {text:'العقد علينا', cls:'good'};
+  }
+  function collect(){
+    const r = emptyRecord();
+    CONTRACTS.forEach(c => {
+      const card = document.querySelector(`[data-pro-contract="${c.key}"]`);
+      const old = getRecord(currentProjectId).contracts[c.key];
       const visits = Math.max(0, N(card?.querySelector('[data-field="visits"]')?.value));
-      record.contracts[item.key] = {
+      r.contracts[c.key] = {
         onUs: !!card?.querySelector('[data-field="onUs"]')?.checked,
         company: S(card?.querySelector('[data-field="company"]')?.value),
         phone: S(card?.querySelector('[data-field="phone"]')?.value),
@@ -202,368 +141,252 @@
         notes: S(card?.querySelector('[data-field="notes"]')?.value)
       };
     });
-    record.annual = getRecord(currentProjectId).annual;
-    return record;
+    r.annual = getRecord(currentProjectId).annual;
+    return r;
   }
-
-  function visitChips(kind, key, visits, done){
+  function visitButtons(kind, id, visits, done){
     visits = Math.max(0, N(visits));
-    done = new Set(A(done).map(Number));
-    if (!visits) return '<div class="contract-empty-v10">حدد عدد الزيارات حتى تظهر الأرقام.</div>';
-    return Array.from({ length: visits }, (_, i) => {
+    if (!visits) return '<span class="pro-empty">حدد عدد الزيارات</span>';
+    const doneSet = new Set(A(done).map(Number));
+    return Array.from({length:visits}, (_,i) => {
       const n = i + 1;
-      return `<button type="button" class="visit-chip-v10 ${done.has(n) ? 'done' : ''}" ${readonlyMode ? 'disabled' : ''} onclick="${kind}('${esc(key)}',${n})">${n}</button>`;
+      return `<button type="button" class="pro-visit ${doneSet.has(n) ? 'done' : ''}" onclick="${kind}('${esc(id)}',${n})" ${currentMode === 'view' ? 'disabled' : ''}>${n}</button>`;
     }).join('');
   }
-
-  function renderContractsInsideModal(record){
-    const box = $('contractCoreServices');
-    if (!box) return;
-    box.classList.remove('three');
-    box.classList.add('contract-grid-v10');
-    box.innerHTML = CORE.map(item => {
-      const row = record.contracts[item.key] || {};
-      const onUs = !!row.onUs;
-      const missing = contractMissing(row);
-      return `<section class="contract-card-v10 ${onUs ? 'on-us' : ''}" data-v10-contract="${item.key}">
-        <div class="contract-card-head-v10">
-          <h3>${esc(item.label)}</h3>
-          <label class="contract-switch-v10">
-            <input type="checkbox" data-field="onUs" ${onUs ? 'checked' : ''} ${readonlyMode ? 'disabled' : ''} onchange="contractV10RefreshCore('${item.key}')">
-            <span>العقد علينا</span>
-          </label>
-        </div>
-        <div class="contract-fields-v10 ${onUs ? '' : 'muted-off'}">
-          <div><label>اسم الشركة</label><input data-field="company" value="${esc(row.company)}" ${readonlyMode ? 'disabled' : ''}></div>
-          <div><label>رقم الشركة</label><input data-field="phone" value="${esc(row.phone)}" ${readonlyMode ? 'disabled' : ''}></div>
-          <div><label>من تاريخ</label><input type="date" data-field="start" value="${esc(row.start)}" ${readonlyMode ? 'disabled' : ''}></div>
-          <div><label>إلى تاريخ</label><input type="date" data-field="end" value="${esc(row.end)}" ${readonlyMode ? 'disabled' : ''}></div>
-          <div><label>عدد الزيارات</label><input type="number" min="0" data-field="visits" value="${esc(row.visits)}" ${readonlyMode ? 'disabled' : ''} onchange="contractV10RefreshCore('${item.key}')"></div>
-          <div><label>ملاحظات</label><input data-field="notes" value="${esc(row.notes)}" ${readonlyMode ? 'disabled' : ''}></div>
-        </div>
-        <div class="visit-row-v10">${visitChips('contractV10ToggleCoreVisit', item.key, row.visits, row.done)}</div>
-        ${onUs && missing.length ? `<div class="contract-warning-v10">ناقص: ${esc(missing.join('، '))}</div>` : ''}
-      </section>`;
-    }).join('');
+  function projectSelect(){
+    return `<select id="contractProProjectSelect" onchange="contractProSwitchProject(this.value)">
+      ${projects().map(p => `<option value="${esc(p.id)}" ${S(p.id)===S(currentProjectId)?'selected':''}>${esc(p.name || p.id)}</option>`).join('')}
+    </select>`;
   }
-
-  function renderAnnual(record){
-    fillAnnualSelect();
-    const body = $('csAnnualBody');
-    if (!body) return;
-    body.innerHTML = A(record.annual).map(item => {
-      const done = A(item.done);
-      return `<tr>
-        <td><b>${esc(item.name)}</b>${item.notes ? `<br><small>${esc(item.notes)}</small>` : ''}</td>
-        <td>${N(item.visits)}</td>
-        <td><div class="visit-row-v10">${visitChips('contractV10ToggleAnnualVisit', item.id, item.visits, done)}</div></td>
-        <td>${done.length}</td>
-        <td>${Math.max(0, N(item.visits) - done.length)}</td>
-        <td>${readonlyMode ? '-' : `<button class="danger" onclick="contractV10DeleteAnnual('${esc(item.id)}')">حذف</button>`}</td>
-      </tr>`;
-    }).join('') || '<tr><td colspan="6">لا توجد خدمات سنوية بعد</td></tr>';
-  }
-
-  function contractMissing(row){
-    const miss = [];
-    if (!row.company) miss.push('اسم الشركة');
-    if (!row.phone) miss.push('رقم الشركة');
-    if (!row.start) miss.push('من تاريخ');
-    if (!row.end) miss.push('إلى تاريخ');
-    if (!N(row.visits)) miss.push('عدد الزيارات');
-    return miss;
-  }
-
-  function contractAlertsForProject(project, record){
-    const alerts = [];
-    CORE.forEach(item => {
-      const row = record.contracts[item.key];
-      if (!row || !row.onUs) return;
-      const missing = contractMissing(row);
-      if (missing.length) alerts.push({ group: item.label, project: project.name || '-', text: 'بيانات ناقصة: ' + missing.join('، ') });
-      const remaining = Math.max(0, N(row.visits) - A(row.done).length);
-      if (N(row.visits) && remaining) alerts.push({ group: item.label, project: project.name || '-', text: `متبقي ${remaining} زيارة من ${N(row.visits)}` });
-    });
-    A(record.annual).forEach(item => {
-      const remaining = Math.max(0, N(item.visits) - A(item.done).length);
-      if (remaining) alerts.push({ group: 'خدمات سنوية', project: project.name || '-', text: `${item.name}: متبقي ${remaining} من ${N(item.visits)}` });
-    });
-    return alerts;
-  }
-
-  function renderSmartAlerts(){
-    const host = $('contractsAlertsList');
-    if (!host) return;
-    const alerts = [];
-    projects().forEach(project => alerts.push(...contractAlertsForProject(project, getRecord(project.id))));
-    const grouped = new Map();
-    alerts.forEach(alert => {
-      if (!grouped.has(alert.group)) grouped.set(alert.group, []);
-      grouped.get(alert.group).push(alert);
-    });
-    const html = [...grouped.entries()].map(([group, rows]) => `<div class="alert-item warn contract-alert-group-v10">
-      <b>${esc(group)}</b>
-      ${rows.slice(0, 12).map(row => `<div><strong>${esc(row.project)}</strong>: ${esc(row.text)}</div>`).join('')}
-    </div>`).join('');
-    if (html) host.innerHTML = html;
-  }
-
-  function renderReport(record){
-    const box = $('csClientReportBox');
-    if (!box) return;
+  function renderShell(){
+    const modal = $('contractSmartModal'); if (!modal) return;
+    document.body.appendChild(modal);
     const p = projectById(currentProjectId) || {};
-    const coreRows = CORE.map(item => {
-      const row = record.contracts[item.key];
-      if (!row.onUs) return '';
-      return `<tr><td>${esc(item.label)}</td><td>${esc(row.company || '-')}</td><td>${esc(row.phone || '-')}</td><td>${esc(row.start || '-')}</td><td>${esc(row.end || '-')}</td><td>${A(row.done).length} / ${N(row.visits)}</td></tr>`;
-    }).filter(Boolean).join('');
-    const annualRows = A(record.annual).map(item => `<tr><td>${esc(item.name)}</td><td colspan="4">خدمة سنوية</td><td>${A(item.done).length} / ${N(item.visits)}</td></tr>`).join('');
-    box.innerHTML = `<div class="smart-box"><b>المشروع:</b> ${esc(p.name || '-')}</div>
-      <table class="smart-report-table"><thead><tr><th>القسم / الخدمة</th><th>الشركة</th><th>رقم الشركة</th><th>من</th><th>إلى</th><th>التنفيذ</th></tr></thead><tbody>${coreRows || '<tr><td colspan="6">لا توجد عقود علينا</td></tr>'}${annualRows}</tbody></table>`;
-  }
-
-  function fillAnnualSelect(){
-    const select = $('csAnnualSelect');
-    if (!select || select.dataset.v10) return;
-    select.innerHTML = ANNUAL_OPTIONS.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
-    select.dataset.v10 = '1';
-  }
-
-  function hideOldServices(){
-    const services = $('servicesSubTab');
-    if (services) services.classList.add('hidden');
-    const oldBtns = document.querySelectorAll('#contractsTabBtn,#servicesTabBtn');
-    oldBtns.forEach(btn => btn.style.display = 'none');
-  }
-
-  window.openContractSmartModal = async function(projectId, mode){
-    await loadSmart();
-    hideOldServices();
-    currentProjectId = S(projectId);
-    readonlyMode = mode === 'view';
-    const project = projectById(projectId) || {};
-    const record = getRecord(projectId);
-    if ($('contractSmartTitle')) $('contractSmartTitle').textContent = (readonlyMode ? 'عرض عقود: ' : 'تعديل عقود: ') + (project.name || '');
-    if ($('contractSmartSub')) $('contractSmartSub').textContent = 'العقود: مصاعد، مسابح، دفاع مدني، والخدمات السنوية';
-    if ($('contractSmartProjectId')) $('contractSmartProjectId').value = currentProjectId;
-    const save = $('contractSmartSaveBtn');
-    if (save) {
-      save.style.display = readonlyMode ? 'none' : '';
-      save.onclick = window.saveContractSmartModal;
-      save.textContent = 'حفظ';
-    }
-    renderContractsInsideModal(record);
-    renderAnnual(record);
-    renderReport(record);
-    document.querySelectorAll('.contract-smart-tabs button').forEach(btn => btn.classList.remove('active'));
-    document.querySelector('.contract-smart-tabs button')?.classList.add('active');
-    ['Main', 'Annual', 'Report'].forEach(name => $('contractSmart' + name + 'Tab')?.classList.toggle('hidden', name !== 'Main'));
-    const modal = $('contractSmartModal');
-    if (modal) {
-      document.body.appendChild(modal);
-      modal.classList.remove('hidden');
-      modal.style.display = 'flex';
-    }
+    const info = contractInfo(p);
+    modal.innerHTML = `<div class="contract-pro-panel" onclick="event.stopPropagation()">
+      <header class="contract-pro-head">
+        <div>
+          <span class="contract-pro-kicker">إدارة عقود المشروع</span>
+          <h2>${currentMode === 'view' ? 'عرض' : 'تعديل'} عقود: ${esc(p.name || '-')}</h2>
+          <div class="contract-pro-meta">
+            <span>بداية العقد: ${esc(dateOnly(p.contract_start) || '-')}</span>
+            <span>نهاية العقد: ${esc(dateOnly(p.contract_end) || '-')}</span>
+            <span class="pro-pill ${esc(info.cls)}">المتبقي: ${esc(info.days)} يوم</span>
+          </div>
+        </div>
+        <div class="contract-pro-tools">
+          ${projectSelect()}
+          <button class="light" onclick="contractProPrint()">طباعة</button>
+          <button class="light" onclick="contractProCopy()">نسخ التقرير</button>
+          ${currentMode === 'view' ? `<button onclick="contractProSetMode('edit')">تعديل</button>` : `<button onclick="saveContractSmartModal()">حفظ</button>`}
+          <button class="danger" onclick="closeContractSmartModal()">إغلاق</button>
+        </div>
+      </header>
+      <nav class="contract-pro-tabs">
+        <button class="active" onclick="contractProTab('contracts',this)">العقود</button>
+        <button onclick="contractProTab('annual',this)">الخدمات السنوية</button>
+        <button onclick="contractProTab('report',this)">تقرير العميل</button>
+      </nav>
+      <main class="contract-pro-body">
+        <section id="contractProContracts"></section>
+        <section id="contractProAnnual" class="hidden"></section>
+        <section id="contractProReport" class="hidden"></section>
+      </main>
+    </div>`;
+    modal.onclick = e => { if (e.target && e.target.id === 'contractSmartModal') closeContractSmartModal(); };
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
+    renderPanels();
+  }
+  function renderPanels(){
+    const r = getRecord(currentProjectId);
+    renderContracts(r); renderAnnual(r); renderReport(r);
+    bindLiveInputs();
+  }
+  function renderContracts(r){
+    const host = $('contractProContracts'); if (!host) return;
+    host.innerHTML = `<div class="contract-pro-grid">${CONTRACTS.map(c => {
+      const x = r.contracts[c.key]; const st = statusFor(x); const disabled = currentMode === 'view' ? 'disabled' : '';
+      const miss = missingFields(x);
+      return `<article class="pro-card ${st.cls}" data-pro-contract="${c.key}">
+        <div class="pro-card-title">
+          <div class="pro-icon">${esc(c.icon)}</div>
+          <div><h3>${esc(c.label)}</h3><span class="pro-pill ${st.cls}">${esc(st.text)}</span></div>
+          <label class="pro-switch ${x.onUs ? 'active' : ''}"><input type="checkbox" data-field="onUs" ${x.onUs?'checked':''} ${disabled} onchange="contractProRefresh()"> <span>${x.onUs ? 'العقد علينا' : 'ليس علينا'}</span></label>
+        </div>
+        <div class="pro-contract-state ${x.onUs ? (miss.length ? 'missing' : 'ok') : 'idle'}">
+          <span>${x.onUs ? (miss.length ? 'العقد ناقص' : 'العقد موجود ومكتمل البيانات') : 'العقد غير مفعل'}</span>
+          ${currentMode === 'view' ? `<button type="button" class="light" onclick="contractProSetMode('edit')">تفعيل التعديل</button>` : `<button type="button" class="${miss.length ? 'danger' : 'light'}" onclick="contractProToggleMissing('${c.key}')">${miss.length ? 'تحديد كناقص' : 'مكتمل'}</button>`}
+        </div>
+        <div class="pro-fields ${x.onUs ? '' : 'off'}">
+          <label>اسم الشركة<input data-field="company" value="${esc(x.company)}" ${disabled}></label>
+          <label>رقم الشركة<input data-field="phone" value="${esc(x.phone)}" ${disabled}></label>
+          <label>من تاريخ<input type="date" data-field="start" value="${esc(x.start)}" ${disabled}></label>
+          <label>إلى تاريخ<input type="date" data-field="end" value="${esc(x.end)}" ${disabled}></label>
+          <label>عدد الزيارات<input type="number" min="0" data-field="visits" value="${esc(x.visits)}" ${disabled} onchange="contractProRefresh()"></label>
+          <label>ملاحظات<input data-field="notes" value="${esc(x.notes)}" ${disabled}></label>
+        </div>
+        <div class="pro-visits">${visitButtons('contractProToggleCore', c.key, x.visits, x.done)}</div>
+        ${x.onUs && miss.length ? `<div class="pro-warning">تنبيه: العقد علينا ولا تظهر بياناته كاملة في السجلات. الناقص: ${esc(miss.join('، '))}</div>` : ''}
+      </article>`;
+    }).join('')}</div>`;
+  }
+  function renderAnnual(r){
+    const host = $('contractProAnnual'); if (!host) return;
+    const disabled = currentMode === 'view' ? 'disabled' : '';
+    host.innerHTML = `<section class="pro-annual-add">
+      <label>الخدمة<select id="proAnnualName" ${disabled}>${ANNUAL_OPTIONS.map(x=>`<option>${esc(x)}</option>`).join('')}</select></label>
+      <label>خدمة أخرى<input id="proAnnualCustom" ${disabled}></label>
+      <label>عدد الزيارات<input id="proAnnualVisits" type="number" min="1" value="1" ${disabled}></label>
+      <button onclick="contractProAddAnnual()" ${disabled}>إضافة</button>
+    </section>
+    <div class="pro-annual-list">${A(r.annual).map(a => `<article class="pro-annual-item">
+      <div><h3>${esc(a.name)}</h3><small>${A(a.done).length} منفذة من ${N(a.visits)}</small></div>
+      <div class="pro-visits">${visitButtons('contractProToggleAnnual', a.id, a.visits, a.done)}</div>
+      ${currentMode === 'view' ? '' : `<button class="danger" onclick="contractProDeleteAnnual('${esc(a.id)}')">حذف</button>`}
+    </article>`).join('') || '<div class="pro-empty wide">لا توجد خدمات سنوية بعد</div>'}</div>`;
+  }
+  function renderReport(r){
+    const host = $('contractProReport'); if (!host) return;
+    const p = projectById(currentProjectId) || {};
+    const coreRows = CONTRACTS.map(c => {
+      const x = r.contracts[c.key]; if (!x.onUs) return '';
+      return `<tr><td>${esc(c.label)}</td><td>${esc(statusFor(x).text)}</td><td>${esc(x.company || '-')}</td><td>${esc(x.phone || '-')}</td><td>${esc(x.start || '-')}</td><td>${esc(x.end || '-')}</td><td>${A(x.done).length}/${N(x.visits)}</td></tr>`;
+    }).join('');
+    const annualRows = A(r.annual).map(a => `<tr><td>${esc(a.name)}</td><td>خدمة سنوية</td><td colspan="4">-</td><td>${A(a.done).length}/${N(a.visits)}</td></tr>`).join('');
+    host.innerHTML = `<div class="pro-report-card"><h3>تقرير عقود ${esc(p.name || '-')}</h3><table><thead><tr><th>القسم</th><th>الحالة</th><th>الشركة</th><th>رقم الشركة</th><th>من</th><th>إلى</th><th>التنفيذ</th></tr></thead><tbody>${coreRows || '<tr><td colspan="7">لا توجد عقود علينا</td></tr>'}${annualRows}</tbody></table></div>`;
+  }
+  function keepDraft(){
+    cache[S(currentProjectId)] = collect();
+    writeLS();
+  }
+  function bindLiveInputs(){
+    document.querySelectorAll('#contractSmartModal input, #contractSmartModal select').forEach(el => {
+      if (el.dataset.proBound) return;
+      el.dataset.proBound = '1';
+      el.addEventListener('change', () => { if (currentMode !== 'view') keepDraft(); });
+      el.addEventListener('input', () => { if (currentMode !== 'view') keepDraft(); });
+    });
+  }
+  window.contractProRefresh = function(){ keepDraft(); renderPanels(); };
+  window.contractProToggleMissing = function(key){
+    if (currentMode === 'view') return;
+    const r = collect();
+    const x = r.contracts[key];
+    if (!x) return;
+    x.onUs = true;
+    if (!N(x.visits)) x.visits = 1;
+    cache[S(currentProjectId)] = r;
+    writeLS();
+    renderPanels();
   };
-
-  window.closeContractSmartModal = function(){
-    const modal = $('contractSmartModal');
-    if (modal) {
-      modal.classList.add('hidden');
-      modal.style.display = '';
-    }
-    document.body.style.overflow = '';
-    currentProjectId = '';
+  window.contractProToggleCore = function(key,no){
+    if (currentMode === 'view') return;
+    const r = collect(); const x = r.contracts[key]; const set = new Set(A(x.done).map(Number));
+    set.has(no) ? set.delete(no) : set.add(no); x.done = [...set].sort((a,b)=>a-b);
+    cache[S(currentProjectId)] = r; writeLS(); renderPanels();
   };
-
-  window.contractSmartBackdrop = function(event){
-    if (event && event.target && event.target.id === 'contractSmartModal') window.closeContractSmartModal();
+  window.contractProToggleAnnual = function(id,no){
+    if (currentMode === 'view') return;
+    const r = collect(); const a = A(r.annual).find(x => S(x.id) === S(id)); if (!a) return;
+    const set = new Set(A(a.done).map(Number)); set.has(no) ? set.delete(no) : set.add(no);
+    a.done = [...set].sort((x,y)=>x-y); cache[S(currentProjectId)] = r; writeLS(); renderPanels();
   };
-
-  window.contractSmartTab = function(tab, btn){
-    ['main', 'annual', 'report'].forEach(name => $('contractSmart' + name.charAt(0).toUpperCase() + name.slice(1) + 'Tab')?.classList.add('hidden'));
-    $('contractSmart' + tab.charAt(0).toUpperCase() + tab.slice(1) + 'Tab')?.classList.remove('hidden');
-    document.querySelectorAll('.contract-smart-tabs button').forEach(b => b.classList.remove('active'));
+  window.contractProAddAnnual = function(){
+    if (currentMode === 'view') return;
+    const r = collect(); const custom = S($('proAnnualCustom')?.value);
+    const name = custom || S($('proAnnualName')?.value); const visits = Math.max(1, N($('proAnnualVisits')?.value || 1));
+    if (!name) return say('اختر الخدمة', 'err');
+    r.annual.push({id:'a'+Date.now()+Math.random().toString(16).slice(2), name, visits, done:[], notes:''});
+    cache[S(currentProjectId)] = r; writeLS(); renderPanels();
+  };
+  window.contractProDeleteAnnual = function(id){
+    if (currentMode === 'view') return;
+    const r = collect(); r.annual = A(r.annual).filter(x => S(x.id) !== S(id));
+    cache[S(currentProjectId)] = r; writeLS(); renderPanels();
+  };
+  window.contractProSwitchProject = function(id){ keepDraft(); currentProjectId = S(id); renderShell(); };
+  window.contractProSetMode = function(mode){ currentMode = mode; renderShell(); };
+  window.contractProTab = function(tab, btn){
+    ['Contracts','Annual','Report'].forEach(x => $('contractPro'+x)?.classList.add('hidden'));
+    $('contractPro' + tab.charAt(0).toUpperCase() + tab.slice(1))?.classList.remove('hidden');
+    document.querySelectorAll('.contract-pro-tabs button').forEach(b => b.classList.remove('active'));
     btn?.classList.add('active');
-    if (tab === 'report') renderReport(getRecord(currentProjectId));
   };
-
-  window.contractV10RefreshCore = function(){
-    const record = collectFromModal();
-    cache[S(currentProjectId)] = record;
-    writeLS();
-    renderContractsInsideModal(record);
-    renderReport(record);
+  window.openContractSmartModal = async function(projectId, mode){
+    await loadAll(); currentProjectId = S(projectId || projects()[0]?.id || ''); currentMode = mode === 'edit' ? 'edit' : 'view'; renderShell();
   };
-
-  window.contractV10ToggleCoreVisit = function(key, no){
-    if (readonlyMode) return;
-    const record = collectFromModal();
-    const row = record.contracts[key];
-    if (!row) return;
-    const n = Number(no);
-    const set = new Set(A(row.done).map(Number));
-    if (set.has(n)) set.delete(n); else set.add(n);
-    row.done = [...set].sort((a, b) => a - b);
-    cache[S(currentProjectId)] = record;
-    writeLS();
-    renderContractsInsideModal(record);
-    renderReport(record);
+  window.closeContractSmartModal = function(){
+    const modal = $('contractSmartModal'); if (modal) { modal.classList.add('hidden'); modal.style.display = ''; }
+    document.body.style.overflow = ''; currentProjectId = '';
   };
-
-  window.addContractAnnualService = function(){
-    if (readonlyMode) return;
-    const record = collectFromModal();
-    let name = S($('csAnnualSelect')?.value);
-    const custom = S($('csAnnualCustom')?.value);
-    if (custom) name = custom;
-    const visits = Math.max(1, N($('csAnnualVisits')?.value || 1));
-    if (!name) return say('اختر الخدمة أو اكتب اسمها', 'err');
-    record.annual.push({ id: 'a' + Date.now() + Math.random().toString(16).slice(2), name, visits, done: [], notes: '' });
-    cache[S(currentProjectId)] = record;
-    writeLS();
-    if ($('csAnnualCustom')) $('csAnnualCustom').value = '';
-    if ($('csAnnualVisits')) $('csAnnualVisits').value = '1';
-    renderAnnual(record);
-    renderReport(record);
-  };
-
-  window.contractV10ToggleAnnualVisit = function(id, no){
-    if (readonlyMode) return;
-    const record = collectFromModal();
-    const item = A(record.annual).find(x => S(x.id) === S(id));
-    if (!item) return;
-    const n = Number(no);
-    const set = new Set(A(item.done).map(Number));
-    if (set.has(n)) set.delete(n); else set.add(n);
-    item.done = [...set].sort((a, b) => a - b);
-    cache[S(currentProjectId)] = record;
-    writeLS();
-    renderAnnual(record);
-    renderReport(record);
-  };
-
-  window.contractV10DeleteAnnual = function(id){
-    if (readonlyMode) return;
-    if (!confirm('حذف هذه الخدمة السنوية؟')) return;
-    const record = collectFromModal();
-    record.annual = A(record.annual).filter(x => S(x.id) !== S(id));
-    cache[S(currentProjectId)] = record;
-    writeLS();
-    renderAnnual(record);
-    renderReport(record);
-  };
-
   window.saveContractSmartModal = async function(){
-    if (!currentProjectId) return;
-    const record = collectFromModal();
-    await persist(currentProjectId, record);
-    say('تم حفظ عقود المشروع والخدمات السنوية');
-    renderContracts();
-    renderSmartAlerts();
+    const r = collect(); await saveRecord(currentProjectId, r); say('تم حفظ عقود المشروع'); renderContractsTable(); renderAlerts();
+  };
+  window.contractProCopy = async function(){
+    const txt = $('contractProReport')?.innerText || '';
+    try { await navigator.clipboard.writeText(txt); say('تم نسخ التقرير'); } catch(_) { alert(txt); }
+  };
+  window.contractProPrint = function(){
+    const r = getRecord(currentProjectId); renderReport(r);
+    const html = $('contractProReport')?.innerHTML || '';
+    const w = window.open('', '_blank'); w.document.write(`<html dir="rtl"><head><title>تقرير العقود</title><style>body{font-family:Tahoma;padding:24px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:10px;text-align:right}th{background:#064c3b;color:#fff}</style></head><body>${html}</body></html>`); w.document.close(); setTimeout(()=>w.print(),300);
   };
 
-  window.renderContracts = function(){
-    const body = $('contractsBody');
-    if (!body) return;
-    const q = S($('contractSearch')?.value);
-    const status = S($('contractFilterStatus')?.value);
-    let rows = projects();
-    if (q) rows = rows.filter(p => [p.name, p.location].join(' ').includes(q));
-    if (status) rows = rows.filter(p => contractInfoLocal(p).key === status);
-    rows.sort((a, b) => {
-      const da = daysLeftLocal(a.contract_end);
-      const db = daysLeftLocal(b.contract_end);
-      return (da ?? 999999) - (db ?? 999999);
+  function renderAlerts(){
+    const host = $('contractsAlertsList'); if (!host) return;
+    const rows = [];
+    projects().forEach(p => {
+      const r = getRecord(p.id);
+      CONTRACTS.forEach(c => {
+        const x = r.contracts[c.key]; if (!x.onUs) return;
+        const miss = missingFields(x);
+        if (miss.length) rows.push(`<div class="alert-item warn"><b>${esc(c.label)} - ${esc(p.name)}</b><br>العقد علينا، لكن بيانات العقد/الشركة ناقصة: ${esc(miss.join('، '))}</div>`);
+      });
     });
+    if (rows.length) host.innerHTML = rows.join('');
+    else host.innerHTML = '<div class="alert-item">لا توجد عقود ناقصة حاليا</div>';
+  }
+  function renderContractsTable(){
+    const body = $('contractsBody'); if (!body) return;
+    const q = S($('contractSearch')?.value); const st = S($('contractFilterStatus')?.value);
+    let rows = projects(); if (q) rows = rows.filter(p => S(p.name).includes(q)); if (st) rows = rows.filter(p => contractInfo(p).key === st);
+    rows.sort((a,b)=>(daysLeft(a.contract_end) ?? 999999)-(daysLeft(b.contract_end) ?? 999999));
     body.innerHTML = rows.map(p => {
-      const info = contractInfoLocal(p);
-      return `<tr><td><b>${esc(p.name)}</b></td><td>${N(p.buildings_count)}</td><td>${N(p.units_count)}</td><td>${esc(isoDateLocal(p.contract_start) || '-')}</td><td>${esc(isoDateLocal(p.contract_end) || '-')}</td><td>${esc(info.days)}</td><td><span class="badge ${esc(info.cls)}">${esc(info.text)}</span></td><td class="row-actions"><button class="light" onclick="openContractSmartModal(${Number(p.id)||0},'view')">عرض</button><button onclick="openContractSmartModal(${Number(p.id)||0},'edit')">تعديل</button></td></tr>`;
+      const c = contractInfo(p);
+      return `<tr><td><b>${esc(p.name)}</b></td><td>${N(p.buildings_count)}</td><td>${N(p.units_count)}</td><td>${esc(dateOnly(p.contract_start)||'-')}</td><td>${esc(dateOnly(p.contract_end)||'-')}</td><td>${esc(c.days)}</td><td><span class="badge ${c.cls==='bad'?'red':c.cls==='warn'?'amber':'green'}">${esc(c.text)}</span></td><td class="row-actions"><button class="light" onclick="openContractSmartModal(${Number(p.id)||0},'view')">عرض</button><button onclick="openContractSmartModal(${Number(p.id)||0},'edit')">تعديل</button></td></tr>`;
     }).join('') || '<tr><td colspan="8">لا توجد بيانات</td></tr>';
-    if ($('contractsActiveCount')) $('contractsActiveCount').textContent = projects().filter(p => contractInfoLocal(p).key === 'active').length;
-    if ($('contractsSoonCount')) $('contractsSoonCount').textContent = projects().filter(p => contractInfoLocal(p).key === 'soon').length;
-    if ($('contractsExpiredCount')) $('contractsExpiredCount').textContent = projects().filter(p => contractInfoLocal(p).key === 'expired').length;
-    if ($('contractsMissingCount')) $('contractsMissingCount').textContent = projects().filter(p => contractInfoLocal(p).key === 'missing').length;
-    renderSmartAlerts();
-  };
-
-  const oldRenderProjects = window.renderProjects;
-  window.renderProjects = function(){
-    if (typeof oldRenderProjects === 'function') oldRenderProjects.apply(this, arguments);
-    const body = $('projectsBody');
-    if (!body) return;
-    A([...body.querySelectorAll('tr')]).forEach(tr => {
-      if (tr.querySelector('[data-contract-view-v10]')) return;
-      const onclick = A([...tr.querySelectorAll('button')]).map(btn => btn.getAttribute('onclick') || '').find(text => /editProject\(/.test(text)) || '';
-      const match = onclick.match(/editProject\(([^)]+)\)/);
-      const projectId = match ? Number(String(match[1]).replace(/['"]/g, '')) : 0;
-      if (!projectId) return;
-      const actions = tr.querySelector('.row-actions') || tr.lastElementChild;
-      if (actions) actions.insertAdjacentHTML('afterbegin', `<button class="light" data-contract-view-v10="1" onclick="openContractSmartModal(${projectId},'view')">عرض</button>`);
-    });
-  };
+    if ($('contractsActiveCount')) $('contractsActiveCount').textContent = projects().filter(p => contractInfo(p).key === 'active').length;
+    if ($('contractsSoonCount')) $('contractsSoonCount').textContent = projects().filter(p => contractInfo(p).key === 'soon').length;
+    if ($('contractsExpiredCount')) $('contractsExpiredCount').textContent = projects().filter(p => contractInfo(p).key === 'expired').length;
+    if ($('contractsMissingCount')) $('contractsMissingCount').textContent = projects().filter(p => contractInfo(p).key === 'missing').length;
+    renderAlerts();
+  }
+  window.renderContracts = renderContractsTable;
 
   const oldShowPage = window.showPage;
-  window.showPage = function(id, btn){
-    if (id !== 'contracts') window.closeContractSmartModal();
-    const result = oldShowPage ? oldShowPage.apply(this, arguments) : undefined;
-    if (id === 'contracts') {
-      hideOldServices();
-      setTimeout(() => { hideOldServices(); renderContracts(); }, 60);
-    }
-    return result;
-  };
+  window.showPage = function(id, btn){ if (id !== 'contracts') closeContractSmartModal(); const r = oldShowPage ? oldShowPage.apply(this, arguments) : undefined; if (id === 'contracts') setTimeout(renderContractsTable, 40); return r; };
 
-  const oldShowContractsSubTab = window.showContractsSubTab;
-  window.showContractsSubTab = function(tab){
-    hideOldServices();
-    const contracts = $('contractsSubTab');
-    if (contracts) contracts.classList.remove('hidden');
-    if (tab && tab !== 'services' && oldShowContractsSubTab) return oldShowContractsSubTab.apply(this, arguments);
-    renderContracts();
-  };
-
-  function installCss(){
-    if ($('contractWorkflowV10Css')) return;
-    const style = document.createElement('style');
-    style.id = 'contractWorkflowV10Css';
-    style.textContent = `
+  function css(){
+    if ($('contractsProV11Css')) return;
+    const s = document.createElement('style'); s.id='contractsProV11Css';
+    s.textContent = `
       #servicesSubTab{display:none!important}
-      #contractSmartModal.contract-smart-modal{position:fixed!important;inset:0!important;z-index:999999!important;display:flex;align-items:center;justify-content:center;background:rgba(8,31,25,.62)!important;padding:18px!important}
-      #contractSmartModal.contract-smart-modal.hidden{display:none!important}
-      #contractSmartModal .contract-smart-panel{width:min(1260px,96vw)!important;max-height:92vh!important;overflow:auto!important;background:#fff!important;border-radius:24px!important;box-shadow:0 30px 90px rgba(0,0,0,.28)!important}
-      .contract-grid-v10{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(270px,1fr))!important;gap:12px!important}
-      .contract-card-v10{border:1px solid #d9e8e1;border-radius:14px;background:#fff;padding:12px}
-      .contract-card-v10.on-us{border-color:#86cdb5;background:#fbfffd}
-      .contract-card-head-v10{display:flex;align-items:center;justify-content:space-between;gap:10px}
-      .contract-card-head-v10 h3{margin:0;color:#063f32}
-      .contract-switch-v10{display:inline-flex;align-items:center;gap:7px;margin:0;color:#063f32;font-weight:800}
-      .contract-switch-v10 input{width:auto}
-      .contract-fields-v10{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
-      .contract-fields-v10.muted-off{opacity:.42}
-      .visit-row-v10{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-      .visit-chip-v10{min-width:34px;height:34px;border-radius:10px;background:#eef6f3!important;color:#064c3b!important;border:1px solid #d7e8e1!important;padding:0 8px!important}
-      .visit-chip-v10.done{background:#064c3b!important;color:#fff!important;border-color:#064c3b!important}
-      .contract-warning-v10{margin-top:10px;border:1px solid #f0c3c3;background:#fdecec;color:#9d2222;border-radius:10px;padding:8px;font-weight:800}
-      .contract-empty-v10{border:1px dashed #d7e8e1;border-radius:10px;padding:8px;color:#60706a;background:#fbfdfc}
-      .contract-alert-group-v10 div{margin-top:6px;line-height:1.7}
-      @media(max-width:760px){.contract-fields-v10{grid-template-columns:1fr}}
+      #contractSmartModal{position:fixed!important;inset:0!important;z-index:999999!important;display:flex;align-items:center;justify-content:center;background:rgba(13,30,25,.62)!important;padding:18px!important}
+      #contractSmartModal.hidden{display:none!important}.contract-pro-panel{width:min(1180px,96vw);max-height:92vh;overflow:auto;background:#f8fbfa;border-radius:22px;box-shadow:0 30px 90px rgba(0,0,0,.28);border:1px solid #d8e7e0}
+      .contract-pro-head{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding:18px;background:#fff;border-bottom:1px solid #dce8e4}.contract-pro-kicker{color:#60706a;font-weight:800;font-size:12px}.contract-pro-head h2{margin:4px 0 8px;color:#063f32}.contract-pro-meta{display:flex;gap:8px;flex-wrap:wrap;color:#60706a;font-size:12px}.contract-pro-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.contract-pro-tools select{min-width:220px}
+      .pro-pill{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-weight:800;background:#eef6f3;color:#064c3b}.pro-pill.warn{background:#fff4d7;color:#8a6400}.pro-pill.bad{background:#ffe3e3;color:#9b2424}.pro-pill.idle{background:#eef1f0;color:#60706a}
+      .contract-pro-tabs{display:flex;gap:8px;padding:12px 18px;background:#f8fbfa;position:sticky;top:84px;z-index:4}.contract-pro-tabs button.active{background:#064c3b!important;color:#fff!important}.contract-pro-body{padding:18px}.contract-pro-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px}
+      .pro-card,.pro-annual-item,.pro-annual-add,.pro-report-card{background:#fff;border:1px solid #dce8e4;border-radius:16px;padding:14px}.pro-card.good{border-color:#9ad8bf}.pro-card.warn{border-color:#f0d28a}.pro-card-title{display:grid;grid-template-columns:42px 1fr auto;gap:10px;align-items:center}.pro-icon{width:42px;height:42px;border-radius:14px;background:#e9f6f1;display:grid;place-items:center;font-weight:900;color:#064c3b}.pro-card-title h3{margin:0;color:#063f32}.pro-switch{display:flex;gap:7px;align-items:center;font-weight:900;color:#60706a;border:1px solid #d7e8e1;background:#f4f7f6;border-radius:999px;padding:7px 10px;margin:0}.pro-switch.active{background:#064c3b;color:#fff;border-color:#064c3b}.pro-switch input{width:auto;accent-color:#064c3b}.pro-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.pro-fields.off{opacity:.45}.pro-visits{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}.pro-visit{min-width:34px;height:34px;padding:0 8px!important;border-radius:10px!important;background:#eef6f3!important;color:#064c3b!important;border:1px solid #d7e8e1!important}.pro-visit.done{background:#064c3b!important;color:#fff!important}.pro-warning{margin-top:10px;background:#fff4d7;border:1px solid #f0d28a;color:#805b00;border-radius:12px;padding:8px;font-weight:800}.pro-empty{border:1px dashed #d7e8e1;border-radius:12px;padding:8px;color:#60706a;background:#fbfdfc}.pro-empty.wide{padding:16px;text-align:center}.pro-annual-add{display:grid;grid-template-columns:1fr 1fr 160px auto;gap:10px;align-items:end;margin-bottom:14px}.pro-annual-list{display:grid;gap:10px}.pro-annual-item{display:grid;grid-template-columns:220px 1fr auto;gap:10px;align-items:center}.pro-report-card table{width:100%;border-collapse:collapse}.pro-report-card th,.pro-report-card td{border-bottom:1px solid #edf1ef;padding:10px;text-align:right}.pro-report-card th{background:#064c3b;color:#fff}
+      .pro-contract-state{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;border-radius:12px;padding:8px 10px;font-weight:900}.pro-contract-state.ok{background:#e7f6ef;color:#07533f}.pro-contract-state.missing{background:#fff4d7;color:#805b00}.pro-contract-state.idle{background:#eef1f0;color:#60706a}.pro-contract-state button{padding:7px 10px!important;border-radius:10px!important}
+      .contract-pro-panel input:not([type="checkbox"]),.contract-pro-panel select{min-height:38px}.contract-pro-panel input:disabled,.contract-pro-panel select:disabled{background:#f7faf9!important;color:#879893!important;cursor:not-allowed}
+      @media(max-width:820px){.contract-pro-head{display:block}.contract-pro-tools{margin-top:12px}.contract-pro-tabs{top:128px}.pro-fields,.pro-annual-add,.pro-annual-item{grid-template-columns:1fr}.pro-card-title{grid-template-columns:42px 1fr}}
     `;
-    document.head.appendChild(style);
+    document.head.appendChild(s);
   }
-
-  async function boot(){
-    installCss();
-    hideOldServices();
-    fillAnnualSelect();
-    await loadSmart();
-    try { renderContracts(); } catch (_) {}
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
-  else setTimeout(boot, 0);
-  window.addEventListener('load', () => setTimeout(boot, 500), { once: true });
-
-  console.log('Tasneef contracts workflow v10 loaded');
+  async function boot(){ css(); await loadAll(); renderContractsTable(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, {once:true}); else setTimeout(boot,0);
+  window.addEventListener('load', () => setTimeout(boot,500), {once:true});
+  console.log('Tasneef contracts pro v11 loaded');
 })();

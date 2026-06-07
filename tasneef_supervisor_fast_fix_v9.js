@@ -1,13 +1,18 @@
 (function(){
   'use strict';
 
-  if (window.__tasneefTechnicianFastFixV9) return;
-  window.__tasneefTechnicianFastFixV9 = true;
+  if (window.__tasneefSupervisorFastFixV9) return;
+  window.__tasneefSupervisorFastFixV9 = true;
 
   const $ = id => document.getElementById(id);
   const A = value => Array.isArray(value) ? value : [];
   const S = value => String(value ?? '').trim();
+  const N = value => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
   const today = () => new Date().toISOString().slice(0, 10);
+  const monthStart = () => today().slice(0, 8) + '01';
   const say = (text, type) => {
     try {
       if (typeof window.msg === 'function') window.msg(text, type);
@@ -33,6 +38,29 @@
     }
   }
 
+  function workerSupervisorId(worker){
+    return S(
+      worker.app_supervisor_id ||
+      worker.supervisor_id ||
+      worker.assigned_supervisor_id ||
+      worker.manager_id ||
+      ''
+    );
+  }
+
+  function workerProjectId(worker){
+    return S(worker.project_id || worker.assigned_project_id || worker.current_project_id || '');
+  }
+
+  function fillOptions(id, rows, label, allLabel){
+    const el = $(id);
+    if (!el) return;
+    const current = el.value;
+    el.innerHTML = (allLabel ? `<option value="">${allLabel}</option>` : '') +
+      A(rows).map(row => `<option value="${String(row.id).replace(/"/g, '&quot;')}">${String(row[label] || row.name || row.full_name || row.username || row.id).replace(/[<>&"]/g, m => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[m]))}</option>`).join('');
+    if (current && [...el.options].some(o => S(o.value) === S(current))) el.value = current;
+  }
+
   async function safeQuery(builder){
     try {
       const res = await builder;
@@ -44,130 +72,124 @@
     }
   }
 
-  function esc(value){
-    return S(value).replace(/[<>&"]/g, m => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[m]));
-  }
-
-  function fillProjects(){
-    const el = $('techNewTicketProject');
-    if (!el) return;
-    const current = el.value;
-    el.innerHTML = '<option value="">اختر المشروع</option>' +
-      A(ds().projects).map(p => `<option value="${esc(p.id)}">${esc(p.name || p.project_name || p.id)}</option>`).join('');
-    if (current && [...el.options].some(o => S(o.value) === S(current))) el.value = current;
-  }
-
-  async function loadTechnicianData(){
+  async function loadSupervisorData(){
+    const u = currentUser();
+    if (!u || !u.id || !window.sb) return false;
+    const sid = S(u.id);
     const d = ds();
-    const [projects, tickets, users] = await Promise.all([
-      safeQuery(window.sb.from('projects').select('*').order('id').limit(1000)),
+
+    const [projects, workers, users, logs, tickets, attendance] = await Promise.all([
+      safeQuery(window.sb.from('projects').select('*').eq('supervisor_id', u.id).order('id')),
+      safeQuery(window.sb.from('workers').select('*').limit(1200)),
+      safeQuery(window.sb.from('app_users').select('id,full_name,username,role,is_active').order('id')),
+      safeQuery(window.sb.from('time_logs').select('*').eq('supervisor_id', u.id).gte('log_date', monthStart()).order('id', { ascending: false }).limit(250)),
       safeQuery(window.sb.from('tickets').select('*').order('id', { ascending: false }).limit(350)),
-      safeQuery(window.sb.from('app_users').select('id,full_name,username,role,is_active').order('id').limit(300))
+      safeQuery(window.sb.from('attendance').select('*').gte('attendance_date', monthStart()).order('attendance_date', { ascending: false }).limit(1200))
     ]);
-    d.projects = projects;
-    d.tickets = tickets;
+
+    const projectIds = new Set(projects.map(p => S(p.id)));
+    const filteredWorkers = workers.filter(w => workerSupervisorId(w) === sid || projectIds.has(workerProjectId(w)));
+    const workerIds = new Set(filteredWorkers.map(w => S(w.id)));
+
     d.users = users;
-    d.supervisors = users.filter(u => u.role === 'supervisor' && u.is_active !== false);
+    d.supervisors = users.filter(x => x.role === 'supervisor' && x.is_active !== false);
+    d.projects = projects;
+    d.workers = filteredWorkers;
+    d.logs = logs.filter(l => S(l.supervisor_id) === sid);
+    d.tickets = tickets.filter(t =>
+      S(t.supervisor_id) === sid ||
+      S(t.created_by) === sid ||
+      projectIds.has(S(t.project_id))
+    );
+    d.attendance = attendance.filter(a =>
+      S(a.supervisor_id) === sid ||
+      workerIds.has(S(a.worker_id)) ||
+      projectIds.has(S(a.project_id))
+    );
+    return true;
   }
 
-  async function reloadAndRender(){
-    if (!window.sb) return;
-    await loadTechnicianData();
-    fillProjects();
-    try { window.renderTechnicianTickets && window.renderTechnicianTickets(); } catch (e) { console.warn(e); }
-    try { window.renderTechAttendance && window.renderTechAttendance(); } catch (_) {}
+  function renderSupervisorParts(){
+    const u = currentUser();
+    if ($('supTitle')) $('supTitle').textContent = 'لوحة المشرف - ' + (u.full_name || u.username || '');
+    fillOptions('logProject', ds().projects, 'name', 'اختر المشروع');
+    fillOptions('attendanceProject', ds().projects, 'name', 'كل مشاريع المشرف');
+    fillOptions('ticketProject', ds().projects, 'name', 'اختر المشروع');
+    fillOptions('supTicketFilterProject', ds().projects, 'name', 'كل المشاريع');
+    if ($('logDate') && !$('logDate').value) $('logDate').value = today();
+    if ($('attendanceDate') && !$('attendanceDate').value) $('attendanceDate').value = today();
+    try { window.renderSupervisorAttendanceList && window.renderSupervisorAttendanceList(); } catch (e) { console.warn(e); }
+    try { window.renderTimeLogs && window.renderTimeLogs(); } catch (e) { console.warn(e); }
+    try { window.renderTickets && window.renderTickets(); } catch (e) { console.warn(e); }
+    try { window.renderSupervisorDailySummary && window.renderSupervisorDailySummary(); } catch (_) {}
   }
 
-  window.tasneefReloadTechnicianFastV9 = reloadAndRender;
+  window.tasneefReloadSupervisorFastV9 = async function(){
+    const ok = await loadSupervisorData();
+    if (ok) renderSupervisorParts();
+    return ok;
+  };
 
-  window.initTechnician = async function(){
+  window.initSupervisor = async function(){
     const u = currentUser();
     if (!u || !u.id) {
       try {
-        if (typeof window.requireRole === 'function') window.requireRole('technician');
+        if (typeof window.requireRole === 'function') window.requireRole('supervisor');
       } catch (_) {}
       return;
     }
-    if ($('techTitle')) $('techTitle').textContent = 'لوحة الفني - ' + (u.full_name || u.username || '');
-    await reloadAndRender();
-    if (!window.__tasneefTechRefreshV9) {
-      window.__tasneefTechRefreshV9 = setInterval(reloadAndRender, 60000);
-    }
+    await window.tasneefReloadSupervisorFastV9();
   };
 
-  async function updateTicket(id, row, doneMessage){
-    if (!window.sb) return say('الاتصال بقاعدة البيانات غير متاح', 'err');
-    const res = await window.sb.from('tickets').update(row).eq('id', id);
-    if (res.error) return say(res.error.message || String(res.error), 'err');
-    say(doneMessage);
-    await reloadAndRender();
-  }
-
-  window.techClaimTicket = async function(id){
+  window.saveSupervisorAttendance = async function(){
     const u = currentUser();
-    const t = A(ds().tickets).find(x => S(x.id) === S(id));
-    if (!t) return say('التكت غير موجود', 'err');
-    if (S(t.status) === 'closed') return say('التكت مغلق', 'err');
-    if (t.claimed_by && S(t.claimed_by) !== S(u.id)) return say('هذا التكت مستلم بواسطة ' + (t.claimed_by_name || 'شخص آخر'), 'err');
-    const now = new Date().toISOString();
-    const name = u.full_name || u.username || 'الفني';
-    await updateTicket(id, {
-      status: 'processing',
-      claimed_by: u.id,
-      claimed_by_name: name,
-      claimed_at: t.claimed_at || now,
-      updated_at: now
-    }, 'تم استلام التكت');
-  };
+    const date = $('attendanceDate')?.value || today();
+    const selectedProject = S($('attendanceProject')?.value);
+    const selects = A([...document.querySelectorAll('#supervisorAttendanceList select[data-worker], #supervisorAttendanceList select.att-status-v343')]);
+    if (!selects.length) return say('لا يوجد عمال للحفظ', 'err');
+    const rows = selects.map(select => {
+      const wid = S(select.dataset.worker || select.dataset.workerId);
+      const worker = A(ds().workers).find(w => S(w.id) === wid) || {};
+      const projectId = selectedProject || workerProjectId(worker) || null;
+      const noteEl = document.querySelector(`[data-note-worker="${wid}"], input.att-note-v343[data-worker="${wid}"]`);
+      return {
+        attendance_date: date,
+        worker_id: N(wid) || wid,
+        supervisor_id: N(u.id) || u.id,
+        project_id: projectId ? (N(projectId) || projectId) : null,
+        status: select.value || 'present',
+        notes: noteEl ? S(noteEl.value) : '',
+        created_by: N(u.id) || u.id
+      };
+    });
 
-  window.techCloseTicket = async function(id){
-    const u = currentUser();
-    const t = A(ds().tickets).find(x => S(x.id) === S(id));
-    if (!t) return say('التكت غير موجود', 'err');
-    if (S(t.status) === 'closed') return say('التكت مغلق بالفعل', 'err');
-    const note = prompt('كيف تم إغلاق التكت؟');
-    if (!note || !S(note)) return say('لا يمكن إغلاق التكت بدون ذكر طريقة الإغلاق', 'err');
-    const now = new Date().toISOString();
-    const name = u.full_name || u.username || 'الفني';
-    const row = {
-      status: 'closed',
-      closed_at: now,
-      closed_by: u.id,
-      closed_by_name: name,
-      closure_note: S(note),
-      updated_at: now
-    };
-    if (!t.claimed_at) {
-      row.claimed_by = u.id;
-      row.claimed_by_name = name;
-      row.claimed_at = now;
-    }
-    await updateTicket(id, row, 'تم إغلاق التكت');
-  };
-
-  window.saveTechnicianTicket = async function(){
-    const u = currentUser();
-    const project = $('techNewTicketProject')?.value;
-    const title = $('techNewTicketTitle')?.value;
-    const description = $('techNewTicketDescription')?.value;
-    if (!project || !S(title)) return say('اختر المشروع واكتب عنوان التكت', 'err');
-    const row = {
-      project_id: Number(project) || project,
-      title: S(title),
-      description: S(description),
-      priority: $('techNewTicketPriority')?.value || 'normal',
-      status: 'open',
-      created_by: u.id,
-      supervisor_id: null
-    };
-    const res = await window.sb.from('tickets').insert(row);
-    if (res.error) return say(res.error.message || String(res.error), 'err');
-    say('تم حفظ التكت');
     try {
-      if (typeof window.clearTechnicianTicketForm === 'function') window.clearTechnicianTicketForm();
-    } catch (_) {}
-    await reloadAndRender();
+      const workerIds = rows.map(r => r.worker_id);
+      const found = await window.sb.from('attendance').select('id,worker_id').eq('attendance_date', date).in('worker_id', workerIds);
+      if (found.error) throw found.error;
+      const byWorker = new Map(A(found.data).map(r => [S(r.worker_id), r.id]));
+      const inserts = [];
+      for (const row of rows) {
+        const id = byWorker.get(S(row.worker_id));
+        if (id) {
+          const res = await window.sb.from('attendance').update(row).eq('id', id);
+          if (res.error) throw res.error;
+        } else {
+          inserts.push(row);
+        }
+      }
+      if (inserts.length) {
+        const res = await window.sb.from('attendance').insert(inserts);
+        if (res.error) throw res.error;
+      }
+      say('تم حفظ التحضير');
+      await loadSupervisorData();
+      renderSupervisorParts();
+    } catch (error) {
+      say(error.message || String(error), 'err');
+    }
   };
 
-  console.log('Tasneef technician fast fix v9 loaded');
+  try { window.initSupervisor = window.initSupervisor; } catch (_) {}
+  console.log('Tasneef supervisor fast fix v9 loaded');
 })();

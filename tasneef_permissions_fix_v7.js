@@ -1,416 +1,344 @@
 (function(){
   'use strict';
-  if(window.__tasneefPermissionsRootV40) return;
-  window.__tasneefPermissionsRootV40 = true;
 
+  if (window.__tasneefPermissionsFixV7) return;
+  window.__tasneefPermissionsFixV7 = true;
+
+  const $ = id => document.getElementById(id);
   const S = v => String(v ?? '').trim();
   const A = v => Array.isArray(v) ? v : [];
-  const $ = id => document.getElementById(id);
-  const toast = (text,type) => {
-    try{ if(typeof window.msg === 'function') window.msg(text,type); else alert(text); }
-    catch(_){ alert(text); }
+  const toast = (text, type) => {
+    try {
+      if (typeof window.msg === 'function') window.msg(text, type);
+      else alert(text);
+    } catch (_) {
+      alert(text);
+    }
   };
 
-  const CORE = [
-    ['can_dashboard','لوحة التحكم','عام'],
-    ['can_time_logs','التسجيلات اليومية','تشغيل'],
-    ['can_manage_users','إدارة المستخدمين','إدارة'],
-    ['can_projects','المشاريع','تشغيل'],
-    ['can_contracts','العقود والخدمات','تشغيل'],
-    ['can_manage_workers','العمال','تشغيل'],
-    ['can_attendance','الحضور والغياب','تشغيل'],
-    ['can_monthly','الأوقات الشهرية','تشغيل'],
-    ['can_tickets','التكتات','تشغيل'],
-    ['can_orders','الأوردرات','تشغيل'],
-    ['can_client_reports','تقارير العملاء','تقارير'],
-    ['can_client_ratings','تقييمات العملاء','تقارير'],
-    ['can_alerts','التنبيهات','عام'],
-    ['can_assistant','مساعد تصنيف','عام'],
-    ['can_export','التصدير والاستيراد','عام'],
-    ['can_expenses_inventory','المالية والمخزون','مالية ومخزون'],
-    ['can_manage_inventory','إدارة المخزون','مالية ومخزون'],
-    ['can_inventory_requests','طلبات الصرف','مالية ومخزون'],
-    ['can_edit_inventory_requests','تعديل طلبات الصرف','مالية ومخزون'],
-    ['can_delete_inventory_requests','حذف طلبات الصرف','مالية ومخزون'],
-    ['can_journey','رحلة التشغيل اليومية','تشغيل'],
-    ['can_reports','الملخص والتقارير','تقارير'],
-    ['can_edit_time_logs','تعديل السجلات اليومية','تشغيل']
+  const CORE_KEYS = [
+    'can_dashboard',
+    'can_time_logs',
+    'can_manage_users',
+    'can_projects',
+    'can_contracts',
+    'can_manage_workers',
+    'can_attendance',
+    'can_monthly',
+    'can_tickets',
+    'can_client_reports',
+    'can_client_ratings',
+    'can_alerts',
+    'can_assistant',
+    'can_export',
+    'can_expenses_inventory',
+    'can_inventory_requests',
+    'can_manage_inventory',
+    'can_edit_inventory_requests',
+    'can_delete_inventory_requests',
+    'can_journey',
+    'can_reports',
+    'can_edit_time_logs'
   ];
-  const CORE_KEYS = CORE.map(x => x[0]);
-  const ACTIONS = [['view','مشاهدة'],['add','إضافة'],['edit','تعديل'],['delete','حذف'],['print','طباعة/تصدير']];
-  const TABS = [
-    ['dashboard','لوحة التحكم','can_dashboard'],
-    ['daily','التسجيلات اليومية','can_time_logs'],
-    ['users','إدارة المستخدمين','can_manage_users'],
-    ['projects','المشاريع','can_projects'],
-    ['contracts','العقود والخدمات','can_contracts'],
-    ['workers','العمال','can_manage_workers'],
-    ['attendance','الحضور والغياب','can_attendance'],
-    ['monthly','الأوقات الشهرية','can_monthly'],
-    ['tickets','التكتات','can_tickets'],
-    ['orders','الأوردرات','can_orders'],
-    ['clientReports','تقارير العملاء','can_client_reports'],
-    ['clientRatings','تقييمات العملاء','can_client_ratings'],
-    ['alerts','التنبيهات','can_alerts'],
-    ['assistant','مساعد تصنيف','can_assistant'],
-    ['export','التصدير والاستيراد','can_export'],
-    ['financeDashboard','المالية والمخزون','can_expenses_inventory'],
-    ['finance_summary','المالية: الملخص','can_expenses_inventory'],
-    ['finance_products','المالية: المنتجات','can_manage_inventory'],
-    ['finance_suppliers','المالية: الموردين','can_manage_inventory'],
-    ['finance_add','المالية: إضافة للمخزون','can_manage_inventory'],
-    ['finance_movement','المالية: حركة المخزون','can_manage_inventory'],
-    ['finance_cost','المالية: مركز التكلفة','can_expenses_inventory'],
-    ['finance_reports','المالية: التقارير','can_expenses_inventory']
-  ];
-  const PAGE_CORE = Object.fromEntries(TABS.filter(t => !t[0].startsWith('finance_')).map(([page,,core]) => [page, core]));
-  const FINANCE_TAB_CORE = {
-    summary:'can_expenses_inventory',
-    products:'can_manage_inventory',
-    suppliers:'can_manage_inventory',
-    add:'can_manage_inventory',
-    movement:'can_manage_inventory',
-    cost:'can_expenses_inventory',
-    reports:'can_expenses_inventory',
-    overview:'can_expenses_inventory',
-    catalog:'can_manage_inventory',
-    inventory:'can_manage_inventory',
-    movements:'can_manage_inventory',
-    requests:'can_inventory_requests',
-    costCenters:'can_expenses_inventory',
-    items:'can_manage_inventory'
+
+  const TAB_TO_CORE = {
+    overview: 'can_dashboard',
+    expenses: 'can_expenses_inventory',
+    inventory: 'can_manage_inventory',
+    catalog: 'can_manage_inventory',
+    movements: 'can_manage_inventory',
+    requests: 'can_inventory_requests',
+    reports: 'can_client_reports',
+    costCenters: 'can_expenses_inventory',
+    suppliers: 'can_manage_inventory',
+    users: 'can_manage_users',
+    workers: 'can_manage_workers',
+    tickets: 'can_tickets',
+    attendance: 'can_attendance',
+    time_logs: 'can_time_logs',
+    monthly: 'can_monthly'
   };
 
-  const ROLE_LABELS = [
-    ['admin','مدير النظام'],
-    ['financial_manager','مدير مالي'],
-    ['operations_manager','مدير تشغيلي'],
-    ['warehouse_manager','مدير مخزون'],
-    ['supervisor','مشرف'],
-    ['technician','فني']
-  ];
-
-  function normalizeRole(role){
-    const r = S(role);
-    const map = {
-      general_manager:'admin',
-      system_admin:'admin',
-      'مدير عام':'admin',
-      'مدير النظام':'admin',
-      'مدير مالي':'financial_manager',
-      'مدير تشغيلي':'operations_manager',
-      'مدير مخازن':'warehouse_manager',
-      'مدير مخزون':'warehouse_manager',
-      'مشرف':'supervisor',
-      'فني':'technician'
-    };
-    return map[r] || r || 'supervisor';
-  }
   function parsePerms(value){
-    if(!value) return {};
-    if(typeof value === 'object') return value || {};
-    try{ return JSON.parse(value) || {}; }catch(_){ return {}; }
+    if (!value) return {};
+    if (typeof value === 'string') {
+      try { return JSON.parse(value || '{}') || {}; } catch (_) { return {}; }
+    }
+    return value || {};
   }
-  function hasSavedPerms(perms){
-    return Object.keys(perms || {}).some(k => CORE_KEYS.includes(k) || /^tab_/.test(k));
+
+  function allCore(value){
+    return Object.fromEntries(CORE_KEYS.map(key => [key, !!value]));
   }
+
   function roleDefaults(role){
-    const r = normalizeRole(role);
-    const out = {};
-    const set = keys => keys.forEach(k => out[k] = true);
-    if(r === 'admin'){ CORE_KEYS.forEach(k => out[k] = true); TABS.forEach(([tab]) => ACTIONS.forEach(([a]) => out[`tab_${tab}_${a}`] = true)); return out; }
-    if(r === 'financial_manager') set(['can_dashboard','can_orders','can_client_reports','can_client_ratings','can_alerts','can_export','can_reports','can_expenses_inventory','can_manage_inventory','can_inventory_requests','can_edit_inventory_requests','can_delete_inventory_requests']);
-    else if(r === 'operations_manager') set(['can_dashboard','can_time_logs','can_projects','can_contracts','can_manage_workers','can_attendance','can_monthly','can_tickets','can_orders','can_client_reports','can_client_ratings','can_alerts','can_assistant','can_export','can_inventory_requests','can_journey','can_reports','can_edit_time_logs']);
-    else if(r === 'warehouse_manager') set(['can_dashboard','can_expenses_inventory','can_manage_inventory','can_inventory_requests','can_edit_inventory_requests','can_delete_inventory_requests']);
-    else if(r === 'technician') set(['can_dashboard','can_tickets','can_inventory_requests']);
-    else set(['can_dashboard','can_time_logs','can_attendance','can_tickets','can_inventory_requests','can_journey']);
-    TABS.forEach(([tab,,core]) => { if(out[core]) ACTIONS.forEach(([a]) => out[`tab_${tab}_${a}`] = true); });
-    return out;
-  }
-  function exactPerms(user){
-    const direct = parsePerms(user && user.permissions);
-    if(hasSavedPerms(direct)) return direct;
-    return roleDefaults(user && user.role);
-  }
-  function currentSession(){
-    try{ return JSON.parse(localStorage.getItem('tasneef_user') || '{}') || {}; }catch(_){ return {}; }
-  }
-  function localUsers(){
-    return A(window.data && window.data.users);
-  }
-  function currentUser(){
-    const s = currentSession();
-    const fresh = localUsers().find(u =>
-      (s.id && S(u.id) === S(s.id)) ||
-      (s.username && S(u.username).toLowerCase() === S(s.username).toLowerCase())
-    );
-    return Object.assign({}, s, fresh || {});
-  }
-  function isSystemAdmin(user){
-    const u = user || currentUser();
-    return normalizeRole(u.role) === 'admin' || S(u.username).toLowerCase() === 'admin';
-  }
-  function can(key, user){
-    const u = user || currentUser();
-    if(isSystemAdmin(u)) return true;
-    return exactPerms(u)[key] === true;
-  }
-  window.tasneefCanV201 = can;
-  window.tasneefCanV40 = can;
-
-  function canPage(page, user){
-    if(isSystemAdmin(user)) return true;
-    const core = PAGE_CORE[page];
-    if(!core) return true;
-    const perms = exactPerms(user || currentUser());
-    return perms[core] === true || perms[`tab_${page}_view`] === true;
-  }
-  function pageFromNav(btn){
-    const raw = S(btn && btn.getAttribute('onclick'));
-    const m = raw.match(/showPage\(['"]([^'"]+)['"]/);
-    return m ? m[1] : '';
-  }
-  function firstAllowedNav(){
-    const u = currentUser();
-    return [...document.querySelectorAll('.side .nav[onclick*="showPage"]')]
-      .find(btn => btn.style.display !== 'none' && canPage(pageFromNav(btn), u));
-  }
-  function applySideNav(){
-    const u = currentUser();
-    document.querySelectorAll('.side .nav[onclick*="showPage"]').forEach(btn => {
-      const page = pageFromNav(btn);
-      if(!page) return;
-      btn.style.display = canPage(page, u) ? '' : 'none';
-    });
-    const visible = document.querySelector('.page:not(.hidden)');
-    if(visible && visible.id && !canPage(visible.id, u)){
-      const next = firstAllowedNav();
-      if(next && typeof window.showPage === 'function') window.showPage(pageFromNav(next), next);
+    const r = normalizeRole(role, 'supervisor');
+    if (r === 'admin' || r === 'general_manager') return allCore(true);
+    if (r === 'financial_manager') {
+      return {
+        can_dashboard: true,
+        can_client_reports: true,
+        can_client_ratings: true,
+        can_expenses_inventory: true,
+        can_inventory_requests: true,
+        can_export: true,
+        can_reports: true
+      };
     }
-  }
-
-  function financeTabKey(btn){
-    const raw = S(btn && btn.getAttribute('onclick'));
-    let m = raw.match(/financeShowTab\(['"]([^'"]+)['"]/);
-    if(m) return m[1];
-    m = raw.match(/showTabPage\(['"]([^'"]+)['"]/);
-    if(m) return m[1];
-    const text = S(btn && btn.textContent).replace(/\s+/g,' ');
-    if(/ملخص/.test(text)) return 'summary';
-    if(/منتجات|الأصناف|اصناف/.test(text)) return 'products';
-    if(/الموردين/.test(text)) return 'suppliers';
-    if(/إضافة|اضافة/.test(text)) return 'add';
-    if(/حركة|صرف/.test(text)) return 'movement';
-    if(/تكلفة/.test(text)) return 'cost';
-    if(/تقارير/.test(text)) return 'reports';
-    return '';
-  }
-  function canFinanceTab(key){
-    if(!key) return true;
-    const core = FINANCE_TAB_CORE[key] || FINANCE_TAB_CORE[key.replace('finance_','')];
-    if(!core) return true;
-    const p = exactPerms(currentUser());
-    return p[core] === true || p[`tab_finance_${key}_view`] === true || p[`tab_${key}_view`] === true;
-  }
-  function applyFinanceTabs(){
-    document.querySelectorAll('#financeDashboard .finance-tabs button, #financeDashboard .finance-tab').forEach(btn => {
-      const key = financeTabKey(btn);
-      if(!key) return;
-      btn.style.display = canFinanceTab(key) ? '' : 'none';
-    });
-  }
-  function applyAllPermissions(){
-    applySideNav();
-    applyFinanceTabs();
-  }
-
-  function ensureBox(){
-    const box = $('userPermissionsBoxV72');
-    if(!box || box.dataset.rootV40) return;
-    box.dataset.rootV40 = '1';
-    const groups = [...new Set(CORE.map(x => x[2]))];
-    const coreHtml = groups.map(group => `<section class="perm-root-group-v40"><h4>${group}</h4>${
-      CORE.filter(x => x[2] === group).map(([key,label]) => `<label><span>${label}</span><input type="checkbox" data-perm="${key}" id="perm_${key}"></label>`).join('')
-    }</section>`).join('');
-    const matrix = TABS.map(([tab,label]) => `<tr><td>${label}</td>${ACTIONS.map(([a]) => `<td><input type="checkbox" data-perm="tab_${tab}_${a}" id="perm_tab_${tab}_${a}"></td>`).join('')}</tr>`).join('');
-    box.innerHTML = `
-      <label>الصلاحيات</label>
-      <div class="perm-root-actions-v40">
-        <button type="button" class="light" id="permRoleV40">صلاحيات الدور</button>
-        <button type="button" class="light" id="permAllV40">تحديد الكل</button>
-        <button type="button" class="light" id="permNoneV40">إلغاء الكل</button>
-      </div>
-      <div class="perm-root-groups-v40">${coreHtml}</div>
-      <h3>صلاحيات الأقسام والأزرار</h3>
-      <div class="perm-root-table-wrap-v40"><table class="perm-root-table-v40"><thead><tr><th>القسم</th>${ACTIONS.map(([,l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${matrix}</tbody></table></div>
-      <div class="footer-note">المربعات المحددة فقط هي التي تظهر وتعمل للمستخدم. غير المحدد ممنوع حتى لو كان الدور مديرًا ماليًا أو تشغيليًا.</div>
-    `;
-    $('permRoleV40')?.addEventListener('click', () => setFormPerms(roleDefaults($('userRole')?.value)));
-    $('permAllV40')?.addEventListener('click', () => box.querySelectorAll('input[data-perm]').forEach(i => i.checked = true));
-    $('permNoneV40')?.addEventListener('click', () => box.querySelectorAll('input[data-perm]').forEach(i => i.checked = false));
-  }
-  function ensureStyle(){
-    if($('permRootStyleV40')) return;
-    const st = document.createElement('style');
-    st.id = 'permRootStyleV40';
-    st.textContent = `
-      #userPermissionsBoxV72{max-height:none!important;overflow:visible!important}
-      .perm-root-actions-v40{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
-      .perm-root-groups-v40{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
-      .perm-root-group-v40{border:1px solid #dbeae5;border-radius:14px;background:#fbfffd;padding:10px}
-      .perm-root-group-v40 h4{margin:0 0 8px;color:#064534}
-      .perm-root-group-v40 label{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #edf4f1;padding:6px 0;margin:0;color:#064534}
-      .perm-root-group-v40 label:last-child{border-bottom:0}
-      .perm-root-table-wrap-v40{max-height:360px;overflow:auto;border:1px solid #dbeae5;border-radius:14px;background:#fff;margin-top:8px}
-      .perm-root-table-v40{width:100%;border-collapse:collapse;font-size:12px}
-      .perm-root-table-v40 th{position:sticky;top:0;background:#064534;color:white;padding:8px;z-index:1}
-      .perm-root-table-v40 td{border:1px solid #e4f0ec;padding:7px;text-align:center}
-      .perm-root-table-v40 td:first-child{text-align:right;background:#f7fbfa;font-weight:800;color:#064534}
-    `;
-    document.head.appendChild(st);
-  }
-  function ensureRoleOptions(){
-    const sel = $('userRole');
-    if(!sel) return;
-    const old = S(sel.value);
-    sel.innerHTML = ROLE_LABELS.map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
-    sel.value = ROLE_LABELS.some(([v]) => v === old) ? old : 'supervisor';
-    if(!sel.dataset.rootV40){
-      sel.dataset.rootV40 = '1';
-      sel.addEventListener('change', () => { if(!$('userId')?.value) setFormPerms(roleDefaults(sel.value)); });
+    if (r === 'operations_manager') {
+      return {
+        can_dashboard: true,
+        can_time_logs: true,
+        can_projects: true,
+        can_contracts: true,
+        can_manage_workers: true,
+        can_attendance: true,
+        can_monthly: true,
+        can_tickets: true,
+        can_client_reports: true,
+        can_client_ratings: true,
+        can_expenses_inventory: true,
+        can_inventory_requests: true,
+        can_alerts: true,
+        can_assistant: true,
+        can_export: true,
+        can_journey: true,
+        can_reports: true,
+        can_edit_time_logs: true
+      };
     }
-  }
-  function formInputs(){
-    const box = $('userPermissionsBoxV72');
-    return box ? [...box.querySelectorAll('input[data-perm]')] : [];
-  }
-  function setFormPerms(perms){
-    const p = perms || {};
-    formInputs().forEach(input => input.checked = p[input.dataset.perm] === true);
-  }
-  function collectFormPerms(){
-    const out = {};
-    formInputs().forEach(input => out[input.dataset.perm] = !!input.checked);
-    return out;
-  }
-  function editUserFromLocal(id){
-    return localUsers().find(u => S(u.id) === S(id)) || null;
-  }
-  async function fetchUser(id){
-    const local = editUserFromLocal(id);
-    if(local && local.permissions !== undefined) return local;
-    if(!id || !window.sb) return local;
-    try{
-      const res = await window.sb.from('app_users').select('*').eq('id', id).maybeSingle();
-      if(res && !res.error && res.data) return res.data;
-    }catch(_){}
-    return local;
-  }
-  function updateLocal(user){
-    const rows = localUsers();
-    const i = rows.findIndex(u => S(u.id) === S(user.id));
-    if(i >= 0) rows[i] = Object.assign({}, rows[i], user);
-  }
-  function updateSessionIfCurrent(user){
-    const cur = currentSession();
-    if((cur.id && S(cur.id) === S(user.id)) || (cur.username && S(cur.username).toLowerCase() === S(user.username).toLowerCase())){
-      localStorage.setItem('tasneef_user', JSON.stringify(Object.assign({}, cur, user)));
+    if (r === 'warehouse_manager') {
+      return {
+        can_dashboard: true,
+        can_expenses_inventory: true,
+        can_inventory_requests: true,
+        can_manage_inventory: true,
+        can_edit_inventory_requests: true,
+        can_delete_inventory_requests: true
+      };
     }
-  }
-  window.clearUserForm = function(){
-    ['userId','userFullName','userUsername','userPassword'].forEach(id => { if($(id)) $(id).value = ''; });
-    ensureRoleOptions();
-    if($('userRole')) $('userRole').value = 'supervisor';
-    if($('userActive')) $('userActive').value = 'true';
-    if($('userFormTitle')) $('userFormTitle').textContent = 'إضافة مستخدم';
-    setFormPerms(roleDefaults('supervisor'));
-  };
-  window.editUser = async function(id){
-    ensureStyle(); ensureBox(); ensureRoleOptions();
-    const u = await fetchUser(id);
-    if(!u) return;
-    if($('userId')) $('userId').value = u.id || '';
-    if($('userFullName')) $('userFullName').value = u.full_name || '';
-    if($('userUsername')) $('userUsername').value = u.username || '';
-    if($('userPassword')) $('userPassword').value = u.password || '';
-    if($('userRole')) $('userRole').value = normalizeRole(u.role);
-    if($('userActive')) $('userActive').value = String(u.is_active !== false);
-    if($('userFormTitle')) $('userFormTitle').textContent = 'تعديل مستخدم';
-    setFormPerms(exactPerms(u));
-    $('userFullName')?.scrollIntoView({behavior:'smooth',block:'start'});
-  };
-  window.saveUser = async function(){
-    ensureStyle(); ensureBox(); ensureRoleOptions();
-    const id = S($('userId')?.value);
-    const old = id ? await fetchUser(id) : null;
-    const row = {
-      full_name:S($('userFullName')?.value),
-      username:S($('userUsername')?.value),
-      password:S($('userPassword')?.value) || S(old?.password) || '123456',
-      role:normalizeRole($('userRole')?.value || old?.role),
-      is_active:S($('userActive')?.value || 'true') === 'true',
-      permissions:collectFormPerms()
+    if (r === 'technician') return { can_dashboard: true, can_tickets: true, can_inventory_requests: true };
+    return {
+      can_dashboard: true,
+      can_time_logs: true,
+      can_attendance: true,
+      can_tickets: true,
+      can_inventory_requests: true,
+      can_journey: true
     };
-    if(!row.full_name || !row.username) return toast('الاسم واسم المستخدم مطلوبان','err');
-    if(!window.sb) return toast('قاعدة البيانات غير متصلة','err');
-    const res = id
-      ? await window.sb.from('app_users').update(row).eq('id', id).select('*').maybeSingle()
-      : await window.sb.from('app_users').insert(row).select('*').maybeSingle();
-    if(res.error) return toast('لم يتم حفظ الصلاحيات: ' + (res.error.message || String(res.error)),'err');
-    const saved = res.data || Object.assign({id:id || Date.now()}, row);
-    updateLocal(saved);
-    updateSessionIfCurrent(saved);
-    toast('تم حفظ الصلاحيات وتطبيقها على المستخدم المحدد فقط');
-    try{ if(typeof window.refreshAll === 'function') await window.refreshAll(); }catch(_){}
-    window.clearUserForm();
-    applyAllPermissions();
-  };
-  window.renderUsers = function(){
-    const body = $('usersBody');
-    if(!body) return;
-    const table = body.closest('table');
-    const head = table && table.querySelector('thead');
-    if(head) head.innerHTML = '<tr><th>الاسم</th><th>المستخدم</th><th>الدور</th><th>الحالة</th><th>الصلاحيات</th><th>إجراء</th></tr>';
-    const roleLabel = role => ROLE_LABELS.find(([v]) => v === normalizeRole(role))?.[1] || role || '-';
-    body.innerHTML = localUsers().map(u => {
-      const p = exactPerms(u);
-      const text = CORE.filter(([k]) => p[k]).map(([,label]) => label).slice(0,8).join('، ') || '-';
-      return `<tr><td>${S(u.full_name)}</td><td>${S(u.username)}</td><td><span class="badge">${roleLabel(u.role)}</span></td><td><span class="badge ${u.is_active!==false?'green':'red'}">${u.is_active!==false?'نشط':'موقوف'}</span></td><td style="white-space:normal;min-width:260px">${text}</td><td class="row-actions"><button onclick="editUser(${Number(u.id)||0})">تعديل</button><button class="danger" onclick="deleteRow('app_users',${Number(u.id)||0})">حذف</button></td></tr>`;
-    }).join('') || '<tr><td colspan="6">لا يوجد مستخدمون</td></tr>';
-  };
+  }
 
-  function installShowGuard(){
-    const old = window.showPage;
-    if(typeof old !== 'function' || old.__rootV40) return;
-    const guarded = function(id, btn){
-      if(!canPage(id, currentUser())){
-        toast('لا تملك صلاحية فتح هذا القسم','err');
-        applyAllPermissions();
-        const next = firstAllowedNav();
-        if(next && pageFromNav(next) !== id) return old.call(this, pageFromNav(next), next);
+  function normalizeRole(value, fallback){
+    const x = S(value || fallback);
+    const map = {
+      admin: 'admin',
+      system_admin: 'admin',
+      general_manager: 'general_manager',
+      financial_manager: 'financial_manager',
+      operations_manager: 'operations_manager',
+      warehouse_manager: 'warehouse_manager',
+      supervisor: 'supervisor',
+      technician: 'technician',
+      'مدير عام': 'admin',
+      'مدير النظام': 'admin',
+      'مدير مالي': 'financial_manager',
+      'مدير تشغيلي': 'operations_manager',
+      'مدير مخازن': 'warehouse_manager',
+      'مشرف': 'supervisor',
+      'فني': 'technician'
+    };
+    return map[x] || x || 'supervisor';
+  }
+
+  function safeDbRole(role){
+    const r = normalizeRole(role, 'supervisor');
+    if (['admin', 'supervisor', 'technician'].includes(r)) return r;
+    return /manager|admin|مدير/i.test(r) ? 'admin' : 'supervisor';
+  }
+
+  function hasExplicitPerms(user){
+    return Object.keys(parsePerms(user && user.permissions)).some(key => /^can_|^tab_/.test(key));
+  }
+
+  function effectivePerms(user){
+    const u = user || {};
+    const explicit = parsePerms(u.permissions);
+    const base = Object.assign({}, roleDefaults(u.role), explicit);
+    if (base.can_reports === true) {
+      base.can_client_reports = true;
+      base.can_client_ratings = true;
+    }
+    if (base.can_journey === true) base.can_dashboard = true;
+    if (base.can_edit_time_logs === true) base.can_time_logs = true;
+    return base;
+  }
+
+  function tabFallback(key, base){
+    const match = key.match(/^tab_(.+)_(view|add|edit|delete|print)$/);
+    if (!match) return undefined;
+    const tab = match[1];
+    const action = match[2];
+    if (tab === 'requests' && action === 'edit') return !!base.can_edit_inventory_requests;
+    if (tab === 'requests' && action === 'delete') return !!base.can_delete_inventory_requests;
+    if (tab === 'time_logs' && (action === 'edit' || action === 'delete')) return !!base.can_edit_time_logs;
+    return !!base[TAB_TO_CORE[tab]];
+  }
+
+  function checkboxInputs(){
+    const box = $('userPermissionsBoxV72');
+    const scoped = box ? A([...box.querySelectorAll('input[data-perm]')]) : [];
+    return scoped.length ? scoped : A([...document.querySelectorAll('input[data-perm]')]);
+  }
+
+  function setChecksFromUser(user){
+    const inputs = checkboxInputs();
+    if (!inputs.length || !user) return;
+    const explicit = parsePerms(user.permissions);
+    const base = effectivePerms(user);
+    const useRoleDefaults = !hasExplicitPerms(user);
+
+    inputs.forEach(input => {
+      const key = input.dataset && input.dataset.perm;
+      if (!key) return;
+      if (Object.prototype.hasOwnProperty.call(explicit, key)) {
+        input.checked = !!explicit[key];
         return;
       }
-      const r = old.apply(this, arguments);
-      setTimeout(applyAllPermissions, 40);
-      return r;
+      const tabValue = tabFallback(key, base);
+      if (tabValue !== undefined) {
+        input.checked = tabValue;
+        return;
+      }
+      input.checked = useRoleDefaults ? !!base[key] : !!base[key];
+    });
+  }
+
+  function localUsers(){
+    return A(window.data && (window.data.users || window.data.appUsers));
+  }
+
+  function localUserById(id){
+    return localUsers().find(user => S(user.id) === S(id)) || null;
+  }
+
+  async function fetchUserById(id){
+    const local = localUserById(id);
+    if (local && local.permissions !== undefined) return local;
+    if (!id || !window.sb) return local;
+    try {
+      const res = await window.sb.from('app_users').select('*').eq('id', id).maybeSingle();
+      if (res && !res.error && res.data) return res.data;
+    } catch (_) {}
+    return local;
+  }
+
+  async function hydrateEditingPermissions(id){
+    const userId = S(id || $('userId')?.value);
+    if (!userId) return;
+    const user = await fetchUserById(userId);
+    if (user) setChecksFromUser(user);
+  }
+
+  function collectShownPerms(existing){
+    const merged = Object.assign({}, existing || {});
+    const inputs = checkboxInputs();
+    inputs.forEach(input => {
+      const key = input.dataset && input.dataset.perm;
+      if (key) merged[key] = !!input.checked;
+    });
+    return merged;
+  }
+
+  function updateStoredSession(updated){
+    try {
+      const raw = localStorage.getItem('tasneef_user');
+      const current = raw ? JSON.parse(raw) : null;
+      if (current && (S(current.id) === S(updated.id) || S(current.username) === S(updated.username))) {
+        localStorage.setItem('tasneef_user', JSON.stringify(Object.assign({}, current, updated)));
+      }
+    } catch (_) {}
+    try {
+      const raw = localStorage.getItem('tasneef_session');
+      const current = raw ? JSON.parse(raw) : null;
+      if (current && (S(current.id) === S(updated.id) || S(current.username) === S(updated.username))) {
+        localStorage.setItem('tasneef_session', JSON.stringify(Object.assign({}, current, updated)));
+      }
+    } catch (_) {}
+  }
+
+  function updateLocalUser(updated){
+    const rows = localUsers();
+    const idx = rows.findIndex(user => S(user.id) === S(updated.id));
+    if (idx >= 0) rows[idx] = Object.assign({}, rows[idx], updated);
+  }
+
+  async function writeUser(row, id){
+    if (!window.sb) throw new Error('Supabase غير متصل');
+    return id
+      ? await window.sb.from('app_users').update(row).eq('id', id).select('*').maybeSingle()
+      : await window.sb.from('app_users').insert(row).select('*').maybeSingle();
+  }
+
+  const previousEditUser = window.editUser;
+  if (typeof previousEditUser === 'function') {
+    window.editUser = function(id){
+      const result = previousEditUser.apply(this, arguments);
+      setTimeout(() => hydrateEditingPermissions(id), 80);
+      setTimeout(() => hydrateEditingPermissions(id), 250);
+      return result;
     };
-    guarded.__rootV40 = true;
-    window.showPage = guarded;
-    try{ showPage = guarded; }catch(_){}
   }
-  function install(){
-    ensureStyle();
-    ensureBox();
-    ensureRoleOptions();
-    installShowGuard();
-    if($('userPermissionsBoxV72') && !$('userId')?.value) setFormPerms(roleDefaults($('userRole')?.value || 'supervisor'));
-    try{ window.renderUsers(); }catch(_){}
-    applyAllPermissions();
+
+  const previousClearUserForm = window.clearUserForm;
+  if (typeof previousClearUserForm === 'function') {
+    window.clearUserForm = function(){
+      const result = previousClearUserForm.apply(this, arguments);
+      setTimeout(() => setChecksFromUser({ role: $('userRole')?.value || 'supervisor', permissions: {} }), 80);
+      return result;
+    };
   }
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(install, 200));
-  else setTimeout(install, 50);
-  window.addEventListener('load', () => { setTimeout(install, 500); setTimeout(applyAllPermissions, 1400); });
-  const loop = () => { applyAllPermissions(); setTimeout(loop, 900); };
-  setTimeout(loop, 900);
-  try{ new MutationObserver(() => setTimeout(applyAllPermissions, 30)).observe(document.body, {childList:true,subtree:true,attributes:true,attributeFilter:['class','style']}); }catch(_){}
+
+  window.saveUser = async function(){
+    const id = S($('userId')?.value);
+    const oldUser = id ? await fetchUserById(id) : null;
+    const role = normalizeRole($('userRole')?.value, oldUser && oldUser.role);
+    const existingPerms = parsePerms(oldUser && oldUser.permissions);
+    const permissions = collectShownPerms(existingPerms);
+    const row = {
+      full_name: S($('userFullName')?.value),
+      username: S($('userUsername')?.value),
+      password: S($('userPassword')?.value) || S(oldUser && oldUser.password) || '123456',
+      role,
+      is_active: S($('userActive')?.value || 'true') === 'true',
+      permissions
+    };
+
+    if (!row.full_name || !row.username) return toast('الاسم واسم المستخدم مطلوبان', 'err');
+
+    let res = await writeUser(row, id);
+    if (res.error && /role_check|constraint/i.test(String(res.error.message || ''))) {
+      res = await writeUser(Object.assign({}, row, { role: safeDbRole(role) }), id);
+    }
+    if (res.error) {
+      return toast('لم يتم حفظ التعديل: ' + (res.error.message || String(res.error)), 'err');
+    }
+
+    const saved = res.data || Object.assign({ id: id || undefined }, row);
+    updateLocalUser(saved);
+    updateStoredSession(saved);
+
+    toast('تم حفظ صلاحيات المستخدم المحدد فقط');
+    try { if (typeof window.refreshAll === 'function') await window.refreshAll(); } catch (_) {}
+    try { if (typeof window.clearUserForm === 'function') window.clearUserForm(); } catch (_) {}
+  };
+
+  document.addEventListener('click', event => {
+    const target = event.target && event.target.closest && event.target.closest('button[onclick^="editUser"]');
+    if (!target) return;
+    const call = target.getAttribute('onclick') || '';
+    const match = call.match(/editUser\(([^)]+)\)/);
+    if (match) setTimeout(() => hydrateEditingPermissions(match[1].replace(/['"]/g, '')), 180);
+  }, true);
+
+  console.log('Tasneef permissions fix v7 loaded');
 })();
