@@ -183,9 +183,55 @@
   function stabilizeReportsBody(){
     if(!isWarehouse() || !visible() || activeTab() !== 'reports') return;
     if(!reportBodyLooksBroken()) return;
-    if(typeof window.financeProTabV15 === 'function'){
-      try{ window.financeProTabV15('reports'); }catch(_){}
-    }
+    renderWarehouseReports();
+  }
+  function rowType(v){
+    const t=S(v);
+    const map={'داخل':'in','صرف':'out','خارج':'out','مستهلك':'consume','استهلاك':'consume','مرتجع':'return','مرجع':'return','مهدور':'waste','هدر':'waste','تالف':'damaged','سكراب':'scrap'};
+    return map[t] || t;
+  }
+  function metaOf(note){
+    const raw=S(note);
+    if(!raw.startsWith('finance_pro_v15:')) return {};
+    try{ return JSON.parse(raw.replace('finance_pro_v15:','')) || {}; }catch(_){ return {}; }
+  }
+  function qty(v){ const n=Number(v); return Number.isFinite(n) ? n : 0; }
+  function reportRows(){
+    const st=window.financeProStateV15 || {};
+    const moves=Array.isArray(st.movements) ? st.movements : [];
+    const rows=[];
+    moves.forEach(m=>{
+      const dist=Array.isArray(metaOf(m.notes).distribution) ? metaOf(m.notes).distribution : [];
+      if(dist.length){
+        dist.forEach(d=>rows.push({date:m.movement_date||S(m.created_at).slice(0,10)||'-', type:rowType(d.type||m.movement_type), item:m.item_name||'-', qty:qty(d.qty), receiver:m.receiver||'-', project:d.projectName||d.otherName||m.project_name||'-', order:d.orderNo||m.order_no||'-'}));
+      }else{
+        rows.push({date:m.movement_date||S(m.created_at).slice(0,10)||'-', type:rowType(m.movement_type), item:m.item_name||'-', qty:qty(m.quantity), receiver:m.receiver||'-', project:m.project_name||'-', order:m.order_no||'-'});
+      }
+    });
+    return rows;
+  }
+  function renderWarehouseReports(){
+    if(!isWarehouse() || !visible()) return false;
+    const body=document.getElementById('finBodyV15');
+    if(!body) return false;
+    document.querySelectorAll('#finTabsV15 button[data-fin-tab-v15]').forEach(btn=>{
+      btn.classList.toggle('active', S(btn.getAttribute('data-fin-tab-v15'))==='reports');
+    });
+    const rows=reportRows().filter(r=>['in','consume','return','waste','damaged','scrap'].includes(rowType(r.type)));
+    const productMap={};
+    rows.forEach(r=>{
+      const k=S(r.item)||'-';
+      productMap[k]=productMap[k]||{in:0,consume:0,return:0,waste:0};
+      const t=rowType(r.type);
+      if(t==='in') productMap[k].in+=qty(r.qty);
+      else if(t==='consume') productMap[k].consume+=qty(r.qty);
+      else if(t==='return') productMap[k].return+=qty(r.qty);
+      else productMap[k].waste+=qty(r.qty);
+    });
+    const productRows=Object.keys(productMap).map(name=>`<tr><td>${name}</td><td>${productMap[name].in}</td><td>${productMap[name].consume}</td><td>${productMap[name].return}</td><td>${productMap[name].waste}</td></tr>`).join('');
+    const moveRows=rows.map(r=>`<tr><td>${r.date}</td><td>${r.type==='in'?'داخل':r.type==='consume'?'مستهلك':r.type==='return'?'مرتجع':r.type}</td><td>${r.item}</td><td>${r.qty}</td><td>${r.receiver}</td><td>${r.project}</td><td>${r.order}</td></tr>`).join('');
+    body.innerHTML=`<div class="fin-card"><h3>تقارير مدير المخزون</h3><div class="fin-grid three"><div class="fin-card fin-kpi"><small>حركات ظاهرة</small><b>${rows.length}</b></div><div class="fin-card fin-kpi"><small>منتجات في التقرير</small><b>${Object.keys(productMap).length}</b></div><div class="fin-card fin-kpi"><small>المرتجع</small><b>${rows.filter(r=>rowType(r.type)==='return').reduce((a,r)=>a+qty(r.qty),0)}</b></div></div><h3>تقرير المنتجات</h3><div class="fin-table"><table><thead><tr><th>المنتج</th><th>داخل</th><th>مستهلك</th><th>مرتجع</th><th>تالف/هدر/سكراب</th></tr></thead><tbody>${productRows||'<tr><td colspan="5">لا توجد بيانات</td></tr>'}</tbody></table></div><h3>حركة المخزون</h3><div class="fin-table"><table><thead><tr><th>التاريخ</th><th>الحركة</th><th>المنتج</th><th>الكمية</th><th>المستلم/المورد</th><th>المشروع/الخدمة</th><th>الأوردر</th></tr></thead><tbody>${moveRows||'<tr><td colspan="7">لا توجد حركات</td></tr>'}</tbody></table></div></div>`;
+    return false;
   }
   function ensurePro(tab){
     if(!isWarehouse()) return;
@@ -218,6 +264,15 @@
       if(isWarehouse()){
         const target = ['products','movement','reports'].includes(S(tab)) ? S(tab) : 'products';
         sessionStorage.setItem('tasneef_warehouse_fin_tab_v44', target);
+        if(target === 'reports'){
+          const p=page();
+          if(typeof window.financeProLoadV15 === 'function' && (!p || !p.querySelector('#finBodyV15'))) {
+            try{ await window.financeProLoadV15(false); }catch(_){}
+          }
+          setTimeout(()=>{ clean(); renderWarehouseReports(); }, 40);
+          setTimeout(renderWarehouseReports, 180);
+          return false;
+        }
         const result = await old.call(this, target);
         setTimeout(() => {
           clean();

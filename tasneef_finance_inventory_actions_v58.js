@@ -42,6 +42,27 @@
       return `<tr><td>${E(m.movement_date||S(m.created_at).slice(0,10)||'-')}</td><td>${E(typeLabel(m.movement_type))}</td><td>${N(m.quantity)}</td><td>${E(m.receiver||'-')}</td><td>${E(center)}</td><td>${E(project)}</td><td>${E(m.order_no||'-')}</td><td>${E(m.reason||'-')}</td><td>${money(N(m.quantity)*N(m.unit_cost))}</td></tr>`;
     }).join('');
   }
+  function distributionActivityRows(moves){
+    const rows=[];
+    A(moves).forEach(m=>{
+      const meta=parseMeta(m.notes);
+      const dist=A(meta.distribution).filter(d=>N(d.qty)>0);
+      if(!dist.length) return;
+      dist.forEach(d=>{
+        rows.push(Object.assign({}, m, {
+          __fromDistribution: true,
+          movement_type: normType(d.type || m.movement_type),
+          quantity: N(d.qty),
+          cost_center: d.center || m.cost_center,
+          project_name: d.projectName || d.otherName || m.project_name,
+          order_no: d.orderNo || m.order_no,
+          reason: d.note || m.reason,
+          notes: ''
+        }));
+      });
+    });
+    return rows;
+  }
 
   window.financeProShowProductV15 = function(id){
     let key=S(id);
@@ -63,15 +84,22 @@
       itemKeys.includes(S(m.product_code)) ||
       itemKeys.includes(S(m.code))
     );
-    const inRows=moves.filter(m=>normType(m.movement_type)==='in');
-    const outRows=moves.filter(m=>normType(m.movement_type)==='out');
-    const consumedRows=moves.filter(m=>normType(m.movement_type)==='consume');
-    const returnRows=moves.filter(m=>normType(m.movement_type)==='return');
-    const wasteRows=moves.filter(m=>['waste','damaged','scrap'].includes(normType(m.movement_type)));
+    const distRows=distributionActivityRows(moves);
+    const simpleRows=moves.filter(m=>!A(parseMeta(m.notes).distribution).length);
+    const activityRows=simpleRows.concat(distRows);
+    const inRows=activityRows.filter(m=>normType(m.movement_type)==='in');
+    const consumedRows=activityRows.filter(m=>normType(m.movement_type)==='consume');
+    const returnRows=activityRows.filter(m=>normType(m.movement_type)==='return');
+    const simpleReturnRows=returnRows.filter(m=>!m.__fromDistribution);
+    const wasteRows=activityRows.filter(m=>['waste','damaged','scrap'].includes(normType(m.movement_type)));
+    const outRows=activityRows.filter(m=>normType(m.movement_type)==='out')
+      .concat(consumedRows)
+      .concat(wasteRows);
     const sum = rows => rows.reduce((a,m)=>a+N(m.quantity),0);
+    const displayBalance = Math.max(0, sum(inRows) - sum(outRows) + sum(simpleReturnRows));
     const img=item.image_url?`<img src="${E(item.image_url)}" style="width:96px;height:96px;object-fit:contain;border:1px solid #d9e7e2;border-radius:16px;background:#fff;padding:4px">`:'';
     modal('بيانات المنتج: '+(item.name||'-'), [
-      {title:'الملخص', html:`<div class="fin-grid">${img?`<div class="fin-card">${img}</div>`:''}<div class="fin-card fin-kpi"><small>الرصيد الحالي</small><b>${N(item.quantity)}</b></div><div class="fin-card fin-kpi"><small>الداخل</small><b>${sum(inRows)}</b></div><div class="fin-card fin-kpi"><small>الخارج</small><b>${sum(outRows)}</b></div><div class="fin-card fin-kpi"><small>المستهلك</small><b>${sum(consumedRows)}</b></div><div class="fin-card fin-kpi"><small>المرتجع</small><b>${sum(returnRows)}</b></div></div>`},
+      {title:'الملخص', html:`<div class="fin-grid">${img?`<div class="fin-card">${img}</div>`:''}<div class="fin-card fin-kpi"><small>الرصيد الحالي</small><b>${N(displayBalance)}</b></div><div class="fin-card fin-kpi"><small>الداخل</small><b>${sum(inRows)}</b></div><div class="fin-card fin-kpi"><small>الخارج</small><b>${sum(outRows)}</b></div><div class="fin-card fin-kpi"><small>المستهلك</small><b>${sum(consumedRows)}</b></div><div class="fin-card fin-kpi"><small>المرتجع</small><b>${sum(returnRows)}</b></div></div>`},
       {title:'الداخل', html:`<div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية</th><th>المورد</th><th>مركز التكلفة</th><th>المشروع/الخدمة</th><th>الأوردر</th><th>البيان</th><th>القيمة</th></tr></thead><tbody>${movementRows(inRows)}</tbody></table></div>`},
       {title:'الخارج', html:`<div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية</th><th>المستلم</th><th>مركز التكلفة</th><th>المشروع/الخدمة</th><th>الأوردر</th><th>البيان</th><th>القيمة</th></tr></thead><tbody>${movementRows(outRows)}</tbody></table></div>`},
       {title:'المستهلك', html:`<div class="fin-table"><table><thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية</th><th>المستلم</th><th>مركز التكلفة</th><th>المشروع/الخدمة</th><th>الأوردر</th><th>البيان</th><th>القيمة</th></tr></thead><tbody>${movementRows(consumedRows)}</tbody></table></div>`},
