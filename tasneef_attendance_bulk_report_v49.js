@@ -98,31 +98,13 @@
   async function upsertAttendanceRows(rows){
     if(!window.sb) throw new Error('الاتصال بقاعدة البيانات غير جاهز');
     if(!rows.length) return;
-    const byDate = {};
-    rows.forEach(row => {
-      byDate[row.attendance_date] = byDate[row.attendance_date] || [];
-      byDate[row.attendance_date].push(row);
-    });
-    for(const date of Object.keys(byDate)){
-      const group = byDate[date];
-      const ids = group.map(row => row.worker_id);
-      const found = await window.sb.from('attendance').select('id,worker_id').eq('attendance_date', date).in('worker_id', ids);
-      if(found.error) throw found.error;
-      const existing = new Map(A(found.data).map(row => [S(row.worker_id), row.id]));
-      const inserts = [];
-      for(const row of group){
-        const id = existing.get(S(row.worker_id));
-        if(id){
-          const res = await window.sb.from('attendance').update(row).eq('id', id);
-          if(res.error) throw res.error;
-        }else{
-          inserts.push(row);
-        }
-      }
-      if(inserts.length){
-        const res = await window.sb.from('attendance').insert(inserts);
-        if(res.error) throw res.error;
-      }
+    const unique = new Map();
+    rows.forEach(row => unique.set(S(row.attendance_date) + '|' + S(row.worker_id), row));
+    const cleanRows = [...unique.values()];
+    for(let i = 0; i < cleanRows.length; i += 400){
+      const chunk = cleanRows.slice(i, i + 400);
+      const res = await window.sb.from('attendance').upsert(chunk, { onConflict:'attendance_date,worker_id' });
+      if(res.error) throw res.error;
     }
   }
 
