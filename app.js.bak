@@ -19780,7 +19780,7 @@ function financePrintReport(kind){
     try{
       await fastLoadAdminData();
       try{ hydrateForms(); }catch(e){ console.warn('fast hydrate failed', e); }
-      try{ renderAll(); }catch(e){ console.warn('fast renderAll failed', e); try{ renderDashboard(); renderAlerts(); }catch(_e){} }
+      try{ renderDashboard(); renderAlerts(); }catch(e){ console.warn('fast dashboard render failed', e); }
     }catch(e){
       console.warn('fast admin start failed, falling back to full start', e);
       if(typeof fullInitAdminV359 === 'function') return fullInitAdminV359.apply(this, arguments);
@@ -19791,7 +19791,7 @@ function financePrintReport(kind){
         window.__tasneefAdminWarmupPromise = (window.loadAll ? window.loadAll() : loadAll())
           .then(function(){
             try{ hydrateForms(); }catch(_){}
-            try{ renderAll(); }catch(_){ try{ renderDashboard(); renderAlerts(); }catch(__){} }
+            try{ renderDashboard(); renderAlerts(); }catch(_){}
           })
           .catch(function(e){ console.warn('admin background warmup failed', e); });
       });
