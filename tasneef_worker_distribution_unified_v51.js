@@ -1,312 +1,228 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة الفني</title>
+<link rel="stylesheet" href="style.css?v=307">
+<style>
+  :root{--tech-brand:#064b3b;--tech-soft:#eef7f4;--tech-line:#d5e5df;--tech-danger:#c03535;--tech-warn:#f7e8b2}
+  body{background:#f4faf7}
+  .tech-shell{max-width:1180px;margin:0 auto;padding:16px}
+  .hero.compact{align-items:center;gap:14px}
+  .tech-layout{display:grid;grid-template-columns:1fr;gap:14px}
+  .tech-main-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+  .tech-main-tab,.tech-ticket-tab{border:1px solid var(--tech-line)!important;background:#fff!important;color:var(--tech-brand)!important;border-radius:14px!important;padding:10px 16px!important;font-weight:800!important;cursor:pointer}
+  .tech-main-tab.active,.tech-ticket-tab.active{background:var(--tech-brand)!important;color:#fff!important}
+  .tech-main-page,.tech-page{display:none}
+  .tech-main-page.active,.tech-page.active{display:block}
+  .tech-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
+  .tech-kpi{background:#fff;border:1px solid var(--tech-line);border-radius:18px;padding:14px;box-shadow:0 10px 28px rgba(6,75,59,.05)}
+  .tech-kpi small{display:block;color:#697b75;margin-bottom:8px}.tech-kpi b{font-size:28px;color:var(--tech-brand)}
+  .tech-ticket-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px}
+  .tech-att-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  .tech-att-actions button{min-width:120px}.tech-att-actions .danger{background:var(--tech-danger)!important;color:#fff!important}
+  .tech-att-card{background:#fff;border:1px solid var(--tech-line);border-radius:18px;padding:14px;margin-bottom:12px}
+  .tech-att-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
+  .tech-att-summary .box{background:#fff;border:1px solid var(--tech-line);border-radius:16px;padding:12px}.tech-att-summary small{display:block;color:#60746d}.tech-att-summary b{font-size:24px;color:var(--tech-brand)}
+  .badge-att{display:inline-flex;align-items:center;justify-content:center;min-width:64px;border-radius:999px;padding:5px 10px;font-weight:800;font-size:12px}.badge-present{background:#e5f6ee;color:#087542}.badge-absent{background:#ffe7e7;color:#a91d1d}.badge-pending{background:#eef3f1;color:#66736f}
+  .tech-table-wrap{max-height:60vh;overflow:auto;border:1px solid var(--tech-line);border-radius:16px;background:#fff}.tech-table-wrap table{min-width:920px}
+  .tech-mobile-note{display:none;color:#6b7f78;font-size:12px;margin:6px 0}
+  @media(max-width:780px){.tech-shell{padding:10px}.tech-kpis,.tech-att-summary{grid-template-columns:1fr}.grid.two{grid-template-columns:1fr!important}.tech-mobile-note{display:block}.tech-table-wrap{max-height:68vh}.hero.compact{padding:14px}.hero.compact h1{font-size:22px}.tech-main-tab,.tech-ticket-tab{flex:1 1 120px}}
+  @media print{body *{visibility:hidden!important}#techAttendancePrintArea,#techAttendancePrintArea *{visibility:visible!important}#techAttendancePrintArea{position:absolute;inset:0;width:100%;background:#fff}.no-print{display:none!important}}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body onload="initTechnician()">
+<div class="tech-shell">
+  <header class="hero compact">
+    <div><h1 id="techTitle">لوحة الفني</h1><p>صفحة مرتبة للفني: إنشاء التكتات، متابعة الأعمال، وتسجيل الحضور والغياب.</p></div>
+    <div class="actions"><button class="light" onclick="playAppSound('ticket')">اختبار الصوت</button><button onclick="logout()">خروج</button></div>
+  </header>
+  <div id="globalMsg" class="msg hidden"></div>
+
+  <nav class="tech-main-tabs no-print">
+    <button class="tech-main-tab active" onclick="showTechMainTab('techDashboardTab',this)">الرئيسية</button>
+    <button class="tech-main-tab" onclick="showTechMainTab('techCreateTab',this)">إنشاء تكت</button>
+    <button class="tech-main-tab" onclick="showTechMainTab('techTicketsTab',this)">التكتات</button>
+    <button class="tech-main-tab" onclick="showTechMainTab('techAttendanceTab',this)">حضور وغياب</button>
+  </nav>
+
+  <section id="techDashboardTab" class="tech-main-page active">
+    <div class="tech-kpis">
+      <div class="tech-kpi"><small>تكتات مفتوحة</small><b id="techOpenCount">0</b></div>
+      <div class="tech-kpi"><small>تكتاتي قيد المعالجة</small><b id="techMineCount">0</b></div>
+      <div class="tech-kpi"><small>أغلقتها أنا</small><b id="techDoneCount">0</b></div>
+    </div>
+    <div class="card">
+      <h2>مختصر العمل</h2>
+      <p>استخدم التبويبات بالأعلى لإنشاء تكت، متابعة التكتات، أو تسجيل الحضور والغياب.</p>
+      <div class="actions"><button onclick="showTechMainTabById('techTicketsTab')">فتح التكتات</button><button class="light" onclick="showTechMainTabById('techAttendanceTab')">تسجيل الحضور</button></div>
+    </div>
+  </section>
+
+  <section id="techCreateTab" class="tech-main-page">
+    <section class="card" id="techCreateTicketCard">
+      <h2>إنشاء تكت جديد</h2>
+      <div class="grid two">
+        <div><label>المشروع</label><select id="techNewTicketProject"><option value="">اختر المشروع</option></select></div>
+        <div><label>الأولوية</label><select id="techNewTicketPriority"><option value="normal">عادي</option><option value="high">مهم</option><option value="urgent">عاجل</option><option value="low">منخفض</option></select></div>
+        <div><label>عنوان المشكلة</label><input id="techNewTicketTitle" placeholder="مثال: تسريب مياه / عطل إنارة"></div>
+        <div><label>وصف المشكلة</label><input id="techNewTicketDescription" placeholder="اكتب وصف واضح للمشكلة"></div>
+      </div>
+      <div class="actions" style="margin-top:10px"><button onclick="saveTechnicianTicket()">حفظ التكت</button><button class="light" onclick="clearTechnicianTicketForm()">مسح</button></div>
+    </section>
+  </section>
+
+  <section id="techTicketsTab" class="tech-main-page">
+    <div class="card no-print">
+      <div class="filters">
+        <select id="techTicketStatus" onchange="renderTechnicianTickets()"><option value="">كل الحالات</option><option value="open">مفتوح</option><option value="processing">تحت المعالجة</option><option value="closed">مغلق</option></select>
+        <input id="techTicketSearch" oninput="renderTechnicianTickets()" placeholder="بحث برقم التكت أو المشروع أو الوصف">
+        <button class="light" onclick="initTechnician()">تحديث</button>
+      </div>
+    </div>
+    <nav class="tech-ticket-tabs no-print">
+      <button class="tech-ticket-tab active" onclick="showTechWindow('techOpen',this)">التكتات المفتوحة</button>
+      <button class="tech-ticket-tab" onclick="showTechWindow('techMine',this)">تكتاتي</button>
+      <button class="tech-ticket-tab" onclick="showTechWindow('techDone',this)">المنجزة</button>
+    </nav>
+    <p class="tech-mobile-note">مرر الجدول يمينًا ويسارًا إذا كنت تستخدم الجوال.</p>
+    <section id="techOpen" class="tech-page active card"><h2>التكتات المفتوحة</h2><div class="tech-table-wrap"><table><thead><tr><th>رقم</th><th>المشروع</th><th>العنوان</th><th>الوصف</th><th>الأولوية</th><th>الحالة</th><th>مدة الفتح</th><th>استلم بواسطة</th><th>أغلق بواسطة</th><th>كيف تم الإغلاق</th><th>واتساب</th><th>إجراء</th></tr></thead><tbody id="techOpenTicketsBody"></tbody></table></div></section>
+    <section id="techMine" class="tech-page card"><h2>تكتاتي قيد المعالجة</h2><div class="tech-table-wrap"><table><thead><tr><th>رقم</th><th>المشروع</th><th>العنوان</th><th>الوصف</th><th>الأولوية</th><th>الحالة</th><th>مدة الفتح</th><th>استلم بواسطة</th><th>أغلق بواسطة</th><th>كيف تم الإغلاق</th><th>واتساب</th><th>إجراء</th></tr></thead><tbody id="techMyTicketsBody"></tbody></table></div></section>
+    <section id="techDone" class="tech-page card"><h2>التكتات التي أغلقتها</h2><div class="tech-table-wrap"><table><thead><tr><th>رقم</th><th>المشروع</th><th>العنوان</th><th>الوصف</th><th>الأولوية</th><th>الحالة</th><th>مدة الفتح</th><th>استلم بواسطة</th><th>أغلق بواسطة</th><th>كيف تم الإغلاق</th><th>واتساب</th><th>إجراء</th></tr></thead><tbody id="techDoneTicketsBody"></tbody></table></div></section>
+  </section>
+
+  <section id="techAttendanceTab" class="tech-main-page">
+    <div id="techAttendancePrintArea">
+      <div class="card tech-att-card">
+        <h2>حضور وغياب الفنيين</h2>
+        <div class="grid two no-print">
+          <div><label>الشهر</label><input id="techAttendanceMonth" type="month" onchange="renderTechAttendance()"></div>
+          <div><label>ملاحظات اليوم</label><input id="techAttendanceNote" placeholder="مثال: حضور موقع / طوارئ / إذن"></div>
+        </div>
+        <div class="tech-att-actions no-print">
+          <button onclick="techAttendanceCheckIn()">تسجيل حضور</button>
+          <button class="light" onclick="techAttendanceCheckOut()">تسجيل انصراف</button>
+          <button class="danger" onclick="techAttendanceAbsent()">تسجيل غياب</button>
+          <button class="light" onclick="printTechAttendancePDF()">طباعة PDF</button>
+        </div>
+      </div>
+      <div id="techAttendanceSummary" class="tech-att-summary"></div>
+      <div class="card">
+        <h2 id="techAttendanceReportTitle">تقرير حضور الفني</h2>
+        <div class="tech-table-wrap"><table><thead><tr><th>التاريخ</th><th>اليوم</th><th>الحالة</th><th>وقت الحضور</th><th>وقت الانصراف</th><th>ملاحظات</th><th class="no-print">إجراء</th></tr></thead><tbody id="techAttendanceBody"></tbody></table></div>
+      </div>
+    </div>
+  </section>
+</div>
+<script src="orders_seed.js?v=337"></script>
+<script src="app.js?v=352"></script>
+<script src="tasneef_orders_workflow_v8.js?v=8"></script>
+<script src="tasneef_orders_shared_sync_v64.js?v=64"></script>
+<script>
 (function(){
-  'use strict';
-  if(window.__tasneefWorkerDistributionUnifiedV51) return;
-  window.__tasneefWorkerDistributionUnifiedV51 = true;
-
-  const $ = id => document.getElementById(id);
-  const A = v => Array.isArray(v) ? v : [];
-  const S = v => String(v ?? '').trim();
-  const N = v => { const n = Number(v); return Number.isFinite(n) ? n : null; };
-  const E = v => S(v).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  const D = () => (window.data = window.data || {});
-  const active = x => x && x.is_active !== false && !['inactive','deleted','محذوف','موقوف'].includes(S(x.status || 'active').toLowerCase());
-  const same = (a,b) => S(a) === S(b);
-
-  function message(text, type){ try{ if(typeof window.msg === 'function') window.msg(text, type); else alert(text); }catch(_){ alert(text); } }
-  function projectRow(id){ return A(D().projects).find(p => same(p.id, id)) || {}; }
-  function workerRow(id){ return A(D().workers).find(w => same(w.id, id)) || {}; }
-  function projectNameSafe(id){ try{ if(typeof window.projectName === 'function') return window.projectName(id) || '-'; }catch(_){} const p = projectRow(id); return S(p.name || p.project_name || '-'); }
-  function supervisorNameSafe(id){ try{ if(typeof window.supervisorName === 'function') return window.supervisorName(id) || '-'; }catch(_){} const u = A(D().users).find(x => same(x.id, id)) || A(D().supervisors).find(x => same(x.id, id)) || {}; return S(u.full_name || u.name || u.username || '-'); }
-  function assignments(){ return A(D().workerAssignments).filter(a => a && a.is_active !== false); }
-  function assignmentsForWorker(workerId){ return assignments().filter(a => same(a.worker_id, workerId)); }
-  function assignmentsForProject(projectId){ return assignments().filter(a => same(a.project_id, projectId)); }
-  function workerProjectIds(worker){
-    const ids = [];
-    assignmentsForWorker(worker?.id).forEach(a => { if(S(a.project_id)) ids.push(S(a.project_id)); });
-    ['project_id','assigned_project_id','current_project_id'].forEach(k => { if(worker && S(worker[k])) ids.push(S(worker[k])); });
-    return [...new Set(ids.filter(Boolean))];
-  }
-  function workerSupervisorIds(worker){
-    const ids = [];
-    ['app_supervisor_id','supervisor_id','assigned_supervisor_id','manager_id'].forEach(k => { if(worker && S(worker[k])) ids.push(S(worker[k])); });
-    workerProjectIds(worker).forEach(pid => { const sid = projectRow(pid).supervisor_id; if(S(sid)) ids.push(S(sid)); });
-    return [...new Set(ids.filter(Boolean))];
-  }
-  function firstProjectForWorker(worker, selectedSupervisor){
-    const ids = workerProjectIds(worker);
-    if(selectedSupervisor){
-      const bySup = ids.find(pid => same(projectRow(pid).supervisor_id, selectedSupervisor));
-      if(bySup) return bySup;
-    }
-    return ids[0] || '';
-  }
-  function firstSupervisorForWorker(worker, selectedProject){
-    if(selectedProject){ const sid = projectRow(selectedProject).supervisor_id; if(S(sid)) return S(sid); }
-    return workerSupervisorIds(worker)[0] || '';
-  }
-  function workerMatchesSupervisor(worker, supervisorId){ return !supervisorId || workerSupervisorIds(worker).some(id => same(id, supervisorId)); }
-  function workerMatchesProject(worker, projectId){ return !projectId || workerProjectIds(worker).some(id => same(id, projectId)); }
-  function workerLabelProjects(worker){ const names = workerProjectIds(worker).map(projectNameSafe).filter(x => x && x !== '-'); return [...new Set(names)].join('، ') || '-'; }
-  function workerLabelSupervisors(worker){ const names = workerSupervisorIds(worker).map(supervisorNameSafe).filter(x => x && x !== '-'); return [...new Set(names)].join('، ') || '-'; }
-
-  window.tasneefLoadWorkerAssignmentsV51 = async function(){
-    if(!window.sb) return;
+  const ATT_KEY='tasneef_technician_attendance_v310';
+  function $id(id){return document.getElementById(id)}
+  function pad(n){return String(n).padStart(2,'0')}
+  function todayISO(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+  function timeNow(){const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes())}
+  function monthNow(){return todayISO().slice(0,7)}
+  function arabicDay(ds){return ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'][new Date(ds+'T12:00:00').getDay()]}
+  function getStore(){try{return JSON.parse(localStorage.getItem(ATT_KEY)||'{}')}catch(e){return {}}}
+  function setStore(v){localStorage.setItem(ATT_KEY, JSON.stringify(v||{}))}
+  function currentTech(){try{return typeof session==='function' ? (session()||{}) : {}}catch(e){return {}}}
+  function techId(){const u=currentTech();return String(u.id||u.username||u.email||'unknown')}
+  function techName(){const u=currentTech();return u.full_name||u.username||u.email||'الفني'}
+  function getTechRows(month){const store=getStore();const id=techId();return Object.values((store[id]||{})).filter(r=>String(r.date||'').startsWith(month)).sort((a,b)=>String(a.date).localeCompare(String(b.date)))}
+  async function persistTechAttendanceToSystem(row){
+    // يربط حضور الفني بجدول الحضور الشهري في الإدارة، وليس تخزينًا محليًا فقط.
     try{
-      const res = await window.sb.from('worker_project_assignments').select('*').eq('is_active', true).order('id');
-      if(!res.error) D().workerAssignments = A(res.data);
-    }catch(_){}
-  };
-
-  const oldRefresh = window.refreshAll;
-  if(typeof oldRefresh === 'function'){
-    window.refreshAll = async function(){
-      const result = await oldRefresh.apply(this, arguments);
-      await window.tasneefLoadWorkerAssignmentsV51();
-      try{ window.renderProjects && window.renderProjects(); }catch(_){}
-      try{ window.renderWorkers && window.renderWorkers(); }catch(_){}
-      try{ window.renderAttendance && window.renderAttendance(); }catch(_){}
-      try{ window.renderAttendanceMonthly && window.renderAttendanceMonthly(); }catch(_){}
-      try{ window.renderMonthly && window.renderMonthly(); }catch(_){}
-      return result;
-    };
-    try{ refreshAll = window.refreshAll; }catch(_){}
-  }
-
-  window.workerProjectId = function(worker){ return firstProjectForWorker(worker, ''); };
-  window.workerSupId = function(worker){ return firstSupervisorForWorker(worker, firstProjectForWorker(worker, '')); };
-  try{ workerProjectId = window.workerProjectId; }catch(_){}
-  try{ workerSupId = window.workerSupId; }catch(_){}
-
-  window.renderProjectManager = function(){
-    const body = $('projectWorkersBody'); if(!body) return;
-    const pid = S($('manageProjectId')?.value);
-    if(!pid){ body.innerHTML = '<tr><td colspan="5">اختر مشروع من زر إدارة المشروع</td></tr>'; return; }
-    const rows = A(D().workers).filter(w => active(w) && workerMatchesProject(w, pid));
-    body.innerHTML = rows.map(w => `<tr><td>${E(w.name || w.full_name || '-')}</td><td>${E(workerLabelSupervisors(w))}</td><td><span class="badge ${(w.worker_type || 'primary') === 'support' ? 'amber' : 'green'}">${(w.worker_type || 'primary') === 'support' ? 'بديل / مساند' : 'أساسي'}</span></td><td><span class="badge ${w.status === 'inactive' ? 'red' : 'green'}">${w.status === 'inactive' ? 'موقوف' : 'نشط'}</span></td><td class="row-actions"><button class="danger" onclick="removeWorkerFromProject(${Number(w.id)||0})">إزالة من هذا المشروع</button></td></tr>`).join('') || '<tr><td colspan="5">لا يوجد عمال مرتبطون بهذا المشروع</td></tr>';
-  };
-
-  window.addExistingWorkerToProject = async function(){
-    const pid = N($('manageProjectId')?.value), wid = N($('manageWorkerSelect')?.value), type = $('manageWorkerType')?.value || 'primary';
-    if(!pid || !wid) return message('اختر المشروع والعامل', 'err');
-    const sid = N(projectRow(pid).supervisor_id) || null;
-    let assignOk = false;
-    try{ const res = await window.sb.from('worker_project_assignments').upsert({worker_id:wid, project_id:pid, worker_type:type, is_active:true}, {onConflict:'worker_id,project_id'}); assignOk = !res.error; }catch(_){}
-    const upd = await window.sb.from('workers').update({project_id:pid, supervisor_id:sid, app_supervisor_id:sid, worker_type:type}).eq('id', wid);
-    if(upd.error && !assignOk) return message(upd.error.message, 'err');
-    message('تم ربط العامل بالمشروع وتحديث التوزيع');
-    await window.refreshAll();
-    window.openProjectManager && window.openProjectManager(pid);
-  };
-
-  window.saveProjectManagerSupervisor = async function(){
-    const pid = N($('manageProjectId')?.value), sid = N($('projectManageSupervisor')?.value) || null;
-    if(!pid) return message('اختر المشروع أولاً', 'err');
-    const pRes = await window.sb.from('projects').update({supervisor_id:sid}).eq('id', pid);
-    if(pRes.error) return message(pRes.error.message, 'err');
-    const workerIds = assignmentsForProject(pid).map(a => a.worker_id);
-    if(workerIds.length) await window.sb.from('workers').update({supervisor_id:sid, app_supervisor_id:sid}).in('id', workerIds);
-    await window.sb.from('workers').update({supervisor_id:sid, app_supervisor_id:sid}).eq('project_id', pid);
-    message('تم ربط المشرف بالمشروع وتحديث عمال المشروع');
-    await window.refreshAll();
-    window.openProjectManager && window.openProjectManager(pid);
-  };
-
-  window.removeWorkerFromProject = async function(workerId){
-    if(!confirm('إزالة العامل من هذا المشروع؟')) return;
-    const pid = N($('manageProjectId')?.value), wid = N(workerId);
-    if(!pid || !wid) return;
-    try{ await window.sb.from('worker_project_assignments').update({is_active:false}).eq('worker_id', wid).eq('project_id', pid); }catch(_){}
-    await window.sb.from('workers').update({project_id:null}).eq('id', wid).eq('project_id', pid);
-    message('تمت إزالة العامل من هذا المشروع');
-    await window.refreshAll();
-    window.openProjectManager && window.openProjectManager(pid);
-  };
-
-  window.renderWorkers = function(){
-    const body = $('workersBody'); if(!body) return;
-    const sid = S($('workerFilterSupervisor')?.value), pid = S($('workerFilterProject')?.value), st = S($('workerFilterStatus')?.value), tp = S($('workerFilterType')?.value), q = S($('workerSearch')?.value).toLowerCase();
-    let rows = A(D().workers).filter(active);
-    if(sid) rows = rows.filter(w => workerMatchesSupervisor(w, sid));
-    if(pid) rows = rows.filter(w => workerMatchesProject(w, pid));
-    if(st) rows = rows.filter(w => S(w.status || 'active') === st);
-    if(tp) rows = rows.filter(w => S(w.worker_type || 'primary') === tp);
-    if(q) rows = rows.filter(w => [w.name,w.phone,workerLabelSupervisors(w),workerLabelProjects(w),w.notes].join(' ').toLowerCase().includes(q));
-    body.innerHTML = rows.map(w => `<tr><td>${E(w.name || '-')}</td><td>${E(workerLabelSupervisors(w))}</td><td>${E(workerLabelProjects(w))}</td><td><span class="badge ${(w.worker_type || 'primary') === 'support' ? 'amber' : 'green'}">${(w.worker_type || 'primary') === 'support' ? 'بديل / مساند' : 'أساسي'}</span></td><td>${E(w.phone || '')}</td><td>${Number(w.salary || 0)}</td><td><span class="badge ${w.status === 'inactive' ? 'red' : 'green'}">${w.status === 'inactive' ? 'موقوف' : 'نشط'}</span></td><td>${E(w.notes || '-')}</td><td class="row-actions"><button onclick="editWorker(${Number(w.id)||0})">تعديل</button><button class="light" onclick="toggleWorkerStatus(${Number(w.id)||0})">${w.status === 'inactive' ? 'تفعيل' : 'إيقاف'}</button><button class="danger" onclick="deleteRow('workers',${Number(w.id)||0})">حذف</button></td></tr>`).join('') || '<tr><td colspan="9">لا توجد بيانات</td></tr>';
-  };
-
-  window.renderAttendanceWorkersQuick = function(){
-    const div = $('attendanceQuick'); if(!div) return;
-    const sid = S($('attendanceSupervisor')?.value), pid = S($('attendanceProject')?.value);
-    if(!sid && !pid){ div.innerHTML = ''; return; }
-    const rows = A(D().workers).filter(w => active(w) && workerMatchesSupervisor(w, sid) && workerMatchesProject(w, pid));
-    div.innerHTML = rows.map(w => `<div class="quick-item"><b>${E(w.name || '-')}</b><small>${E(workerLabelProjects(w))}</small><div><button onclick="quickAttendance(${Number(w.id)||0},'present')">حاضر</button> <button class="danger" onclick="quickAttendance(${Number(w.id)||0},'absent')">غائب</button></div></div>`).join('') || '<div class="quick-item">لا يوجد عمال حسب التوزيع المختار</div>';
-  };
-
-  window.saveAttendance = async function(){
-    const id = $('attendanceId')?.value, workerId = N($('attendanceWorker')?.value), worker = workerRow(workerId);
-    const pid = N($('attendanceProject')?.value) || N(firstProjectForWorker(worker, $('attendanceSupervisor')?.value));
-    const sid = N($('attendanceSupervisor')?.value) || N(firstSupervisorForWorker(worker, pid));
-    const row = {attendance_date:$('attendanceDate')?.value || new Date().toISOString().slice(0,10), worker_id:workerId, supervisor_id:sid || null, project_id:pid || null, status:$('attendanceStatus')?.value || 'present', notes:$('attendanceNotes')?.value || '', created_by:(typeof session === 'function' ? session()?.id : null) || null};
-    if(!row.worker_id) return message('اختر العامل', 'err');
-    const res = id ? await window.sb.from('attendance').update(row).eq('id', id) : await window.sb.from('attendance').upsert(row, {onConflict:'attendance_date,worker_id'});
-    if(res.error) return message(res.error.message, 'err');
-    message('تم حفظ الحضور حسب توزيع العامل');
-    try{ clearAttendanceForm(); }catch(_){}
-    await window.refreshAll();
-  };
-
-  window.renderAttendance = function(){
-    const body = $('attendanceBody'); if(!body) return;
-    const date = S($('attendanceFilterDate')?.value), sid = S($('attendanceFilterSupervisor')?.value), q = S($('attendanceSearch')?.value).toLowerCase();
-    let rows = A(D().attendance);
-    if(date) rows = rows.filter(a => S(a.attendance_date) === date);
-    rows = rows.filter(a => {
-      const w = workerRow(a.worker_id), effPid = S(a.project_id || firstProjectForWorker(w, a.supervisor_id || sid)), effSid = S(a.supervisor_id || firstSupervisorForWorker(w, effPid));
-      if(sid && !same(effSid, sid) && !workerMatchesSupervisor(w, sid)) return false;
-      if(q && ![w.name,w.full_name,supervisorNameSafe(effSid),projectNameSafe(effPid),a.notes].join(' ').toLowerCase().includes(q)) return false;
-      a.__effPidV51 = effPid; a.__effSidV51 = effSid; return true;
-    });
-    body.innerHTML = rows.map(a => {
-      const w = workerRow(a.worker_id), st = S(a.status).toLowerCase(), isPresent = ['present','حاضر','حضور'].includes(st);
-      return `<tr><td>${E(a.attendance_date || '-')}</td><td>${E(w.name || w.full_name || a.worker_name || '-')}</td><td>${E(supervisorNameSafe(a.__effSidV51))}</td><td>${E(projectNameSafe(a.__effPidV51))}</td><td><span class="badge ${isPresent ? 'green' : 'red'}">${isPresent ? 'حاضر' : 'غائب'}</span></td><td>${E(a.notes || '')}</td><td class="row-actions"><button onclick="editAttendance(${Number(a.id)||0})">تعديل</button><button class="danger" onclick="deleteRow('attendance',${Number(a.id)||0})">حذف</button></td></tr>`;
-    }).join('') || '<tr><td colspan="7">لا توجد بيانات</td></tr>';
-    window.renderAttendanceWorkersQuick();
-  };
-
-  function monthNow(){ return new Date().toISOString().slice(0,7); }
-  function daysInMonth(month){ const y = Number(month.slice(0,4)), m = Number(month.slice(5,7)); return new Date(y, m, 0).getDate(); }
-  function recDate(row){ return S(row.attendance_date || row.date || row.created_at).slice(0,10); }
-  function recMonth(row){ return recDate(row).slice(0,7); }
-  function statusClass(value){
-    const st = S(value).toLowerCase();
-    if(['present','حاضر','حضور'].includes(st)) return 'present';
-    if(['absent','غائب','غياب'].includes(st)) return 'absent';
-    return '';
-  }
-  function installAttendanceSupervisorOptions(){
-    const sel = $('attendanceMatrixSupervisor');
-    if(!sel) return '';
-    const keep = sel.value;
-    const rows = A(D().supervisors).length ? A(D().supervisors) : A(D().users).filter(u => S(u.role) === 'supervisor');
-    sel.innerHTML = '<option value="">كل المشرفين والفنيين</option>' + rows.map(s => `<option value="${E(s.id)}">${E(s.full_name || s.name || s.username || s.id)}</option>`).join('');
-    sel.value = keep;
-    return sel.value;
-  }
-  window.renderAttendanceMonthly = function(){
-    const body = $('attendanceMatrixBody'), head = $('attendanceMatrixHead');
-    if(!body || !head) return;
-    const monthEl = $('attendanceMatrixMonth');
-    if(monthEl && !monthEl.value) monthEl.value = monthNow();
-    const month = monthEl?.value || monthNow();
-    const selected = installAttendanceSupervisorOptions();
-    const type = S($('attendanceMatrixTypeV13')?.value);
-    const q = S($('attendanceMatrixSearch')?.value).toLowerCase();
-    const dayCount = daysInMonth(month);
-    const latest = new Map();
-    A(D().attendance).filter(a => recMonth(a) === month).forEach(a => {
-      const key = S(a.worker_id || a.user_id || a.technician_id) + '|' + recDate(a);
-      const old = latest.get(key);
-      if(!old || S(a.updated_at || a.created_at || a.id) > S(old.updated_at || old.created_at || old.id)) latest.set(key, a);
-    });
-    const rows = [];
-    A(D().workers).filter(active).forEach(w => {
-      const pid = firstProjectForWorker(w, selected);
-      const sid = firstSupervisorForWorker(w, pid);
-      rows.push({id:S(w.id), kind:'worker', label:'عامل', name:S(w.name || w.full_name || '-'), supervisor_id:sid, project_id:pid});
-    });
-    A(D().users).filter(u => ['technician','فني'].includes(S(u.role))).forEach(u => {
-      rows.push({id:S(u.id), kind:'technician', label:'فني', name:S(u.full_name || u.name || u.username || '-'), supervisor_id:S(u.supervisor_id || u.manager_id || ''), project_id:''});
-    });
-    const filtered = rows.filter(r => {
-      const w = workerRow(r.id);
-      if(type === 'worker' && r.kind !== 'worker') return false;
-      if(type === 'technician' && r.kind !== 'technician') return false;
-      if(selected && r.kind === 'worker' && !workerMatchesSupervisor(w, selected)) return false;
-      if(selected && r.kind !== 'worker' && !same(r.supervisor_id, selected)) return false;
-      if(q && ![r.name,r.label,supervisorNameSafe(r.supervisor_id),projectNameSafe(r.project_id)].join(' ').toLowerCase().includes(q)) return false;
-      return true;
-    });
-    head.innerHTML = '<tr><th>الاسم</th><th>النوع</th><th>المشرف / الفني</th><th>المشروع</th><th>الفترة</th>' + Array.from({length:dayCount}, (_,i)=>`<th>${String(i+1).padStart(2,'0')}</th>`).join('') + '</tr>';
-    let totalPresent = 0, totalAbsent = 0;
-    body.innerHTML = filtered.map(r => {
-      const cells = [];
-      for(let day = 1; day <= dayCount; day++){
-        const date = month + '-' + String(day).padStart(2,'0');
-        const rec = latest.get(r.id + '|' + date);
-        const st = statusClass(rec?.status);
-        if(st === 'present'){ totalPresent++; cells.push('<td><span class="att-cell att-present">ح</span></td>'); }
-        else if(st === 'absent'){ totalAbsent++; cells.push('<td><span class="att-cell att-absent">غ</span></td>'); }
-        else cells.push('<td><span class="att-cell att-empty">-</span></td>');
+      if(!window.sb || !window.sb.from) return;
+      const u=currentTech();
+      const status = row.status === 'absent' ? 'absent' : 'present';
+      const noteParts = ['فني: '+techName()];
+      if(row.check_in) noteParts.push('حضور: '+row.check_in);
+      if(row.check_out) noteParts.push('انصراف: '+row.check_out);
+      if(row.note) noteParts.push(row.note);
+      const attendanceRow={
+        attendance_date: row.date,
+        worker_id: Number(u.id) || Number(row.tech_id) || null,
+        supervisor_id: Number(u.supervisor_id || u.manager_id) || null,
+        project_id: null,
+        status,
+        notes: noteParts.join(' | '),
+        created_by: Number(u.id) || null
+      };
+      if(attendanceRow.worker_id){
+        try{ await sb.from('attendance').upsert(attendanceRow,{onConflict:'attendance_date,worker_id'}); }catch(e){ console.warn('tech attendance upsert failed',e); }
       }
-      return `<tr><td><b>${E(r.name)}</b></td><td>${E(r.label)}</td><td>${E(supervisorNameSafe(r.supervisor_id))}</td><td>${E(projectNameSafe(r.project_id))}</td><td>-</td>${cells.join('')}</tr>`;
-    }).join('') || `<tr><td colspan="${5+dayCount}">لا توجد سجلات حسب الفلتر المختار</td></tr>`;
-    const sum = $('attendanceMatrixSummary');
-    if(sum){
-      const pct = (totalPresent + totalAbsent) ? (totalPresent / (totalPresent + totalAbsent) * 100) : 0;
-      sum.innerHTML = `<div class="kpi"><small>عدد الصفوف</small><b>${filtered.length}</b></div><div class="kpi"><small>إجمالي الحضور</small><b>${totalPresent}</b></div><div class="kpi"><small>إجمالي الغياب</small><b>${totalAbsent}</b></div><div class="kpi"><small>نسبة الحضور</small><b>${pct.toFixed(1)}%</b></div>`;
-    }
-  };
-  try{ renderAttendanceMonthly = window.renderAttendanceMonthly; }catch(_){}
-
-  window.renderSupervisorAttendanceList = function(){
-    const list = $('supervisorAttendanceList'); if(!list) return;
-    const user = (typeof session === 'function' ? session() : {}) || {}, sid = S(user.id), selectedProject = S($('attendanceProject')?.value), q = S($('attendanceWorkerSearchV343')?.value).toLowerCase();
-    const projects = A(D().projects).filter(p => same(p.supervisor_id, sid));
-    const projectIds = new Set(projects.map(p => S(p.id)));
-    const workers = A(D().workers).filter(w => active(w) && (workerMatchesSupervisor(w, sid) || workerProjectIds(w).some(pid => projectIds.has(S(pid)))) && workerMatchesProject(w, selectedProject) && (!q || S(w.name || w.full_name).toLowerCase().includes(q)));
-    if($('attendanceProject')){
-      const keep = $('attendanceProject').value;
-      $('attendanceProject').innerHTML = '<option value="">كل مشاريع المشرف</option>' + projects.map(p => `<option value="${E(p.id)}">${E(p.name || p.project_name || p.id)}</option>`).join('');
-      $('attendanceProject').value = keep;
-    }
-    list.innerHTML = workers.map(w => { const pid = selectedProject || firstProjectForWorker(w, sid); return `<div class="att-v343-card" data-worker-card-v343="1"><b>${E(w.name || w.full_name || '-')}</b><small>المشروع: ${E(projectNameSafe(pid))}</small><select class="att-status-v343" data-worker="${E(w.id)}" data-project="${E(pid)}"><option value="present">حاضر</option><option value="absent">غائب</option></select><input class="att-v343-note" data-note-worker="${E(w.id)}" placeholder="ملاحظة اختيارية"></div>`; }).join('') || '<div class="quick-item">لا يوجد عمال مرتبطون بتوزيع هذا المشرف</div>';
-  };
-
-  window.saveSupervisorAttendance = async function(){
-    const user = (typeof session === 'function' ? session() : {}) || {}, date = $('attendanceDate')?.value || new Date().toISOString().slice(0,10);
-    const cards = [...document.querySelectorAll('#supervisorAttendanceList .att-v343-card')];
-    if(!cards.length) return message('لا توجد أسماء للحفظ', 'err');
-    const rows = cards.map(card => {
-      const sel = card.querySelector('select[data-worker]'), wid = N(sel?.dataset.worker) || sel?.dataset.worker, worker = workerRow(wid), pid = N(sel?.dataset.project) || N(firstProjectForWorker(worker, user.id));
-      return {attendance_date:date, worker_id:wid, supervisor_id:N(user.id)||user.id, project_id:pid || null, status:sel?.value || 'present', notes:S(card.querySelector('.att-v343-note')?.value), created_by:N(user.id)||user.id};
-    });
-    const res = await window.sb.from('attendance').upsert(rows, {onConflict:'attendance_date,worker_id'});
-    if(res.error) return message(res.error.message, 'err');
-    message('تم حفظ التحضير حسب توزيع العمال');
-    try{ await window.tasneefLoadWorkerAssignmentsV51(); }catch(_){}
-    window.renderSupervisorAttendanceList();
-  };
-
-  function monthlyWorkerNames(projectId){
-    const names = new Set();
-    A(D().workers).filter(active).forEach(w => { if(workerMatchesProject(w, projectId)) names.add(S(w.name || w.full_name)); });
-    return [...names].filter(Boolean).join('، ') || '-';
+      // حضور وانصراف الفنيين لا يذهب إلى التسجيلات اليومية نهائيًا.
+      // يتم حفظه فقط في جدول attendance ليظهر في قسم الحضور والغياب مثل المشرفين.
+      // كما نحذف أي سجلات قديمة تم إنشاؤها سابقًا في time_logs حتى لا تظهر في التسجيلات اليومية.
+      try{
+        const uid = Number(u.id)||0;
+        if(uid){
+          await sb.from('time_logs')
+            .delete()
+            .eq('user_id', uid)
+            .eq('log_date', row.date)
+            .eq('visit_type', 'technician_attendance');
+        }
+      }catch(e){ console.warn('cleanup old technician time_logs failed',e); }
+    }catch(e){ console.warn('persistTechAttendanceToSystem failed',e); }
   }
-  window.uniqueWorkersForProjectTextV60 = monthlyWorkerNames;
-  window.uniqueWorkersForProjectTextV56 = monthlyWorkerNames;
-  try{ uniqueWorkersForProjectTextV60 = monthlyWorkerNames; }catch(_){}
-  try{ uniqueWorkersForProjectTextV56 = monthlyWorkerNames; }catch(_){}
-  try{ renderProjectManager = window.renderProjectManager; }catch(_){}
-  try{ addExistingWorkerToProject = window.addExistingWorkerToProject; }catch(_){}
-  try{ saveProjectManagerSupervisor = window.saveProjectManagerSupervisor; }catch(_){}
-  try{ removeWorkerFromProject = window.removeWorkerFromProject; }catch(_){}
-  try{ renderWorkers = window.renderWorkers; }catch(_){}
-  try{ renderAttendanceWorkersQuick = window.renderAttendanceWorkersQuick; }catch(_){}
-  try{ saveAttendance = window.saveAttendance; }catch(_){}
-  try{ renderAttendance = window.renderAttendance; }catch(_){}
-  try{ renderSupervisorAttendanceList = window.renderSupervisorAttendanceList; }catch(_){}
-  try{ saveSupervisorAttendance = window.saveSupervisorAttendance; }catch(_){}
-
-  async function boot(){
-    await window.tasneefLoadWorkerAssignmentsV51();
-    try{ window.renderProjectManager(); }catch(_){}
-    try{ window.renderWorkers(); }catch(_){}
-    try{ window.renderAttendance(); }catch(_){}
-    try{ window.renderAttendanceMonthly && window.renderAttendanceMonthly(); }catch(_){}
-    try{ window.renderSupervisorAttendanceList(); }catch(_){}
-    try{ window.renderMonthly && window.renderMonthly(); }catch(_){}
+  async function saveToday(status){
+    const month=$id('techAttendanceMonth')?.value||monthNow();
+    const date=todayISO();
+    const store=getStore();const id=techId();store[id]=store[id]||{};
+    const old=store[id][date]||{date, tech_id:id, tech_name:techName()};
+    const note=$id('techAttendanceNote')?.value||old.note||'';
+    let row=old;
+    if(status==='present') row={...old,date,tech_id:id,tech_name:techName(),status:'present',check_in:old.check_in||timeNow(),note};
+    if(status==='checkout') row={...old,date,tech_id:id,tech_name:techName(),status:old.status||'present',check_in:old.check_in||timeNow(),check_out:timeNow(),note};
+    if(status==='absent') row={...old,date,tech_id:id,tech_name:techName(),status:'absent',check_in:'',check_out:'',note};
+    store[id][date]=row;
+    setStore(store);
+    if($id('techAttendanceMonth')) $id('techAttendanceMonth').value=month;
+    renderTechAttendance();
+    await persistTechAttendanceToSystem(row);
+    if(typeof msg==='function') msg(status==='checkout'?'تم حفظ انصراف الفني في الحضور والغياب فقط':'تم حفظ حضور/غياب الفني في الحضور والغياب فقط');
   }
-  document.addEventListener('DOMContentLoaded', () => setTimeout(boot, 1400));
-  window.addEventListener('load', () => setTimeout(boot, 1800));
-  document.addEventListener('click', e => { if(e.target && (S(e.target.textContent).includes('إدارة المشروع') || S(e.target.textContent).includes('توزيع'))) setTimeout(boot, 400); }, true);
+  window.showTechMainTab=function(id,btn){
+    document.querySelectorAll('.tech-main-page').forEach(p=>p.classList.remove('active'));
+    $id(id)?.classList.add('active');
+    document.querySelectorAll('.tech-main-tab').forEach(b=>b.classList.remove('active'));
+    btn?.classList.add('active');
+    if(id==='techAttendanceTab') renderTechAttendance();
+    if(id==='techTicketsTab' && typeof renderTechnicianTickets==='function') renderTechnicianTickets();
+  };
+  window.showTechMainTabById=function(id){const btn=[...document.querySelectorAll('.tech-main-tab')].find(b=>String(b.getAttribute('onclick')||'').includes(id));window.showTechMainTab(id,btn)};
+  window.techAttendanceCheckIn=function(){saveToday('present')};
+  window.techAttendanceCheckOut=function(){saveToday('checkout')};
+  window.techAttendanceAbsent=function(){saveToday('absent')};
+  window.deleteTechAttendance=function(date){if(!confirm('حذف سجل هذا اليوم؟')) return; const store=getStore(); const id=techId(); if(store[id]) delete store[id][date]; setStore(store); renderTechAttendance();};
+  window.renderTechAttendance=function(){
+    if(!$id('techAttendanceBody')) return;
+    if($id('techAttendanceMonth') && !$id('techAttendanceMonth').value) $id('techAttendanceMonth').value=monthNow();
+    const month=$id('techAttendanceMonth')?.value||monthNow();
+    const rows=getTechRows(month);
+    const present=rows.filter(r=>r.status==='present').length, absent=rows.filter(r=>r.status==='absent').length, total=rows.length;
+    const pct=total?Math.round((present/total)*100):0;
+    if($id('techAttendanceSummary')) $id('techAttendanceSummary').innerHTML=`<div class="box"><small>الفني</small><b>${techName()}</b></div><div class="box"><small>أيام الحضور</small><b>${present}</b></div><div class="box"><small>أيام الغياب</small><b>${absent}</b></div><div class="box"><small>النسبة</small><b>${pct}%</b></div>`;
+    if($id('techAttendanceReportTitle')) $id('techAttendanceReportTitle').textContent='تقرير حضور الفني - '+techName()+' - '+month;
+    $id('techAttendanceBody').innerHTML=rows.map(r=>`<tr><td>${r.date}</td><td>${arabicDay(r.date)}</td><td><span class="badge-att ${r.status==='present'?'badge-present':'badge-absent'}">${r.status==='present'?'حاضر':'غائب'}</span></td><td>${r.check_in||'-'}</td><td>${r.check_out||'-'}</td><td>${(r.note||'').replace(/[<>&]/g,'')}</td><td class="no-print"><button class="danger" onclick="deleteTechAttendance('${r.date}')">حذف</button></td></tr>`).join('') || '<tr><td colspan="7">لا توجد سجلات حضور لهذا الشهر</td></tr>';
+  };
+  window.printTechAttendancePDF=function(){renderTechAttendance();setTimeout(()=>window.print(),150)};
+  const oldInit=window.initTechnician;
+  window.initTechnician=async function(){
+    if(typeof oldInit==='function') await oldInit();
+    if($id('techAttendanceMonth') && !$id('techAttendanceMonth').value) $id('techAttendanceMonth').value=monthNow();
+    renderTechAttendance();
+  };
 })();
+</script>
+<script src="tasneef_technician_fast_fix_v9.js?v=13"></script>
+<script src="tasneef_attendance_status_fix_v16.js?v=16"></script>
+</body>
+</html>

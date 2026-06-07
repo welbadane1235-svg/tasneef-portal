@@ -1,155 +1,90 @@
 (function(){
-  if(window.__tasneefFinanceProLockV31) return;
-  window.__tasneefFinanceProLockV31 = true;
+  if(window.__tasneefFinanceRolesV28) return;
+  window.__tasneefFinanceRolesV28 = true;
 
-  const S = (v)=>String(v ?? '').trim();
-  const financeRoles = new Set(['admin','general_manager','financial_manager','warehouse_manager','operations_manager']);
-  const oldTabMap = {
-    overview:'summary', summary:'summary', dashboard:'summary',
-    inventory:'products', catalog:'products', items:'products', products:'products',
-    add:'add', invoice:'add', invoices:'add',
-    movements:'movement', movement:'movement', requests:'movement',
-    suppliers:'suppliers',
-    costCenters:'cost', cost:'cost', expenses:'cost',
-    reports:'reports'
+  const S=(v)=>String(v ?? '').trim();
+  const currentUser=()=>{
+    try{ return JSON.parse(localStorage.getItem('tasneef_user') || 'null') || {}; }
+    catch(e){ return {}; }
+  };
+  const role=()=>S(currentUser().role);
+  const isWarehouse=()=>role()==='warehouse_manager';
+  const allowedTabs=new Set(['products','movement']);
+
+  function installStyle(){
+    if(document.getElementById('financeRolesStyleV28')) return;
+    const st=document.createElement('style');
+    st.id='financeRolesStyleV28';
+    st.textContent=`
+      body.finance-warehouse-role-v28 .fin-hero p:after{content:" مدير المخزن: عرض المنتجات وحركة المخزون فقط.";display:block;margin-top:4px;color:#e7fff6}
+      body.finance-warehouse-role-v28 .fin-warehouse-hidden-v28{display:none!important}
+    `;
+    document.head.appendChild(st);
+  }
+
+  function hidePriceColumns(table){
+    const ths=[...table.querySelectorAll('thead th')];
+    if(!ths.length) return;
+    const hide=ths.map((th,i)=>/(سعر|ضريبة|قبل|بعد|قيمة|تكلفة|ربح|ر\.س|ط±\.ط³)/.test(S(th.textContent)) ? i : -1).filter(i=>i>=0);
+    if(!hide.length) return;
+    [...table.rows].forEach(row=>{
+      hide.forEach(i=>{ if(row.cells[i]) row.cells[i].classList.add('fin-warehouse-hidden-v28'); });
+    });
+  }
+
+  function applyWarehouseView(){
+    installStyle();
+    document.body.classList.toggle('finance-warehouse-role-v28', isWarehouse());
+    if(!isWarehouse()) return;
+
+    document.querySelectorAll('#finTabsV15 button').forEach(btn=>{
+      const js=S(btn.getAttribute('onclick'));
+      const keep=[...allowedTabs].some(tab=>js.includes(`'${tab}'`) || js.includes(`"${tab}"`));
+      btn.style.display=keep ? '' : 'none';
+    });
+
+    document.querySelectorAll('.fin-meta div,.fin-soft,.fin-kpi').forEach(el=>{
+      const txt=S(el.textContent);
+      if(/(سعر|ضريبة|قبل الضريبة|بعد الضريبة|قيمة|تكلفة|ربح|ر\.س|ط±\.ط³)/.test(txt)){
+        el.classList.add('fin-warehouse-hidden-v28');
+      }
+    });
+    document.querySelectorAll('.fin-table table').forEach(hidePriceColumns);
+  }
+
+  function forceWarehouseTab(){
+    if(!isWarehouse()) return;
+    const active=document.querySelector('#finTabsV15 button.active');
+    const js=S(active?.getAttribute('onclick'));
+    const ok=[...allowedTabs].some(tab=>js.includes(`'${tab}'`) || js.includes(`"${tab}"`));
+    if(!ok && typeof window.financeProTabV15==='function'){
+      setTimeout(()=>window.financeProTabV15('products'),0);
+    }
+  }
+
+  const wrap=(name, after)=>{
+    const old=window[name];
+    if(typeof old!=='function' || old.__financeRolesWrappedV28) return;
+    const fn=function(){
+      const result=old.apply(this, arguments);
+      Promise.resolve(result).finally(()=>setTimeout(after,20));
+      return result;
+    };
+    fn.__financeRolesWrappedV28=true;
+    window[name]=fn;
   };
 
-  function currentRole(){
-    try{
-      const user = JSON.parse(localStorage.getItem('tasneef_user') || localStorage.getItem('tasneef_session') || '{}') || {};
-      return S(user.role);
-    }catch(e){ return ''; }
-  }
-  function shouldLockFinance(){
-    const role = currentRole();
-    return !role || financeRoles.has(role);
-  }
-  function page(){
-    return document.getElementById('financeDashboard');
-  }
-  function financeVisible(){
-    const el = page();
-    return !!el && !el.classList.contains('hidden');
-  }
-  function hasProShell(){
-    const el = page();
-    return !!el && !!el.querySelector('.fin-shell,#finTabsV15,#finBodyV15');
-  }
-  function removeLegacyBits(){
-    const el = page();
-    if(!el) return;
-    if(hasProShell()){
-      el.querySelectorAll('.finance-tabs,.finance-tab-page,#financeTabOverview,#financeTabInventory,#financeTabMovements,#financeTabReports,#financeTabCostCenters,#financeTabSuppliers,#financeTabCatalog,#financeTabExpenses').forEach(node=>{
-        if(!node.closest('.fin-shell')) node.remove();
-      });
-    }
-    const blocked = [
-      'الأصناف','الموردين','تقليل التكلفة','تعديل التكلفة',
-      'ط§ظ„ط£طµظ†ط§ظپ','ط§ظ„ظ…ظˆط±ط¯ظٹظ†','طھظ‚ظ„ظٹظ„ ط§ظ„طھظƒظ„ظپط©','طھط¹ط¯ظٹظ„ ط§ظ„طھظƒظ„ظپط©',
-      'ط·آ§ط¸â€‍ط·آ£ط·آµط¸â€ ط·آ§ط¸ظ¾','ط·آ§ط¸â€‍ط¸â€¦ط¸ث†ط·آ±ط·آ¯ط¸ظ¹ط¸â€ ','ط·ع¾ط¸â€ڑط¸â€‍ط¸ظ¹ط¸â€‍ ط·آ§ط¸â€‍ط·ع¾ط¸ئ’ط¸â€‍ط¸ظ¾ط·آ©'
-    ];
-    document.querySelectorAll('button,a').forEach(btn=>{
-      if(btn.closest('.fin-shell')) return;
-      const text = S(btn.textContent).replace(/\s+/g,' ');
-      if(blocked.some(word=>text === word || text.includes(word))) btn.style.display = 'none';
-    });
-  }
-  function renderPro(forceLoad){
-    if(!shouldLockFinance()) return;
-    if(!forceLoad && hasProShell()) {
-      removeLegacyBits();
-      return;
-    }
-    if(typeof window.financeProLoadV15 === 'function'){
-      window.financeProLoadV15(!!forceLoad);
-    }else if(typeof window.financeProRenderCurrentV15 === 'function'){
-      window.financeProRenderCurrentV15();
-    }
-    setTimeout(removeLegacyBits, 30);
-    setTimeout(removeLegacyBits, 180);
-  }
-  function showFinance(btn){
-    if(!shouldLockFinance()) return false;
-    const el = page();
-    if(!el) return false;
-    document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden'));
-    el.classList.remove('hidden');
-    el.classList.add('finance-pro');
-    el.style.display = 'block';
-    el.style.visibility = 'visible';
-    el.style.opacity = '1';
-    document.querySelectorAll('.nav').forEach(n=>n.classList.remove('active'));
-    if(btn && btn.classList) btn.classList.add('active');
-    setTimeout(()=>renderPro(false), 0);
-    setTimeout(()=>renderPro(false), 220);
-    return true;
-  }
-  function mapTab(tab){
-    return oldTabMap[S(tab)] || 'summary';
-  }
-  function installFunctionLocks(){
-    if(!shouldLockFinance()) return;
-
-    const oldShow = window.showPage;
-    if(typeof oldShow === 'function' && !oldShow.__financeProLockV31){
-      const wrapped = function(id, btn){
-        if(id === 'financeDashboard') return showFinance(btn);
-        return oldShow.apply(this, arguments);
-      };
-      wrapped.__financeProLockV31 = true;
-      wrapped.__financeProOriginal = oldShow;
-      window.showPage = wrapped;
-    }
-
-    window.financeRenderAll = function(){
-      if(financeVisible() || page()){
-        renderPro(false);
-      }
-    };
-    window.financeShowTab = function(tab){
-      const id = mapTab(tab);
-      if(typeof window.financeProTabV15 === 'function') return window.financeProTabV15(id);
-      renderPro(false);
-    };
-    [
-      'financeHydrateForms','financeRenderKpis','financeRenderRecent','financeRenderExpenses',
-      'inventoryRenderItems','inventoryRenderMovements','inventoryRenderRequests','financeRenderReports',
-      'ensureTabs','ensureFinanceTabsVisibleV178'
-    ].forEach(name=>{
-      window[name] = function(){
-        if(financeVisible()) removeLegacyBits();
-      };
-    });
-    document.body.classList.add('finance-pro-exclusive-v31');
-  }
-  function guardVisibleFinance(){
-    if(!shouldLockFinance()) return;
-    installFunctionLocks();
-    if(financeVisible()){
-      if(!hasProShell()) renderPro(false);
-      else removeLegacyBits();
-    }
-  }
-  function boot(){
-    installFunctionLocks();
-    removeLegacyBits();
-    [250, 700, 1300, 2300, 3600].forEach(ms=>setTimeout(guardVisibleFinance, ms));
+  function install(){
+    wrap('financeProLoadV15', ()=>{ forceWarehouseTab(); applyWarehouseView(); });
+    wrap('financeProTabV15', ()=>{ forceWarehouseTab(); applyWarehouseView(); });
+    wrap('financeProRenderCurrentV15', applyWarehouseView);
+    wrap('financeProRenderProductListV15', applyWarehouseView);
+    wrap('financeProShowProductV15', applyWarehouseView);
+    applyWarehouseView();
+    forceWarehouseTab();
   }
 
-  document.addEventListener('DOMContentLoaded', boot);
-  window.addEventListener('load', boot);
-  setTimeout(boot, 1200);
-  setTimeout(boot, 2600);
-
-  let busy = false;
-  new MutationObserver(()=>{
-    if(busy) return;
-    busy = true;
-    setTimeout(()=>{
-      busy = false;
-      if(financeVisible() && (!hasProShell() || page().querySelector('.finance-tabs,.finance-tab-page'))) guardVisibleFinance();
-    }, 90);
-  }).observe(document.documentElement, {childList:true, subtree:true});
-
-  setInterval(guardVisibleFinance, 1400);
+  const observer=new MutationObserver(()=>applyWarehouseView());
+  document.addEventListener('DOMContentLoaded',()=>{ install(); observer.observe(document.body,{childList:true,subtree:true}); });
+  setTimeout(()=>{ install(); observer.observe(document.body,{childList:true,subtree:true}); },800);
 })();

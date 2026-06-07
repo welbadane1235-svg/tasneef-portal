@@ -1,90 +1,116 @@
 (function(){
-  if(window.__tasneefFinanceRolesV28) return;
+  if(window.__tasneefFinanceRolesV29) return;
+  window.__tasneefFinanceRolesV29 = true;
   window.__tasneefFinanceRolesV28 = true;
 
   const S=(v)=>String(v ?? '').trim();
-  const currentUser=()=>{
-    try{ return JSON.parse(localStorage.getItem('tasneef_user') || 'null') || {}; }
-    catch(e){ return {}; }
+  const role=()=>{
+    try{
+      const u=JSON.parse(localStorage.getItem('tasneef_user') || localStorage.getItem('tasneef_session') || '{}') || {};
+      return S(u.role);
+    }catch(e){ return ''; }
   };
-  const role=()=>S(currentUser().role);
   const isWarehouse=()=>role()==='warehouse_manager';
-  const allowedTabs=new Set(['products','movement']);
+  const allowed=['products','movement'];
 
-  function installStyle(){
-    if(document.getElementById('financeRolesStyleV28')) return;
+  function style(){
+    if(document.getElementById('financeRolesStyleV29')) return;
     const st=document.createElement('style');
-    st.id='financeRolesStyleV28';
+    st.id='financeRolesStyleV29';
     st.textContent=`
-      body.finance-warehouse-role-v28 .fin-hero p:after{content:" مدير المخزن: عرض المنتجات وحركة المخزون فقط.";display:block;margin-top:4px;color:#e7fff6}
-      body.finance-warehouse-role-v28 .fin-warehouse-hidden-v28{display:none!important}
+      #financeDashboard.finance-pro:not(.hidden){display:block!important;visibility:visible!important;opacity:1!important}
+      #financeDashboard.finance-pro .fin-shell{display:grid!important;visibility:visible!important;opacity:1!important}
+      body.finance-pro-exclusive-v29 #financeDashboard .finance-tabs,
+      body.finance-pro-exclusive-v29 #financeDashboard .finance-tab-page{display:none!important}
+      body.finance-warehouse-role-v29 .fin-money-hidden-v29{display:none!important}
+      body.finance-warehouse-role-v29 #finBodyV15 .fin-grid .fin-kpi:has(.fin-money-hidden-v29){display:none!important}
     `;
     document.head.appendChild(st);
   }
-
-  function hidePriceColumns(table){
-    const ths=[...table.querySelectorAll('thead th')];
-    if(!ths.length) return;
-    const hide=ths.map((th,i)=>/(سعر|ضريبة|قبل|بعد|قيمة|تكلفة|ربح|ر\.س|ط±\.ط³)/.test(S(th.textContent)) ? i : -1).filter(i=>i>=0);
-    if(!hide.length) return;
-    [...table.rows].forEach(row=>{
-      hide.forEach(i=>{ if(row.cells[i]) row.cells[i].classList.add('fin-warehouse-hidden-v28'); });
-    });
+  function tabId(btn){
+    const js=S(btn?.getAttribute('onclick'));
+    const m=js.match(/financeProTabV15\(['"]([^'"]+)['"]\)/);
+    return m ? m[1] : '';
   }
-
-  function applyWarehouseView(){
-    installStyle();
-    document.body.classList.toggle('finance-warehouse-role-v28', isWarehouse());
-    if(!isWarehouse()) return;
-
+  function normalizeTabs(){
+    const warehouse=isWarehouse();
+    document.body.classList.add('finance-pro-exclusive-v29');
+    document.body.classList.toggle('finance-warehouse-role-v29', warehouse);
+    document.body.classList.remove(
+      'finance-warehouse-role-v28',
+      'warehouse-manager-view-v151',
+      'warehouse-manager-view-v162',
+      'warehouse-manager-view-v163',
+      'warehouse-manager-view-v164',
+      'warehouse-manager-view-v178',
+      'warehouse-manager-view-v179',
+      'warehouse-manager-view-v180'
+    );
     document.querySelectorAll('#finTabsV15 button').forEach(btn=>{
-      const js=S(btn.getAttribute('onclick'));
-      const keep=[...allowedTabs].some(tab=>js.includes(`'${tab}'`) || js.includes(`"${tab}"`));
-      btn.style.display=keep ? '' : 'none';
+      const id=tabId(btn);
+      btn.style.display=(!warehouse || allowed.includes(id)) ? '' : 'none';
     });
-
-    document.querySelectorAll('.fin-meta div,.fin-soft,.fin-kpi').forEach(el=>{
-      const txt=S(el.textContent);
-      if(/(سعر|ضريبة|قبل الضريبة|بعد الضريبة|قيمة|تكلفة|ربح|ر\.س|ط±\.ط³)/.test(txt)){
-        el.classList.add('fin-warehouse-hidden-v28');
-      }
-    });
-    document.querySelectorAll('.fin-table table').forEach(hidePriceColumns);
-  }
-
-  function forceWarehouseTab(){
-    if(!isWarehouse()) return;
-    const active=document.querySelector('#finTabsV15 button.active');
-    const js=S(active?.getAttribute('onclick'));
-    const ok=[...allowedTabs].some(tab=>js.includes(`'${tab}'`) || js.includes(`"${tab}"`));
-    if(!ok && typeof window.financeProTabV15==='function'){
-      setTimeout(()=>window.financeProTabV15('products'),0);
+    if(!warehouse) return;
+    const active=tabId(document.querySelector('#finTabsV15 button.active'));
+    if(active && !allowed.includes(active) && typeof window.financeProTabV15==='function'){
+      setTimeout(()=>window.financeProTabV15('products'), 30);
     }
   }
-
-  const wrap=(name, after)=>{
-    const old=window[name];
-    if(typeof old!=='function' || old.__financeRolesWrappedV28) return;
-    const fn=function(){
-      const result=old.apply(this, arguments);
-      Promise.resolve(result).finally(()=>setTimeout(after,20));
-      return result;
-    };
-    fn.__financeRolesWrappedV28=true;
-    window[name]=fn;
-  };
-
-  function install(){
-    wrap('financeProLoadV15', ()=>{ forceWarehouseTab(); applyWarehouseView(); });
-    wrap('financeProTabV15', ()=>{ forceWarehouseTab(); applyWarehouseView(); });
-    wrap('financeProRenderCurrentV15', applyWarehouseView);
-    wrap('financeProRenderProductListV15', applyWarehouseView);
-    wrap('financeProShowProductV15', applyWarehouseView);
-    applyWarehouseView();
-    forceWarehouseTab();
+  function markMoney(){
+    const warehouse=isWarehouse();
+    document.querySelectorAll('.fin-money-hidden-v29').forEach(el=>el.classList.remove('fin-money-hidden-v29'));
+    if(!warehouse) return;
+    const moneyWords=/(سعر|ضريبة|قبل الضريبة|بعد الضريبة|قيمة|تكلفة|ربح|ر\.س|ط±\.ط³)/;
+    document.querySelectorAll('.fin-meta div,.fin-kpi,.fin-soft').forEach(el=>{
+      if(moneyWords.test(S(el.textContent))) el.classList.add('fin-money-hidden-v29');
+    });
+    document.querySelectorAll('.fin-table table').forEach(table=>{
+      const idx=[...table.querySelectorAll('thead th')]
+        .map((th,i)=>moneyWords.test(S(th.textContent)) ? i : -1)
+        .filter(i=>i>=0);
+      if(!idx.length) return;
+      [...table.rows].forEach(row=>{
+        idx.forEach(i=>{ if(row.cells[i]) row.cells[i].classList.add('fin-money-hidden-v29'); });
+      });
+    });
   }
-
-  const observer=new MutationObserver(()=>applyWarehouseView());
-  document.addEventListener('DOMContentLoaded',()=>{ install(); observer.observe(document.body,{childList:true,subtree:true}); });
-  setTimeout(()=>{ install(); observer.observe(document.body,{childList:true,subtree:true}); },800);
+  function hideLegacyShortcuts(){
+    const blocked=[
+      'الأصناف','الموردين','تقليل التكلفة','تعديل التكلفة',
+      'ط§ظ„ط£طµظ†ط§ظپ','ط§ظ„ظ…ظˆط±ط¯ظٹظ†','طھظ‚ظ„ظٹظ„ ط§ظ„طھظƒظ„ظپط©','طھط¹ط¯ظٹظ„ ط§ظ„طھظƒظ„ظپط©'
+    ];
+    document.querySelectorAll('button,a').forEach(el=>{
+      if(el.closest('.fin-shell')) return;
+      const text=S(el.textContent).replace(/\s+/g,' ');
+      if(blocked.some(x=>text===x || text.includes(x))) el.style.display='none';
+    });
+  }
+  function apply(){
+    style();
+    normalizeTabs();
+    markMoney();
+    hideLegacyShortcuts();
+  }
+  function wrap(name){
+    const old=window[name];
+    if(typeof old!=='function' || old.__financeRolesV29) return;
+    const fn=function(){
+      const out=old.apply(this, arguments);
+      Promise.resolve(out).finally(()=>setTimeout(apply, 40));
+      return out;
+    };
+    fn.__financeRolesV29=true;
+    window[name]=fn;
+  }
+  function install(){
+    ['financeProLoadV15','financeProTabV15','financeProRenderCurrentV15','financeProRenderProductListV15','financeProShowProductV15'].forEach(wrap);
+    apply();
+  }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(install,500));
+  setTimeout(install,1100);
+  window.addEventListener('load',()=>setTimeout(install,1600));
+  setInterval(()=>{
+    const page=document.getElementById('financeDashboard');
+    if(page && !page.classList.contains('hidden')) apply();
+  },2500);
 })();
