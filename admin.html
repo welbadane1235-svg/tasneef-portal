@@ -137,6 +137,7 @@
     <button class="nav" onclick="showPage('monthly',this)">الأوقات الشهرية</button>
     <button class="nav" onclick="showPage('tickets',this)">التكتات</button>
     <button class="nav" onclick="showPage('orders',this)">الأوردرات</button>
+    <button class="nav" data-audit-nav-v10043="1" onclick="showPage('inventoryAudit',this); if(window.tasneefInventoryAuditV10042) tasneefInventoryAuditV10042.load();">الجرد</button>
     <button class="nav" onclick="showPage('clientReports',this)">تقارير العملاء</button>
     <button class="nav" onclick="showPage('clientRatings',this)">تقييمات العملاء</button>
     <button class="nav" onclick="showPage('alerts',this)">التنبيهات</button>
@@ -467,6 +468,25 @@
     </section>
 
 
+    <section id="inventoryAudit" class="page hidden inventory-audit-page-v10042">
+      <div class="card section-head audit-head-v10042">
+        <div>
+          <h2>قسم الجرد</h2>
+          <p>جرد مستقل مرتبط بالمالية والمخزون. عند فتح عملية جرد يتم قفل المالية والمخزون حتى إغلاق العملية.</p>
+        </div>
+        <div class="actions">
+          <button onclick="tasneefInventoryAuditV10042.openCreateModal()">+ عملية جرد جديدة</button>
+          <button class="light" onclick="tasneefInventoryAuditV10042.load()">تحديث</button>
+        </div>
+      </div>
+      <div id="auditActiveBoxV10042"></div>
+      <div class="grid two audit-grid-v10042">
+        <div class="card"><h2>عمليات الجرد</h2><div id="auditListV10042"></div></div>
+        <div class="card"><h2>تفاصيل الجرد</h2><div id="auditDetailsV10042"><div class="footer-note">اختر عملية جرد أو أنشئ عملية جديدة.</div></div></div>
+      </div>
+    </section>
+
+
     <section id="clientReports" class="page hidden">
       <div class="card section-head">
         <div>
@@ -734,6 +754,6 @@ window.__tasneefV201Loaded=true;
 <script src="tasneef_tickets_filters_exact_v10041.js?v=10041" defer></script>
 <script src="tasneef_orders_clean_root_v10036.js?v=10036" defer></script>
 <script src="tasneef_quotes_exact_pdf_v10041.js?v=10041" defer></script>
-<script src="tasneef_inventory_audit_safe_v10042.js?v=10042" defer></script>
+<script src="tasneef_inventory_audit_safe_v10043.js?v=10043" defer></script>
 </body>
 </html>
