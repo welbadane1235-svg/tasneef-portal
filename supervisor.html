@@ -8,7 +8,7 @@
 
 </style>
 <style>
-.sup-tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:14px}.sup-tab{background:#fff!important;color:var(--brand)!important;border:1px solid var(--line)!important;box-shadow:0 6px 18px rgba(10,64,51,.05)}.sup-tab.active{background:var(--brand)!important;color:#fff!important}.sup-page{display:none}.sup-page.active{display:block}.sound-btn{background:#fff!important;color:var(--brand)!important;border:1px solid rgba(255,255,255,.6)!important}.summary-card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.summary-card-mini{border:1px solid var(--line);border-radius:16px;background:#fbfdfc;padding:14px}.summary-card-mini small{display:block;color:var(--muted);margin-bottom:8px}.summary-card-mini b{font-size:26px;color:var(--brand)}.date-filter-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.sup-help{background:#f8fbfa;border:1px dashed var(--line);border-radius:14px;padding:10px;line-height:1.7;color:var(--muted);font-size:13px;margin-bottom:10px}@media(max-width:760px){.sup-tabs{grid-template-columns:repeat(2,1fr);position:sticky;top:0;z-index:50;background:var(--bg);padding:8px;margin:0 0 10px}.summary-card-grid,.date-filter-row{grid-template-columns:1fr}.mobile-shell .card{margin:10px}.hero{align-items:flex-start}.hero .actions{margin:0}}
+.sup-tabs{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:14px}.sup-tab{background:#fff!important;color:var(--brand)!important;border:1px solid var(--line)!important;box-shadow:0 6px 18px rgba(10,64,51,.05)}.sup-tab.active{background:var(--brand)!important;color:#fff!important}.sup-page{display:none}.sup-page.active{display:block}.sound-btn{background:#fff!important;color:var(--brand)!important;border:1px solid rgba(255,255,255,.6)!important}.summary-card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.summary-card-mini{border:1px solid var(--line);border-radius:16px;background:#fbfdfc;padding:14px}.summary-card-mini small{display:block;color:var(--muted);margin-bottom:8px}.summary-card-mini b{font-size:26px;color:var(--brand)}.date-filter-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.sup-help{background:#f8fbfa;border:1px dashed var(--line);border-radius:14px;padding:10px;line-height:1.7;color:var(--muted);font-size:13px;margin-bottom:10px}@media(max-width:760px){.sup-tabs{grid-template-columns:repeat(2,1fr);position:sticky;top:0;z-index:50;background:var(--bg);padding:8px;margin:0 0 10px}.summary-card-grid,.date-filter-row{grid-template-columns:1fr}.mobile-shell .card{margin:10px}.hero{align-items:flex-start}.hero .actions{margin:0}}
 </style>
 
 <style>
@@ -57,6 +57,7 @@
     <button class="sup-tab active" onclick="showSupervisorWindow('supLogs',this)">دخول / خروج</button>
     <button class="sup-tab" onclick="showSupervisorWindow('supAttendance',this)">تسجيل الحضور</button>
     <button class="sup-tab" onclick="showSupervisorWindow('supTickets',this)">التكتات</button>
+    <button class="sup-tab" onclick="showSupervisorWindow('supOrders',this); supOrdersLoadV10061()">الأوردرات</button>
     <button class="sup-tab" onclick="showSupervisorWindow('supSummary',this)">الملخص اليومي</button>
     <button class="sup-tab" onclick="showSupervisorWindow('supClientDailyReport',this); supClientReportInit()">تقرير يومي</button>
   </nav>
@@ -83,6 +84,27 @@
         <div class="sup-help">لن يتم إغلاق التكت إلا بعد كتابة طريقة الإغلاق واسم من أغلقه.</div>
       </div><div class="actions"><button onclick="saveTicket()">حفظ التكت</button><button class="light" onclick="clearTicketForm()">تكت جديد</button></div></section>
     <section class="card"><h2>تكتاتي</h2><div class="filters"><select id="supTicketFilterProject" onchange="renderTickets()"><option value="">كل المشاريع</option></select><select id="supTicketFilterStatus" onchange="renderTickets()"><option value="">كل الحالات</option><option value="open">مفتوح</option><option value="processing">تحت المعالجة</option><option value="closed">مغلق</option></select><input id="supTicketSearch" oninput="renderTickets()" placeholder="بحث برقم التكت أو العنوان"></div><div id="supTicketsSmartSummary" class="smart-ticket-summary"></div><div id="supTicketsBody" class="smart-ticket-grid"></div></section>
+  </section>
+
+
+
+
+  <section id="supOrders" class="sup-page">
+    <section class="card"><h2 id="supOrderFormTitleV10061">رفع / تعديل أوردر</h2>
+      <div class="sup-help">المشرف يستطيع رفع أوردر صيانة خارجي بنفس فكرة التكتات، وسيظهر في لوحة الإدارة ضمن قسم الأوردرات.</div>
+      <input type="hidden" id="supOrderEditNoV10061">
+      <div class="split"><div><label>المشروع</label><select id="supOrderProjectV10061"></select></div><div><label>رقم الشقة / الموقع</label><input id="supOrderUnitV10061" placeholder="مثال: A-12 / المواقف / السطح"></div></div>
+      <div class="split"><div><label>اسم العميل</label><input id="supOrderClientV10061" placeholder="اختياري"></div><div><label>رقم العميل</label><input id="supOrderPhoneV10061" placeholder="05xxxxxxxx"></div></div>
+      <div class="split"><div><label>تخص</label><select id="supOrderConcernV10061"><option value="الجمعية">الجمعية</option><option value="العميل">العميل</option></select></div><div><label>حالة التنفيذ</label><select id="supOrderStatusV10061"><option>لم ينفذ</option><option>تم التنفيذ</option><option>ملغي</option></select></div></div>
+      <label>تفاصيل الأوردر</label><textarea id="supOrderDetailsV10061" placeholder="اكتب تفاصيل الأوردر بشكل واضح"></textarea>
+      <label>ملاحظات</label><textarea id="supOrderNotesV10061" placeholder="ملاحظات إضافية"></textarea>
+      <div class="actions"><button onclick="supOrdersSaveV10061(this)">حفظ الأوردر</button><button class="light" onclick="supOrdersClearV10061()">أوردر جديد</button></div>
+    </section>
+    <section class="card"><h2>أوردراتي</h2>
+      <div class="filters"><select id="supOrderFilterProjectV10061" onchange="supOrdersRenderV10061()"><option value="">كل المشاريع</option></select><select id="supOrderFilterStatusV10061" onchange="supOrdersRenderV10061()"><option value="">كل الحالات</option><option>لم ينفذ</option><option>تم التنفيذ</option><option>ملغي</option></select><input id="supOrderSearchV10061" oninput="supOrdersRenderV10061()" placeholder="بحث برقم الأوردر، المشروع، العميل، التفاصيل"></div>
+      <div id="supOrdersSummaryV10061" class="summary-card-grid"></div>
+      <div id="supOrdersBodyV10061" class="quick-list"></div>
+    </section>
   </section>
 
 
@@ -122,6 +144,6 @@
 <script src="tasneef_supervisor_fast_fix_v9.js?v=9" defer></script>
 <script src="tasneef_attendance_status_fix_v16.js?v=16" defer></script>
 <script src="tasneef_worker_distribution_unified_v51.js?v=51" defer></script>
-<script src="tasneef_attendance_server_sync_v10003.js?v=10003"></script>
+<script src="tasneef_supervisor_orders_v10061.js?v=10061" defer></script>
 </body>
 </html>
