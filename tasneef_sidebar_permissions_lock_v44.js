@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  // V10046 ROOT FIX: sidebar is rebuilt from this NAV list. Inventory audit must be inside this source list.
+  // V10049 LIGHT: no sidebar rebuild on every click, no MutationObserver, no delayed rescue.
   window.__tasneefSidebarPermissionsLockV44 = true;
   window.__tasneefSidebarFastLockV47 = true;
 
@@ -40,7 +40,11 @@
     dashboard:['can_dashboard','tab_dashboard_view'], alerts:['can_alerts','tab_alerts_view'], assistant:['can_assistant','tab_assistant_view'], export:['can_export','tab_export_view']
   };
 
-  function roleOf(role){ const r=S(role); const map={general_manager:'admin',system_admin:'admin','مدير عام':'admin','مدير النظام':'admin','مدير مالي':'financial_manager','مدير تشغيلي':'operations_manager','مدير مخازن':'warehouse_manager','مدير مخزون':'warehouse_manager','مشرف':'supervisor','فني':'technician'}; return map[r] || r || 'supervisor'; }
+  function roleOf(role){
+    const r=S(role);
+    const map={general_manager:'admin',system_admin:'admin','مدير عام':'admin','مدير النظام':'admin','مدير مالي':'financial_manager','مدير تشغيلي':'operations_manager','مدير مخازن':'warehouse_manager','مدير مخزون':'warehouse_manager','مشرف':'supervisor','فني':'technician'};
+    return map[r] || r || 'supervisor';
+  }
   function parsePerms(v){ if(!v) return {}; if(typeof v==='object') return v||{}; try{return JSON.parse(v)||{};}catch(_){return{};} }
   function hasExplicit(p){ return Object.keys(p||{}).some(k=>CORE_KEYS.includes(k)||/^tab_/.test(k)); }
   function defaults(role){
@@ -55,38 +59,73 @@
   }
   function sessionUser(){ try{return JSON.parse(localStorage.getItem('tasneef_user')||'{}')||{};}catch(_){return{};} }
   function dataUsers(){ return A(window.data && window.data.users); }
-  function currentUser(){ const s=sessionUser(); const fresh=dataUsers().find(u=>(s.id&&S(u.id)===S(s.id))||(s.username&&S(u.username).toLowerCase()===S(s.username).toLowerCase())); return Object.assign({},s,fresh||{}, {permissions:(fresh&&fresh.permissions)||s.permissions}); }
+  function currentUser(){
+    const s=sessionUser();
+    const fresh=dataUsers().find(u=>(s.id&&S(u.id)===S(s.id))||(s.username&&S(u.username).toLowerCase()===S(s.username).toLowerCase()));
+    return Object.assign({},s,fresh||{}, {permissions:(fresh&&fresh.permissions)||s.permissions});
+  }
   function exactPerms(user){ const u=user||currentUser(); const p=parsePerms(u.permissions); return hasExplicit(p)?p:defaults(u.role); }
   function isAdmin(user){ const u=user||currentUser(); return roleOf(u.role)==='admin' || S(u.username).toLowerCase()==='admin'; }
-  function canPage(page,user){ if(isAdmin(user)) return true; const row=NAV.find(([id])=>id===page); if(!row) return true; const p=exactPerms(user); return (PAGE_ALIASES[page]||[row[1]]).some(k=>p[k]===true); }
+  function canPage(page,user){
+    if(isAdmin(user)) return true;
+    const row=NAV.find(([id])=>id===page);
+    if(!row) return true;
+    const p=exactPerms(user);
+    return (PAGE_ALIASES[page]||[row[1]]).some(k=>p[k]===true);
+  }
   function firstAllowed(){ const u=currentUser(); const item=NAV.find(([id])=>canPage(id,u)); return item?item[0]:'dashboard'; }
-  function pageFromButton(btn){ const m=S(btn&&btn.getAttribute('onclick')).match(/showPage\(['"]([^'"]+)['"]/); return m?m[1]:S(btn&&btn.dataset&&btn.dataset.page); }
+  function pageFromButton(btn){
+    const dp=S(btn && btn.dataset && btn.dataset.page); if(dp) return dp;
+    const m=S(btn&&btn.getAttribute('onclick')).match(/showPage\(['"]([^'"]+)['"]/);
+    return m?m[1]:'';
+  }
   function brandHtml(side){ const brand=side.querySelector('.brand'); return brand?brand.outerHTML:'<div class="brand"><span>ت</span><div><b>شركة تصنيف</b><small>إدارة المرافق</small></div></div>'; }
-  function ensureStyle(){ if($('sidebarLockStyleV10046')) return; const st=document.createElement('style'); st.id='sidebarLockStyleV10046'; st.textContent='.side[data-permission-lock-v44="1"] .nav{display:block!important}.side[data-permission-lock-v44="1"] .nav[data-denied-v44="1"]{display:none!important}.side[data-permission-lock-v44="1"] .nav.danger{display:block!important}'; document.head.appendChild(st); }
-  function directOpenPage(id,btn){
-    const target=$(id); if(!target) return false;
-    document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden'));
-    target.classList.remove('hidden'); target.style.display=''; target.style.visibility=''; target.style.opacity='';
-    document.querySelectorAll('.side .nav').forEach(n=>n.classList.remove('active'));
-    const activeBtn=btn||[...document.querySelectorAll('.side .nav')].find(b=>pageFromButton(b)===id);
-    activeBtn?.classList?.add('active');
-    try{ if(id==='financeDashboard' && typeof window.financeProRenderAll==='function') window.financeProRenderAll(); }catch(_){}
-    try{ if(id==='inventoryAudit' && window.tasneefInventoryAuditV10046?.load) setTimeout(()=>window.tasneefInventoryAuditV10046.load(),30); }catch(_){}
-    setTimeout(rebuildSidebar,30); return true;
-  }
-  function rebuildSidebar(){
-    const side=document.querySelector('.side'); if(!side) return; ensureStyle();
-    const u=currentUser(); const active=document.querySelector('.page:not(.hidden)'); const activeId=active?.id||firstAllowed();
-    const allowed=NAV.filter(([id])=>canPage(id,u));
-    const buttons=allowed.map(([id,,label])=>`<button class="nav${id===activeId?' active':''}" data-page="${id}" onclick="showPage('${id}',this)">${label}</button>`).join('');
-    side.dataset.permissionLockV44='1';
+
+  function buildSidebarOnce(){
+    const side=document.querySelector('.side'); if(!side || side.dataset.lightSidebarV10049==='1') return;
+    const u=currentUser();
+    const active=document.querySelector('.page:not(.hidden)');
+    const activeId=active?.id || firstAllowed();
+    const buttons=NAV.filter(([id])=>canPage(id,u)).map(([id,,label])=>`<button class="nav${id===activeId?' active':''}" data-page="${id}" onclick="showPage('${id}',this)">${label}</button>`).join('');
     side.innerHTML=brandHtml(side)+buttons+'<button class="nav danger" onclick="logout()">تسجيل خروج</button>';
-    guardCurrentPage();
+    side.dataset.lightSidebarV10049='1';
   }
-  function guardCurrentPage(){ const active=document.querySelector('.page:not(.hidden)'); if(active&&active.id&&!canPage(active.id)){ const next=firstAllowed(); directOpenPage(next,[...document.querySelectorAll('.side .nav')].find(b=>pageFromButton(b)===next)); } }
-  function wrapShowPage(){ const old=window.showPage; if(typeof old==='function' && old.__sidebarLockV10046) return; const original=(old&&old.__sidebarOriginalV44)||old; const wrapped=function(id,btn){ if(!canPage(id)){ try{ if(typeof msg==='function') msg('لا تملك صلاحية فتح هذا القسم','err'); }catch(_){} rebuildSidebar(); return; } if(id==='financeDashboard'){ let r; try{ r=original?.apply(this,arguments); }catch(_){} setTimeout(()=>{ if($(id)?.classList.contains('hidden')) directOpenPage(id,btn); rebuildSidebar(); },40); return r; } return directOpenPage(id,btn); }; wrapped.__sidebarLockV10046=true; wrapped.__sidebarOriginalV44=original; window.showPage=wrapped; try{ showPage=wrapped; }catch(_){} }
-  function observe(){ const side=document.querySelector('.side'); if(!side||side.__sidebarObserverV10046) return; side.__sidebarObserverV10046=true; let t=null; new MutationObserver(()=>{ clearTimeout(t); t=setTimeout(()=>{wrapShowPage(); rebuildSidebar();},120); }).observe(side,{childList:true}); }
-  function boot(){ wrapShowPage(); rebuildSidebar(); observe(); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,80)); else setTimeout(boot,30);
-  window.addEventListener('load',()=>{ setTimeout(boot,300); setTimeout(boot,1200); });
+
+  function activate(id,btn){
+    document.querySelectorAll('.side .nav').forEach(n=>n.classList.remove('active'));
+    const b=btn || [...document.querySelectorAll('.side .nav')].find(x=>pageFromButton(x)===id || S(x.dataset.page)===id);
+    if(b) b.classList.add('active');
+  }
+  function hooks(id){
+    try{ if(id==='contracts' && typeof window.showContractsSubTab==='function') window.showContractsSubTab('services'); }catch(_){}
+    try{ if(id==='attendance' && typeof window.renderAttendanceMonthly==='function') window.renderAttendanceMonthly(); }catch(_){}
+    try{ if(id==='clientReports' && typeof window.renderPremiumReports==='function') window.renderPremiumReports(); }catch(_){}
+    try{
+      if(id==='financeDashboard'){
+        const target=$(id); if(target) target.classList.add('finance-pro');
+        if(typeof window.financeProLoadV15==='function' && target && !target.querySelector('.fin-shell,#finTabsV15,#finBodyV15')) window.financeProLoadV15(false);
+        if(typeof window.financeProRenderAll==='function') window.financeProRenderAll();
+      }
+    }catch(_){}
+    try{ if(id==='inventoryAudit' && window.tasneefInventoryAuditV10046?.load) window.tasneefInventoryAuditV10046.load(); }catch(_){}
+  }
+  function openPage(id,btn){
+    id=S(id); const target=$(id);
+    if(!target) return false;
+    if(!canPage(id)){ try{ if(typeof msg==='function') msg('لا تملك صلاحية فتح هذا القسم','err'); }catch(_){} return false; }
+    document.querySelectorAll('.page').forEach(p=>{ p.classList.toggle('hidden', p!==target); p.style.display=''; p.style.visibility=''; p.style.opacity=''; });
+    activate(id,btn); hooks(id); return true;
+  }
+  function installShowPage(){
+    window.showPage=function(id,btn){ const ok=openPage(id,btn); if(!ok){ try{ if(typeof msg==='function') msg('القسم غير موجود: '+id,'err'); }catch(_){} } return ok; };
+    try{ showPage=window.showPage; }catch(_){}
+  }
+  function boot(){ buildSidebarOnce(); installShowPage(); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+  window.addEventListener('load', boot);
+
+  window.tasneefRebuildSidebarV10049=function(){
+    const side=document.querySelector('.side'); if(side) delete side.dataset.lightSidebarV10049;
+    buildSidebarOnce();
+  };
 })();
