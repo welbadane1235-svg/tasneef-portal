@@ -964,3 +964,120 @@
   setTimeout(boot,1600);
   console.log('Tasneef '+VERSION+' loaded');
 })();
+
+
+/* ===== v10082 finance tab isolation + stable product value cards ===== */
+(function(){
+  'use strict';
+  const VERSION='v10082-tab-isolation-stable-summary';
+  const S=v=>String(v??'').trim();
+  const N=v=>Number(v||0)||0;
+  const A=v=>Array.isArray(v)?v:[];
+  const VAT=0.15;
+  function st(){ return window.financeProStateV15 || (window.financeProStateV15={items:[],movements:[],invoiceLines:[],distribution:[]}); }
+  function activeFinanceTabText(){
+    const active=document.querySelector('#financeDashboard .finance-tab.active, #financeDashboard .finance-tabs .active, .finance-tab.active');
+    return S(active && active.innerText);
+  }
+  function isProductsTab(){
+    const t=activeFinanceTabText();
+    return /منتجات|المنتجات|products|items/i.test(t) && !/عمليات|ملخص|تقارير|حركة|مورد|مركز/.test(t);
+  }
+  function isFinanceVisible(){ return !!document.querySelector('#financeDashboard:not(.hidden), #financeDashboard'); }
+  function looksLikeInjectedProductsTable(table){
+    if(!table) return false;
+    const txt=S(table.innerText);
+    const hasProductRows=!!table.querySelector('tr[data-prod-v10073],tr[data-v10075-product]');
+    const hasImageBtns=/إضافة صورة|بدون صورة/.test(txt);
+    const hasProductHeaders=/المنتج/.test(txt)&&/الكود/.test(txt)&&/حد النفاد/.test(txt)&&/الكمية/.test(txt);
+    return hasProductRows || (hasImageBtns && hasProductHeaders);
+  }
+  function isolateFinanceTabs(){
+    if(!isFinanceVisible()) return;
+    const productMode=isProductsTab();
+    document.querySelectorAll('#financeDashboard table').forEach(table=>{
+      if(looksLikeInjectedProductsTable(table)){
+        table.closest('.table-wrap')?.classList.toggle('tasneef-v10082-hidden-products', !productMode);
+        table.classList.toggle('tasneef-v10082-hidden-products', !productMode);
+      }
+    });
+    document.querySelectorAll('#finDirectProductsBarV10073,#finFastProductsBarV10075,#finFastProductsStatusV10075,#finRecoverProductsV10070').forEach(el=>{
+      el.style.display=productMode ? '' : 'none';
+    });
+  }
+  function moveType(m){ return S(m?.movement_type).toLowerCase(); }
+  function safeJson(v){ const t=S(v); try{return JSON.parse(t.replace(/^finance_pro_v15:/,''))||{};}catch(_){return{};} }
+  function isIn(m){ const t=moveType(m), r=S(m?.reason); return ['in','add','incoming','purchase','ادخال','إدخال','اضافة','إضافة'].includes(t)||/إضافة مخزون|فاتورة/.test(r); }
+  function isOut(m){ const t=moveType(m), r=S(m?.reason); return ['out','issue','consume','consumption','waste','damaged','scrap','صرف','استهلاك','تالف','هالك'].includes(t)||/صرف|استهلاك|تالف|هالك/.test(r); }
+  function isReturn(m){ const t=moveType(m), r=S(m?.reason); return ['return','returned','مرتجع'].includes(t)||/مرتجع|استرجاع/.test(r); }
+  function itemKey(i){ return S(i?.id)||S(i?.product_code)||S(i?.serial_number)||S(i?.barcode)||S(i?.supplier_barcode)||S(i?.name); }
+  function itemForMove(m){
+    const items=A(st().items), mid=S(m.item_id), mc=S(m.product_code||m.barcode), mn=S(m.item_name);
+    return items.find(i=>S(i.id)===mid)||items.find(i=>mc&&[i.product_code,i.serial_number,i.barcode,i.supplier_barcode].map(S).includes(mc))||items.find(i=>S(i.name)===mn)||{id:mid,name:mn,product_code:mc};
+  }
+  function unitCost(m){
+    const meta=safeJson(m.notes), q=N(m.quantity)||1;
+    if(N(meta.beforeVat)) return N(meta.beforeVat)/q;
+    if(N(meta.afterVat)) return (N(meta.afterVat)/(1+VAT))/q;
+    return N(m.unit_cost||m.cost||m.price);
+  }
+  function calcInventoryValue(){
+    const groups=new Map();
+    A(st().movements).slice().sort((a,b)=>S(a.movement_date||a.created_at).localeCompare(S(b.movement_date||b.created_at))).forEach(m=>{
+      const it=itemForMove(m), k=itemKey(it)||S(m.item_id)||S(m.item_name); if(!k) return;
+      if(!groups.has(k)) groups.set(k,{layers:[]});
+      const g=groups.get(k), q=N(m.quantity); if(q<=0) return;
+      if(isIn(m)||isReturn(m)) g.layers.push({qty:q,cost:unitCost(m)});
+      else if(isOut(m)){
+        let need=q;
+        for(const l of g.layers){ if(need<=0) break; const take=Math.min(l.qty,need); l.qty-=take; need-=take; }
+      }
+      const meta=safeJson(m.notes);
+      A(meta.distribution).forEach(d=>{
+        if(/consume|waste|damaged|scrap|out|issue|صرف|استهلاك|تالف/.test(S(d.type))){
+          let need=N(d.qty);
+          for(const l of g.layers){ if(need<=0) break; const take=Math.min(l.qty,need); l.qty-=take; need-=take; }
+        }
+      });
+    });
+    let net=0; groups.forEach(g=>g.layers.forEach(l=>{ if(N(l.qty)>0) net+=N(l.qty)*N(l.cost); }));
+    return {net,vat:net*VAT,gross:net*(1+VAT)};
+  }
+  function money(v){ return `${N(v).toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2})} ر.س`; }
+  function setValueByLabel(label,value,exclude){
+    const cards=[...document.querySelectorAll('#financeDashboard .kpi,#financeDashboard .card,#financeDashboard .fin-soft')];
+    cards.forEach(el=>{
+      const txt=S(el.innerText);
+      if(!txt.includes(label)) return;
+      if(exclude && txt.includes(exclude)) return;
+      if(txt.length>160) return;
+      const b=el.querySelector('b,strong');
+      if(b && S(b.textContent)!==value) b.textContent=value;
+    });
+  }
+  function stabilizeSummary(){
+    const c=calcInventoryValue();
+    setValueByLabel('السعر قبل الضريبة',money(c.net),'حركة');
+    setValueByLabel('الضريبة',money(c.vat),'حركة');
+    setValueByLabel('السعر شامل الضريبة',money(c.gross),'حركة');
+  }
+  function boot(){ isolateFinanceTabs(); stabilizeSummary(); }
+  const css=document.createElement('style');
+  css.textContent='.tasneef-v10082-hidden-products{display:none!important}';
+  document.head.appendChild(css);
+  const oldTab=window.financeProTabV15;
+  if(typeof oldTab==='function' && !oldTab.__v10082){
+    const wrapped=function(tab){ const r=oldTab.apply(this,arguments); setTimeout(boot,80); setTimeout(boot,350); return r; };
+    wrapped.__v10082=true; window.financeProTabV15=wrapped; try{ financeProTabV15=wrapped; }catch(_){ }
+  }
+  const oldShow=window.showPage;
+  if(typeof oldShow==='function' && !oldShow.__v10082){
+    const wrapped=function(){ const r=oldShow.apply(this,arguments); setTimeout(boot,120); setTimeout(boot,500); return r; };
+    wrapped.__v10082=true; window.showPage=wrapped; try{ showPage=wrapped; }catch(_){ }
+  }
+  let t=null;
+  const mo=new MutationObserver(()=>{ clearTimeout(t); t=setTimeout(boot,120); });
+  window.addEventListener('load',()=>{ try{ mo.observe(document.body,{childList:true,subtree:true,characterData:true}); }catch(_){} setTimeout(boot,700); setTimeout(boot,1800); });
+  setInterval(()=>{ if(document.querySelector('#financeDashboard')) boot(); },1200);
+  console.log('Tasneef '+VERSION+' loaded');
+})();
