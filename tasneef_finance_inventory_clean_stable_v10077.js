@@ -286,10 +286,11 @@
     }catch(e){ alert(e.message||String(e)); } finally{ if(btn){btn.disabled=false;btn.textContent='استرجاع المنتجات المفقودة من الفواتير';} }
   };
 
-  document.addEventListener('input',e=>{ if(e.target&&e.target.closest&&e.target.closest('#financeDashboard')) saveDraft(); },true);
-  document.addEventListener('change',e=>{ if(e.target&&e.target.closest&&e.target.closest('#financeDashboard')) { saveDraft(); setTimeout(injectButtons,100); } },true);
-  const mo=new MutationObserver(()=>setTimeout(()=>{ restoreDraft(); injectButtons(); renderInvoiceLines(); },100));
-  function boot(){ try{ if(document.body) mo.observe(document.body,{childList:true,subtree:true}); }catch(_){} setInterval(()=>{ restoreDraft(); injectButtons(); },1500); }
+  // v10081: لا نعيد رسم الفاتورة مع كل تغيير في الصفحة حتى لا يظهر الملخص ويختفي ولا يحصل لاق.
+  let __v10081DraftTimer=null;
+  document.addEventListener('input',e=>{ if(e.target&&e.target.closest&&e.target.closest('#financeDashboard')) { clearTimeout(__v10081DraftTimer); __v10081DraftTimer=setTimeout(saveDraft,400); } },true);
+  document.addEventListener('change',e=>{ if(e.target&&e.target.closest&&e.target.closest('#financeDashboard')) { saveDraft(); setTimeout(injectButtons,150); } },true);
+  function boot(){ restoreDraft(); injectButtons(); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
   console.log('Tasneef '+VERSION+' loaded');
 })();
@@ -820,10 +821,10 @@
   window.addEventListener('load', function(){ setTimeout(addClearButton,1200); });
 })();
 
-/* ===== v10080 inventory operations, matching and movement-value fix ===== */
+/* ===== v10081 inventory stable no-lag exact-match fix ===== */
 (function(){
   'use strict';
-  const VERSION='v10080-products-equal-movements-edit-delete-match';
+  const VERSION='v10081-no-lag-summary-exact-match-new-product';
   const VAT=0.15;
   const S=v=>String(v??'').trim();
   const N=v=>Number(v||0)||0;
@@ -831,7 +832,7 @@
   const $=id=>document.getElementById(id);
   const money=v=>`${N(v).toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2})} ر.س`;
   const esc=v=>S(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  window.__tasneefFinanceInventoryV10080=true;
+  window.__tasneefFinanceInventoryV10081=true;
   function st(){ return window.financeProStateV15 || (window.financeProStateV15={items:[],movements:[],invoiceLines:[],distribution:[]}); }
   function sb(){ return window.supabaseClient || window.supabase || window.sb || null; }
   function code(i){ return S(i?.product_code||i?.serial_number||i?.barcode||i?.supplier_barcode||i?.code||''); }
@@ -895,9 +896,10 @@
     setCard('السعر شامل الضريبة', money(calc.gross),'حركة');
   }
   function findProductByAny(text){
+    // v10081: مطابقة تامة فقط. لا نستخدم includes حتى لا يملأ النظام منتج موجود بمجرد كتابة حرف،
+    // وبكذا تقدر تضيف منتج جديد بحرية. اختيار منتج قديم يكون من القائمة أو بكتابة الاسم/الكود كامل.
     const q=S(text).toLowerCase(); if(!q) return null;
-    return A(st().items).find(i=>[i.name,i.product_code,i.serial_number,i.barcode,i.supplier_barcode,i.distributor_code].map(x=>S(x).toLowerCase()).includes(q)) ||
-           A(st().items).find(i=>[i.name,i.product_code,i.serial_number,i.barcode,i.supplier_barcode,i.distributor_code].some(x=>S(x).toLowerCase().includes(q)));
+    return A(st().items).find(i=>[i.id,i.name,i.product_code,i.serial_number,i.barcode,i.supplier_barcode,i.distributor_code].map(x=>S(x).toLowerCase()).includes(q)) || null;
   }
   function fillLineFromItem(i){
     if(!i) return;
@@ -954,9 +956,10 @@
     const wrapped=function(){ const calc=applyComputedToItems(); const r=oldRender.apply(this,arguments); setTimeout(()=>{updateKpis();bindMatching();injectMovementButtons();},100); return r; };
     wrapped.__v10080=true; window.financeProRenderV15=wrapped; try{ financeProRenderV15=wrapped; }catch(_){ }
   }
-  function boot(){ bindMatching(); updateKpis(); injectMovementButtons(); }
-  document.addEventListener('input',function(e){ const id=e.target&&e.target.id; if(['finLineNameV15','finLineCodeV15','finLineDistributorCodeV15'].includes(id)){ const found=findProductByAny(e.target.value); if(found) fillLineFromItem(found); }},true);
-  document.addEventListener('click',()=>setTimeout(boot,250),true);
+  function boot(){ bindMatching(); try{ updateKpis(); }catch(_){} injectMovementButtons(); }
+  // v10081: منع المطابقة أثناء الكتابة. المطابقة تتم فقط عند الخروج من الخانة/التغيير وبمطابقة كاملة.
+  let __v10081BootTimer=null;
+  document.addEventListener('click',()=>{ clearTimeout(__v10081BootTimer); __v10081BootTimer=setTimeout(boot,350); },true);
   window.addEventListener('load',()=>setTimeout(boot,1200));
   setTimeout(boot,1600);
   console.log('Tasneef '+VERSION+' loaded');
