@@ -1,4 +1,4 @@
-/* Tasneef Finance Inventory Pro v10090
+/* Tasneef Finance Inventory Pro v10091
    RESTORE REPORTS + MOVEMENT + CONSUMPTION
    Official core file only: no injected external scripts, no MutationObserver, no duplicate renderer.
    Changes:
@@ -7,10 +7,11 @@
    - Custom Yes/No delete confirmation modal.
    - Supplier invoice deletion removes related IN movements and reverses quantities only.
    - Direct invoice loading by invoice number.
+   - v10091: fast product list rendering; details are calculated only when opening product.
 */
 (function(){
   'use strict';
-  const VERSION='v10090-movement-edit-product-math-official';
+  const VERSION='v10091-fast-products-orders-upload-fix';
   const VAT=0.15;
   const state={loaded:false,tab:'summary',items:[],movements:[],expenses:[],projects:[],users:[],tickets:[],invoiceLines:[],distribution:[],reportTab:'products',suppliers:[],editMovementId:''};
   window.financeProStateV15=state;
@@ -94,9 +95,47 @@
   function renderSummary(body){const stock=stockValue(); const fin=state.movements.reduce((a,m)=>{const type=S(m.movement_type); if(type==='return'||type==='out')return a; const net=type==='in'||movementFinancialTypes().includes(type)?movementReportNet(m):movementNet(m); const vat=type==='in'?movementVat(m):net*VAT; a.net+=net; a.vat+=vat; a.gross+=net+vat; return a;},{net:0,vat:0,gross:0}); body.innerHTML=`<div class="fin-grid"><div class="fin-card fin-kpi"><small>عدد المنتجات</small><b>${state.items.length}</b></div><div class="fin-card fin-kpi"><small>السعر قبل الضريبة</small><b>${money(stock)}</b></div><div class="fin-card fin-kpi"><small>الضريبة</small><b>${money(stock*VAT)}</b></div><div class="fin-card fin-kpi"><small>السعر شامل الضريبة</small><b>${money(stock*(1+VAT))}</b></div></div><div class="fin-card"><h3>الأصناف التي سوف تنتهي (${lowItems().length})</h3><div class="fin-table"><table><thead><tr><th>المنتج</th><th>الكود</th><th>المتوفر</th><th>الحد الأدنى</th><th>التكلفة</th><th>الحالة</th></tr></thead><tbody>${lowItems().map(i=>`<tr><td><b>${esc(i.name)}</b></td><td>${esc(itemCode(i)||'-')}</td><td>${N(computedItemQty(i))}</td><td>${N(i.min_quantity||i.reorder_level||1)}</td><td>${money(itemUnitCost(i))}</td><td><span class="fin-badge warn">قارب الانتهاء</span></td></tr>`).join('')||'<tr><td colspan="6">لا توجد أصناف قاربت الانتهاء</td></tr>'}</tbody></table></div></div><div class="fin-grid three"><div class="fin-card fin-kpi"><small>حركة المخزون قبل الضريبة</small><b>${money(fin.net)}</b></div><div class="fin-card fin-kpi"><small>ضريبة حركة المخزون</small><b>${money(fin.vat)}</b></div><div class="fin-card fin-kpi"><small>حركة المخزون بعد الضريبة</small><b>${money(fin.gross)}</b></div></div>`;}
 
   function renderProducts(body){body.innerHTML=`<div class="fin-card"><div class="fin-actions"><div style="flex:1"><label>بحث</label><input id="finProductSearchV15" placeholder="ابحث باسم المنتج أو الكود" oninput="financeProRenderProductListV15()"></div><div><label>الحالة</label><select id="finProductStatusV15" onchange="financeProRenderProductListV15()"><option value="">كل المنتجات</option><option value="available">متوفر</option><option value="low">قارب الانتهاء</option><option value="zero">رصيد صفر</option></select></div><div><label>الوحدة</label><select id="finProductUnitV15" onchange="financeProRenderProductListV15()"><option value="">كل الوحدات</option>${unitList().map(u=>`<option>${esc(u)}</option>`).join('')}</select></div><div><label>نوع المنتج</label><select id="finProductTypeV15" onchange="financeProRenderProductListV15()"><option value="">الكل</option><option value="عدة">عدة</option><option value="مادة">مادة</option><option value="غير">غير</option></select></div></div><div id="finProductListV15"></div></div>`; renderProductList();}
-  function renderProductList(){const box=$('finProductListV15'); if(!box)return; const q=S($('finProductSearchV15')?.value).toLowerCase(), st=S($('finProductStatusV15')?.value), unit=S($('finProductUnitV15')?.value), type=S($('finProductTypeV15')?.value); const rows=state.items.filter(i=>{const hay=[i.name,itemCode(i),i.category,i.supplier].map(S).join(' ').toLowerCase(), qty=computedItemQty(i); if(q&&!hay.includes(q))return false; if(st==='available'&&qty<=N(i.min_quantity||i.reorder_level||1))return false; if(st==='low'&&!(qty>0&&qty<=N(i.min_quantity||i.reorder_level||1)))return false; if(st==='zero'&&qty!==0)return false; if(unit&&S(i.unit)!==unit)return false; if(type&&productType(i)!==type)return false; return true;}); box.innerHTML=`<div class="fin-report-cards">${rows.map(i=>{const qty=computedItemQty(i), low=qty>0&&qty<=N(i.min_quantity||i.reorder_level||1), zero=qty===0; const img=i.image_url?`<img class="fin-thumb" src="${esc(i.image_url)}" alt="" onclick="financeProZoomImageV15('${encodeURIComponent(i.image_url)}','${encodeURIComponent(S(i.name))}')">`:''; return `<div class="fin-product-card">${img}<h4>${esc(i.name||'-')}</h4><span class="fin-badge ${zero?'bad':low?'warn':''}">${zero?'رصيد صفر':low?'قارب الانتهاء':'متوفر'}</span><div class="fin-meta"><div><small>الكود</small><b>${esc(itemCode(i)||'-')}</b></div><div><small>الوحدة</small><b>${esc(i.unit||'-')}</b></div><div><small>النوع</small><b>${esc(productType(i))}</b></div><div><small>الكمية</small><b>${N(qty)}</b></div><div><small>سعر قبل الضريبة</small><b>${money(itemUnitCost(i))}</b></div><div><small>بعد الضريبة للوحدة</small><b>${money(itemUnitCost(i)*(1+VAT))}</b></div></div><div class="fin-card-actions"><button class="light" onclick="financeProShowProductV15('${esc(i.id)}')">عرض البيانات</button><label class="light" style="display:inline-flex;align-items:center;justify-content:center;min-width:130px;cursor:pointer;border:1px solid #d8ebe3;border-radius:11px;padding:8px 11px;background:#eef7f3;color:#073d31">تحميل صورة<input type="file" accept="image/*" style="display:none" onchange="financeProUploadProductImageV15('${esc(i.id)}',this)"></label>${canDelete()?`<button class="danger" onclick="financeProDeleteProductV15('${esc(i.id)}')">حذف</button>`:''}</div></div>`;}).join('')||'<div class="fin-soft">لا توجد منتجات حسب الفلتر.</div>'}</div>`;}
-  window.financeProUploadProductImageV15=async function(id,input){try{const file=input&&input.files&&input.files[0]; if(!file)return; if(file.size>3*1024*1024&&!await confirmBox('تنبيه حجم الصورة','الصورة كبيرة وقد تبطئ التحميل. هل تريد الاستمرار؟'))return; const dataUrl=await new Promise((resolve,reject)=>{const r=new FileReader(); r.onload=()=>resolve(String(r.result||'')); r.onerror=reject; r.readAsDataURL(file);}); const c=client(); if(!c)throw new Error('الاتصال غير جاهز'); const res=await c.from('inventory_items').update({image_url:dataUrl}).eq('id',id).select('*'); if(res.error)throw res.error; const updated=A(res.data)[0]; const idx=state.items.findIndex(i=>String(i.id)===String(id)); if(idx>-1)state.items[idx]=updated||{...state.items[idx],image_url:dataUrl}; renderProductList(); if(typeof msg==='function')msg('تم حفظ صورة المنتج');}catch(e){alert(e.message||String(e));}finally{if(input)input.value='';}};
-  window.financeProZoomImageV15=function(encoded,title){const url=decodeURIComponent(S(encoded)); if(!url)return; modal(decodeURIComponent(S(title||'صورة المنتج')),`<div style="text-align:center"><img class="fin-modal-img" src="${esc(url)}" alt=""></div>`);};
+  function renderProductList(){
+    const box=$('finProductListV15');
+    if(!box) return;
+    clearTimeout(window.__financeProductRenderTimerV10091);
+    if(!state.items.length){
+      box.innerHTML='<div class="fin-soft">لا توجد منتجات محملة حتى الآن. اضغط تحديث البيانات.</div>';
+      return;
+    }
+    box.innerHTML='<div class="fin-soft">جاري تجهيز قائمة المنتجات...</div>';
+    window.__financeProductRenderTimerV10091=setTimeout(renderProductListNowV10091, 10);
+  }
+  function renderProductListNowV10091(){
+    const box=$('finProductListV15'); if(!box)return;
+    const q=S($('finProductSearchV15')?.value).toLowerCase();
+    const st=S($('finProductStatusV15')?.value);
+    const unit=S($('finProductUnitV15')?.value);
+    const type=S($('finProductTypeV15')?.value);
+    const quickQty=(i)=>N(i.quantity);
+    let rows=state.items.filter(i=>{
+      const hay=[i.name,itemCode(i),i.category,i.supplier,i.supplier_barcode].map(S).join(' ').toLowerCase();
+      const qty=quickQty(i);
+      const min=N(i.min_quantity||i.reorder_level||1);
+      if(q&&!hay.includes(q))return false;
+      if(st==='available'&&qty<=min)return false;
+      if(st==='low'&&!(qty>0&&qty<=min))return false;
+      if(st==='zero'&&qty!==0)return false;
+      if(unit&&S(i.unit)!==unit)return false;
+      if(type&&productType(i)!==type)return false;
+      return true;
+    });
+    rows=rows.sort((a,b)=>S(a.name).localeCompare(S(b.name),'ar'));
+    const total=rows.length;
+    const limit=q?200:80;
+    const shown=rows.slice(0,limit);
+    const note=total>shown.length?`<div class="fin-product-note">تم عرض أول ${shown.length} منتج من ${total}. استخدم البحث للوصول للمنتج بسرعة.</div>`:'';
+    box.innerHTML=`${note}<div class="fin-report-cards">${shown.map(i=>{
+      const qty=quickQty(i), min=N(i.min_quantity||i.reorder_level||1), low=qty>0&&qty<=min, zero=qty===0;
+      const img=i.image_url?`<img class="fin-thumb" loading="lazy" src="${esc(i.image_url)}" alt="" onclick="financeProZoomImageV15('${encodeURIComponent(i.image_url)}','${encodeURIComponent(S(i.name))}')">`:'';
+      return `<div class="fin-product-card">${img}<h4>${esc(i.name||'-')}</h4><span class="fin-badge ${zero?'bad':low?'warn':''}">${zero?'رصيد صفر':low?'قارب الانتهاء':'متوفر'}</span><div class="fin-meta"><div><small>الكود</small><b>${esc(itemCode(i)||'-')}</b></div><div><small>الوحدة</small><b>${esc(i.unit||'-')}</b></div><div><small>النوع</small><b>${esc(productType(i))}</b></div><div><small>الكمية</small><b>${N(qty)}</b></div><div><small>سعر قبل الضريبة</small><b>${money(itemUnitCost(i))}</b></div><div><small>بعد الضريبة للوحدة</small><b>${money(itemUnitCost(i)*(1+VAT))}</b></div></div><div class="fin-card-actions"><button class="light" onclick="financeProShowProductV15('${esc(i.id)}')">عرض البيانات</button><label class="light" style="display:inline-flex;align-items:center;justify-content:center;min-width:130px;cursor:pointer;border:1px solid #d8ebe3;border-radius:11px;padding:8px 11px;background:#eef7f3;color:#073d31">تحميل صورة<input type="file" accept="image/*" style="display:none" onchange="financeProUploadProductImageV15('${esc(i.id)}',this)"></label>${canDelete()?`<button class="danger" onclick="financeProDeleteProductV15('${esc(i.id)}')">حذف</button>`:''}</div></div>`;
+    }).join('')||'<div class="fin-soft">لا توجد منتجات حسب الفلتر.</div>'}</div>`;
+  }
 
   function renderSuppliers(body){body.innerHTML=`<div class="fin-card"><h3>الموردين</h3><div class="fin-grid three"><div><label>اسم المورد</label><input id="finSupplierNameV15" placeholder="اسم المورد"></div><div><label>رقم الجوال</label><input id="finSupplierPhoneV15" placeholder="05xxxxxxxx"></div><div><label>ملاحظة</label><input id="finSupplierNoteV15" placeholder="ملاحظة اختيارية"></div></div><div class="fin-actions"><button onclick="financeProAddSupplierV15()">إضافة المورد</button></div><div class="fin-actions"><div style="flex:1"><label>بحث</label><input id="finSupplierSearchV15" placeholder="ابحث باسم المورد" oninput="financeProRenderSuppliersV15()"></div></div><div id="finSuppliersListV15"></div></div>`; renderSuppliersList();}
   function renderSuppliersList(){const box=$('finSuppliersListV15'); if(!box)return; const q=S($('finSupplierSearchV15')?.value).toLowerCase(); const rows=supplierList().filter(s=>!q||s.toLowerCase().includes(q)); box.innerHTML=`<div class="fin-table"><table><thead><tr><th>المورد</th><th>عدد المنتجات</th><th>عدد العمليات</th><th>آخر تعامل</th><th>قبل الضريبة</th><th>الضريبة</th><th>بعد الضريبة</th><th>إجراء</th></tr></thead><tbody>${rows.map(s=>{const items=state.items.filter(i=>S(i.supplier)===s); const moves=state.movements.filter(m=>S(m.receiver)===s&&S(m.movement_type)==='in'); const net=moves.reduce((a,m)=>a+movementNet(m),0), vat=moves.reduce((a,m)=>a+movementVat(m),0), gross=moves.reduce((a,m)=>a+movementGross(m),0); const last=moves.map(m=>movementDate(m)).sort().pop()||'-'; const key=encodeURIComponent(s); return `<tr><td><b>${esc(s)}</b></td><td>${items.length}</td><td>${moves.length}</td><td>${esc(last)}</td><td>${money(net)}</td><td>${money(vat)}</td><td>${money(gross)}</td><td class="fin-actions"><button class="light" onclick="financeProShowSupplierV15(decodeURIComponent('${key}'))">عرض</button><button class="danger" onclick="financeProDeleteSupplierV15(decodeURIComponent('${key}'))">حذف</button></td></tr>`;}).join('')||'<tr><td colspan="8">لا توجد موردين حتى الآن</td></tr>'}</tbody></table></div>`;}
@@ -227,6 +266,22 @@
   window.financeProLoadV15=async force=>{await loadAll(force); renderShell(); if(force&&typeof msg==='function')msg('تم تحديث بيانات المالية والمخزون');};
   window.financeProRenderProductListV15=renderProductList; window.financeProRenderSuppliersV15=renderSuppliersList; window.financeProRenderCurrentV15=renderBody;
   function patchShowPage(){if(window.__financeProShowPagePatchedV10089)return; window.__financeProShowPagePatchedV10089=true; const old=window.showPage; window.showPage=function(id,btn){if(id==='financeDashboard'){ensurePage(); document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden')); $('financeDashboard')?.classList.remove('hidden'); document.querySelectorAll('.nav').forEach(n=>n.classList.remove('active')); btn?.classList.add('active'); loadAll(false).then(renderShell); return;} return typeof old==='function'?old.apply(this,arguments):undefined;}; try{showPage=window.showPage;}catch(_){}}
-  function boot(){ensurePage(); patchShowPage();}
+
+  function patchFriendlyErrorsV10091(){
+    if(window.__tasneefFriendlyErrorsV10091) return;
+    window.__tasneefFriendlyErrorsV10091=true;
+    window.addEventListener('error', function(ev){
+      try{ console.warn('Tasneef error:', ev.message, ev.filename, ev.lineno); }catch(_){}
+    });
+    window.addEventListener('unhandledrejection', function(ev){
+      try{ console.warn('Tasneef promise error:', ev.reason); }catch(_){}
+      const reason=ev.reason && (ev.reason.message || ev.reason.error_description || ev.reason.details || String(ev.reason));
+      if(reason && /order|orders|أوردر|اوردر|طلب|supabase|insert|update/i.test(reason)){
+        if(typeof msg==='function') msg('تعذر حفظ/رفع الأوردر: '+reason, 'err');
+      }
+    });
+  }
+
+  function boot(){ensurePage(); patchShowPage(); patchFriendlyErrorsV10091();}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot); else boot(); window.addEventListener('load',boot); console.log('Tasneef '+VERSION+' loaded');
 })();
