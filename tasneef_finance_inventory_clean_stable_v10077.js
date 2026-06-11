@@ -2,7 +2,7 @@
 /* ===== tasneef_finance_inventory_stable_root_v10070.js merged into clean stable v10077 ===== */
 (function(){
   'use strict';
-  const VERSION='v10070-finance-inventory-root-stable';
+  const VERSION='v10078-finance-inventory-single-json-fix';
   const VAT_RATE=0.15;
   const $=id=>document.getElementById(id);
   const S=v=>String(v??'').trim();
@@ -11,6 +11,18 @@
   const esc=v=>S(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const today=()=>new Date().toISOString().slice(0,10);
   const money=v=>`${N(v).toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2})} ر.س`;
+
+  // v10078: Supabase .single() fix - يحمي من خطأ Cannot coerce the result to a single JSON object
+  function oneRow(res, label){
+    if(res && res.error) throw res.error;
+    const d = res ? res.data : null;
+    if(Array.isArray(d)){
+      if(!d.length) throw new Error((label||'العملية')+' لم ترجع أي سجل من السيرفر. تأكد من صلاحيات Supabase/RLS وأن رقم المنتج صحيح.');
+      return d[0];
+    }
+    if(!d) throw new Error((label||'العملية')+' لم ترجع بيانات من السيرفر.');
+    return d;
+  }
 
 
   // v10077: منع أي مؤقتات/قنوات قديمة من ملفات الترقيع السابقة
@@ -190,13 +202,12 @@
       updated_by:uid(), updated_by_name:uname(), updated_at:new Date().toISOString()
     };
     if(S(line.image)) upd.image_url=S(line.image);
-    const res=await sb.from('inventory_items').update(upd).eq('id',item.id).select('*').single();
-    if(res.error) throw res.error;
-    return res.data;
+    const res=await sb.from('inventory_items').update(upd).eq('id',item.id).select('*');
+    return oneRow(res,'تحديث المنتج');
   }
   async function createItem(line,q,supplier,cost,invoiceNo){
     const ins={name:S(line.name),product_code:S(line.code),serial_number:S(line.code),barcode:S(line.code),supplier_barcode:S(line.distributor_code)||S(line.code),image_url:S(line.image)||'',unit:S(line.unit)||'حبة',item_type:S(line.item_type)||'مادة',type:S(line.item_type)||'مادة',quantity:N(q),min_quantity:N(line.min_quantity)||1,unit_cost:+N(cost).toFixed(4),supplier,category:S(line.item_type)||'عام',notes:'تمت الإضافة من فاتورة '+invoiceNo,created_by:uid(),created_by_name:uname(),updated_by:uid(),updated_by_name:uname(),updated_at:new Date().toISOString()};
-    const res=await sb.from('inventory_items').insert(ins).select('*').single(); if(res.error) throw res.error; return res.data;
+    const res=await sb.from('inventory_items').insert(ins).select('*'); return oneRow(res,'إنشاء المنتج');
   }
   async function saveIncomingMovement(item,line,q,date,supplier,invoiceNo,cost,oldMove){
     const c=rowVat(q,line.price,line.tax_mode);
@@ -205,11 +216,11 @@
     if(oldMove){
       meta.oldQuantity=N(line._oldQty||oldMove.quantity); meta.deltaQuantity=N(q)-meta.oldQuantity;
       const up={item_id:item.id,item_name:item.name,quantity:N(q),movement_date:date,receiver:supplier,reason:'تعديل آمن لفاتورة '+invoiceNo,notes:'finance_pro_v15:'+JSON.stringify(meta),product_code:S(line.code)||itemCode(item),barcode:S(line.distributor_code)||itemCode(item),unit_cost:+N(cost).toFixed(4),updated_by:uid(),updated_by_name:uname(),updated_at:new Date().toISOString()};
-      const mr=await sb.from('inventory_movements').update(up).eq('id',oldMove.id).select('*').single(); if(mr.error) throw mr.error; return mr.data;
+      const mr=await sb.from('inventory_movements').update(up).eq('id',oldMove.id).select('*'); return oneRow(mr,'تحديث حركة المخزون');
     }
     meta.createdBy=uid(); meta.createdByName=uname(); meta.createdAt=new Date().toISOString();
     const mv={item_id:item.id,item_name:item.name,movement_type:'in',quantity:N(q),movement_date:date,receiver:supplier,reason:'إضافة مخزون - فاتورة '+invoiceNo,notes:'finance_pro_v15:'+JSON.stringify(meta),product_code:S(line.code)||itemCode(item),barcode:S(line.distributor_code)||itemCode(item),unit_cost:+N(cost).toFixed(4),created_by:uid(),created_by_name:uname(),updated_by:uid(),updated_by_name:uname(),updated_at:new Date().toISOString()};
-    const mr=await sb.from('inventory_movements').insert(mv).select('*').single(); if(mr.error) throw mr.error; return mr.data;
+    const mr=await sb.from('inventory_movements').insert(mv).select('*'); return oneRow(mr,'إنشاء حركة المخزون');
   }
   window.financeProSaveInvoiceV15=async function(btn){
     try{
@@ -252,7 +263,7 @@
     document.body.insertAdjacentHTML('beforeend',html);
   }
   window.financeProSaveProductEditV10070=async function(id,btn){
-    try{ if(btn) btn.disabled=true; const upd={name:S($('editProdName10070')?.value),product_code:S($('editProdCode10070')?.value),serial_number:S($('editProdCode10070')?.value),barcode:S($('editProdCode10070')?.value),supplier_barcode:S($('editProdDist10070')?.value),unit:S($('editProdUnit10070')?.value)||'حبة',item_type:S($('editProdType10070')?.value)||'مادة',type:S($('editProdType10070')?.value)||'مادة',min_quantity:N($('editProdMin10070')?.value)||1,unit_cost:N($('editProdCost10070')?.value),updated_by:uid(),updated_by_name:uname(),updated_at:new Date().toISOString()}; const res=await sb.from('inventory_items').update(upd).eq('id',id).select('*').single(); if(res.error) throw res.error; const ss=st(); const idx=A(ss.items).findIndex(i=>String(i.id)===String(id)); if(idx>=0) ss.items[idx]=res.data; document.querySelector('.modal-backdrop:last-child')?.remove(); if(typeof msg==='function') msg('تم تعديل المنتج بدون تغيير الكمية'); }catch(e){ alert(e.message||String(e)); } finally{ if(btn) btn.disabled=false; }
+    try{ if(btn) btn.disabled=true; const upd={name:S($('editProdName10070')?.value),product_code:S($('editProdCode10070')?.value),serial_number:S($('editProdCode10070')?.value),barcode:S($('editProdCode10070')?.value),supplier_barcode:S($('editProdDist10070')?.value),unit:S($('editProdUnit10070')?.value)||'حبة',item_type:S($('editProdType10070')?.value)||'مادة',type:S($('editProdType10070')?.value)||'مادة',min_quantity:N($('editProdMin10070')?.value)||1,unit_cost:N($('editProdCost10070')?.value),updated_by:uid(),updated_by_name:uname(),updated_at:new Date().toISOString()}; const res=await sb.from('inventory_items').update(upd).eq('id',id).select('*'); const row=oneRow(res,'تعديل المنتج'); const ss=st(); const idx=A(ss.items).findIndex(i=>String(i.id)===String(id)); if(idx>=0) ss.items[idx]=row; document.querySelector('.modal-backdrop:last-child')?.remove(); if(typeof msg==='function') msg('تم تعديل المنتج بدون تغيير الكمية'); }catch(e){ alert(e.message||String(e)); } finally{ if(btn) btn.disabled=false; }
   };
 
   window.financeProRecoverProductsFromInvoicesV10070=async function(btn){
@@ -265,7 +276,7 @@
         if(exists) continue;
         const meta=safeJson(m.notes)||{}; const code=S(m.product_code)||('PRD-'+String(Date.now()+count).slice(-6)); const q=stableBalance({id:m.item_id,name:m.item_name,product_code:code},'');
         const ins={name:S(m.item_name)||'منتج مسترجع',product_code:code,serial_number:code,barcode:code,supplier_barcode:S(m.barcode)||code,image_url:'',unit:'حبة',item_type:S(meta.itemType||'مادة'),type:S(meta.itemType||'مادة'),quantity:q||N(m.quantity),min_quantity:N(meta.minQuantity)||1,unit_cost:N(m.unit_cost),supplier:S(meta.supplier||m.receiver||''),category:S(meta.itemType||'عام'),notes:'استرجاع تلقائي من فاتورة قديمة v10070',created_by:uid(),created_by_name:uname(),updated_by:uid(),updated_by_name:uname(),updated_at:new Date().toISOString()};
-        const res=await sb.from('inventory_items').insert(ins).select('*').single(); if(res.error) throw res.error; ss.items.push(res.data); count++;
+        const res=await sb.from('inventory_items').insert(ins).select('*'); ss.items.push(oneRow(res,'استيراد المنتج')); count++;
       }
       if(typeof msg==='function') msg('تم استرجاع '+count+' منتج مفقود من الفواتير القديمة');
       if(typeof window.financeProRenderProductListV15==='function') window.financeProRenderProductListV15();
@@ -472,9 +483,9 @@
       if(btn){ btn.disabled=true; btn.textContent='جاري الحفظ...'; }
       const id=S($('prodImgItemV10073')?.value); const data=S(window.__prodImgV10073||'');
       if(!id) throw new Error('اختر المنتج'); if(!data) throw new Error('اختر الصورة أولاً');
-      const res=await sb.from('inventory_items').update({image_url:data, updated_at:new Date().toISOString()}).eq('id',id).select('*').single();
-      if(res.error) throw res.error;
-      const ss=st(); const idx=A(ss.items).findIndex(i=>String(i.id)===String(id)); if(idx>=0) ss.items[idx]=res.data;
+      const res=await sb.from('inventory_items').update({image_url:data, updated_at:new Date().toISOString()}).eq('id',id).select('*');
+      const row=oneRow(res,'حفظ صورة المنتج');
+      const ss=st(); const idx=A(ss.items).findIndex(i=>String(i.id)===String(id)); if(idx>=0) ss.items[idx]=row;
       document.querySelector('.modal-backdrop:last-child')?.remove(); renderProductsEverywhere(ss.items);
       if(typeof window.msg==='function') window.msg('تم حفظ صورة المنتج');
     }catch(e){ alert(e.message||String(e)); }
@@ -712,10 +723,10 @@
       if(btn){btn.disabled=true;btn.textContent='جاري الحفظ...';}
       const id=S($('prodImageItemV10075')?.value); const data=S(window.__prodImageV10075||'');
       if(!id) throw new Error('اختر المنتج'); if(!data) throw new Error('اختر الصورة');
-      const res=await sb.from('inventory_items').update({image_url:data,updated_at:new Date().toISOString()}).eq('id',id).select('*').single();
-      if(res.error) throw res.error;
-      const idx=productsCache.findIndex(i=>String(i.id)===String(id)); if(idx>=0) productsCache[idx]=res.data;
-      const ss=st(); const idx2=A(ss.items).findIndex(i=>String(i.id)===String(id)); if(idx2>=0) ss.items[idx2]=res.data;
+      const res=await sb.from('inventory_items').update({image_url:data,updated_at:new Date().toISOString()}).eq('id',id).select('*');
+      const row=oneRow(res,'حفظ صورة المنتج');
+      const idx=productsCache.findIndex(i=>String(i.id)===String(id)); if(idx>=0) productsCache[idx]=row;
+      const ss=st(); const idx2=A(ss.items).findIndex(i=>String(i.id)===String(id)); if(idx2>=0) ss.items[idx2]=row;
       renderProductTables(A(ss.items)); document.querySelector('.modal-backdrop:last-child')?.remove();
       if(typeof window.msg==='function') window.msg('تم حفظ صورة المنتج');
     }catch(e){ alert(e.message||String(e)); }
