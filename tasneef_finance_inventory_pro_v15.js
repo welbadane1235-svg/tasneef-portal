@@ -1,4 +1,4 @@
-/* Tasneef Finance Inventory Pro v10092
+/* Tasneef Finance Inventory Pro v10093
    RESTORE REPORTS + MOVEMENT + CONSUMPTION
    Official core file only: no injected external scripts, no MutationObserver, no duplicate renderer.
    Changes:
@@ -12,7 +12,7 @@
 */
 (function(){
   'use strict';
-  const VERSION='v10092-products-fallback-load-fix';
+  const VERSION='v10093-instant-products-photo-filter';
   const VAT=0.15;
   const state={loaded:false,tab:'summary',items:[],movements:[],expenses:[],projects:[],users:[],tickets:[],invoiceLines:[],distribution:[],reportTab:'products',suppliers:[],editMovementId:''};
   window.financeProStateV15=state;
@@ -116,46 +116,47 @@
 
   function renderSummary(body){const stock=stockValue(); const fin=state.movements.reduce((a,m)=>{const type=S(m.movement_type); if(type==='return'||type==='out')return a; const net=type==='in'||movementFinancialTypes().includes(type)?movementReportNet(m):movementNet(m); const vat=type==='in'?movementVat(m):net*VAT; a.net+=net; a.vat+=vat; a.gross+=net+vat; return a;},{net:0,vat:0,gross:0}); body.innerHTML=`<div class="fin-grid"><div class="fin-card fin-kpi"><small>عدد المنتجات</small><b>${productItems().length}</b></div><div class="fin-card fin-kpi"><small>السعر قبل الضريبة</small><b>${money(stock)}</b></div><div class="fin-card fin-kpi"><small>الضريبة</small><b>${money(stock*VAT)}</b></div><div class="fin-card fin-kpi"><small>السعر شامل الضريبة</small><b>${money(stock*(1+VAT))}</b></div></div><div class="fin-card"><h3>الأصناف التي سوف تنتهي (${lowItems().length})</h3><div class="fin-table"><table><thead><tr><th>المنتج</th><th>الكود</th><th>المتوفر</th><th>الحد الأدنى</th><th>التكلفة</th><th>الحالة</th></tr></thead><tbody>${lowItems().map(i=>`<tr><td><b>${esc(i.name)}</b></td><td>${esc(itemCode(i)||'-')}</td><td>${N(computedItemQty(i))}</td><td>${N(i.min_quantity||i.reorder_level||1)}</td><td>${money(itemUnitCost(i))}</td><td><span class="fin-badge warn">قارب الانتهاء</span></td></tr>`).join('')||'<tr><td colspan="6">لا توجد أصناف قاربت الانتهاء</td></tr>'}</tbody></table></div></div><div class="fin-grid three"><div class="fin-card fin-kpi"><small>حركة المخزون قبل الضريبة</small><b>${money(fin.net)}</b></div><div class="fin-card fin-kpi"><small>ضريبة حركة المخزون</small><b>${money(fin.vat)}</b></div><div class="fin-card fin-kpi"><small>حركة المخزون بعد الضريبة</small><b>${money(fin.gross)}</b></div></div>`;}
 
-  function renderProducts(body){body.innerHTML=`<div class="fin-card"><div class="fin-actions"><div style="flex:1"><label>بحث</label><input id="finProductSearchV15" placeholder="ابحث باسم المنتج أو الكود" oninput="financeProRenderProductListV15()"></div><div><label>الحالة</label><select id="finProductStatusV15" onchange="financeProRenderProductListV15()"><option value="">كل المنتجات</option><option value="available">متوفر</option><option value="low">قارب الانتهاء</option><option value="zero">رصيد صفر</option></select></div><div><label>الوحدة</label><select id="finProductUnitV15" onchange="financeProRenderProductListV15()"><option value="">كل الوحدات</option>${unitList().map(u=>`<option>${esc(u)}</option>`).join('')}</select></div><div><label>نوع المنتج</label><select id="finProductTypeV15" onchange="financeProRenderProductListV15()"><option value="">الكل</option><option value="عدة">عدة</option><option value="مادة">مادة</option><option value="غير">غير</option></select></div></div><div id="finProductListV15"></div></div>`; renderProductList();}
+  function renderProducts(body){body.innerHTML=`<div class="fin-card"><div class="fin-actions"><div style="flex:1"><label>بحث</label><input id="finProductSearchV15" placeholder="ابحث باسم المنتج أو الكود" oninput="financeProRenderProductListV15()"></div><div><label>الحالة</label><select id="finProductStatusV15" onchange="financeProRenderProductListV15()"><option value="">كل المنتجات</option><option value="available">متوفر</option><option value="low">قارب الانتهاء</option><option value="zero">رصيد صفر</option></select></div><div><label>الوحدة</label><select id="finProductUnitV15" onchange="financeProRenderProductListV15()"><option value="">كل الوحدات</option>${unitList().map(u=>`<option>${esc(u)}</option>`).join('')}</select></div><div><label>نوع المنتج</label><select id="finProductTypeV15" onchange="financeProRenderProductListV15()"><option value="">الكل</option><option value="عدة">عدة</option><option value="مادة">مادة</option><option value="غير">غير</option></select></div><div><label>الصورة</label><select id="finProductImageFilterV15" onchange="financeProRenderProductListV15()"><option value="">الكل</option><option value="without">بدون صور</option><option value="with">فيها صور</option></select></div></div><div id="finProductListV15"></div></div>`; renderProductList();}
   function renderProductList(){
     const box=$('finProductListV15');
     if(!box) return;
-    clearTimeout(window.__financeProductRenderTimerV10091);
     const sourceItems=productItems();
     if(!sourceItems.length){
       box.innerHTML='<div class="fin-soft">لا توجد منتجات محملة حتى الآن. اضغط تحديث البيانات.</div>';
       return;
     }
-    box.innerHTML='<div class="fin-soft">جاري تجهيز قائمة المنتجات...</div>';
-    window.__financeProductRenderTimerV10091=setTimeout(renderProductListNowV10091, 10);
+    renderProductListNowV10091(sourceItems);
   }
-  function renderProductListNowV10091(){
+  function renderProductListNowV10091(sourceItems){
     const box=$('finProductListV15'); if(!box)return;
+    sourceItems=sourceItems||productItems();
     const q=S($('finProductSearchV15')?.value).toLowerCase();
     const st=S($('finProductStatusV15')?.value);
     const unit=S($('finProductUnitV15')?.value);
     const type=S($('finProductTypeV15')?.value);
+    const imageFilter=S($('finProductImageFilterV15')?.value);
     const quickQty=(i)=>N(i.quantity);
     let rows=sourceItems.filter(i=>{
       const hay=[i.name,itemCode(i),i.category,i.supplier,i.supplier_barcode].map(S).join(' ').toLowerCase();
       const qty=quickQty(i);
       const min=N(i.min_quantity||i.reorder_level||1);
+      const hasImage=!!S(i.image_url);
       if(q&&!hay.includes(q))return false;
       if(st==='available'&&qty<=min)return false;
       if(st==='low'&&!(qty>0&&qty<=min))return false;
       if(st==='zero'&&qty!==0)return false;
       if(unit&&S(i.unit)!==unit)return false;
       if(type&&productType(i)!==type)return false;
+      if(imageFilter==='without'&&hasImage)return false;
+      if(imageFilter==='with'&&!hasImage)return false;
       return true;
     });
     rows=rows.sort((a,b)=>S(a.name).localeCompare(S(b.name),'ar'));
     const total=rows.length;
-    const limit=q?200:80;
-    const shown=rows.slice(0,limit);
-    const note=total>shown.length?`<div class="fin-product-note">تم عرض أول ${shown.length} منتج من ${total}. استخدم البحث للوصول للمنتج بسرعة.</div>`:'';
-    box.innerHTML=`${note}<div class="fin-report-cards">${shown.map(i=>{
+    const note=`<div class="fin-product-note">عدد المنتجات المعروضة: ${total}</div>`;
+    box.innerHTML=`${note}<div class="fin-report-cards">${rows.map(i=>{
       const qty=quickQty(i), min=N(i.min_quantity||i.reorder_level||1), low=qty>0&&qty<=min, zero=qty===0;
-      const img=i.image_url?`<img class="fin-thumb" loading="lazy" src="${esc(i.image_url)}" alt="" onclick="financeProZoomImageV15('${encodeURIComponent(i.image_url)}','${encodeURIComponent(S(i.name))}')">`:'';
+      const img=i.image_url?`<img class="fin-thumb" loading="lazy" src="${esc(i.image_url)}" alt="" onclick="financeProZoomImageV15('${encodeURIComponent(i.image_url)}','${encodeURIComponent(S(i.name))}')">`:'<div class="fin-thumb" style="display:grid;place-items:center;color:#8aa096;font-size:11px">بدون صورة</div>';
       return `<div class="fin-product-card">${img}<h4>${esc(i.name||'-')}</h4><span class="fin-badge ${zero?'bad':low?'warn':''}">${zero?'رصيد صفر':low?'قارب الانتهاء':'متوفر'}</span><div class="fin-meta"><div><small>الكود</small><b>${esc(itemCode(i)||'-')}</b></div><div><small>الوحدة</small><b>${esc(i.unit||'-')}</b></div><div><small>النوع</small><b>${esc(productType(i))}</b></div><div><small>الكمية</small><b>${N(qty)}</b></div><div><small>سعر قبل الضريبة</small><b>${money(itemUnitCost(i))}</b></div><div><small>بعد الضريبة للوحدة</small><b>${money(itemUnitCost(i)*(1+VAT))}</b></div></div><div class="fin-card-actions"><button class="light" onclick="financeProShowProductV15('${esc(i.id)}')">عرض البيانات</button><label class="light" style="display:inline-flex;align-items:center;justify-content:center;min-width:130px;cursor:pointer;border:1px solid #d8ebe3;border-radius:11px;padding:8px 11px;background:#eef7f3;color:#073d31">تحميل صورة<input type="file" accept="image/*" style="display:none" onchange="financeProUploadProductImageV15('${esc(i.id)}',this)"></label>${canDelete()?`<button class="danger" onclick="financeProDeleteProductV15('${esc(i.id)}')">حذف</button>`:''}</div></div>`;
     }).join('')||'<div class="fin-soft">لا توجد منتجات حسب الفلتر.</div>'}</div>`;
   }
