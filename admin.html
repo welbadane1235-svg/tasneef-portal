@@ -137,6 +137,11 @@ body .tasneef-version-badge, body .version-badge, body .build-badge, body #versi
 /* V10055 hide old build/version floating badge */
 body .tasneef-version-badge, body .version-badge, body .build-badge, body #versionBadge, body #buildBadge{display:none!important}
 </style>
+
+<style id="monthlyExcelStyleV10149Css">
+.monthly-pro-v10149 .mt49-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}.mt49-filters{align-items:end}.mt49-summary{grid-template-columns:repeat(5,1fr)!important}.monthly-excel-v10149,.monthly-workers-v10149,.monthly-detail-v10149{overflow:hidden}.mt49-title-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}.mt49-title-row small{color:var(--muted)}.mt49-visit-grid{display:grid;grid-template-columns:repeat(4,minmax(240px,1fr));gap:12px;margin-top:14px}.mt49-supervisor-card{border:2px solid #1f2937;background:#fff;border-radius:4px;min-height:320px;padding:10px}.mt49-supervisor-card h3{text-align:center;margin:0 0 8px;color:#111;font-size:20px}.mt49-supervisor-card table{width:100%;border-collapse:collapse}.mt49-supervisor-card td{padding:5px;text-align:center;border-bottom:1px solid #eef2f1}.mt49-supervisor-card tr.total td{font-weight:900;border-top:2px solid #111;border-bottom:0}.mt49-workers-title{text-align:center;margin:28px 0 8px;font-weight:900;font-size:18px}.mt49-worker-names{display:flex;flex-direction:column;align-items:center;gap:5px;min-height:80px}.mt49-worker-names span{font-weight:700}.mt49-workers-grid{display:grid;grid-template-columns:repeat(7,minmax(150px,1fr));gap:8px;margin-top:12px}.mt49-project-workers{border:2px solid #111;background:#fff;padding:10px;min-height:150px}.mt49-project-workers h3{text-align:center;margin:0 0 8px;color:#111;font-size:16px}.mt49-project-workers div{display:flex;flex-direction:column;align-items:center;gap:4px}.mt49-project-workers span{font-weight:700}.monthly-detail-v10149 table th,.monthly-detail-v10149 table td{text-align:center}.monthly-detail-v10149 .danger{background:#b83232!important;color:#fff!important}@media(max-width:1200px){.mt49-visit-grid{grid-template-columns:repeat(2,minmax(240px,1fr))}.mt49-workers-grid{grid-template-columns:repeat(3,minmax(150px,1fr))}.mt49-summary{grid-template-columns:1fr!important}}@media(max-width:760px){.mt49-visit-grid,.mt49-workers-grid{grid-template-columns:1fr}.mt49-supervisor-card{min-height:auto}}
+</style>
+
 </head>
 <body onload="initAdmin()">
 <div class="app-shell">
@@ -385,54 +390,65 @@ body .tasneef-version-badge, body .version-badge, body .build-badge, body #versi
     </section>
 
     <section id="monthly" class="page hidden">
-  <div class="card monthly-system-v10145">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+  <div class="card monthly-pro-v10149">
+    <div class="mt49-head">
       <div>
         <h2>الأوقات الشهرية</h2>
-        <div class="footer-note">قسم ثابت ورسمي. المصدر الأساسي Supabase، والبيانات المحلية تظهر كمصدر منفصل للترحيل فقط حتى لا تختلط الأرقام.</div>
+        <div class="footer-note">تصميم احترافي مطابق لفكرة ملف Excel: الدقائق لكل مشروع، والنسبة = دقائق المشروع ÷ إجمالي دقائق المشرف.</div>
       </div>
-      <span id="mtStatusV10145" class="badge amber">جاهز</span>
+      <span id="mt49Status" class="badge amber">جاهز</span>
     </div>
-
-    <div class="filters" style="margin-top:14px">
-      <div><label>الشهر</label><input type="month" id="mtMonthV10145"></div>
-      <div><label>مصدر البيانات</label><select id="mtSourceV10145"><option value="official">Supabase الرسمي فقط</option><option value="merged">Supabase + المحلي لهذا الجهاز</option><option value="local">المحلي لهذا الجهاز فقط</option></select></div>
-      <div><label>المشرف</label><select id="mtSupervisorV10145"><option value="">كل المشرفين</option></select></div>
-      <div><label>المشروع</label><select id="mtProjectV10145"><option value="">كل المشاريع</option></select></div>
-      <button type="button" class="light" id="mtRefreshV10145">تحديث الأوقات</button>
-      <button type="button" id="mtPrintV10145">طباعة التقرير</button>
-      <button type="button" id="mtCsvV10145">تصدير CSV</button>
+    <div class="filters mt49-filters">
+      <div><label>الشهر</label><input type="month" id="mt49Month"></div>
+      <div><label>المشرف</label><select id="mt49Supervisor"><option value="">كل المشرفين</option></select></div>
+      <div><label>المشروع</label><select id="mt49Project"><option value="">كل المشاريع</option></select></div>
+      <button type="button" class="light" id="mt49Refresh">تحديث الأوقات</button>
+      <button type="button" id="mt49Print">طباعة التقرير</button>
+      <button type="button" id="mt49Csv">تصدير CSV</button>
     </div>
-
-    <div id="mtSummaryV10145" class="kpis small" style="margin-top:12px"></div>
-    <div id="mtSourcesV10145" class="msg"></div>
-    <div id="mtMessageV10145" class="msg hidden"></div>
+    <div id="mt49Summary" class="kpis small mt49-summary"></div>
+    <div id="mt49Message" class="msg hidden"></div>
   </div>
 
-  <div class="card monthly-manual-v10145">
+  <div class="card monthly-manual-v10149">
     <h2>تعديل يدوي للأوقات الشهرية</h2>
-    <div class="footer-note">التعديل اليدوي محفوظ للشهر المختار، ولا يحذف السجلات الأصلية.</div>
-    <input type="hidden" id="mtManualIdV10145">
+    <div class="footer-note">أي تعديل يدوي يحفظ للشهر المختار ويظهر فورًا في التصميم والطباعة، ولا يحذف سجلات الدخول والخروج الأصلية.</div>
+    <input type="hidden" id="mt49ManualId">
     <div class="filters">
-      <input id="mtManualSupervisorV10145" list="mtSupervisorListV10145" placeholder="اسم المشرف">
-      <datalist id="mtSupervisorListV10145"></datalist>
-      <input id="mtManualProjectV10145" list="mtProjectListV10145" placeholder="اسم المشروع">
-      <datalist id="mtProjectListV10145"></datalist>
-      <input id="mtManualWorkersV10145" placeholder="أسماء العمال">
-      <input id="mtManualRequiredV10145" type="number" step="1" placeholder="الدقائق المطلوبة">
-      <input id="mtManualActualV10145" type="number" step="1" placeholder="الدقائق الفعلية">
-      <input id="mtManualTravelV10145" type="number" step="1" placeholder="وقت الانتقال بالدقائق">
-      <input id="mtManualPercentV10145" type="number" step="1" placeholder="النسبة % اختياري">
-      <button type="button" id="mtManualSaveV10145">حفظ / تحديث</button>
-      <button type="button" class="light" id="mtManualClearV10145">تفريغ</button>
+      <input id="mt49ManualSupervisor" list="mt49SupervisorList" placeholder="اسم المشرف">
+      <datalist id="mt49SupervisorList"></datalist>
+      <input id="mt49ManualProject" list="mt49ProjectList" placeholder="اسم المشروع">
+      <datalist id="mt49ProjectList"></datalist>
+      <input id="mt49ManualWorkers" placeholder="أسماء العمال">
+      <input id="mt49ManualMinutes" type="number" step="1" placeholder="الدقائق">
+      <input id="mt49ManualTravel" type="number" step="1" placeholder="وقت الانتقال بالدقائق">
+      <button type="button" id="mt49ManualSave">حفظ / تحديث</button>
+      <button type="button" class="light" id="mt49ManualClear">تفريغ</button>
     </div>
   </div>
 
-  <div class="card">
+  <div class="card monthly-excel-v10149">
+    <div class="mt49-title-row">
+      <h2>مشاريع الزيارة اليومية</h2>
+      <small>نفس معادلة Excel: النسبة لكل مشروع من إجمالي دقائق المشرف.</small>
+    </div>
+    <div id="mt49VisitGrid" class="mt49-visit-grid"></div>
+  </div>
+
+  <div class="card monthly-workers-v10149">
+    <div class="mt49-title-row">
+      <h2>أسماء العمال حسب المشاريع</h2>
+      <small>تظهر من جدول العمال أو من السجلات إذا كانت مرتبطة بالعامل.</small>
+    </div>
+    <div id="mt49WorkersGrid" class="mt49-workers-grid"></div>
+  </div>
+
+  <div class="card monthly-detail-v10149">
+    <h2>جدول تفصيلي</h2>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>المشرف</th><th>المشروع</th><th>أسماء العمال</th><th>عدد السجلات</th><th>الساعات المطلوبة</th><th>الساعات الفعلية</th><th>وقت الانتقال</th><th>نسبة العمل %</th><th>حالة الأداء</th><th>المصدر</th><th>إجراء</th></tr></thead>
-        <tbody id="mtBodyV10145"><tr><td colspan="11">اختر الشهر ثم اضغط تحديث الأوقات.</td></tr></tbody>
+        <thead><tr><th>المشرف</th><th>المشروع</th><th>أسماء العمال</th><th>عدد السجلات</th><th>الدقائق</th><th>الساعات</th><th>وقت الانتقال</th><th>النسبة من إجمالي المشرف</th><th>المصدر</th><th>إجراء</th></tr></thead>
+        <tbody id="mt49Body"><tr><td colspan="10">اختر الشهر ثم اضغط تحديث الأوقات.</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -847,6 +863,6 @@ window.__tasneefV201Loaded=true;
   <script src="tasneef_admin_tasks_dashboard_card_v10127.js?v=10127" defer></script>
   
 <script src="tasneef_language_switcher_safe_v10134.js?v=10134" defer></script>
-<script src="tasneef_monthly_foundation_v10148.js?v=10148" defer></script>
+<script src="tasneef_monthly_excel_style_v10149.js?v=10149" defer></script>
 </body>
 </html>
