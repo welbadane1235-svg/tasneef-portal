@@ -57,6 +57,7 @@
     <button class="sup-tab active" onclick="showSupervisorWindow('supLogs',this)">دخول / خروج</button>
     <button class="sup-tab" onclick="showSupervisorWindow('supAttendance',this)">تسجيل الحضور</button>
     <button class="sup-tab" onclick="showSupervisorWindow('supTickets',this)">التكتات</button>
+    <button class="sup-tab" onclick="showSupervisorWindow('supAdminTasks',this); if(window.TasneefFieldAdminTasksV10130) window.TasneefFieldAdminTasksV10130.open('supervisor')">مهام إدارية</button>
     <button class="sup-tab" onclick="showSupervisorWindow('supOrders',this); supOrdersLoadV10061()">الأوردرات</button>
     <button class="sup-tab" onclick="showSupervisorWindow('supSummary',this)">الملخص اليومي</button>
     <button class="sup-tab" onclick="showSupervisorWindow('supClientDailyReport',this); supClientReportInit()">تقرير يومي</button>
@@ -84,6 +85,14 @@
         <div class="sup-help">لن يتم إغلاق التكت إلا بعد كتابة طريقة الإغلاق واسم من أغلقه.</div>
       </div><div class="actions"><button onclick="saveTicket()">حفظ التكت</button><button class="light" onclick="clearTicketForm()">تكت جديد</button></div></section>
     <section class="card"><h2>تكتاتي</h2><div class="filters"><select id="supTicketFilterProject" onchange="renderTickets()"><option value="">كل المشاريع</option></select><select id="supTicketFilterStatus" onchange="renderTickets()"><option value="">كل الحالات</option><option value="open">مفتوح</option><option value="processing">تحت المعالجة</option><option value="closed">مغلق</option></select><input id="supTicketSearch" oninput="renderTickets()" placeholder="بحث برقم التكت أو العنوان"></div><div id="supTicketsSmartSummary" class="smart-ticket-summary"></div><div id="supTicketsBody" class="smart-ticket-grid"></div></section>
+  </section>
+
+  <section id="supAdminTasks" class="sup-page">
+    <section class="card">
+      <h2>مهام إدارية</h2>
+      <div class="sup-help">المهام المرسلة لك من الإدارة، أو المهام التي أنشأتها. تظهر من Supabase مباشرة.</div>
+      <div id="supAdminTasksContent"></div>
+    </section>
   </section>
 
 
@@ -146,5 +155,6 @@
 <script src="tasneef_worker_distribution_unified_v51.js?v=51" defer></script>
 <script src="tasneef_supervisor_orders_v10061.js?v=10061" defer></script>
 <script src="tasneef_orders_system_projects_only_v10063.js?v=10063" defer></script>
+<script src="tasneef_field_admin_tasks_v10130.js?v=10130" defer></script>
 </body>
 </html>

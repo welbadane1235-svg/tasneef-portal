@@ -45,6 +45,7 @@
     <button class="tech-main-tab active" onclick="showTechMainTab('techDashboardTab',this)">الرئيسية</button>
     <button class="tech-main-tab" onclick="showTechMainTab('techCreateTab',this)">إنشاء تكت</button>
     <button class="tech-main-tab" onclick="showTechMainTab('techTicketsTab',this)">التكتات</button>
+    <button class="tech-main-tab" onclick="showTechMainTab('techAdminTasksTab',this); if(window.TasneefFieldAdminTasksV10130) window.TasneefFieldAdminTasksV10130.open('technician')">مهام إدارية</button>
     <button class="tech-main-tab" onclick="showTechMainTab('techAttendanceTab',this)">حضور وغياب</button>
   </nav>
 
@@ -59,6 +60,14 @@
       <p>استخدم التبويبات بالأعلى لإنشاء تكت، متابعة التكتات، أو تسجيل الحضور والغياب.</p>
       <div class="actions"><button onclick="showTechMainTabById('techTicketsTab')">فتح التكتات</button><button class="light" onclick="showTechMainTabById('techAttendanceTab')">تسجيل الحضور</button></div>
     </div>
+  </section>
+
+  <section id="techAdminTasksTab" class="tech-main-page">
+    <section class="card">
+      <h2>مهام إدارية</h2>
+      <p>المهام المرسلة لك أو التي أنشأتها تظهر هنا مباشرة من Supabase.</p>
+      <div id="techAdminTasksContent"></div>
+    </section>
   </section>
 
   <section id="techCreateTab" class="tech-main-page">
@@ -99,6 +108,7 @@
         <h2>حضور وغياب الفنيين</h2>
         <div class="grid two no-print">
           <div><label>الشهر</label><input id="techAttendanceMonth" type="month" onchange="renderTechAttendance()"></div>
+          <div><label>تاريخ التحضير</label><input id="techAttendanceDate" type="date"></div>
           <div><label>ملاحظات اليوم</label><input id="techAttendanceNote" placeholder="مثال: حضور موقع / طوارئ / إذن"></div>
         </div>
         <div class="tech-att-actions no-print">
@@ -174,7 +184,7 @@
   }
   async function saveToday(status){
     const month=$id('techAttendanceMonth')?.value||monthNow();
-    const date=todayISO();
+    const date=$id('techAttendanceDate')?.value||todayISO();
     const store=getStore();const id=techId();store[id]=store[id]||{};
     const old=store[id][date]||{date, tech_id:id, tech_name:techName()};
     const note=$id('techAttendanceNote')?.value||old.note||'';
@@ -218,6 +228,7 @@
   window.initTechnician=async function(){
     if(typeof oldInit==='function') await oldInit();
     if($id('techAttendanceMonth') && !$id('techAttendanceMonth').value) $id('techAttendanceMonth').value=monthNow();
+    if($id('techAttendanceDate') && !$id('techAttendanceDate').value) $id('techAttendanceDate').value=todayISO();
     renderTechAttendance();
   };
 })();
@@ -225,5 +236,6 @@
 <script src="tasneef_technician_fast_fix_v9.js?v=13"></script>
 <script src="tasneef_attendance_status_fix_v16.js?v=16"></script>
 <script src="tasneef_attendance_server_sync_v10003.js?v=10003"></script>
+<script src="tasneef_field_admin_tasks_v10130.js?v=10130" defer></script>
 </body>
 </html>
