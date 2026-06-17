@@ -2,8 +2,8 @@
    Read-only reporting module. Improves project fields + supervisor phone lookup. */
 (function(){
   'use strict';
-  const VERSION='v10184-project-command-center-open-fix';
-  const STATE={loaded:false,tab:'dashboard',projects:[],users:[],contracts:[],contractServices:[],annualServices:[],projectServices:[],serviceSchedules:[],smartContracts:[],tickets:[],selectedProjectId:'',filterProjectId:'',filterSupervisorId:'',lastLoadedAt:''};
+  const VERSION='v10185-project-command-center-filter-contract-fix';
+  const STATE={loaded:false,tab:'dashboard',projects:[],users:[],contracts:[],contractServices:[],annualServices:[],projectServices:[],serviceSchedules:[],smartContracts:[],tickets:[],selectedProjectId:'',filterProjectId:'',filterSupervisorId:'',filterContractType:'',lastLoadedAt:''};
   const $=id=>document.getElementById(id);
   const A=v=>Array.isArray(v)?v:[];
   const S=v=>String(v??'').trim();
@@ -235,6 +235,45 @@
   function projectStatus(p){const a=[...missingDataAlerts(p),...contractActivationAlerts(p),...delayAlerts(p)]; if(a.some(x=>x.priority==='عالية'))return 'يحتاج متابعة'; if(a.length)return 'ناقص بيانات'; return 'مكتمل';}
   function statusClass(s){return /متأخر|عالية|يحتاج/.test(S(s))?'bad':/مستمر|ناقص|متوسطة/.test(S(s))?'warn':'ok';}
 
+  function contractTypeSpec(type){
+    const t=S(type);
+    if(t==='elevators')return {label:'عقد مصاعد', patterns:[/مصعد|مصاعد|elevator|lift/i]};
+    if(t==='pools')return {label:'عقد مسابح', patterns:[/مسبح|مسابح|pool|swimming/i]};
+    if(t==='civil')return {label:'عقد دفاع مدني', patterns:[/دفاع|دفاع مدني|حريق|fire|civil|safety/i]};
+    return null;
+  }
+  function projectHasContractType(p,type){
+    const spec=contractTypeSpec(type); if(!spec)return true;
+    const rows=[...relatedRowsForProject(p),...projectRelatedContracts(p)];
+    return rows.some(r=>{
+      const text=[
+        serviceName(r),
+        field(r,['name','title','description','contract_type','maintenance_type','service_type','type','category','notes','status','contract_status'],'')
+      ].map(S).join(' ');
+      return spec.patterns.some(re=>re.test(text));
+    });
+  }
+  function supervisorFilterRows(){
+    const map=new Map();
+    A(STATE.projects).forEach(p=>{ const s=supervisorOf(p); const key=S(s.id||s.name); if(key&&s.name&&s.name!=='-')map.set(key,{id:key,name:s.name}); });
+    A(STATE.users).forEach(u=>{ const name=userName(u); const id=S(field(u,['id','user_id','uuid','username','email'],'')); if(id&&name)map.set(id,{id,name}); });
+    return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+  }
+  function filteredProjects(){
+    let rows=A(STATE.projects);
+    const pid=S(STATE.filterProjectId), sid=S(STATE.filterSupervisorId), ctype=S(STATE.filterContractType);
+    if(pid) rows=rows.filter(p=>idOf(p)===pid);
+    if(sid) rows=rows.filter(p=>{ const s=supervisorOf(p); return S(s.id)===sid || S(s.name)===sid; });
+    if(ctype) rows=rows.filter(p=>projectHasContractType(p,ctype));
+    return rows;
+  }
+  function filterBar(){
+    const projects=A(STATE.projects).slice().sort((a,b)=>projectName(a).localeCompare(projectName(b),'ar'));
+    const supervisors=supervisorFilterRows();
+    const contractTypes=[['','كل العقود'],['elevators','عقد مصاعد'],['pools','عقد مسابح'],['civil','عقد دفاع مدني']];
+    return `<div class="pcc-card"><div class="pcc-actions"><div style="flex:1"><label>فلتر المشروع</label><select id="pccFilterProject10185" onchange="projectCommandCenterV10172.filterProject(this.value)"><option value="">كل المشاريع</option>${projects.map(p=>`<option value="${esc(idOf(p))}" ${STATE.filterProjectId===idOf(p)?'selected':''}>${esc(projectName(p)||idOf(p))}</option>`).join('')}</select></div><div style="flex:1"><label>فلتر المشرف</label><select id="pccFilterSupervisor10185" onchange="projectCommandCenterV10172.filterSupervisor(this.value)"><option value="">كل المشرفين</option>${supervisors.map(s=>`<option value="${esc(s.id)}" ${STATE.filterSupervisorId===S(s.id)?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div><div><label>فلتر العقود</label><select id="pccFilterContract10185" onchange="projectCommandCenterV10172.filterContract(this.value)">${contractTypes.map(([id,label])=>`<option value="${esc(id)}" ${STATE.filterContractType===id?'selected':''}>${esc(label)}</option>`).join('')}</select></div><button type="button" class="light" onclick="projectCommandCenterV10172.clearFilters()">مسح الفلاتر</button></div></div>`;
+  }
+
   function ensureStyle(){
     if($('pccStyle10172'))return;
     const st=document.createElement('style'); st.id='pccStyle10172'; st.textContent=`
@@ -287,7 +326,8 @@
     select:id=>{STATE.selectedProjectId=id; render();},
     filterProject:id=>{STATE.filterProjectId=S(id); if(id)STATE.selectedProjectId=S(id); render();},
     filterSupervisor:id=>{STATE.filterSupervisorId=S(id); const rows=filteredProjects(); if(rows[0])STATE.selectedProjectId=idOf(rows[0]); render();},
-    clearFilters:()=>{STATE.filterProjectId=''; STATE.filterSupervisorId=''; render();},
+    filterContract:type=>{STATE.filterContractType=S(type); const rows=filteredProjects(); if(rows[0])STATE.selectedProjectId=idOf(rows[0]); render();},
+    clearFilters:()=>{STATE.filterProjectId=''; STATE.filterSupervisorId=''; STATE.filterContractType=''; render();},
     printCurrent:()=>{if(STATE.tab==='project')api.printProject(STATE.selectedProjectId); else if(STATE.tab==='alerts')api.printAlerts(); else if(STATE.tab==='all')api.printAll(); else printHtml('لوحة مؤشرات المشاريع',bodyHtml());},
     printProject:id=>{const rows=filteredProjects().length?filteredProjects():STATE.projects; const p=STATE.projects.find(x=>idOf(x)===S(id))||rows[0]; if(!p)return; printHtml('ملخص المشروع - '+projectName(p),projectProfileHtml(p,supervisorOf(p),serviceSummary(p),[...missingDataAlerts(p),...contractActivationAlerts(p),...delayAlerts(p)],completeness(p)));},
     printAlerts:()=>printHtml('تقرير التنبيهات والمخاطر',topAlertsHtml(alertsAll())),
