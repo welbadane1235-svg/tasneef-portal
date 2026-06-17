@@ -6,7 +6,7 @@
   if(window.__tasneefAdminTasksV10126) return;
   window.__tasneefAdminTasksV10126=true;
 
-  const VERSION='v10126-admin-tasks-clean-online-rebuild';
+  const VERSION='v10184-admin-tasks-close-approve-notes';
   const SUPABASE_URL='https://zmjdqiswytxlbfgnfjfv.supabase.co';
   const SUPABASE_ANON_KEY='sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb';
   const TABLE='admin_tasks';
@@ -193,6 +193,44 @@
     if(!res.ok) return alert('تعذر تحديث المهمة:\n'+await res.text().catch(()=>String(res.status)));
     await loadTasks();
   }
+  function promptModal(title,label,placeholder,required=true){
+    return new Promise(resolve=>{
+      const id='at26Prompt_'+Date.now();
+      document.body.insertAdjacentHTML('beforeend',`<div id="${id}" class="at26-modal show"><div class="at26-box"><h3>${esc(title)}</h3><div class="at26-box-body"><label>${esc(label)}</label><textarea id="${id}_txt" style="width:100%;min-height:120px;border:1px solid #d6e3df;border-radius:12px;padding:10px;margin-top:8px;direction:rtl" placeholder="${esc(placeholder||'')}"></textarea></div><div class="at26-box-actions"><button class="at26-btn light" id="${id}_cancel">إلغاء</button><button class="at26-btn" id="${id}_ok">اعتماد</button></div></div></div>`);
+      const root=$(id), txt=$(id+'_txt');
+      $(id+'_cancel').onclick=()=>{root.remove(); resolve(null);};
+      $(id+'_ok').onclick=()=>{const v=cleanText(txt.value); if(required&&!v){alert('اكتب البيان المطلوب أولاً'); return;} root.remove(); resolve(v);};
+      setTimeout(()=>txt&&txt.focus(),80);
+    });
+  }
+  function approveDecisionModal(){
+    return new Promise(resolve=>{
+      const id='at26Approve_'+Date.now();
+      document.body.insertAdjacentHTML('beforeend',`<div id="${id}" class="at26-modal show"><div class="at26-box"><h3>اعتماد إغلاق المهمة</h3><div class="at26-box-body"><p class="at26-muted">اختر اعتماد المهمة أو رفض الاعتماد مع كتابة السبب.</p><label>ملاحظة الاعتماد / سبب عدم الاعتماد</label><textarea id="${id}_txt" style="width:100%;min-height:120px;border:1px solid #d6e3df;border-radius:12px;padding:10px;margin-top:8px;direction:rtl" placeholder="اكتب الملاحظة أو السبب"></textarea></div><div class="at26-box-actions"><button class="at26-btn light" id="${id}_cancel">إلغاء</button><button class="at26-btn danger" id="${id}_reject" style="background:#c53030;color:#fff">عدم اعتماد</button><button class="at26-btn" id="${id}_approve">اعتماد</button></div></div></div>`);
+      const root=$(id), txt=$(id+'_txt');
+      $(id+'_cancel').onclick=()=>{root.remove(); resolve(null);};
+      $(id+'_approve').onclick=()=>{const v=cleanText(txt.value); root.remove(); resolve({approved:true,note:v||'تم الاعتماد'});};
+      $(id+'_reject').onclick=()=>{const v=cleanText(txt.value); if(!v){alert('اكتب سبب عدم الاعتماد'); return;} root.remove(); resolve({approved:false,note:v});};
+      setTimeout(()=>txt&&txt.focus(),80);
+    });
+  }
+  async function closeTaskWithAction(id){
+    const t=rows.find(x=>String(x.id)===String(id));
+    const action=await promptModal('إغلاق المهمة','الإجراء الذي تم اتخاذه','مثال: تم تنفيذ المطلوب وإرفاق الصور في القروب',true);
+    if(action===null) return;
+    const oldDetails=S(t&&t.details);
+    const nextDetails=oldDetails.includes('إجراء الإغلاق:')?oldDetails:(oldDetails+'\n\nإجراء الإغلاق: '+action);
+    await updateTask(id,{status:'closed',closed_at:nowIso(),closed_by:userDisplay(),details:nextDetails,approved_note:'إجراء الإغلاق: '+action});
+  }
+  async function approveTaskWithDecision(id){
+    const decision=await approveDecisionModal();
+    if(!decision) return;
+    if(decision.approved){
+      await updateTask(id,{status:'approved',approved_at:nowIso(),approved_by:userDisplay(),approved_note:'تم الاعتماد: '+decision.note});
+    }else{
+      await updateTask(id,{status:'open',approved_at:null,approved_by:null,approved_note:'لم يتم الاعتماد: '+decision.note});
+    }
+  }
 
   function injectCss(){
     if($('at26Style')) return;
@@ -270,10 +308,10 @@
       const actions=[];
       if(t.status==='open' && isToMe(t)) actions.push(`<button class="at26-btn light" data-close="${esc(t.id)}">إغلاق</button>`);
       if(t.status==='closed' && isFromMe(t)) actions.push(`<button class="at26-btn" data-approve="${esc(t.id)}">اعتماد</button>`);
-      return `<tr data-id="${esc(t.id)}"><td>${statusLabel(t.status)}</td><td><b>${esc(t.title)}</b><div class="at26-details">${esc(t.details)}</div></td><td>${esc(t.from_name||t.from_user)}</td><td>${esc(t.to_name||t.to_user)}</td><td>${esc(t.priority)}</td><td>${esc(t.schedule_type)}<br>${formatDate(t.due_at)}</td><td>${formatDate(t.created_at)}</td><td>${formatDate(t.closed_at)}</td><td>${formatDate(t.approved_at)}</td><td>${actions.join(' ')||'—'}</td></tr>`;
+      return `<tr data-id="${esc(t.id)}"><td>${statusLabel(t.status)}</td><td><b>${esc(t.title)}</b><div class="at26-details">${esc(t.details)}${t.approved_note?'<br><br><b>ملاحظة:</b> '+esc(t.approved_note):''}</div></td><td>${esc(t.from_name||t.from_user)}</td><td>${esc(t.to_name||t.to_user)}</td><td>${esc(t.priority)}</td><td>${esc(t.schedule_type)}<br>${formatDate(t.due_at)}</td><td>${formatDate(t.created_at)}</td><td>${formatDate(t.closed_at)}</td><td>${formatDate(t.approved_at)}</td><td>${actions.join(' ')||'—'}</td></tr>`;
     }).join('');
-    body.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>updateTask(b.dataset.close,{status:'closed',closed_at:nowIso(),closed_by:userDisplay()}));
-    body.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>updateTask(b.dataset.approve,{status:'approved',approved_at:nowIso(),approved_by:userDisplay()}));
+    body.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeTaskWithAction(b.dataset.close));
+    body.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>approveTaskWithDecision(b.dataset.approve));
   }
   function openPage(){
     ensureNav(); ensureSection();

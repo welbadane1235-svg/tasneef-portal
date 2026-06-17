@@ -2,7 +2,7 @@
    Read-only reporting module. Improves project fields + supervisor phone lookup. */
 (function(){
   'use strict';
-  const VERSION='v10181-project-command-center';
+  const VERSION='v10184-project-command-center-open-fix';
   const STATE={loaded:false,tab:'dashboard',projects:[],users:[],contracts:[],contractServices:[],annualServices:[],projectServices:[],serviceSchedules:[],smartContracts:[],tickets:[],selectedProjectId:'',filterProjectId:'',filterSupervisorId:'',lastLoadedAt:''};
   const $=id=>document.getElementById(id);
   const A=v=>Array.isArray(v)?v:[];
@@ -294,7 +294,42 @@
     printAll:()=>printHtml('ملخص كل المشاريع',allProjectsTab())
   };
   window.projectCommandCenterV10172=api;
-  function boot(){ensurePage();}
+  function attachNavHandlers(){
+    try{
+      document.querySelectorAll('.nav,button').forEach(btn=>{
+        const t=S(btn.textContent);
+        if(!/مركز متابعة المشاريع/.test(t) || btn.__pcc10184Bound) return;
+        btn.__pcc10184Bound=true;
+        btn.onclick=function(ev){
+          try{ if(ev){ev.preventDefault(); ev.stopPropagation();} }catch(_){}
+          document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden'));
+          ensurePage().classList.remove('hidden');
+          document.querySelectorAll('.nav').forEach(n=>n.classList.remove('active'));
+          btn.classList.add('active');
+          api.open().catch(e=>{ensurePage().innerHTML=`<div class="pcc-shell"><div class="pcc-card"><h3>تعذر فتح مركز متابعة المشاريع</h3><p>${esc(e.message||e)}</p><button onclick="projectCommandCenterV10172.reload()">إعادة المحاولة</button></div></div>`;});
+          return false;
+        };
+      });
+    }catch(e){console.warn('pcc attach nav failed',e);}
+  }
+  function patchShowPage(){
+    if(window.__pccShowPagePatched10184) return;
+    window.__pccShowPagePatched10184=true;
+    const old=window.showPage;
+    window.showPage=function(id,btn){
+      if(id==='projectCommandCenter'){
+        document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden'));
+        ensurePage().classList.remove('hidden');
+        document.querySelectorAll('.nav').forEach(n=>n.classList.remove('active'));
+        if(btn) btn.classList.add('active');
+        api.open().catch(e=>{ensurePage().innerHTML=`<div class="pcc-shell"><div class="pcc-card"><h3>تعذر فتح مركز متابعة المشاريع</h3><p>${esc(e.message||e)}</p><button onclick="projectCommandCenterV10172.reload()">إعادة المحاولة</button></div></div>`;});
+        return;
+      }
+      return typeof old==='function'?old.apply(this,arguments):undefined;
+    };
+    try{showPage=window.showPage;}catch(_){}
+  }
+  function boot(){ensurePage(); patchShowPage(); attachNavHandlers(); setTimeout(attachNavHandlers,800); setTimeout(attachNavHandlers,2500);}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot); else boot(); window.addEventListener('load',boot);
   console.log('Tasneef '+VERSION+' loaded');
 })();
