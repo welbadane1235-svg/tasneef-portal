@@ -2,7 +2,7 @@
    Read-only reporting module. Improves project fields + supervisor phone lookup. */
 (function(){
   'use strict';
-  const VERSION='v10188-project-command-center-root-services-contracts';
+  const VERSION='v10185-project-command-center-filter-contract-fix';
   const STATE={loaded:false,tab:'dashboard',projects:[],users:[],contracts:[],contractServices:[],annualServices:[],projectServices:[],serviceSchedules:[],smartContracts:[],tickets:[],selectedProjectId:'',filterProjectId:'',filterSupervisorId:'',filterContractType:'',lastLoadedAt:''};
   const $=id=>document.getElementById(id);
   const A=v=>Array.isArray(v)?v:[];
@@ -118,53 +118,18 @@
     const pid=idOf(p), pn=projectName(p);
     return STATE.contracts.filter(c=>rowProjectId(c)===pid || rowProjectName(c)===pn || S(field(c,['project'],''))===pn).map(c=>S(field(c,['id','contract_id','uuid']))).filter(Boolean);
   }
-  function truthyExplicit(v){
-    const t=low(v);
-    if(v===true || v===1) return true;
-    if(v===false || v===0) return false;
-    if(/^(true|yes|y|1|علينا|نعم|مفعل|فعال|ساري|active|enabled)$/i.test(t)) return true;
-    if(/^(false|no|n|0|لا|ليس علينا|مو علينا|غير علينا|غير مفعل|inactive|disabled)$/i.test(t)) return false;
-    return null;
-  }
-  function contractState(r){
-    r=r||{};
-    const keys=Object.keys(r||{});
-    const hasAny=keys.some(k=>S(r[k])!=='' && S(r[k])!=='null' && S(r[k])!=='undefined');
-    if(!hasAny) return {scope:'غير محدد',status:'غير محدد',required:0,done:0,remaining:0,late:0,active:false,noData:true};
-    const text=low([r.scope,r.contract_scope,r.coverage,r.contract_coverage,r.status,r.state,r.contract_status,r.activation_status,r.note,r.notes,r.description,r.onUs,r.on_us,r.ours,r.is_ours].map(S).join(' '));
-    if(/مو علينا|ليس علينا|غير علينا|not ours|not included|excluded/.test(text) || truthyExplicit(r.onUs??r.on_us??r.onus??r.ours??r.is_ours)===false){
-      return {scope:'مو علينا',status:'مو علينا',required:0,done:0,remaining:0,late:0,active:false,notOurs:true};
-    }
-    const visits=N(r.visits||r.visit_count||r.count||r.required_count||r.required||r.total||0);
-    const done=A(r.done).length || N(r.done_count||r.completed_count||r.executed_count||r.done||r.completed||0);
-    const explicitOnUs = truthyExplicit(r.onUs??r.on_us??r.onus??r.ours??r.is_ours);
-    const explicitActive = /active|enabled|فعال|مفعل|ساري|علينا/.test(text) || explicitOnUs===true;
-    if(/علينا\s*كامل|كامل|مكتمل|completed|done/.test(text)){
-      const req=Math.max(1,visits||done||1); return {scope:'علينا كامل',status:'علينا كامل',required:req,done:Math.max(done,req),remaining:0,late:0,active:true};
-    }
-    if(/علينا\s*ناقص|ناقص|غير مكتمل|partial|incomplete/.test(text)){
-      const req=Math.max(1,visits||1); const rem=Math.max(1,req-done); return {scope:'علينا ناقص',status:'علينا ناقص',required:req,done,remaining:rem,late:0,active:true};
-    }
-    if(!explicitActive && visits<=0 && done<=0){
-      return {scope:'غير محدد',status:'غير محدد',required:0,done:0,remaining:0,late:0,active:false,noData:false};
-    }
-    const req=Math.max(1,visits||done||1);
-    const rem=Math.max(0,req-done);
-    return {scope:rem>0?'علينا ناقص':'علينا كامل',status:rem>0?'علينا ناقص':'علينا كامل',required:req,done,remaining:rem,late:0,active:true};
-  }
   function smartServiceRowsForProject(p){
     const rec=smartRecordForProject(p);
     const out=[];
     const pid=idOf(p), pn=projectName(p);
     const contracts=rec.contracts||rec.core||{};
-    const coreMap=[['elevators','صيانة مصاعد'],['pools','صيانة مسابح'],['civilDefense','الدفاع المدني'],['civil_defense','الدفاع المدني']];
-    coreMap.forEach(([k,label])=>{
-      const r=contracts&&contracts[k]||{};
-      const hasData=Object.keys(r||{}).some(x=>S(r[x])!=='' && S(r[x])!=='false' && S(r[x])!=='0') || (k in (contracts||{}));
-      const st=contractState(r);
-      if(hasData || ['elevators','pools','civilDefense'].includes(k)){
-        out.push({project_id:pid,project_name:pn,service_name:label,required_count:st.required,completed_count:st.done,due_date:S(r.end||r.to||r.contract_end||r.next_date||''),status:st.status,contract_scope:st.scope,remaining:st.remaining,late_count:st.late,_smart:true,_source:'عقد'});
-      }
+    const coreNames={elevators:'صيانة مصاعد',pools:'صيانة مسابح',civilDefense:'الدفاع المدني',civil_defense:'الدفاع المدني'};
+    Object.keys(contracts||{}).forEach(k=>{
+      const r=contracts[k]||{}; const service=coreNames[k]||serviceKey(k);
+      const visits=N(r.visits||r.visit_count||r.count||0);
+      const done=A(r.done).length || N(r.done_count||r.completed_count||0);
+      const active=!!(r.onUs??r.on_us) || S(r.company||r.company_name||r.phone||r.start||r.end) || visits>0;
+      if(active) out.push({project_id:pid,project_name:pn,service_name:service,required_count:Math.max(1,visits||1),completed_count:done,due_date:S(r.end||r.next_date||''),status:(done>=Math.max(1,visits||1))?'مكتمل':(active?'مستمر':'غير مفعل'),_smart:true,_source:'عقد'});
     });
     A(rec.annual).forEach(a=>{
       const visits=Math.max(1,N(a.visits||a.visit_count||a.required_count||1));
@@ -226,17 +191,13 @@
     Object.values(groups).forEach(g=>{
       const dates=g.rows.map(dueDate).filter(Boolean).sort();
       const todayStr=today();
-      const contractScope=g.rows.map(r=>S(r.contract_scope)).filter(Boolean)[0]||'';
-      const explicitLate=g.rows.reduce((a,r)=>a+N(field(r,['late_count','delayed_count','overdue_count'],0)),0);
-      const lateRows=explicitLate || g.rows.filter(r=>dueDate(r) && dueDate(r).slice(0,10)<todayStr && completedCount(r)<=0).length;
+      const lateRows=g.rows.filter(r=>dueDate(r) && dueDate(r).slice(0,10)<todayStr && completedCount(r)<=0).length;
       const ticketsDone=ticketsForProjectService(p,g.service).filter(t=>/done|closed|completed|منجز|مغلق|تم/.test(low(field(t,['status','state'],'')))).length;
       if(ticketsDone>0)g.done=Math.max(g.done,ticketsDone);
       g.remaining=Math.max(0,g.required-g.done);
       g.late=lateRows;
       g.last=dates.length?dates[dates.length-1].slice(0,10):'-';
-      if(contractScope==='مو علينا')g.status='مو علينا';
-      else if(contractScope)g.status=contractScope;
-      else if(g.late>0)g.status='متأخر'; else if(g.remaining>0)g.status='مستمر'; else g.status='مكتمل';
+      if(g.late>0)g.status='متأخر'; else if(g.remaining>0)g.status='مستمر'; else g.status='مكتمل';
     });
     return Object.values(groups).sort((a,b)=>a.service.localeCompare(b.service,'ar'));
   }
@@ -245,28 +206,17 @@
     const rows=[...relatedRowsForProject(p),...STATE.contracts.filter(c=>contractIdsForProject(p).includes(S(field(c,['id','contract_id','uuid']))))];
     return rows.some(r=>patterns.some(re=>re.test(low([serviceName(r),field(r,['name','title','description','contract_type','maintenance_type','notes'],'')].map(S).join(' ')))));
   }
-  function smartContractStateFor(p,key){
-    const rec=smartRecordForProject(p), contracts=rec.contracts||rec.core||{};
-    const r=contracts&&contracts[key]||{};
-    return contractState(r);
-  }
   function contractActivationAlerts(p){
     const alerts=[];
     const specs=[
-      {name:'عقد صيانة المصاعد',patterns:[/مصعد|elevator|lift/],keys:['elevator_contract_status','elevator_status','lift_contract_status','maintenance_elevator_status'],smart:'elevators'},
-      {name:'عقد صيانة المسابح',patterns:[/مسبح|pool/],keys:['pool_contract_status','pool_status','swimming_pool_contract_status'],smart:'pools'},
-      {name:'عقد الدفاع المدني',patterns:[/دفاع|حريق|fire|civil/],keys:['fire_contract_status','civil_defense_status','fire_safety_status','defense_contract_status'],smart:'civilDefense'}
+      {name:'عقد صيانة المصاعد',patterns:[/مصعد|elevator|lift/],keys:['elevator_contract_status','elevator_status','lift_contract_status','maintenance_elevator_status']},
+      {name:'عقد صيانة المسابح',patterns:[/مسبح|pool/],keys:['pool_contract_status','pool_status','swimming_pool_contract_status']},
+      {name:'عقد الدفاع المدني',patterns:[/دفاع|حريق|fire|civil/],keys:['fire_contract_status','civil_defense_status','fire_safety_status','defense_contract_status']}
     ];
     specs.forEach(s=>{
-      const st=smartContractStateFor(p,s.smart);
-      if(st.scope==='مو علينا') return;
       const val=S(field(p,s.keys,''));
-      const exists=hasContractService(p,s.patterns) || val || !st.noData;
-      if(st.scope==='علينا كامل') return;
-      if(st.scope==='علينا ناقص'){
-        alerts.push({project:p,type:'عقد علينا ناقص',field:s.name,priority:'عالية',action:'استكمال بيانات العقد أو تنفيذ المتبقي'}); return;
-      }
-      if(!exists || (!st.active && !isActiveStatus(val))) alerts.push({project:p,type:'عقد غير مفعل',field:s.name,priority:'عالية',action:'تفعيل أو تحديث حالة العقد'});
+      const exists=hasContractService(p,s.patterns) || val;
+      if(!exists || !isActiveStatus(val)) alerts.push({project:p,type:'عقد غير مفعل',field:s.name,priority:'عالية',action:'تفعيل أو تحديث حالة العقد'});
     });
     return alerts;
   }
@@ -294,8 +244,6 @@
   }
   function projectHasContractType(p,type){
     const spec=contractTypeSpec(type); if(!spec)return true;
-    const smartKey=type==='elevators'?'elevators':type==='pools'?'pools':type==='civil'?'civilDefense':'';
-    if(smartKey){ const rec=smartRecordForProject(p), contracts=rec.contracts||rec.core||{}; if(contracts && Object.prototype.hasOwnProperty.call(contracts,smartKey)) return true; }
     const rows=[...relatedRowsForProject(p),...projectRelatedContracts(p)];
     return rows.some(r=>{
       const text=[

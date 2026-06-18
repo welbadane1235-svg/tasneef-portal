@@ -6,7 +6,7 @@
   if(window.__tasneefAdminTasksV10126) return;
   window.__tasneefAdminTasksV10126=true;
 
-  const VERSION='v10188-admin-tasks-root-close-approve-reopen';
+  const VERSION='v10184-admin-tasks-close-approve-notes';
   const SUPABASE_URL='https://zmjdqiswytxlbfgnfjfv.supabase.co';
   const SUPABASE_ANON_KEY='sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb';
   const TABLE='admin_tasks';
@@ -189,18 +189,8 @@
   async function updateTask(id,patch){
     patch=Object.assign({},patch,{updated_at:nowIso()});
     Object.keys(patch).forEach(k=>{ if(patch[k]==='') patch[k]=null; });
-    let res=await api('/rest/v1/'+TABLE+'?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(patch)});
-    if(!res.ok){
-      const tx=await res.text().catch(()=>String(res.status));
-      if(/schema cache|column|Could not find/i.test(tx)){
-        const safe={status:patch.status, details:patch.details, updated_at:patch.updated_at};
-        Object.keys(safe).forEach(k=>{ if(safe[k]===undefined) delete safe[k]; });
-        res=await api('/rest/v1/'+TABLE+'?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(safe)});
-        if(!res.ok) return alert('تعذر تحديث المهمة:\n'+await res.text().catch(()=>String(res.status)));
-      }else{
-        return alert('تعذر تحديث المهمة:\n'+tx);
-      }
-    }
+    const res=await api('/rest/v1/'+TABLE+'?id=eq.'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify(patch)});
+    if(!res.ok) return alert('تعذر تحديث المهمة:\n'+await res.text().catch(()=>String(res.status)));
     await loadTasks();
   }
   function promptModal(title,label,placeholder,required=true){
@@ -240,16 +230,6 @@
     }else{
       await updateTask(id,{status:'open',approved_at:null,approved_by:null,approved_note:'لم يتم الاعتماد: '+decision.note});
     }
-  }
-
-  async function reopenTaskWithNote(id){
-    const t=rows.find(x=>String(x.id)===String(id));
-    const note=await promptModal('إعادة فتح المهمة','سبب إعادة الفتح / ملاحظة المراجعة','مثال: الإغلاق غير كافٍ، يلزم إرفاق صور التنفيذ أو استكمال الإجراء',true);
-    if(note===null) return;
-    const oldDetails=S(t&&t.details);
-    const stamp=new Date().toLocaleString('ar-SA');
-    const nextDetails=oldDetails+'\n\nإعادة فتح بتاريخ '+stamp+': '+note;
-    await updateTask(id,{status:'open',closed_at:null,closed_by:null,approved_at:null,approved_by:null,approved_note:'أعيد فتح المهمة: '+note,details:nextDetails});
   }
 
   function injectCss(){
@@ -327,14 +307,11 @@
     body.innerHTML=list.map(t=>{
       const actions=[];
       if(t.status==='open' && isToMe(t)) actions.push(`<button class="at26-btn light" data-close="${esc(t.id)}">إغلاق</button>`);
-      if(t.status==='closed' && isFromMe(t)) actions.push(`<button class="at26-btn" data-approve="${esc(t.id)}">اعتماد</button><button class="at26-btn light" data-reopen="${esc(t.id)}">إعادة فتح</button>`);
-      if(t.status==='approved' && isFromMe(t)) actions.push(`<button class="at26-btn light" data-reopen="${esc(t.id)}">إعادة فتح</button>`);
-      const closedAction=(S(t.details).match(/إجراء الإغلاق:[\s\S]*/)||[''])[0];
-      return `<tr data-id="${esc(t.id)}"><td>${statusLabel(t.status)}</td><td><b>${esc(t.title)}</b><div class="at26-details">${esc(t.details)}${t.approved_note?'<br><br><b>ملاحظة الاعتماد:</b> '+esc(t.approved_note):''}</div></td><td>${esc(t.from_name||t.from_user)}</td><td>${esc(t.to_name||t.to_user)}</td><td>${esc(t.priority)}</td><td>${esc(t.schedule_type)}<br>${formatDate(t.due_at)}</td><td>${formatDate(t.created_at)}</td><td>${formatDate(t.closed_at)}</td><td>${formatDate(t.approved_at)}</td><td>${actions.join(' ')||'—'}</td></tr>`;
+      if(t.status==='closed' && isFromMe(t)) actions.push(`<button class="at26-btn" data-approve="${esc(t.id)}">اعتماد</button>`);
+      return `<tr data-id="${esc(t.id)}"><td>${statusLabel(t.status)}</td><td><b>${esc(t.title)}</b><div class="at26-details">${esc(t.details)}${t.approved_note?'<br><br><b>ملاحظة:</b> '+esc(t.approved_note):''}</div></td><td>${esc(t.from_name||t.from_user)}</td><td>${esc(t.to_name||t.to_user)}</td><td>${esc(t.priority)}</td><td>${esc(t.schedule_type)}<br>${formatDate(t.due_at)}</td><td>${formatDate(t.created_at)}</td><td>${formatDate(t.closed_at)}</td><td>${formatDate(t.approved_at)}</td><td>${actions.join(' ')||'—'}</td></tr>`;
     }).join('');
     body.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeTaskWithAction(b.dataset.close));
     body.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>approveTaskWithDecision(b.dataset.approve));
-    body.querySelectorAll('[data-reopen]').forEach(b=>b.onclick=()=>reopenTaskWithNote(b.dataset.reopen));
   }
   function openPage(){
     ensureNav(); ensureSection();
