@@ -152,7 +152,7 @@
   function installSmartButton(){const sec=serviceSection(); if(!sec||$('[data-v10108-smart-print]')) return; const head=sec.querySelector('.table-head .row-actions')||sec.querySelector('.table-head')||sec; const btn=document.createElement('button'); btn.type='button'; btn.className='light'; btn.dataset.v10108SmartPrint='1'; btn.textContent='جدول ذكي'; btn.onclick=window.printContractServicesSmartV10108; head.insertBefore(btn,head.firstChild);}
 
   // ===== Orders filtered print =====
-  const ORDER_HEADERS=['رقم الطلب','رقم الطلب بالجروب','تاريخ الطلب','وقت الطلب','مرسل الطلب','المشروع','نوع العقار','رقم الشقة','اسم العميل','رقم العميل','المنفذ','التفاصيل','ملاحظات','تخص','تاريخ التنفيذ','كيفية التنفيذ','حالة التنفيذ','تقرير','السعر (شامل الضريبة)','الضريبة 15%','السعر قبل الضريبة','التكلفة','الربح','حالة السداد','رقم الفاتورة','فوترة بالسيستم'];
+  const ORDER_HEADERS=['رقم الطلب','رقم الطلب بالجروب','تاريخ الطلب','وقت الطلب','مرسل الطلب','المشروع','نوع العقار','رقم الشقة','اسم العميل','رقم العميل','المنفذ','التفاصيل','ملاحظات','تخص','تاريخ التنفيذ','كيفية التنفيذ','حالة التنفيذ','تقرير','السعر (شامل الضريبة)','الضريبة 15%','السعر قبل الضريبة','التكلفة','الربح','حالة السداد','الإيصال','رقم الفاتورة','فوترة بالسيستم'];
   function readOrders(){try{return A(JSON.parse(localStorage.getItem('tasneef_orders_v233')||'[]'));}catch(_){return []}}
   function ofield(r,h){return S(r?.[h] ?? '');}
   function orderDate(r){return ofield(r,'تاريخ الطلب')||S(r.order_date||r.created_at).slice(0,10);}
