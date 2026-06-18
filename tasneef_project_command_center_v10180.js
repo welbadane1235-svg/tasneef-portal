@@ -2,7 +2,7 @@
    Read-only reporting module. Improves project fields + supervisor phone lookup. */
 (function(){
   'use strict';
-  const VERSION='v10186-project-command-center-true-data';
+  const VERSION='v10188-project-command-center-sql-seed';
   const STATE={loaded:false,tab:'dashboard',projects:[],users:[],contracts:[],contractServices:[],annualServices:[],projectServices:[],serviceSchedules:[],smartContracts:[],tickets:[],orders:[],selectedProjectId:'',filterProjectId:'',filterSupervisorId:'',filterContractType:'',lastLoadedAt:''};
   const $=id=>document.getElementById(id);
   const A=v=>Array.isArray(v)?v:[];
@@ -103,7 +103,8 @@
   }
   async function load(force){
     if(STATE.loaded&&!force)return;
-    const [projects,users,users2,contracts,contracts2,cs,cs2,annual,annual2,ps,schedules,smartContracts,tickets,orders]=await Promise.all([
+    const [seedProjects,projects,users,users2,contracts,contracts2,cs,cs2,annual,annual2,ps,schedules,smartContracts,tickets,orders]=await Promise.all([
+      table('project_command_center_seed','*',8000),
       table('projects','*',8000),
       table('app_users','*',5000),
       table('users','*',5000),
@@ -119,7 +120,7 @@
       table('tickets','*',10000),
       table('orders_shared','*',12000)
     ]);
-    STATE.projects=mergeRows([...projectLocalRows(),...projects], p=>idOf(p)||projectName(p));
+    STATE.projects=mergeRows([...projectLocalRows(),...projects,...seedProjects], p=>idOf(p)||projectName(p));
     STATE.users=mergeRows([...usersLocalRows(),...users,...users2], u=>S(field(u,['id','user_id','uuid','username','email','full_name','name'],'')));
     STATE.contracts=mergeRows([...contracts,...contracts2], c=>S(field(c,['id','contract_id','uuid'],''))||rowProjectId(c)||rowProjectName(c));
     STATE.contractServices=[...cs,...cs2];

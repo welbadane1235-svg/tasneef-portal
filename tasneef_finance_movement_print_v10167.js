@@ -8,7 +8,7 @@
   if(window.__tasneefFinanceMovementFiltersSyncV10165) return;
   window.__tasneefFinanceMovementFiltersSyncV10165 = true;
 
-  const VERSION='v10165-finance-voucher-inv-order-signatures';
+  const VERSION='v10149-finance-voucher-tax-fix';
   const $=id=>document.getElementById(id);
   const A=v=>Array.isArray(v)?v:[];
   const S=v=>String(v??'').trim();
@@ -70,6 +70,24 @@
     const meta=safeJson(m&&m.notes)||{};
     if(N(meta.beforeVat)>0) return N(meta.beforeVat);
     return N(m&&m.quantity)*movementUnitCost(m);
+  }
+  function movementTaxMode(m,item){
+    const meta=safeJson(m&&m.notes)||{};
+    const raw=S(meta.taxMode||meta.tax_mode||m&&m.tax_mode||m&&m.taxMode||item&&item.tax_mode||item&&item.taxMode||item&&item.vat_mode||item&&item.vatMode||'before').toLowerCase();
+    if(['none','no','zero','0','بدون','بدون ضريبة','غير خاضع'].includes(raw)) return 'none';
+    if(['after','included','include','شامل','شامل الضريبة'].includes(raw)) return 'after';
+    return 'before';
+  }
+  function movementTax(m,item,net){
+    const meta=safeJson(m&&m.notes)||{};
+    const mode=movementTaxMode(m,item);
+    if(mode==='none') return 0;
+    if(meta.vat!==undefined && meta.vat!==null && S(meta.vat)!==''){
+      const totalBefore=N(meta.beforeVat);
+      if(totalBefore>0 && N(net)>0) return N(meta.vat)*(N(net)/totalBefore);
+      return N(meta.vat);
+    }
+    return N(net)*VAT;
   }
   function movementDistributionRows(m){
     const meta=safeJson(m&&m.notes)||{};
@@ -355,12 +373,12 @@
     const now=new Date().toLocaleString('ar-SA');
     const totalQty=rows.reduce((a,r)=>a+N(r.quantity),0);
     const totalNet=rows.reduce((a,r)=>a+movementNet(r),0);
-    const totalTax=rows.reduce((a,r)=>a+(movementNet(r)*VAT),0);
+    const totalTax=rows.reduce((a,r)=>{const item=officialItemForMovement(r)||{}; const net=movementNet(r); return a+movementTax(r,item,net);},0);
     const totalGross=totalNet+totalTax;
     const isIn=isInputVoucher(rows);
     const isOut=isOutVoucher(rows);
     const needsProjectCurrent=isProjectUseVoucher(rows);
-    const needsOutCurrent=isOut || needsProjectCurrent;
+    const needsOutCurrent=needsProjectCurrent; // سند الصرف لا يعرض كمية حالية مضللة؛ الكمية موجودة في عمود الكمية
     const supervisor=filters.supervisor ? ((supervisorOptions().find(([v])=>v===filters.supervisor)||[])[1] || filters.supervisor) : ([...new Set(rows.map(r=>movementStaffName(r)).filter(Boolean))].join(' / ')||'الكل');
     const supplier=isIn ? supplierNameForRows(rows) : supervisor;
     const invoiceNo=invoiceSystemNo(rows);
@@ -371,7 +389,7 @@
       const qty=N(r.quantity);
       const net=movementNet(r);
       const unit=movementUnitCost(r);
-      const tax=net*VAT;
+      const tax=movementTax(r,item,net);
       const gross=net+tax;
       return `<tr>
         <td>${idx+1}</td>
