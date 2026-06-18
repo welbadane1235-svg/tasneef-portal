@@ -192,6 +192,34 @@
     delete out.updated_by; delete out.source; delete out.created_by;
     return out;
   }
+
+  function clearOrderEntryFormAfterSave(){
+    // v10145: بعد حفظ التعديل نخلي نموذج الإدخال فاضي حتى يعرف المستخدم أن الحفظ تم.
+    try{
+      const receiptName=$('orderReceiptNameV233');
+      const receiptFile=$('orderReceiptFileV233');
+      const preserveScroll=window.scrollY;
+      if(typeof window.clearOrderFormV233==='function' && !window.clearOrderFormV233.__v10145Busy){
+        window.clearOrderFormV233.__v10145Busy=true;
+        try{ window.clearOrderFormV233(); }finally{ window.clearOrderFormV233.__v10145Busy=false; }
+      }else{
+        const box=document.querySelector('.orders-form-card-v233') || document.getElementById('orders');
+        if(box){
+          box.querySelectorAll('input,textarea,select').forEach(el=>{
+            if(el.type==='file') el.value='';
+            else if(el.id==='orderNoV233' || el.id==='orderEditIndexV233') el.value='';
+            else if(el.tagName==='SELECT') el.selectedIndex=0;
+            else el.value='';
+          });
+        }
+      }
+      if(receiptFile) receiptFile.value='';
+      if(receiptName) receiptName.textContent='اختياري';
+      const title=$('orderFormTitleV233'); if(title) title.textContent='إضافة أوردر';
+      setTimeout(()=>{ try{ window.scrollTo({top:preserveScroll}); }catch(_){ } },0);
+    }catch(e){ console.warn('clearOrderEntryFormAfterSave failed',e); }
+  }
+
   async function saveOrder(){
     const btn=[...document.querySelectorAll('button')].find(b=>/حفظ\s*الأوردر|حفظ\s*الاوردر/i.test(S(b.textContent)))||document.activeElement;
     try{ if(btn) btn.disabled=true; }catch(_){ }
@@ -211,9 +239,10 @@
       const f=receiptInput(); if(f) f.value='';
       const nm=$('orderReceiptNameV233'); if(nm) nm.textContent=merged[RECEIPT_NAME_KEY]?'مرفق محفوظ: '+merged[RECEIPT_NAME_KEY]:'اختياري';
       if(findReceipt(merged)) receiptCache.set(no,findReceipt(merged));
-      // تحديث فوري: نعيد جلب السيرفر، ثم نطلب من الرسم الحالي إعادة العرض.
+      // تحديث فوري: نعيد جلب السيرفر، ثم نطلب من الرسم الحالي إعادة العرض، وبعدها نفرغ النموذج.
       await refreshOrdersView(true);
-      notify('تم حفظ الأوردر وتحديث السجل','ok');
+      clearOrderEntryFormAfterSave();
+      notify('تم حفظ الأوردر وتحديث السجل وتم تفريغ البيانات','ok');
       return true;
     }catch(e){
       notify('لم يتم حفظ الأوردر:\n'+(e.message||e),'err');
