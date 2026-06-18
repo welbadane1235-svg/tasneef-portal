@@ -4,7 +4,7 @@
 */
 (function(){
   'use strict';
-  const VERSION='v10153-daily-logs-no-camera-no-whatsapp';
+  const VERSION='v10154-daily-logs-camera-whatsapp-restored';
   const SUPABASE_URL='https://zmjdqiswytxlbfgnfjfv.supabase.co';
   const SUPABASE_ANON_KEY='sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb';
   const TABLE='time_logs';
@@ -85,63 +85,63 @@
     try{ if(typeof window.msg==='function') window.msg(text); }catch(_){ }
   }
 
-  let __noExternalUntil=0;
-  function isDailyBtn(el){
-    try{
-      const b=el && el.closest ? el.closest('button') : null;
-      if(!b) return false;
-      const t=S(b.textContent);
-      const inLogs=!!(b.closest('#supLogs') || (document.getElementById('logProject') && document.getElementById('logProject').closest('section')));
-      return inLogs && /دخول الآن|خروج الآن|تسجيل دخول|تسجيل خروج|انصراف/.test(t);
-    }catch(_){return false;}
+
+  function dailyMediaMessage(kind,time){
+    const p=projectInfo();
+    const action=kind==='in'?'تسجيل دخول':'تسجيل خروج';
+    return [
+      'شركة تصنيف لإدارة المرافق',
+      action,
+      'المشرف: '+userName(),
+      'المشروع: '+(p.name||p.id||'-'),
+      'نوع الزيارة: '+visitType(),
+      'التاريخ: '+logDate(),
+      'الوقت: '+displayTime(time||timeNow())
+    ].join('\n');
   }
-  function markNoExternal(ms){ __noExternalUntil=Date.now()+(ms||15000); }
-  function isNoExternalActive(){ return Date.now()<__noExternalUntil || isDailyBtn(document.activeElement); }
-  (function patchDailyNoExternal(){
+  function openDailyCamera(kind){
     try{
-      if(!window.__tasneefDailyNoExternalOpenV10153){
-        window.__tasneefDailyNoExternalOpenV10153=true;
-        const oldOpen=window.open;
-        window.open=function(url){
-          const u=S(url);
-          if(isNoExternalActive() && /wa\.me|whatsapp|api\.whatsapp/i.test(u)){
-            try{ smartToast('تم تسجيل العملية بدون إرسال واتساب','wait'); }catch(_){ }
-            return null;
-          }
-          return oldOpen.apply(window,arguments);
-        };
-      }
+      const input=document.createElement('input');
+      input.type='file'; input.accept='image/*'; input.capture='environment';
+      input.style.position='fixed'; input.style.left='-9999px'; input.style.top='-9999px';
+      input.setAttribute('aria-hidden','true');
+      document.body.appendChild(input);
+      input.onchange=function(){
+        const f=input.files&&input.files[0];
+        if(f){ smartToast((kind==='in'?'تم فتح تصوير الدخول':'تم فتح تصوير الخروج'),'wait'); }
+        setTimeout(()=>{try{input.remove();}catch(_){ }},1000);
+      };
+      input.click();
     }catch(_){ }
+  }
+  function openDailyWhatsapp(kind,time){
     try{
-      const md=navigator.mediaDevices;
-      if(md && md.getUserMedia && !md.__tasneefDailyNoCameraV10153){
-        const oldGet=md.getUserMedia.bind(md);
-        md.__tasneefDailyNoCameraV10153=true;
-        md.getUserMedia=function(){
-          if(isNoExternalActive()){
-            try{ smartToast('تم تسجيل العملية بدون فتح الكاميرا','wait'); }catch(_){ }
-            const Err=window.DOMException || Error;
-            return Promise.reject(new Err('Camera disabled for daily login/logout','NotAllowedError'));
-          }
-          return oldGet.apply(md,arguments);
-        };
-      }
+      const text=dailyMediaMessage(kind,time);
+      const url='https://wa.me/?text='+encodeURIComponent(text);
+      window.open(url,'_blank','noopener');
     }catch(_){ }
-  })();
+  }
+  function shouldOpenMediaOnce(key){
+    const lk=lockRead('media|'+key);
+    if(recent(lk,120000)) return false;
+    lockWrite('media|'+key,{status:'opened'});
+    return true;
+  }
   function installDailyClickGuard(){
-    if(window.__tasneefDailyClickGuardV10153) return;
-    window.__tasneefDailyClickGuardV10153=true;
+    if(window.__tasneefDailyClickGuardV10154) return;
+    window.__tasneefDailyClickGuardV10154=true;
     document.addEventListener('click',function(ev){
       const b=ev.target && ev.target.closest ? ev.target.closest('button') : null;
-      if(!isDailyBtn(b)) return;
+      if(!b) return;
       const t=S(b.textContent);
-      markNoExternal(18000);
-      ev.preventDefault();
-      ev.stopImmediatePropagation();
+      const inLogs=!!(b.closest('#supLogs') || (document.getElementById('logProject') && document.getElementById('logProject').closest('section')));
+      if(!inLogs || !/دخول الآن|خروج الآن|تسجيل دخول|تسجيل خروج|انصراف/.test(t)) return;
+      ev.preventDefault(); ev.stopImmediatePropagation();
       if(/دخول الآن|تسجيل دخول/.test(t)) return checkInSmart();
       if(/خروج الآن|تسجيل خروج|انصراف/.test(t)) return checkOutSmart();
     },true);
   }
+
 
   function buttonBusy(kind,busy){
     const buttons=[...document.querySelectorAll('button')];
@@ -194,12 +194,12 @@
   async function checkInSmart(){
     const key=opKey('in'), l=lockRead(key);
     if(recent(l,120000)){ smartToast(l.status==='done'?'تم تسجيل الدخول':'جاري حفظ تسجيل الدخول، لا تضغط مرة ثانية','wait'); return; }
-    lockWrite(key,{status:'pending'}); buttonBusy('in',true);
+    lockWrite(key,{status:'pending'}); const __openMediaIn=shouldOpenMediaOnce(key); if(__openMediaIn) openDailyCamera('in'); buttonBusy('in',true);
     try{
       const rows=await fetchTodayRows();
       const open=rows.find(r=>hasIn(r)&&!hasOut(r));
-      if(open){ fillForm('in',hasIn(open),open); lockWrite(key,{status:'done'}); smartToast('تم تسجيل الدخول'); return; }
-      const t=timeNow(); const row=await insertCheckIn(t); fillForm('in',t,row); lockWrite(key,{status:'done'}); smartToast('تم تسجيل الدخول');
+      if(open){ fillForm('in',hasIn(open),open); lockWrite(key,{status:'done'}); smartToast('تم تسجيل الدخول'); if(__openMediaIn) openDailyWhatsapp('in',hasIn(open)); return; }
+      const t=timeNow(); const row=await insertCheckIn(t); fillForm('in',t,row); lockWrite(key,{status:'done'}); smartToast('تم تسجيل الدخول'); if(__openMediaIn) openDailyWhatsapp('in',t);
       try{ if(typeof window.renderSupervisorDailySummary==='function') window.renderSupervisorDailySummary(); }catch(_){ }
     }catch(e){ lockClear(key); smartToast('تعذر تسجيل الدخول: '+S(e.message||e),'err'); }
     finally{ buttonBusy('in',false); }
@@ -207,21 +207,21 @@
   async function checkOutSmart(){
     const key=opKey('out'), l=lockRead(key);
     if(recent(l,120000)){ smartToast(l.status==='done'?'تم تسجيل الخروج':'جاري حفظ تسجيل الخروج، لا تضغط مرة ثانية','wait'); return; }
-    lockWrite(key,{status:'pending'}); buttonBusy('out',true);
+    lockWrite(key,{status:'pending'}); const __openMediaOut=shouldOpenMediaOnce(key); if(__openMediaOut) openDailyCamera('out'); buttonBusy('out',true);
     try{
       const rows=await fetchTodayRows();
       const open=rows.find(r=>hasIn(r)&&!hasOut(r));
-      if(open){ const t=timeNow(); const row=await updateCheckOut(open,t); fillForm('out',t,row); lockWrite(key,{status:'done'}); smartToast('تم تسجيل الخروج'); return; }
+      if(open){ const t=timeNow(); const row=await updateCheckOut(open,t); fillForm('out',t,row); lockWrite(key,{status:'done'}); smartToast('تم تسجيل الخروج'); if(__openMediaOut) openDailyWhatsapp('out',t); return; }
       const already=rows.find(r=>hasIn(r)&&hasOut(r));
-      if(already){ fillForm('out',hasOut(already),already); lockWrite(key,{status:'done'}); smartToast('تم تسجيل الخروج'); return; }
+      if(already){ fillForm('out',hasOut(already),already); lockWrite(key,{status:'done'}); smartToast('تم تسجيل الخروج'); if(__openMediaOut) openDailyWhatsapp('out',hasOut(already)); return; }
       lockClear(key); smartToast('لا يوجد تسجيل دخول مفتوح لهذا المشروع اليوم','err');
     }catch(e){ lockClear(key); smartToast('تعذر تسجيل الخروج: '+S(e.message||e),'err'); }
     finally{ buttonBusy('out',false); }
   }
   function install(){
     if(!document.getElementById('logProject')) return;
-    window.supervisorCheckIn=function(){ markNoExternal(18000); return checkInSmart(); };
-    window.supervisorCheckOut=function(){ markNoExternal(18000); return checkOutSmart(); };
+    window.supervisorCheckIn=function(){ return checkInSmart(); };
+    window.supervisorCheckOut=function(){ return checkOutSmart(); };
     installDailyClickGuard();
     // حفظ يدوي بصيغة صحيحة: يحول HH:MM إلى تاريخ + وقت كامل قبل الإرسال إلى Supabase.
     window.saveTimeLog=async function(){
@@ -268,7 +268,7 @@
         try{ if(typeof window.renderTimeLogs==='function') window.renderTimeLogs(); }catch(_){ }
       }catch(e){ lockClear(key); smartToast('تعذر حفظ التسجيل: '+S(e.message||e),'err'); }
     };
-    console.log(VERSION,'installed - login/logout without camera or whatsapp');
+    console.log(VERSION,'installed - login/logout with camera and whatsapp');
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(install,900)); else setTimeout(install,900);
   setTimeout(install,2500);
