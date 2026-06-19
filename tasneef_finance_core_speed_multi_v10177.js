@@ -292,20 +292,20 @@
     host.innerHTML=blocks.map((b,bi)=>{
       const item=resolveBlockItem(b), status=blockStatus(b), after=item?N(item.quantity)+netDelta(b):0, listId='mb10177_list_'+b.id;
       const rows=A(b.rows).map((r,ri)=>`<div class="mb10177-row mb10183-row">
-        <div><label>الكمية</label><input type="number" min="0" step="0.01" id="mb10177_rqty_${b.id}_${ri}" value="${N(r.qty)||''}" oninput="financeMultiBoxesSync10177()"></div>
+        <div><label>الكمية</label><input type="number" min="0" step="0.01" id="mb10177_rqty_${b.id}_${ri}" value="${N(r.qty)||''}" oninput="financeMultiBoxesSyncNoRender10158()" onchange="financeMultiBoxesSync10177()" onblur="financeMultiBoxesSync10177()"></div>
         <div><label>المشروع</label><select id="mb10177_proj_${b.id}_${ri}" onchange="financeMultiBoxesSync10177()">${optionsProjects(r.project_id)}</select></div>
         <div><label>المشرف</label><select id="mb10177_staff_${b.id}_${ri}" onchange="financeMultiBoxesSync10177()">${optionsStaff(r.staff_id)}</select></div>
         <div><label>مركز التكلفة</label><select id="mb10177_center_${b.id}_${ri}" onchange="financeMultiBoxesSync10177()"><option ${r.center==='FM'?'selected':''}>FM</option><option ${r.center==='CN'?'selected':''}>CN</option><option ${r.center==='GENERAL'?'selected':''}>GENERAL</option></select></div>
         <div><label>الحركة</label><select id="mb10177_type_${b.id}_${ri}" onchange="financeMultiBoxesSync10177()"><option value="out" ${r.type==='out'?'selected':''}>صرف</option><option value="consume" ${r.type==='consume'?'selected':''}>مستهلك</option><option value="return" ${r.type==='return'?'selected':''}>مرتجع</option><option value="damaged" ${r.type==='damaged'?'selected':''}>تالف</option><option value="waste" ${r.type==='waste'?'selected':''}>مهدور</option><option value="scrap" ${r.type==='scrap'?'selected':''}>سكراب</option></select></div>
         <div class="mb10183-order"><label>رقم الأوردر</label><input id="mb10177_order_${b.id}_${ri}" value="${esc(r.order_no||'')}" placeholder="اكتب رقم الأوردر" onblur="financeMultiBoxesConfirmOrder10182(this)" onchange="delete this.dataset.confirmedOrder10182; financeMultiBoxesSync10177()"></div>
-        <div class="mb10183-note"><label>ملاحظة</label><input id="mb10177_note_${b.id}_${ri}" value="${esc(r.note||'')}" placeholder="ملاحظة الحركة" oninput="financeMultiBoxesSync10177()"></div>
+        <div class="mb10183-note"><label>ملاحظة</label><input id="mb10177_note_${b.id}_${ri}" value="${esc(r.note||'')}" placeholder="ملاحظة الحركة" oninput="financeMultiBoxesSyncNoRender10158()" onchange="financeMultiBoxesSyncNoRender10158()"></div>
         <button type="button" class="danger" onclick="financeMultiBoxesRemoveDist10177('${b.id}',${ri})">حذف</button>
       </div>`).join('');
       return `<div class="mb10177-box">
         <div class="mb10177-head"><h4>منتج ${bi+1}</h4><span class="mb10177-badge ${status.cls}">${esc(status.txt)}</span></div>
         <div class="mb10177-main">
-          <div><label>اسم المنتج</label><input class="fin-fast-search-input" list="${listId}" id="mb10177_item_${b.id}" value="${esc(b.item_text||(item?productDisplay(item):''))}" placeholder="اكتب اسم المنتج أو الكود" oninput="financeMultiBoxesSync10177()">${datalistProducts(listId)}</div>
-          <div><label>كمية المنتج</label><input type="number" min="0" step="0.01" id="mb10177_qty_${b.id}" value="${N(b.qty)||''}" oninput="financeMultiBoxesSync10177()"></div>
+          <div><label>اسم المنتج</label><input class="fin-fast-search-input" list="${listId}" id="mb10177_item_${b.id}" value="${esc(b.item_text||(item?productDisplay(item):''))}" placeholder="اكتب اسم المنتج أو الكود" oninput="financeMultiBoxesSyncNoRender10158()" onchange="financeMultiBoxesSync10177()" onblur="financeMultiBoxesSync10177()">${datalistProducts(listId)}</div>
+          <div><label>كمية المنتج</label><input type="number" min="0" step="0.01" id="mb10177_qty_${b.id}" value="${N(b.qty)||''}" oninput="financeMultiBoxesSyncNoRender10158()" onchange="financeMultiBoxesSync10177()" onblur="financeMultiBoxesSync10177()"></div>
           <div class="mb10177-kpi"><small>المتوفر</small><b>${item?N(item.quantity):'-'}</b></div>
           <div class="mb10177-kpi"><small>بعد الحركة</small><b>${item?N(after):'-'}</b></div>
           <button type="button" class="danger" onclick="financeMultiBoxesRemoveProduct10177('${b.id}')">حذف المنتج</button>
@@ -316,6 +316,8 @@
     }).join('');
   }
   window.financeMultiBoxesSync10177=function(){syncFromDom(); renderBlocks();};
+  // v10158: sync without re-render while typing so product name/quantity fields do not lose focus or accept one character only.
+  window.financeMultiBoxesSyncNoRender10158=function(){try{syncFromDom();}catch(e){console.warn('multi boxes live sync failed',e);}};
   window.financeMultiBoxesAddProduct10177=function(){syncFromDom(); blocks.push(newBlock()); renderBlocks();};
   window.financeMultiBoxesRemoveProduct10177=function(id){syncFromDom(); blocks=blocks.filter(b=>b.id!==id); ensureInitial(); renderBlocks();};
   window.financeMultiBoxesAddDist10177=function(id){syncFromDom(); const b=blocks.find(x=>x.id===id); if(b)b.rows.push(newDistRow()); renderBlocks();};
