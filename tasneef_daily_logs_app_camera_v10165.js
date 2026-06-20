@@ -4,7 +4,7 @@
 */
 (function(){
   'use strict';
-  const VERSION='v10165-worker-flow-rls-dedup-fix';
+  const VERSION='v10167-worker-delete-clean-filter';
   const SUPABASE_URL='https://zmjdqiswytxlbfgnfjfv.supabase.co';
   const SUPABASE_ANON_KEY='sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb';
   const TABLE='time_logs';
@@ -708,7 +708,15 @@
       const box=document.getElementById('tasneefDailyWorkersTableV10164'); if(!box)return;
       const date=S(document.getElementById('dailyDate')&&document.getElementById('dailyDate').value)||logDate();
       const r=await getClient().from(W_MOV).select('*').eq('movement_date',date).limit(1000); if(r.error){box.innerHTML='<div class="wf64-note">شغل ملف SQL الخاص بحركة العمال حتى تظهر هنا.</div>'; return;}
-      const rows=r.data||[];
+      let rows=r.data||[];
+      // v10167: إذا حُذف سجل التسجيل اليومي، لا تُعرض حركة العمال المرتبطة به.
+      try{
+        const lr=await getClient().from(TABLE).select('id,log_date,created_at,check_in').limit(2000);
+        if(!lr.error){
+          const live=new Set((lr.data||[]).filter(x=>{const dd=S(x.log_date)||S(x.created_at).slice(0,10)||S(x.check_in).slice(0,10); return !dd||dd===date;}).map(x=>S(rowId(x)||x.id)).filter(Boolean));
+          rows=rows.filter(m=>!S(m.time_log_id)||live.has(S(m.time_log_id)));
+        }
+      }catch(_){ }
       box.innerHTML=`<table><thead><tr><th>العامل</th><th>المشرف</th><th>المشروع</th><th>الدخول</th><th>الخروج</th><th>الحالة</th></tr></thead><tbody>${rows.length?rows.map(m=>`<tr><td>${wEsc(m.worker_name)}</td><td>${wEsc(m.supervisor_name)}</td><td>${wEsc(m.project_name||m.group_name)}</td><td>${m.start_at?new Date(m.start_at).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}):'-'}</td><td>${m.end_at?new Date(m.end_at).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}):'-'}</td><td>${m.status==='open'?'يعمل الآن':'مغلق'}</td></tr>`).join(''):'<tr><td colspan="6">لا توجد حركات عمال لهذا التاريخ.</td></tr>'}</tbody></table>`;
     }catch(_){ }
   }

@@ -7,7 +7,7 @@
 */
 (function(){
   'use strict';
-  const VERSION='v10183-finance-core-speed-multi-order-link-core';
+  const VERSION='v10184-finance-core-speed-multi-product-exact-select';
   if(window.__tasneefFinanceCoreSpeedMulti10177 && window.__tasneefFinanceCoreSpeedMulti10177_VERSION===VERSION) return;
   window.__tasneefFinanceCoreSpeedMulti10177=true;
   window.__tasneefFinanceCoreSpeedMulti10177_VERSION=VERSION;
@@ -301,7 +301,15 @@
   }
   function syncFromDom(){
     blocks.forEach(b=>{
-      const txt=S($(`mb10177_item_${b.id}`)?.value); b.item_text=txt; const it=findProductByText(txt)||itemById(b.item_id); if(it)b.item_id=String(it.id);
+      const txt=S($(`mb10177_item_${b.id}`)?.value);
+      b.item_text=txt;
+      const current=itemById(b.item_id);
+      // v10167: لا تغيّر المنتج المختار لمجرد أن النص يشبه منتجاً آخر.
+      // نحافظ على الاختيار بالـ id إذا كان النص هو نفس عرض المنتج المختار، ونبحث فقط عند تغيير النص فعلياً.
+      let it=null;
+      if(current && txt && txt===productDisplay(current)) it=current;
+      else it=findProductByText(txt)||current;
+      if(it)b.item_id=String(it.id);
       b.qty=N($(`mb10177_qty_${b.id}`)?.value)||0;
       b.rows.forEach((r,idx)=>{r.qty=N($(`mb10177_rqty_${b.id}_${idx}`)?.value)||0; r.project_id=S($(`mb10177_proj_${b.id}_${idx}`)?.value); r.staff_id=S($(`mb10177_staff_${b.id}_${idx}`)?.value); r.center=S($(`mb10177_center_${b.id}_${idx}`)?.value)||'FM'; r.type=S($(`mb10177_type_${b.id}_${idx}`)?.value)||'out'; r.order_no=normalizeOrderNo($(`mb10177_order_${b.id}_${idx}`)?.value); r.note=S($(`mb10177_note_${b.id}_${idx}`)?.value);});
     });
@@ -347,7 +355,7 @@
       return !q || d.includes(q) || c.includes(q);
     }).slice(0,10);
     if(!items.length){host.innerHTML='<div class="mb10159-empty">لا يوجد منتج مطابق</div>'; host.classList.add('open'); return;}
-    host.innerHTML=items.map(i=>`<button type="button" class="mb10159-sug-item" onmousedown="event.preventDefault(); financeMultiBoxesSelectProduct10159('${id}','${esc(String(i.id))}')">${esc(i.name||i.product_name||'منتج')}<small>${esc(i.internal_code||i.code||i.product_code||'')} | المتوفر ${N(i.quantity)}</small></button>`).join('');
+    host.innerHTML=items.map(i=>`<button type="button" class="mb10159-sug-item" data-product-id="${esc(String(i.id))}" onmousedown="event.preventDefault(); financeMultiBoxesSelectProduct10159('${id}',this.getAttribute('data-product-id'))"><b>${esc(i.name||i.product_name||'منتج')}</b><small>${esc(itemCode(i)||i.internal_code||i.code||i.product_code||'')} | ${esc(itemDistCode(i)||'')} | المتوفر ${N(i.quantity)}</small></button>`).join('');
     host.classList.add('open');
   }
   window.financeMultiBoxesProductTyping10159=function(id,input,force){
@@ -358,10 +366,14 @@
       input._mb10159Timer=setTimeout(()=>renderProductSuggestions10159(id,input.value), force?0:180);
     }catch(e){console.warn('product typing failed',e);}
   };
+  const mbSelecting10167={};
   window.financeMultiBoxesSelectProduct10159=function(id,productId){
     try{
       const b=blocks.find(x=>x.id===id), item=itemById(productId); if(!b||!item)return;
+      mbSelecting10167[id]=Date.now();
       b.item_id=String(item.id); b.item_text=productDisplay(item);
+      const input=$(`mb10177_item_${id}`); if(input) input.value=b.item_text;
+      const host=$('mb10159_sug_'+id); if(host) host.classList.remove('open');
       renderBlocks();
     }catch(e){console.warn('product select failed',e);}
   };
@@ -369,8 +381,12 @@
     setTimeout(()=>{const host=$('mb10159_sug_'+id); if(host) host.classList.remove('open');},160);
     try{
       const b=blocks.find(x=>x.id===id); if(!b)return;
+      if(mbSelecting10167[id] && Date.now()-mbSelecting10167[id]<900) return;
       b.item_text=S(input.value);
-      const it=findProductByText(b.item_text)||itemById(b.item_id);
+      const current=itemById(b.item_id);
+      let it=null;
+      if(current && b.item_text===productDisplay(current)) it=current;
+      else it=findProductByText(b.item_text)||current;
       if(it){ b.item_id=String(it.id); b.item_text=productDisplay(it); renderBlocks(); }
     }catch(e){console.warn('product blur failed',e);}
   };

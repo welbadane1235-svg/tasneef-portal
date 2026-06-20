@@ -1,9 +1,9 @@
-/* Tasneef v10166 - Daily logs print includes all worker movements */
+/* Tasneef v10167 - Daily logs print filters deleted time logs */
 (function(){
   'use strict';
   const SUPABASE_URL='https://zmjdqiswytxlbfgnfjfv.supabase.co';
   const SUPABASE_ANON_KEY='sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb';
-  const W_MOV='worker_project_movements';
+  const W_MOV='worker_project_movements', TIME_LOGS='time_logs';
   const S=v=>String(v==null?'':v).trim();
   const $=id=>document.getElementById(id);
   const esc=s=>S(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -47,8 +47,15 @@
     try{
       const r=await c.from(W_MOV).select('*').eq('movement_date',date).limit(5000);
       if(r.error) throw r.error;
-      const rows=(r.data||[]).filter(matchesFilter);
-      // لا نربط الطباعة بـ time_log_id حتى لا يسقط عامل واحد؛ نطبع حركة العمال الفعلية حسب التاريخ والفلاتر.
+      let rows=(r.data||[]).filter(matchesFilter);
+      // v10167: لا تطبع عمال سجل يومي تم حذفه. إذا كان time_log_id موجوداً يجب أن يكون السجل الأصلي موجوداً.
+      try{
+        const lr=await c.from(TIME_LOGS).select('id,log_date,created_at,check_in').limit(5000);
+        if(!lr.error){
+          const live=new Set((lr.data||[]).filter(x=>{const dd=S(x.log_date)||S(x.created_at).slice(0,10)||S(x.check_in).slice(0,10); return !dd||dd===date;}).map(x=>S(x.id)).filter(Boolean));
+          rows=rows.filter(m=>!S(m.time_log_id)||live.has(S(m.time_log_id)));
+        }
+      }catch(_){ }
       rows.sort((a,b)=>S(a.supervisor_name).localeCompare(S(b.supervisor_name),'ar')||S(a.project_name||a.group_name).localeCompare(S(b.project_name||b.group_name),'ar')||S(a.worker_name).localeCompare(S(b.worker_name),'ar'));
       return rows;
     }catch(e){ console.warn('worker print load failed',e); return []; }
@@ -72,7 +79,7 @@
       body{font-family:Tahoma,Arial,sans-serif;color:#10231d;margin:28px;background:#fff}h1,h2{color:#0A4033;margin:0 0 12px}.head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:4px solid #0A4033;padding-bottom:14px;margin-bottom:18px}.brand{font-weight:900;font-size:22px}.meta{color:#52645d;line-height:1.9}.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}.kpi{border:1px solid #dde9e5;border-radius:14px;padding:10px;background:#f8fcfa}.kpi small{display:block;color:#66766f}.kpi b{font-size:22px;color:#0A4033}table{width:100%;border-collapse:collapse;margin:10px 0 24px;font-size:12px}th{background:#0A4033;color:#fff;padding:9px;border:1px solid #0A4033}td{padding:8px;border:1px solid #dfe8e5;text-align:center}tr:nth-child(even) td{background:#f7fbfa}.section{break-inside:avoid}.note{color:#66766f;font-size:12px;margin-top:20px}@media print{body{margin:12mm}.no-print{display:none}}
     </style></head><body><div class="head"><div><div class="brand">شركة تصنيف لإدارة المرافق</div><div class="meta">تقرير التسجيلات اليومية شامل عمال المشاريع</div></div><div class="meta">التاريخ: ${esc(date)}<br>وقت الطباعة: ${new Date().toLocaleString('ar-SA')}</div></div>
     <div class="section"><h1>التسجيلات اليومية</h1>${cloneDailyTable()}</div>
-    <div class="section"><h2>عمال التسجيلات اليومية</h2><div class="kpis"><div class="kpi"><small>عدد حركات العمال</small><b>${workers.length}</b></div><div class="kpi"><small>إجمالي دقائق العمال</small><b>${total}</b></div><div class="kpi"><small>إجمالي ساعات العمال</small><b>${fmtM(total)}</b></div></div><table><thead><tr><th>#</th><th>العامل</th><th>المشرف</th><th>المشروع</th><th>نوع الزيارة</th><th>الدخول</th><th>الخروج</th><th>المدة</th><th>الحالة</th></tr></thead><tbody>${workerRows}</tbody></table></div><div class="note">مصدر عمال التسجيلات: جدول حركة العمال الفعلي worker_project_movements، لذلك لا يتم إسقاط أي عامل حتى لو لم يكن مرتبطًا بسجل time_logs.</div><script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>`;
+    <div class="section"><h2>عمال التسجيلات اليومية</h2><div class="kpis"><div class="kpi"><small>عدد حركات العمال</small><b>${workers.length}</b></div><div class="kpi"><small>إجمالي دقائق العمال</small><b>${total}</b></div><div class="kpi"><small>إجمالي ساعات العمال</small><b>${fmtM(total)}</b></div></div><table><thead><tr><th>#</th><th>العامل</th><th>المشرف</th><th>المشروع</th><th>نوع الزيارة</th><th>الدخول</th><th>الخروج</th><th>المدة</th><th>الحالة</th></tr></thead><tbody>${workerRows}</tbody></table></div><div class="note">مصدر عمال التسجيلات: جدول حركة العمال الفعلي، مع استبعاد أي حركة مرتبطة بسجل يومي تم حذفه.</div><script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>`;
   }
   window.exportDailyManagerPDF=async function(){
     const date=S($('dailyDate')&&$('dailyDate').value)||today();
