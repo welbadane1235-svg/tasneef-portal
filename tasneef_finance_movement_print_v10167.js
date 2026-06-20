@@ -900,17 +900,9 @@
     return A(st.movements).filter(m=>S(m.item_id)===id || (code && [m.product_code,m.barcode].map(S).includes(code)) || (!m.item_id && S(m.item_name)===name));
   }
   function qty(item){
-    const rows=movementRowsForItem(item);
-    if(!rows.length) return N(item&&item.quantity);
-    const safeJson=v=>{const t=S(v); if(!t.startsWith('finance_pro_v15:')) return {}; try{return JSON.parse(t.replace('finance_pro_v15:',''))||{};}catch(_){return{};}};
-    const sign=t=>{t=S(t); if(t==='in'||t==='return') return 1; if(['out','consume','waste','damaged','scrap'].includes(t)) return -1; return 0;};
-    let total=N(item&&item.quantity);
-    rows.forEach(m=>{
-      const meta=safeJson(m.notes)||{};
-      const returned=A(meta.distribution).filter(d=>S(d.type)==='return'&&S(m.movement_type)!=='return').reduce((a,d)=>a+N(d.qty),0);
-      total += returned;
-    });
-    return total;
+    // v10172: كرت المنتج يعرض الرصيد الرسمي من جدول inventory_items فقط.
+    // لا نعيد احتساب الرصيد من الحركات هنا حتى لا يظهر رقم مختلف عن عرض المنتج/قاعدة البيانات.
+    return N(item&&item.quantity);
   }
   function officialProducts(){
     const st=state();

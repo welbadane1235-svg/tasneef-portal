@@ -51,7 +51,9 @@
     const inside=productMovements(item).filter(m=>S(m.movement_type)==='in').reduce((a,m)=>a+N(m.quantity),0);
     const out=rows.filter(r=>outTypes.includes(S(r.movement_type))).reduce((a,r)=>a+N(r.quantity),0);
     const ret=q('return'); const consumed=rows.filter(r=>finTypes.includes(S(r.movement_type))).reduce((a,r)=>a+N(r.quantity),0);
-    return {inside,out,ret,consumed,balance:Math.max(0,inside-out)};
+    // v10172: الكمية الحالية في عرض المنتج = الرصيد الرسمي من جدول inventory_items.
+    // الحركات تبقى للتفاصيل فقط حتى لا يظهر في العرض 11 بينما كرت المنتج 2.
+    return {inside,out,ret,consumed,balance:N(item&&item.quantity)};
   }
   function filters(){return {q:S($('finReportSearchV15')?.value).toLowerCase(), product:S($('finReportProductV15')?.value), from:S($('finReportFromV15')?.value), to:S($('finReportToV15')?.value), center:S($('finReportCenterV15')?.value), project:S($('finReportProjectV15')?.value), type:S($('finReportTypeV15')?.value), productClass:S($('finReportProductClassV10169')?.value)};}
   function passDate(m,f){const dt=movementDate(m); if(f.from&&dt<f.from)return false; if(f.to&&dt>f.to)return false; return true;}
