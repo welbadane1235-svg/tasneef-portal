@@ -189,6 +189,15 @@
     if(['material','materials'].includes(low)||['مادة','مواد'].includes(raw)) return 'مادة';
     return raw;
   }
+  function productClassLabel(item,m){
+    const raw=S(item&&(item.product_classification||item.product_class||item.asset_type||item.classification)) || S(m&&(m.product_classification||m.product_class||m.asset_type||m.classification)) || 'منتج';
+    const low=raw.toLowerCase();
+    if(['asset','fixed_asset','أصل','اصل'].includes(low) || ['أصل','اصل'].includes(raw)) return 'أصل';
+    return 'منتج';
+  }
+  function productUnitLabel(item,m){
+    return S(item&&(item.unit||item.unit_name)) || S(m&&(m.unit||m.unit_name)) || 'حبة';
+  }
   function supplierNameForRows(rows){
     const vals=[];
     A(rows).forEach(r=>{
@@ -399,6 +408,8 @@
         ${needsOutCurrent?`<td>${N(currentQtyForOutMovement(r))}</td>`:''}
         ${needsProjectCurrent?`<td>${esc(projectNameForMovement(r))}</td><td>${esc(orderNoForMovement(r))}</td>`:''}
         <td>${esc(productTypeLabel(item,r))}</td>
+        <td>${esc(productClassLabel(item,r))}</td>
+        <td>${esc(productUnitLabel(item,r))}</td>
         <td>${esc(distributorCode(item,r))}</td>
         <td>${qty}</td>
         <td>${money(unit)}</td>
@@ -466,9 +477,11 @@
               ${needsOutCurrent?'<th>الكمية الحالية للصرف</th>':''}
               ${needsProjectCurrent?'<th>اسم المشروع</th><th>الأوردر</th>':''}
               <th>نوع المنتج</th>
+              <th>تصنيف المنتج</th>
+              <th>الوحدة</th>
               <th>كود الموزع</th>
               <th>الكمية</th>
-              <th>سعر الحبة</th>
+              <th>سعر الوحدة</th>
               <th>المجموع قبل الضريبة</th>
               <th>الضريبة</th>
               <th>المجموع بعد الضريبة</th>
@@ -477,7 +490,7 @@
           <tbody>${bodyRows}</tbody>
           <tfoot>
             <tr>
-              <td colspan="${needsProjectCurrent?9:(needsOutCurrent?7:6)}">الإجمالي</td>
+              <td colspan="${needsProjectCurrent?11:(needsOutCurrent?9:8)}">الإجمالي</td>
               <td>${N(totalQty)}</td>
               <td></td>
               <td>${money(totalNet)}</td>
@@ -739,6 +752,7 @@
       code:metaValue(card,'الكود'),
       unit:metaValue(card,'الوحدة') || 'حبة',
       item_type:metaValue(card,'النوع') || 'مادة',
+      product_classification:metaValue(card,'تصنيف المنتج') || 'منتج',
       cost:S(metaValue(card,'سعر قبل الضريبة')).replace(/[^0-9.]/g,'') || '0'
     };
     const official=officialItemByCardData(data);
@@ -748,6 +762,7 @@
       data.code=itemCode(official)||data.code;
       data.unit=S(official.unit||data.unit);
       data.item_type=S(official.item_type||official.type||official.category||data.item_type);
+      data.product_classification=S(official.product_classification||official.product_class||official.asset_type||official.classification||data.product_classification||'منتج');
       data.cost=S(official.unit_cost||official.cost||official.price||official.purchase_price||data.cost||0);
     }
     data.isFallback=!isBigint(data.id) && !isBigint(data.officialId);
@@ -767,6 +782,7 @@
       <div class="fp10157-grid">
         <div><label>اسم المنتج</label><input id="fp10157Name" value="${esc(data.name)}"></div>
         <div><label>نوع المنتج</label><select id="fp10157Type"><option value="مادة">مادة</option><option value="أداة">أداة</option><option value="مكينة">مكينة</option><option value="عدة">عدة</option><option value="غير">غير</option></select></div>
+        <div><label>تصنيف المنتج</label><select id="fp10157Class"><option value="منتج">منتج</option><option value="أصل">أصل</option></select></div>
         <div><label>الوحدة</label><input id="fp10157Unit" value="${esc(data.unit||'حبة')}"></div>
         <div><label>السعر قبل الضريبة</label><input id="fp10157Cost" type="number" min="0" step="0.01" value="${esc(data.cost||0)}"></div>
         <div><label>الكود</label><input id="fp10157Code" value="${esc(data.code||'-')}" readonly></div>
@@ -775,6 +791,7 @@
     </div>`;
     document.body.appendChild(root);
     const type=$('fp10157Type'); if(type) type.value=S(data.item_type)||'مادة';
+    const cls=$('fp10157Class'); if(cls) cls.value=S(data.product_classification)==='أصل'||S(data.product_classification)==='اصل'?'أصل':'منتج';
     root.addEventListener('click',e=>{ if(e.target===root || e.target.closest('[data-close]')) closeModal(); });
     $('fp10157Save').onclick=saveEdit;
   }
@@ -795,7 +812,7 @@
   async function saveEdit(){
     if(!isSystemAdmin()) return alert('هذا الإجراء خاص بإدارة النظام فقط');
     const id=S($('fp10157Id')?.value), officialId=S($('fp10157OfficialId')?.value), oldName=S($('fp10157OldName')?.value);
-    const name=S($('fp10157Name')?.value), type=S($('fp10157Type')?.value)||'مادة', unit=S($('fp10157Unit')?.value)||'حبة', code=S($('fp10157Code')?.value);
+    const name=S($('fp10157Name')?.value), type=S($('fp10157Type')?.value)||'مادة', cls=(S($('fp10157Class')?.value)==='أصل'?'أصل':'منتج'), unit=S($('fp10157Unit')?.value)||'حبة', code=S($('fp10157Code')?.value);
     const cost=Number($('fp10157Cost')?.value||0)||0;
     if(!name) return alert('اسم المنتج مطلوب');
     const c=client(); if(!c||!c.from) return alert('الاتصال بقاعدة البيانات غير جاهز');
@@ -804,14 +821,14 @@
       if(btn){btn.disabled=true; btn.textContent='جاري الحفظ...';}
       const realId=isBigint(officialId)?officialId:(isBigint(id)?id:'');
       if(realId){
-        const patch={name, item_type:type, type:type, category:type, unit, unit_cost:cost, cost:cost, price:cost, purchase_price:cost};
+        const patch={name, item_type:type, type:type, category:type, product_classification:cls, unit, unit_cost:cost, cost:cost, price:cost, purchase_price:cost};
         const res=await c.from('inventory_items').update(patch).eq('id',realId).select('*');
         if(res.error) throw res.error;
       }
       await updateMovementsByCodeOrName(c,{officialId:realId,code,oldName,name});
       // update local state immediately
       const st=state();
-      A(st.items).forEach(i=>{ if((realId&&S(i.id)===S(realId)) || (code&&[i.product_code,i.serial_number,i.barcode,i.supplier_barcode,i.code].map(S).includes(code))){ i.name=name; i.item_type=type; i.type=type; i.category=type; i.unit=unit; i.unit_cost=cost; i.cost=cost; i.price=cost; i.purchase_price=cost; } });
+      A(st.items).forEach(i=>{ if((realId&&S(i.id)===S(realId)) || (code&&[i.product_code,i.serial_number,i.barcode,i.supplier_barcode,i.code].map(S).includes(code))){ i.name=name; i.item_type=type; i.type=type; i.category=type; i.product_classification=cls; i.unit=unit; i.unit_cost=cost; i.cost=cost; i.price=cost; i.purchase_price=cost; } });
       A(st.movements).forEach(m=>{ if((realId&&S(m.item_id)===S(realId)) || (code&&[m.product_code,m.barcode].map(S).includes(code)) || (oldName&&S(m.item_name)===oldName)){ m.item_name=name; } });
       closeModal();
       if(typeof window.financeProLoadV15==='function') await window.financeProLoadV15(true);
@@ -867,6 +884,7 @@
   function itemCode(i){return S(i&&(i.product_code||i.serial_number||i.barcode||i.supplier_barcode||i.code));}
   function itemCost(i){return N(i&&(i.unit_cost||i.cost||i.price||i.purchase_price));}
   function productType(i){const r=S(i&&(i.item_type||i.type||i.category)); const low=r.toLowerCase(); if(['tool','tools','أداة','اداة','عدة','معدات'].includes(low)||['عدة','معدات','أداة','اداة'].includes(r))return 'أداة'; if(['machine','machines','مكينة','ماكينة'].includes(low)||['مكينة','ماكينة'].includes(r))return 'مكينة'; if(['material','materials','مادة','مواد'].includes(low)||['مادة','مواد'].includes(r))return 'مادة'; return r||'مادة';}
+  function productClass(i){const r=S(i&&(i.product_classification||i.product_class||i.asset_type||i.classification)); return (r==='أصل'||r==='اصل'||r.toLowerCase()==='asset')?'أصل':'منتج';}
   function productKeys(obj){const keys=[]; [obj&&obj.id,obj&&obj.item_id,obj&&obj.product_code,obj&&obj.serial_number,obj&&obj.barcode,obj&&obj.supplier_barcode,obj&&obj.distributor_code,obj&&obj.code,obj&&obj.name,obj&&obj.item_name].forEach(v=>{const x=S(v).toLowerCase(); if(x&&!keys.includes(x))keys.push(x);}); return keys;}
   function lockedImageUrl(item){
     if(S(item&&item.image_url)) return S(item.image_url);
@@ -922,7 +940,7 @@
       const qv=qty(i), min=N(i.min_quantity||i.reorder_level||1), low=qv>0&&qv<=min, zero=qv===0;
       const imageUrl=lockedImageUrl(i);
       const img=imageUrl?`<img class="fin-thumb" loading="lazy" src="${esc(imageUrl)}" alt="" onclick="financeProZoomImageV15('${encodeURIComponent(imageUrl)}','${encodeURIComponent(S(i.name))}')">`:'<div class="fin-thumb" style="display:grid;place-items:center;color:#8aa096;font-size:11px">بدون صورة</div>';
-      return `<div class="fin-product-card">${img}<h4>${esc(i.name||'-')}</h4><span class="fin-badge ${zero?'bad':low?'warn':''}">${zero?'رصيد صفر':low?'قارب الانتهاء':'متوفر'}</span><div class="fin-meta"><div><small>الكود</small><b>${esc(itemCode(i)||'-')}</b></div><div><small>الوحدة</small><b>${esc(i.unit||'-')}</b></div><div><small>النوع</small><b>${esc(productType(i))}</b></div><div><small>الكمية</small><b>${N(qv)}</b></div><div><small>سعر قبل الضريبة</small><b>${money(itemCost(i))}</b></div><div><small>بعد الضريبة للوحدة</small><b>${money(itemCost(i)*(1+VAT))}</b></div></div><div class="fin-card-actions"><button type="button" class="light" data-v10113-edit-product="1">تعديل المنتج</button><button type="button" class="fin-show-product-btn" onclick="return financeProShowProductV15('${esc(i.id)}')">عرض المنتج</button>${(typeof window.financeProDeleteProductV15==='function')?`<button type="button" class="danger" onclick="return financeProDeleteProductV15('${esc(i.id)}')">حذف</button>`:''}<label class="light" style="display:inline-flex;align-items:center;justify-content:center;min-width:130px;cursor:pointer;border:1px solid #d8ebe3;border-radius:11px;padding:8px 11px;background:#eef7f3;color:#073d31">تحميل صورة<input type="file" accept="image/*" style="display:none" onchange="financeProUploadProductImageV15('${esc(i.id)}',this)"></label></div></div>`;
+      return `<div class="fin-product-card">${img}<h4>${esc(i.name||'-')}</h4><span class="fin-badge ${zero?'bad':low?'warn':''}">${zero?'رصيد صفر':low?'قارب الانتهاء':'متوفر'}</span><div class="fin-meta"><div><small>الكود</small><b>${esc(itemCode(i)||'-')}</b></div><div><small>الوحدة</small><b>${esc(i.unit||'-')}</b></div><div><small>النوع</small><b>${esc(productType(i))}</b></div><div><small>تصنيف المنتج</small><b>${esc(productClass(i))}</b></div><div><small>الكمية</small><b>${N(qv)}</b></div><div><small>سعر قبل الضريبة</small><b>${money(itemCost(i))}</b></div><div><small>بعد الضريبة للوحدة</small><b>${money(itemCost(i)*(1+VAT))}</b></div></div><div class="fin-card-actions"><button type="button" class="light" data-v10113-edit-product="1">تعديل المنتج</button><button type="button" class="fin-show-product-btn" onclick="return financeProShowProductV15('${esc(i.id)}')">عرض المنتج</button>${(typeof window.financeProDeleteProductV15==='function')?`<button type="button" class="danger" onclick="return financeProDeleteProductV15('${esc(i.id)}')">حذف</button>`:''}<label class="light" style="display:inline-flex;align-items:center;justify-content:center;min-width:130px;cursor:pointer;border:1px solid #d8ebe3;border-radius:11px;padding:8px 11px;background:#eef7f3;color:#073d31">تحميل صورة<input type="file" accept="image/*" style="display:none" onchange="financeProUploadProductImageV15('${esc(i.id)}',this)"></label></div></div>`;
     }).join('')||'<div class="fin-soft">لا توجد منتجات حسب الفلتر.</div>'}</div>`;
     return true;
   }

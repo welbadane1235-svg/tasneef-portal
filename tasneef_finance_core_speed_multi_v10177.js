@@ -7,7 +7,7 @@
 */
 (function(){
   'use strict';
-  const VERSION='v10184-finance-core-speed-multi-product-exact-select';
+  const VERSION='v10185-finance-unit-product-classification';
   if(window.__tasneefFinanceCoreSpeedMulti10177 && window.__tasneefFinanceCoreSpeedMulti10177_VERSION===VERSION) return;
   window.__tasneefFinanceCoreSpeedMulti10177=true;
   window.__tasneefFinanceCoreSpeedMulti10177_VERSION=VERSION;
@@ -31,6 +31,7 @@
   const itemCost=i=>N(i&&(i.unit_cost||i.cost||i.price||i.purchase_price));
   const itemName=i=>S(i&&(i.name||i.item_name||itemCode(i)||i.id));
   const itemType=i=>S(i&&(i.item_type||i.type||i.category))||'مادة';
+  const itemClass=i=>{const v=S(i&&(i.product_classification||i.product_class||i.asset_type||i.classification)); return (v==='أصل'||v==='اصل'||v.toLowerCase()==='asset')?'أصل':'منتج';};
   const productItems=()=>A(st().items).filter(i=>i&&S(i.id));
   const itemById=id=>productItems().find(i=>String(i.id)===String(id));
   const projectName=id=>A(st().projects).find(p=>String(p.id)===String(id))?.name||A(st().projects).find(p=>String(p.id)===String(id))?.project_name||'';
@@ -101,7 +102,7 @@
   }
 
   // 1) تحميل سريع للمنتجات: منع image_url الثقيلة من تعطيل أول فتح للمالية.
-  const FAST_ITEMS_SELECT='id,name,product_code,serial_number,barcode,supplier_barcode,unit,item_type,type,quantity,min_quantity,unit_cost,supplier,category,notes,created_by_name,updated_by_name,updated_at';
+  const FAST_ITEMS_SELECT='id,name,product_code,serial_number,barcode,supplier_barcode,unit,item_type,type,product_classification,quantity,min_quantity,unit_cost,supplier,category,notes,created_by_name,updated_by_name,updated_at';
   const LS_IMAGES='tasneef_finance_product_images_cache_v10177';
   function readImageCache(){try{return JSON.parse(localStorage.getItem(LS_IMAGES)||'{}')||{};}catch(_){return{};}}
   function saveImageCache(map){try{localStorage.setItem(LS_IMAGES,JSON.stringify(map||{}));}catch(_){}}
@@ -229,20 +230,20 @@
           if(q<=0) throw new Error('كمية غير صحيحة للمنتج: '+S(l.name));
           if(oldItem){
             const oldQty=N(oldItem.quantity), oldCost=itemCost(oldItem), newQty=oldQty+q, avg=newQty>0?((oldQty*oldCost)+(q*cost))/newQty:cost;
-            const upd={quantity:newQty,unit_cost:+avg.toFixed(4),supplier:supplier||oldItem.supplier,unit:l.unit||oldItem.unit,item_type:l.item_type||oldItem.item_type,type:l.item_type||oldItem.type,product_code:l.code||oldItem.product_code,serial_number:l.code||oldItem.serial_number,barcode:l.code||oldItem.barcode,supplier_barcode:l.distributor_code||oldItem.supplier_barcode,min_quantity:N(l.min_quantity)||N(oldItem.min_quantity)||1};
+            const upd={quantity:newQty,unit_cost:+avg.toFixed(4),supplier:supplier||oldItem.supplier,unit:l.unit||oldItem.unit,item_type:l.item_type||oldItem.item_type,type:l.item_type||oldItem.type,product_classification:itemClass(oldItem),product_code:l.code||oldItem.product_code,serial_number:l.code||oldItem.serial_number,barcode:l.code||oldItem.barcode,supplier_barcode:l.distributor_code||oldItem.supplier_barcode,min_quantity:N(l.min_quantity)||N(oldItem.min_quantity)||1};
             if(l.image)upd.image_url=l.image;
             const res=await c.from('inventory_items').update(upd).eq('id',oldItem.id).select(FAST_ITEMS_SELECT);
             if(res.error)throw res.error;
             item=A(res.data)[0]||{...oldItem,...upd}; patchStateItem(item);
           }else{
-            const ins={name:l.name,product_code:l.code,serial_number:l.code,barcode:l.code,supplier_barcode:l.distributor_code||l.code,image_url:l.image||'',unit:l.unit||'حبة',item_type:l.item_type||'مادة',type:l.item_type||'مادة',quantity:q,min_quantity:N(l.min_quantity)||1,unit_cost:+cost.toFixed(4),supplier,category:l.item_type||'عام',notes:'تمت الإضافة من فاتورة '+invoiceNo,created_by_name:currentUserName(),updated_by_name:currentUserName(),updated_at:new Date().toISOString()};
+            const ins={name:l.name,product_code:l.code,serial_number:l.code,barcode:l.code,supplier_barcode:l.distributor_code||l.code,image_url:l.image||'',unit:l.unit||'حبة',item_type:l.item_type||'مادة',type:l.item_type||'مادة',quantity:q,min_quantity:N(l.min_quantity)||1,unit_cost:+cost.toFixed(4),supplier,category:l.item_type||'عام',product_classification:'منتج',notes:'تمت الإضافة من فاتورة '+invoiceNo,created_by_name:currentUserName(),updated_by_name:currentUserName(),updated_at:new Date().toISOString()};
             const res=await c.from('inventory_items').insert(ins).select(FAST_ITEMS_SELECT);
             if(res.error)throw res.error;
             item=A(res.data)[0]||ins; patchStateItem(item);
           }
           const rv=rowVat(q,l.price,l.tax_mode);
           const meta={module:VERSION,invoiceNo,supplier,supplierInvoiceNo:S(l.supplier_invoice_no),minQuantity:N(l.min_quantity)||1,taxMode:S(l.tax_mode||'before'),beforeVat:rv.net,vat:rv.vat,afterVat:rv.gross,createdBy:currentUserName(),createdAt:new Date().toISOString()};
-          movementRows.push({item_id:item.id,item_name:item.name,movement_type:'in',quantity:q,movement_date:date,receiver:supplier,reason:'إضافة مخزون - فاتورة '+invoiceNo,notes:'finance_pro_v15:'+JSON.stringify(meta),product_code:l.code,barcode:l.distributor_code||l.code,unit_cost:+cost.toFixed(4)});
+          movementRows.push({item_id:item.id,item_name:item.name,movement_type:'in',quantity:q,movement_date:date,receiver:supplier,reason:'إضافة مخزون - فاتورة '+invoiceNo,notes:'finance_pro_v15:'+JSON.stringify(meta),product_code:l.code,barcode:l.distributor_code||l.code,unit_cost:+cost.toFixed(4),unit:l.unit||item.unit||'حبة',product_classification:itemClass(item)});
         }
         const mr=await c.from('inventory_movements').insert(movementRows).select('*');
         if(mr.error)throw mr.error;
@@ -414,7 +415,7 @@
           const ord=normalizeOrderNo(r.order_no), rowNote=S(r.note);
           const dist=[{qty:N(r.qty),projectId:S(r.project_id),projectName:projName,center:S(r.center)||'FM',type:S(r.type)||'out',staffId:S(r.staff_id),staffName:supervisor,orderNo:ord,note:rowNote}];
           const meta={module:VERSION,operationNo,isMultiProductBox:true,productSeq:prodSeq,rowSeq:ri+1,batchCount:valid.length,staffId:S(r.staff_id),note:rowNote,distribution:dist,stockEffect:'normal',createdBy:user,createdAt:now,orderNo:ord};
-          const row={item_id:item.id,item_name:item.name,movement_type:S(r.type)||'out',quantity:N(r.qty),movement_date:S($('finMoveDateV15')?.value)||today(),receiver:supervisor,reason:reasonFor(r.type),notes:'finance_pro_v15:'+JSON.stringify(meta),product_code:itemCode(item),barcode:itemDistCode(item)||itemCode(item),unit_cost:+itemCost(item).toFixed(4)};
+          const row={item_id:item.id,item_name:item.name,movement_type:S(r.type)||'out',quantity:N(r.qty),movement_date:S($('finMoveDateV15')?.value)||today(),receiver:supervisor,reason:reasonFor(r.type),notes:'finance_pro_v15:'+JSON.stringify(meta),product_code:itemCode(item),barcode:itemDistCode(item)||itemCode(item),unit_cost:+itemCost(item).toFixed(4),unit:S(item.unit)||'حبة',product_classification:itemClass(item)};
           movementRows.push(row);
           if(ord && ['out','consume','waste','damaged','scrap'].includes(S(r.type)||'out')) orderCostMap.set(ord, N(orderCostMap.get(ord))+orderCostFromMovementRow10182(row));
         });

@@ -17,6 +17,7 @@
   function safeJson(v){const t=S(v); if(!t.startsWith('finance_pro_v15:'))return{}; try{return JSON.parse(t.replace('finance_pro_v15:',''))||{};}catch(_){return{};}}
   function productCode(i){return S(i&&(i.product_code||i.serial_number||i.barcode||i.supplier_barcode||i.code));}
   function productType(i){const raw=S(i&&(i.item_type||i.type||i.category))||'مادة'; const low=raw.toLowerCase(); if(['tool','tools','عدة','أداة','اداة','معدات'].includes(low)||['عدة','أداة','اداة','معدات'].includes(raw))return 'أداة'; if(['machine','machines','مكينة','ماكينة'].includes(low)||['مكينة','ماكينة'].includes(raw))return 'مكينة'; return raw;}
+  function productClass(i){const raw=S(i&&(i.product_classification||i.product_class||i.asset_type||i.classification))||'منتج'; return (raw==='أصل'||raw==='اصل'||raw.toLowerCase()==='asset')?'أصل':'منتج';}
   function itemCost(i){return N(i&&(i.unit_cost||i.cost||i.price||i.purchase_price));}
   function productKeys(o){const keys=[]; [o&&o.id,o&&o.item_id,o&&o.product_code,o&&o.serial_number,o&&o.barcode,o&&o.supplier_barcode,o&&o.distributor_code,o&&o.code,o&&o.name,o&&o.item_name].forEach(v=>{const x=S(v).toLowerCase(); if(x&&!keys.includes(x))keys.push(x);}); return keys;}
   function imageUrl(item){const direct=S(item&&item.image_url); if(direct)return direct; const cache=state().imageCache||{}; for(const k of productKeys(item)){if(S(cache[k]))return S(cache[k]);} return '';}
@@ -40,7 +41,7 @@
     const st=state(); const map=new Map();
     function add(item){ if(!item)return; const key=S(item.id||productCode(item)||item.name); if(key&&!map.has(key))map.set(key,item); }
     A(st.items).forEach(add);
-    A(st.movements).forEach((m,idx)=>{ if(officialItemFor(m))return; const key=S(m.item_id||m.product_code||m.barcode||m.item_name); if(!key||map.has(key))return; map.set(key,{_fallback:true,id:m.item_id||('fb_'+idx),name:S(m.item_name)||key,product_code:S(m.product_code)||S(m.barcode)||key,barcode:S(m.barcode)||S(m.product_code)||'',unit:'حبة',item_type:'مادة',unit_cost:N(m.unit_cost),quantity:0}); });
+    A(st.movements).forEach((m,idx)=>{ if(officialItemFor(m))return; const key=S(m.item_id||m.product_code||m.barcode||m.item_name); if(!key||map.has(key))return; map.set(key,{_fallback:true,id:m.item_id||('fb_'+idx),name:S(m.item_name)||key,product_code:S(m.product_code)||S(m.barcode)||key,barcode:S(m.barcode)||S(m.product_code)||'',unit:S(m.unit)||'حبة',item_type:'مادة',product_classification:S(m.product_classification)||'منتج',unit_cost:N(m.unit_cost),quantity:0}); });
     return [...map.values()];
   }
   function productMovements(item){const code=productCode(item), id=S(item&&item.id), name=S(item&&item.name); return A(state().movements).filter(m=>String(m.item_id)===id || (code&&[m.product_code,m.barcode,m.serial_number].map(S).includes(code)) || (!m.item_id&&S(m.item_name)===name));}
@@ -74,7 +75,7 @@
     const gt=arr=>({out:sum(arr,x=>x.out),ret:sum(arr,x=>x.ret),consume:sum(arr,x=>x.consume),current:sum(arr,x=>x.current),net:sum(arr,x=>x.net),vat:sum(arr,x=>x.vat),gross:sum(arr,x=>x.gross)});
     const st=gt(byStaff), ct=gt(byCenter);
     return `<article class="fpr-product">
-      <div class="fpr-head"><div class="fpr-img">${img?`<img src="${esc(img)}" alt="${esc(item.name)}">`:'بدون صورة'}</div><div><h2>${esc(item.name||'-')}</h2><div class="fpr-chips"><span>الكود: ${esc(productCode(item)||'-')}</span><span>النوع: ${esc(productType(item))}</span><span>الوحدة: ${esc(item.unit||'حبة')}</span><span>الكمية الحالية: ${N(met.balance)}</span></div></div></div>
+      <div class="fpr-head"><div class="fpr-img">${img?`<img src="${esc(img)}" alt="${esc(item.name)}">`:'بدون صورة'}</div><div><h2>${esc(item.name||'-')}</h2><div class="fpr-chips"><span>الكود: ${esc(productCode(item)||'-')}</span><span>النوع: ${esc(productType(item))}</span><span>تصنيف المنتج: ${esc(productClass(item))}</span><span>الوحدة: ${esc(item.unit||'حبة')}</span><span>الكمية الحالية: ${N(met.balance)}</span></div></div></div>
       ${table('الجدول الأول: إدخالات المنتج إلى المخزن',['رقم العملية','تاريخ الإدخال','كمية الإدخال','سعر الحبة الواحدة','المجموع قبل الضريبة','الضريبة','المجموع شامل الضريبة'],inBody,totalsRow(['المجموع','-',sum(base,m=>m.quantity),'-',money(inNet),money(inVat),money(inGross)]))}
       ${table('الجدول الثاني: الحركات حسب المشرف',['اسم المشرف','الصرف','المرتجع','المستهلك','الكمية الحالية للمنتج','قيمة الاستهلاك قبل الضريبة','الضريبة','بعد الضريبة'],groupBody(byStaff),totalsRow(['المجموع',st.out,st.ret,st.consume,st.current,money(st.net),money(st.vat),money(st.gross)]))}
       ${table('الجدول الثالث: مراكز التكلفة',['مركز التكلفة','الخارج','الراجع','المستهلك','الكمية الحالية','قيمة المستهلك قبل الضريبة','الضريبة','بعد الضريبة'],groupBody(byCenter),totalsRow(['المجموع',ct.out,ct.ret,ct.consume,ct.current,money(ct.net),money(ct.vat),money(ct.gross)]))}
