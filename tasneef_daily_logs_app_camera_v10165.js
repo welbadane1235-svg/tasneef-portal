@@ -4,7 +4,7 @@
 */
 (function(){
   'use strict';
-  const VERSION='v10167-worker-delete-clean-filter';
+  const VERSION='v10169-dashboard-daily-workers-fix';
   const SUPABASE_URL='https://zmjdqiswytxlbfgnfjfv.supabase.co';
   const SUPABASE_ANON_KEY='sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb';
   const TABLE='time_logs';
@@ -23,9 +23,17 @@
   function cleanTime(t){
     t=S(t);
     if(!t) return timeNow();
+    const pm=/(^|\s)PM($|\s)|مساء|(^|\s)م($|\s)|م$/i.test(t);
+    const am=/(^|\s)AM($|\s)|صباح|(^|\s)ص($|\s)|ص$/i.test(t);
     if(/T/.test(t)){ try{ const d=new Date(t); if(!isNaN(d)){ const z=n=>String(n).padStart(2,'0'); return z(d.getHours())+':'+z(d.getMinutes()); } }catch(_){ } }
     const m=t.match(/(\d{1,2}):(\d{2})/);
-    if(m) return String(m[1]).padStart(2,'0')+':'+m[2];
+    if(m){
+      let h=Number(m[1]); const mm=m[2];
+      if(pm && h<12) h+=12;
+      if(am && h===12) h=0;
+      if(h<0||h>23) h=Number(m[1])||0;
+      return String(h).padStart(2,'0')+':'+mm;
+    }
     return timeNow();
   }
   function toDbTimestamp(t){
@@ -760,7 +768,94 @@
     }catch(e){ lockClear(key); smartToast(/الصورة مطلوبة|تعذر تجهيز الصورة|تعذر قراءة الصورة/.test(S(e.message||e))?'لا يتم تسجيل الخروج بدون صورة':'تعذر تسجيل الخروج: '+S(e.message||e),'err'); }
     finally{ buttonBusy('out',false); }
   }
+
+
+  // ===== v10169: إصلاح لوحة الرئيسية - تسجيلات اليوم + عدم تكرار العمال =====
+  function admDateOfRow(row){
+    const direct=S(row&& (row.log_date||row.visit_date||row.attendance_date||row.date||row.work_date));
+    if(/^\d{4}-\d{2}-\d{2}/.test(direct)) return direct.slice(0,10);
+    const t=S(row&& (row.check_in||row.check_out||row.created_at||row.updated_at));
+    if(/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0,10);
+    return '';
+  }
+  function admSupName(row){ return S(row&& (row.supervisor_name||row.supervisor||row.user_name||row.created_by_name||row.manager_name||row.supervisor_id||row.user_id||'غير محدد'))||'غير محدد'; }
+  function admMinutesFromTime(v){
+    const hm=cleanTime(v); const m=hm.match(/^(\d{2}):(\d{2})$/); if(!m) return null;
+    return Number(m[1])*60+Number(m[2]);
+  }
+  function admDuration(row){
+    const a=S(row&& (row.check_in||row.time_in||row.log_in||row.in_time||row.start_time));
+    const b=S(row&& (row.check_out||row.time_out||row.log_out||row.out_time||row.end_time));
+    if(!a||!b) return 0;
+    try{ const da=new Date(a), db=new Date(b); if(!isNaN(da)&&!isNaN(db)){ const m=Math.round((db-da)/60000); return m>0?m:0; } }catch(_){ }
+    const x=admMinutesFromTime(a), y=admMinutesFromTime(b); if(x==null||y==null) return 0;
+    return Math.max(0,y-x);
+  }
+  function admFmtHM(mins){ mins=Math.max(0,Math.round(Number(mins)||0)); return Math.floor(mins/60)+':'+String(mins%60).padStart(2,'0'); }
+  function admNormName(n){ return S(n).replace(/[ً-ٰٟ]/g,'').replace(/\s+/g,' ').trim().toLowerCase(); }
+  function admWorkerName(w){ return S(w&& (w.full_name||w.name||w.worker_name||w.employee_name||w.username)); }
+  async function admSelectAll(table,limit){
+    try{ const r=await getClient().from(table).select('*').limit(limit||5000); if(r&&!r.error) return r.data||[]; }catch(_){ }
+    return [];
+  }
+  async function admLoadTodayRows(date){
+    const all=await admSelectAll(TABLE,5000);
+    const seen=new Set(), out=[];
+    all.forEach(r=>{
+      if(admDateOfRow(r)!==date) return;
+      const k=S(rowId(r)||JSON.stringify([r.check_in,r.check_out,r.project_id,r.project_name,r.supervisor_id,r.supervisor_name]));
+      if(seen.has(k)) return; seen.add(k); out.push(r);
+    });
+    return out;
+  }
+  async function admRenderHomeSummaryV10169(){
+    if(!document.getElementById('todaySummary')&&!document.getElementById('kpiTodayLogs')&&!document.getElementById('kpiWorkers')) return;
+    const d=today();
+    const rows=await admLoadTodayRows(d);
+    const kpi=document.getElementById('kpiTodayLogs'); if(kpi) kpi.textContent=String(rows.length);
+    const by=new Map();
+    rows.forEach(r=>{
+      const sup=admSupName(r); if(!by.has(sup)) by.set(sup,{count:0,mins:0});
+      const x=by.get(sup); x.count+=1; x.mins+=admDuration(r);
+    });
+    const box=document.getElementById('todaySummary');
+    if(box){
+      if(by.size){
+        box.innerHTML=[...by.entries()].sort((a,b)=>a[0].localeCompare(b[0],'ar')).map(([sup,x])=>`<div class="summary-item"><b>${wEsc(sup)}</b><br>عدد التسجيلات: ${x.count}<br>إجمالي الوقت: ${admFmtHM(x.mins)}</div>`).join('');
+      }else{
+        box.innerHTML='<div class="summary-item">لا توجد تسجيلات يومية محفوظة بتاريخ اليوم. إذا كنت تعرض تاريخًا سابقًا افتح تبويب التسجيلات اليومية واختر التاريخ المطلوب.</div>';
+      }
+    }
+    try{
+      const workers=await admSelectAll('workers',5000);
+      if(workers.length){
+        const names=new Set(); workers.forEach(w=>{ const n=admNormName(admWorkerName(w)); if(n) names.add(n); });
+        const kw=document.getElementById('kpiWorkers'); if(kw) kw.textContent=String(names.size||workers.length);
+      }
+    }catch(_){ }
+  }
+  function admDedupeWorkerRowsV10169(){
+    ['workersBody','workersTableBody','workerBody'].forEach(id=>{
+      const body=document.getElementById(id); if(!body) return;
+      const seen=new Set();
+      [...body.querySelectorAll('tr')].forEach(tr=>{
+        const tds=[...tr.children].map(td=>admNormName(td.textContent)).filter(Boolean);
+        if(!tds.length) return;
+        const key=tds.join('|');
+        if(seen.has(key)) tr.remove(); else seen.add(key);
+      });
+    });
+  }
+  function admInstallDashboardFixV10169(){
+    if(window.__tasneefDashboardDailyWorkersFixV10169) return;
+    window.__tasneefDashboardDailyWorkersFixV10169=true;
+    admRenderHomeSummaryV10169().catch(()=>{});
+    admDedupeWorkerRowsV10169();
+    setInterval(()=>{admRenderHomeSummaryV10169().catch(()=>{}); admDedupeWorkerRowsV10169();},7000);
+  }
+
   function install(){
+    try{ admInstallDashboardFixV10169(); }catch(_){ }
     if(!document.getElementById('logProject')) return;
     window.supervisorCheckIn=function(){ return checkInSmart(); };
     window.supervisorCheckOut=function(){ return checkOutSmart(); };
@@ -833,7 +928,6 @@
         smartToast('تم تعديل السجل وبقي ظاهرًا');
         try{ if(typeof window.renderSupervisorDailySummary==='function') window.renderSupervisorDailySummary(); }catch(_){ }
         try{ if(typeof window.renderTimeLogs==='function') window.renderTimeLogs(); }catch(_){ }
-        setTimeout(()=>{ try{ if(typeof window.renderTimeLogs==='function') window.renderTimeLogs(); }catch(_){ } },450);
       }catch(e){
         lockClear(key);
         smartToast('تعذر حفظ التعديل: '+S(e.message||e),'err');
