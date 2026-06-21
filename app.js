@@ -20220,3 +20220,136 @@ function financePrintReport(kind){
     ].join('\n');
   };
 })();
+
+/* ===== V10181: Attendance no duplicated worker names in admin/supervisor print ===== */
+(function(){
+  'use strict';
+  if(window.__tasneefV10181AttendanceDedupe) return;
+  window.__tasneefV10181AttendanceDedupe = true;
+  const BUILD='v10181-attendance-worker-name-once-print';
+  const S=v=>String(v??'').trim();
+  const A=v=>Array.isArray(v)?v:[];
+  const $id=id=>document.getElementById(id);
+  const esc=s=>S(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const ds=()=>window.data||{};
+  function todayStr(){ try{ if(typeof today==='function') return today(); }catch(_){} const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function monthNow(){ return todayStr().slice(0,7); }
+  function norm(v){ return S(v).toLowerCase().replace(/[إأآا]/g,'ا').replace(/[ىي]/g,'ي').replace(/ة/g,'ه').replace(/[\u064B-\u0652]/g,'').replace(/\s+/g,' ').trim(); }
+  function idStr(v){ return S(v); }
+  function daysInMonth(month){ const y=Number(S(month).slice(0,4)), m=Number(S(month).slice(5,7)); return new Date(y,m,0).getDate()||31; }
+  function dateOf(month,d){ return S(month)+'-'+String(d).padStart(2,'0'); }
+  function recDate(r){ return S(r?.attendance_date || r?.date || r?.work_date || r?.created_at).slice(0,10); }
+  function recMonth(r){ return recDate(r).slice(0,7); }
+  function workerRow(wid){ return A(ds().workers).find(w=>idStr(w.id)===idStr(wid)) || {}; }
+  function projectRow(pid){ return A(ds().projects).find(p=>idStr(p.id)===idStr(pid)) || {}; }
+  function userRow(uid){ return A(ds().users).find(u=>idStr(u.id)===idStr(uid)) || A(ds().supervisors).find(u=>idStr(u.id)===idStr(uid)) || {}; }
+  function wName(wid, rec){ const w=workerRow(wid); return S(w.name||w.full_name||rec?.worker_name||rec?.name||rec?.worker||('عامل '+S(wid||''))) || '-'; }
+  function pName(pid){ const p=projectRow(pid); return S(p.name||p.project_name||pid||'-') || '-'; }
+  function sName(sid){ const u=userRow(sid); return S(u.full_name||u.name||u.username||sid||'-') || '-'; }
+  function projectId(rec){ const w=workerRow(rec?.worker_id); return rec?.project_id || rec?.assigned_project_id || w.project_id || w.assigned_project_id || ''; }
+  function supervisorId(rec){ const w=workerRow(rec?.worker_id); const p=projectRow(projectId(rec)); return rec?.supervisor_id || rec?.app_supervisor_id || w.supervisor_id || w.app_supervisor_id || p.supervisor_id || ''; }
+  function activeRecord(rec){ return rec && rec.worker_id!==undefined && rec.worker_id!==null && recDate(rec); }
+  function statusInfo(status){
+    const st=norm(status||'');
+    if(['present','حاضر','حضور'].includes(st)) return {short:'ح',label:'حاضر',cell:'att-present',cls:'green',kind:'p'};
+    if(['absent','غائب','غياب'].includes(st)) return {short:'غ',label:'غائب',cell:'att-absent',cls:'red',kind:'a'};
+    if(['leave','اجازه','إجازه','اجازة','إجازة'].includes(st)) return {short:'ج',label:'إجازة',cell:'att-leave',cls:'amber',kind:'l'};
+    if(['transfer','نقل','منقول'].includes(st)) return {short:'ن',label:'نقل',cell:'att-transfer',cls:'',kind:'t'};
+    return {short:'-',label:'لا يوجد سجل',cell:'att-empty',cls:'',kind:''};
+  }
+  function selectedSupervisorOptions(selectId){
+    const el=$id(selectId); if(!el) return '';
+    const old=el.value||'';
+    const rows=[];
+    A(ds().supervisors).forEach(x=>rows.push(x));
+    A(ds().users).filter(u=>S(u.role)==='supervisor').forEach(x=>rows.push(x));
+    A(ds().attendance).forEach(a=>{ const sid=supervisorId(a); if(sid) rows.push({id:sid,full_name:sName(sid)}); });
+    const seen=new Set();
+    const opts=rows.filter(x=>x&&x.id!=null&&!seen.has(idStr(x.id))&&(seen.add(idStr(x.id)),true))
+      .map(x=>`<option value="${esc(x.id)}">${esc(x.full_name||x.name||x.username||x.id)}</option>`).join('');
+    const html='<option value="">كل المشرفين</option>'+opts;
+    if(el.dataset.v10181Html!==html){ el.innerHTML=html; el.dataset.v10181Html=html; }
+    if([...el.options].some(o=>o.value===old)) el.value=old;
+    return el.value||'';
+  }
+  function matchesSupervisor(rec, selectedSid){ return !selectedSid || idStr(supervisorId(rec))===idStr(selectedSid); }
+  function workerKey(rec){
+    if(rec?.worker_id!==undefined && rec?.worker_id!==null && S(rec.worker_id)!=='') return 'id:'+idStr(rec.worker_id);
+    return 'name:'+norm(wName(rec?.worker_id,rec));
+  }
+  function latestByDate(records){
+    const map=new Map();
+    records.forEach(r=>{
+      const d=recDate(r); if(!d) return;
+      const old=map.get(d);
+      const oldRank=Number(old?.id||0), newRank=Number(r?.id||0);
+      if(!old || newRank>=oldRank) map.set(d,r);
+    });
+    return map;
+  }
+  function uniqueText(values){ const out=[]; const seen=new Set(); values.map(S).filter(Boolean).forEach(v=>{ const k=norm(v); if(k && !seen.has(k)){ seen.add(k); out.push(v); }}); return out.join('، ') || '-'; }
+  function workerType(wid){ const w=workerRow(wid); const t=S(w.worker_type||w.type||''); return norm(t).includes('support')||norm(t).includes('مساند')||norm(t).includes('بديل')?'بديل / مساند':'عامل'; }
+  function installStyle(){
+    if($id('tasneefV10181AttendancePrintStyle')) return;
+    const st=document.createElement('style'); st.id='tasneefV10181AttendancePrintStyle';
+    st.textContent=`
+      .attendance-matrix-v10181 th,.attendance-matrix-v10181 td{text-align:center}
+      .attendance-matrix-v10181 th:first-child,.attendance-matrix-v10181 td:first-child{position:sticky;right:0;background:#fff;z-index:3;text-align:right;min-width:170px}
+      .att-v10181-print-title{display:none}
+      @media print{.att-v10181-print-title{display:block!important;text-align:center;margin:0 0 12px;color:#0A4033}.attendance-matrix-v10181{font-size:10px!important}.attendance-matrix-v10181 th,.attendance-matrix-v10181 td{padding:5px!important}.side,.nav,.actions,.filters button,#globalMsg{display:none!important}}
+    `;
+    document.head.appendChild(st);
+  }
+  window.renderAttendanceMonthly=function(){
+    installStyle();
+    const body=$id('attendanceMatrixBody'), head=$id('attendanceMatrixHead'); if(!body||!head) return;
+    const mEl=$id('attendanceMatrixMonth'); if(mEl&&!mEl.value) mEl.value=monthNow();
+    const month=mEl?.value||monthNow();
+    const selectedSid=selectedSupervisorOptions('attendanceMatrixSupervisor');
+    const q=norm($id('attendanceMatrixSearch')?.value||'');
+    const days=daysInMonth(month);
+    let records=A(ds().attendance).filter(r=>activeRecord(r) && recMonth(r)===month && matchesSupervisor(r,selectedSid));
+    if(q) records=records.filter(r=>norm([wName(r.worker_id,r),pName(projectId(r)),sName(supervisorId(r)),S(r.notes)].join(' ')).includes(q));
+    const groups=new Map();
+    records.forEach(r=>{
+      const k=workerKey(r); if(!k || k==='name:') return;
+      if(!groups.has(k)) groups.set(k,{worker_id:r.worker_id,name:wName(r.worker_id,r),records:[]});
+      groups.get(k).records.push(r);
+    });
+    const arr=[...groups.values()].sort((a,b)=>S(a.name).localeCompare(S(b.name),'ar'));
+    head.innerHTML='<tr><th>اسم العامل</th><th>النوع</th><th>المشرف</th><th>المشروع</th>'+Array.from({length:days},(_,i)=>`<th>${String(i+1).padStart(2,'0')}</th>`).join('')+'<th>حضور</th><th>غياب</th><th>إجازة</th><th>نقل</th><th>النسبة</th></tr>';
+    let totalP=0,totalA=0,totalL=0,totalT=0;
+    const table=body.closest('table'); if(table) table.classList.add('attendance-matrix-v10181');
+    body.innerHTML=arr.map(g=>{
+      const byDate=latestByDate(g.records);
+      let p=0,a=0,l=0,t=0; const cells=[];
+      for(let d=1; d<=days; d++){
+        const rec=byDate.get(dateOf(month,d)); const inf=statusInfo(rec?.status);
+        if(inf.kind==='p') p++; else if(inf.kind==='a') a++; else if(inf.kind==='l') l++; else if(inf.kind==='t') t++;
+        cells.push(`<td title="${esc(inf.label)}"><span class="att-cell ${esc(inf.cell)}">${esc(inf.short)}</span></td>`);
+      }
+      totalP+=p; totalA+=a; totalL+=l; totalT+=t;
+      const samples=g.records;
+      const supText=uniqueText(samples.map(supervisorId).filter(Boolean).map(sName));
+      const projText=uniqueText(samples.map(projectId).filter(Boolean).map(pName));
+      const denom=p+a+l+t; const pct=denom?(p/denom*100):0; const cls=pct>=90?'green':(pct>=70?'amber':'red');
+      return `<tr><td><b>${esc(g.name)}</b></td><td>${esc(workerType(g.worker_id))}</td><td>${esc(supText)}</td><td>${esc(projText)}</td>${cells.join('')}<td><span class="badge green">${p}</span></td><td><span class="badge red">${a}</span></td><td><span class="badge amber">${l}</span></td><td><span class="badge">${t}</span></td><td><span class="badge ${cls}">${pct.toFixed(1)}%</span></td></tr>`;
+    }).join('') || `<tr><td colspan="${days+9}">لا توجد سجلات حضور مطابقة للفلاتر المختارة</td></tr>`;
+    const denom=totalP+totalA+totalL+totalT; const pct=denom?(totalP/denom*100):0;
+    const sum=$id('attendanceMatrixSummary'); if(sum) sum.innerHTML=`<div class="kpi"><small>عدد العمال بدون تكرار</small><b>${arr.length}</b></div><div class="kpi"><small>إجمالي الحضور</small><b>${totalP}</b></div><div class="kpi"><small>إجمالي الغياب</small><b>${totalA}</b></div><div class="kpi"><small>نسبة الحضور</small><b>${pct.toFixed(1)}%</b></div>`;
+    const card=body.closest('.card'); if(card && !$id('attV10181PrintTitle')){ const title=document.createElement('h2'); title.id='attV10181PrintTitle'; title.className='att-v10181-print-title'; title.textContent='كشف الحضور والغياب - بدون تكرار أسماء العمال'; card.prepend(title); }
+  };
+  try{ renderAttendanceMonthly=window.renderAttendanceMonthly; }catch(_){}
+  const oldExport=window.exportAttendanceMatrixCSV;
+  window.exportAttendanceMatrixCSV=function(){
+    try{ window.renderAttendanceMonthly&&window.renderAttendanceMonthly(); }catch(_){}
+    if(typeof oldExport==='function') return oldExport.apply(this,arguments);
+  };
+  const oldPrint=window.printAttendanceMonthlyV343;
+  window.printAttendanceMonthlyV343=function(){ try{window.renderAttendanceMonthly&&window.renderAttendanceMonthly();}catch(_){} setTimeout(()=>window.print(),100); };
+  document.addEventListener('change',e=>{ if(e.target&&['attendanceMatrixMonth','attendanceMatrixSupervisor'].includes(e.target.id)) setTimeout(()=>window.renderAttendanceMonthly&&window.renderAttendanceMonthly(),30); });
+  document.addEventListener('input',e=>{ if(e.target&&e.target.id==='attendanceMatrixSearch') setTimeout(()=>window.renderAttendanceMonthly&&window.renderAttendanceMonthly(),30); });
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{ try{ window.renderAttendanceMonthly&&window.renderAttendanceMonthly(); }catch(e){ console.warn(e); } },900));
+  window.TASNEEF_ATTENDANCE_DEDUPE_BUILD=BUILD;
+  console.log('Tasneef '+BUILD+' loaded');
+})();
