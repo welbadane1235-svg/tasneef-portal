@@ -506,9 +506,11 @@
     // لا نرسل حقول فارغة فوق السجل القديم. نحافظ على تاريخ السجل الأصلي عند تعديل الوقت فقط.
     const effectiveDate=dateFromRow(base)||S(payload.log_date)||logDate();
     out.log_date=effectiveDate;
-    if(S(payload.project_id)) out.project_id=payload.project_id; else if(S(base.project_id)) out.project_id=base.project_id;
-    if(S(payload.supervisor_id)) out.supervisor_id=payload.supervisor_id; else if(S(base.supervisor_id)) out.supervisor_id=base.supervisor_id;
-    if(S(payload.visit_type)) out.visit_type=payload.visit_type; else if(S(base.visit_type)) out.visit_type=base.visit_type;
+    // عند تعديل الوقت من شاشة الإدارة لا نغير هوية السجل.
+    // نحافظ على project_id و supervisor_id و visit_type الأصلية إن كانت موجودة حتى لا يختفي السجل من الفلاتر.
+    if(S(base.project_id)) out.project_id=base.project_id; else if(S(payload.project_id)) out.project_id=payload.project_id;
+    if(S(base.supervisor_id)) out.supervisor_id=base.supervisor_id; else if(S(payload.supervisor_id)) out.supervisor_id=payload.supervisor_id;
+    if(S(base.visit_type)) out.visit_type=base.visit_type; else if(S(payload.visit_type)) out.visit_type=payload.visit_type;
     if(Object.prototype.hasOwnProperty.call(payload,'travel_minutes')) out.travel_minutes=payload.travel_minutes;
     if(Object.prototype.hasOwnProperty.call(payload,'notes')) out.notes=payload.notes;
     if(Object.prototype.hasOwnProperty.call(payload,'check_in')) out.check_in=payload.check_in;
