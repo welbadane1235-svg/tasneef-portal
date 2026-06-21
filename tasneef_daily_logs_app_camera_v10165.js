@@ -193,8 +193,16 @@
   function dayNameV10176(ds){ try{return new Date(ds+'T00:00:00').toLocaleDateString('ar-SA',{weekday:'long'});}catch(_){return '-';} }
 
   async function currentWorkerNamesForMessage(){
-    let names=uniqueNames([...(window.__tasneefDailySelectedWorkers||[]).map(x=>typeof x==='string'?x:(x&&x.name)),...readDomWorkerNames(),...readLocalWorkerNames()]).filter(isRealWorkerNameV10176);
-    if(!names.length) names=(await readSupabaseWorkerNames()).filter(isRealWorkerNameV10176);
+    // V10177 strict: لا نقرأ من DOM/localStorage لأنها قد تحتوي اسم المشرف أو اسم المشروع.
+    const p=projectInfo();
+    const row={project_id:p.id, project_name:p.name, supervisor_id:userId(), supervisor_name:userName(), log_date:logDate()};
+    try{
+      if(window.tasneefStrictWorkersForLogV10177){
+        const s=window.tasneefStrictWorkersForLogV10177(row);
+        if(s && s!=='-') return s.split('،').map(x=>x.trim()).filter(Boolean).slice(0,8);
+      }
+    }catch(_){}
+    let names=(await readSupabaseWorkerNames()).filter(n=>isRealWorkerNameV10176(n) && n!==userName() && n!==(p.name||p.id));
     return uniqueNames(names).filter(isRealWorkerNameV10176).slice(0,8);
   }
   function cleaningTypeLabelV10175(v){
@@ -891,4 +899,86 @@
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(install,900)); else setTimeout(install,900);
   setTimeout(install,2500);
+})();
+
+
+/* ===== V10177: Strict worker names for daily WhatsApp/photo message =====
+   يمنع دخول اسم المشرف أو اسم المشروع ضمن أسماء العمال.
+   يعتمد على: حضور العمال لنفس التاريخ + نفس المشروع + نفس المشرف، ثم جدول العمال بنفس المشروع والمشرف.
+*/
+(function(){
+  'use strict';
+  if(window.__tasneefStrictDailyWorkersV10177) return;
+  window.__tasneefStrictDailyWorkersV10177=true;
+  const S=v=>String(v==null?'':v).trim();
+  const norm=v=>S(v).replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/ـ/g,'').replace(/[\u064B-\u065F]/g,'').replace(/\s+/g,' ').toLowerCase();
+  function todayV(){try{if(typeof today==='function')return today();}catch(_){} const d=new Date(),z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());}
+  function rowDate(row){return S(row&&row.log_date)||S(row&&row.visit_date)||S(row&&row.attendance_date)||S(row&&row.work_date)||S(row&&row.date)||S(row&&row.check_in).slice(0,10)||S(row&&row.created_at).slice(0,10)||todayV();}
+  function dayName(ds){try{return new Date(ds+'T00:00:00').toLocaleDateString('ar-SA',{weekday:'long'});}catch(_){return '-';}}
+  function timeClean(v){
+    v=S(v); if(!v)return '-';
+    try{if(/T|Z|\d{4}-\d{2}-\d{2}/.test(v)){const d=new Date(v); if(!isNaN(d))return d.toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit',hour12:false});}}catch(_){}
+    const m=v.match(/(\d{1,2}):(\d{2})/); return m?String(m[1]).padStart(2,'0')+':'+m[2]:v;
+  }
+  function visitLabel(v){v=S(v);try{if(typeof visitTypeText==='function')return visitTypeText(v)||v;}catch(_){} if(v==='deep')return 'نظافة عميقة'; if(v==='surface')return 'نظافة سطحية'; return v||'-';}
+  function projName(row){try{return projectName(row&&row.project_id)||S(row&&row.project_name)||'-';}catch(_){return S(row&&row.project_name)||'-';}}
+  function supName(row){try{return supervisorName(row&&row.supervisor_id)||S(row&&row.supervisor_name)||'-';}catch(_){return S(row&&row.supervisor_name)||'-';}}
+  function workerById(id){
+    const w=(window.data&&data.workers||[]).find(x=>S(x.id)===S(id));
+    return S(w&&(w.name||w.worker_name||w.full_name));
+  }
+  function projectIdOfWorker(w){try{if(typeof workerProjectId==='function')return S(workerProjectId(w));}catch(_){} return S(w&& (w.project_id||w.assigned_project_id));}
+  function supIdOfWorker(w){try{if(typeof workerSupId==='function')return S(workerSupId(w));}catch(_){} return S(w&& (w.app_supervisor_id||w.supervisor_id));}
+  const badWords=['مشروع','المشروع','مشرف','المشرف','شركة','تصنيف','ادارة المرافق','فرساي','آفاق','افاق','العربية','كاف','الماجدية','ماجدية','صفاء','صفا','العجلان','جادة','عالم الابتكار','اتحاد العاصمة','واجهة قرطبة','برج','جوديا','تعمير','الرمز','مغنى','مغني','هاجر','رؤيا','رايات','نجد','تنظيف','نظافة','سطحية','عميقة','غسيل','رش','خزان','خزانات','مبيدات','مصعد','مصاعد','بيسمنت','مواقف'];
+  function validName(n,row){
+    n=S(n).replace(/حاضر|غائب|حضور|غياب|present|absent|موجود|غير موجود|✓|✔|☑/gi,' ').replace(/[:：]+/g,' ').replace(/\s+/g,' ').trim();
+    if(!n||n==='-'||/^\d+$/.test(n))return '';
+    const nn=norm(n), pn=norm(projName(row)), sn=norm(supName(row));
+    if(nn && (nn===pn || nn===sn || (pn&&pn.includes(nn)) || (sn&&sn.includes(nn)) || nn.includes(pn) || nn.includes(sn))) return '';
+    if(badWords.some(w=>nn.includes(norm(w)))) return '';
+    if(n.length>35) return '';
+    const parts=n.split(/\s+/).filter(Boolean);
+    if(parts.length>3) return '';
+    return n;
+  }
+  function unique(list,row){const m=new Map();(list||[]).forEach(x=>{const n=validName(x,row);const k=norm(n);if(k&&!m.has(k))m.set(k,n);});return [...m.values()];}
+  function strictWorkersForRow(row){
+    const pid=S(row&&row.project_id), sid=S(row&&row.supervisor_id), ds=rowDate(row);
+    let names=[];
+    const attendanceRows=(window.data&&data.attendance||[]).filter(a=>{
+      const d=S(a.attendance_date||a.log_date||a.date||a.work_date||a.created_at).slice(0,10);
+      const present=!S(a.status)||/present|حاضر|موجود|yes|true/i.test(S(a.status));
+      const sameDate=!ds||d===ds;
+      const sameProject=pid ? S(a.project_id)===pid : true;
+      const sameSup=sid ? S(a.supervisor_id)===sid : true;
+      return present && sameDate && sameProject && sameSup;
+    });
+    if(attendanceRows.length){
+      names=attendanceRows.map(a=>S(a.worker_name||a.name||a.full_name)||workerById(a.worker_id));
+      const u=unique(names,row); if(u.length) return u.join('، ');
+    }
+    names=(window.data&&data.workers||[]).filter(w=>{
+      const st=norm(w.status||'active'); if(['inactive','deleted','موقوف'].includes(st)) return false;
+      const wp=projectIdOfWorker(w), ws=supIdOfWorker(w);
+      if(pid && sid) return wp===pid && ws===sid;
+      if(pid) return wp===pid;
+      if(sid) return ws===sid;
+      return false;
+    }).map(w=>S(w.name||w.worker_name||w.full_name));
+    return unique(names,row).join('، ') || '-';
+  }
+  window.tasneefStrictWorkersForLogV10177=strictWorkersForRow;
+  window.buildLogWhatsAppMessage=function(row,type){
+    type=type||((row&&row.check_out)?'out':'in');
+    const ds=rowDate(row);
+    return [
+      'اسم المشروع: '+projName(row),
+      'اسم المشرف: '+supName(row),
+      'أسماء العمال: '+strictWorkersForRow(row),
+      'اليوم: '+dayName(ds),
+      'التاريخ: '+ds,
+      'الساعة: '+timeClean(type==='out'?(row&&row.check_out):(row&&row.check_in)),
+      'نوع النظافة: '+visitLabel(row&&row.visit_type)
+    ].join('\n');
+  };
 })();
