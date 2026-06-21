@@ -54,6 +54,15 @@
   }
   function userId(){ const u=currentUser(); return S(u.id||u.user_id||u.uid||u.username||u.email||u.full_name||u.name||'supervisor'); }
   function userName(){ const u=currentUser(); return S(u.full_name||u.name||u.username||u.email||u.id||'المشرف'); }
+  function selectedSupervisorInfo(){
+    const el=$('logSupervisor');
+    if(el){
+      const val=S(el.value);
+      const txt=S(el.options&&el.selectedIndex>=0 ? el.options[el.selectedIndex].textContent : '');
+      if(val||txt) return {id:val||userId(), name:txt||val||userName()};
+    }
+    return {id:userId(), name:userName()};
+  }
   function projectInfo(){
     const el=$('logProject');
     const val=S(el&&el.value);
@@ -152,7 +161,7 @@
   }
   async function readSupabaseWorkerNames(){
     const sb=getClient(); if(!sb) return [];
-    const d=logDate(); const sup=userName(); const uid=userId();
+    const d=logDate(); const supInfo=selectedSupervisorInfo(); const sup=supInfo.name; const uid=supInfo.id; const p=projectInfo();
     try{
       const res=await sb.from('attendance').select('*').limit(1000);
       if(res.error) return [];
@@ -193,16 +202,26 @@
   function dayNameV10176(ds){ try{return new Date(ds+'T00:00:00').toLocaleDateString('ar-SA',{weekday:'long'});}catch(_){return '-';} }
 
   async function currentWorkerNamesForMessage(){
-    // V10177 strict: لا نقرأ من DOM/localStorage لأنها قد تحتوي اسم المشرف أو اسم المشروع.
+    // V10178: الرسالة تعتمد فقط على المشروع المحدد + المشرف المحدد + تاريخ/وقت النموذج.
     const p=projectInfo();
-    const row={project_id:p.id, project_name:p.name, supervisor_id:userId(), supervisor_name:userName(), log_date:logDate()};
+    const sup=selectedSupervisorInfo();
+    const row={project_id:p.id, project_name:p.name, supervisor_id:sup.id, supervisor_name:sup.name, log_date:logDate()};
+    try{
+      const selected=[];
+      document.querySelectorAll('#workersForProject input[type="checkbox"]:checked').forEach(inp=>{
+        const n=S((inp.dataset&&inp.dataset.name)||inp.getAttribute('data-name')||inp.getAttribute('data-worker-name')||'');
+        if(n) selected.push(n);
+      });
+      const sel=uniqueNames(selected).filter(n=>isRealWorkerNameV10176(n) && n!==sup.name && n!==(p.name||p.id));
+      if(sel.length) return sel.slice(0,8);
+    }catch(_){}
     try{
       if(window.tasneefStrictWorkersForLogV10177){
         const s=window.tasneefStrictWorkersForLogV10177(row);
-        if(s && s!=='-') return s.split('،').map(x=>x.trim()).filter(Boolean).slice(0,8);
+        if(s && s!=='-') return s.split('،').map(x=>x.trim()).filter(n=>isRealWorkerNameV10176(n) && n!==sup.name && n!==(p.name||p.id)).slice(0,8);
       }
     }catch(_){}
-    let names=(await readSupabaseWorkerNames()).filter(n=>isRealWorkerNameV10176(n) && n!==userName() && n!==(p.name||p.id));
+    let names=(await readSupabaseWorkerNames()).filter(n=>isRealWorkerNameV10176(n) && n!==sup.name && n!==(p.name||p.id));
     return uniqueNames(names).filter(isRealWorkerNameV10176).slice(0,8);
   }
   function cleaningTypeLabelV10175(v){
@@ -219,7 +238,7 @@
     const d=logDate();
     const lines=[
       'اسم المشروع: '+(p.name||p.id||'-'),
-      'اسم المشرف: '+userName(),
+      'اسم المشرف: '+selectedSupervisorInfo().name,
       'أسماء العمال: '+(workers.length?workers.join('، '):'-'),
       'اليوم: '+dayNameV10176(d),
       'التاريخ: '+d,
@@ -248,7 +267,7 @@
     const action=kind==='in'?'تسجيل دخول':'تسجيل خروج';
     const lines=[
       action+' - شركة تصنيف لإدارة المرافق',
-      'المشرف: '+userName(),
+      'المشرف: '+selectedSupervisorInfo().name,
       'المشروع: '+(p.name||p.id||'-'),
       'التاريخ: '+logDate()+'   الوقت: '+displayTime(time||timeNow()),
       'نوع التنظيف: '+cleaningTypeLabelV10175(visitType())
@@ -287,7 +306,7 @@
     const action=kind==='in'?'تسجيل دخول':'تسجيل خروج';
     const lines=[
       action+' - شركة تصنيف لإدارة المرافق',
-      'المشرف: '+userName(),
+      'المشرف: '+selectedSupervisorInfo().name,
       'المشروع: '+(p.name||p.id||'-'),
       'التاريخ: '+logDate()+'   الوقت: '+displayTime(time||timeNow()),
       'نوع التنظيف: '+cleaningTypeLabelV10175(visitType())
@@ -341,7 +360,7 @@
       const action=kind==='in'?'تسجيل دخول':'تسجيل خروج';
       const p=projectInfo();
       const wrap=document.createElement('div'); wrap.id='tasneefDailyCameraV10157';
-      wrap.innerHTML=`<div class="cam-card"><div class="cam-head"><div class="cam-title">${action}<br><span style="font-size:12px;font-weight:700;opacity:.9">التقط صورة للتوثيق قبل الحفظ</span></div><button type="button" class="cam-close" aria-label="إغلاق">×</button></div><div class="cam-video-wrap"><video autoplay playsinline muted></video><div class="cam-stamp-preview">${action}<br>المشرف: ${userName()}<br>المشروع: ${(p.name||p.id||'-')}<br>التاريخ: ${logDate()} — الوقت: ${displayTime(time||timeNow())}</div></div><div class="cam-actions"><button type="button" class="cam-capture">التقاط الصورة</button><button type="button" class="cam-switch">تبديل الكاميرا</button></div><div class="cam-note">بعد التقاط الصورة يتم ختمها بالتاريخ والوقت ثم حفظ التسجيل وفتح الواتساب مباشرة.</div></div>`;
+      wrap.innerHTML=`<div class="cam-card"><div class="cam-head"><div class="cam-title">${action}<br><span style="font-size:12px;font-weight:700;opacity:.9">التقط صورة للتوثيق قبل الحفظ</span></div><button type="button" class="cam-close" aria-label="إغلاق">×</button></div><div class="cam-video-wrap"><video autoplay playsinline muted></video><div class="cam-stamp-preview">${action}<br>المشرف: ${selectedSupervisorInfo().name}<br>المشروع: ${(p.name||p.id||'-')}<br>التاريخ: ${logDate()} — الوقت: ${displayTime(time||timeNow())}</div></div><div class="cam-actions"><button type="button" class="cam-capture">التقاط الصورة</button><button type="button" class="cam-switch">تبديل الكاميرا</button></div><div class="cam-note">بعد التقاط الصورة يتم ختمها بالتاريخ والوقت ثم حفظ التسجيل وفتح الواتساب مباشرة.</div></div>`;
       document.body.appendChild(wrap);
       const video=wrap.querySelector('video');
       const closeBtn=wrap.querySelector('.cam-close');
@@ -895,7 +914,7 @@
         smartToast('تعذر حفظ التعديل: '+S(e.message||e),'err');
       }
     };
-    console.log(VERSION,'installed - worker attendance project flow + admin edit preserve');
+    console.log(VERSION,'installed - worker attendance project flow + admin edit preserve + selected message v10178');
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(install,900)); else setTimeout(install,900);
   setTimeout(install,2500);
@@ -979,6 +998,52 @@
       'التاريخ: '+ds,
       'الساعة: '+timeClean(type==='out'?(row&&row.check_out):(row&&row.check_in)),
       'نوع النظافة: '+visitLabel(row&&row.visit_type)
+    ].join('\n');
+  };
+})();
+
+
+/* ===== V10178: WhatsApp message must use selected project/supervisor/date/time from the active form ===== */
+(function(){
+  'use strict';
+  window.__tasneefSelectedDailyMessageV10178=true;
+  const S=v=>String(v==null?'':v).trim();
+  const $=id=>document.getElementById(id);
+  function selectedText(id){ const el=$(id); return S(el&&el.options&&el.selectedIndex>=0 ? el.options[el.selectedIndex].textContent : ''); }
+  function selectedValue(id){ const el=$(id); return S(el&&el.value); }
+  function cleanTime(v){
+    v=S(v); if(!v) return '-';
+    try{ if(/T|Z|\d{4}-\d{2}-\d{2}/.test(v)){ const d=new Date(v); if(!isNaN(d)) return d.toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit',hour12:false}); } }catch(_){}
+    const m=v.match(/(\d{1,2}):(\d{2})/); return m?String(m[1]).padStart(2,'0')+':'+m[2]:v;
+  }
+  function today(){ const d=new Date(),z=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate()); }
+  function dayName(ds){ try{return new Date(ds+'T00:00:00').toLocaleDateString('ar-SA',{weekday:'long'});}catch(_){return '-';} }
+  function visitLabel(v){ v=S(v); try{ if(typeof visitTypeText==='function') return visitTypeText(v)||v; }catch(_){} if(v==='deep')return 'نظافة عميقة'; if(v==='surface')return 'نظافة سطحية'; return v||'-'; }
+  function fallbackProject(row){ try{ if(row&&row.project_id&&typeof projectName==='function') return projectName(row.project_id)||S(row.project_name)||S(row.project_id); }catch(_){} return S(row&&row.project_name)||S(row&&row.project_id)||'-'; }
+  function fallbackSupervisor(row){ try{ if(row&&row.supervisor_id&&typeof supervisorName==='function') return supervisorName(row.supervisor_id)||S(row.supervisor_name)||S(row.supervisor_id); }catch(_){} return S(row&&row.supervisor_name)||S(row&&row.supervisor_id)||'-'; }
+  function formWorkers(row){
+    let out=[];
+    try{ if(window.tasneefStrictWorkersForLogV10177){ const s=window.tasneefStrictWorkersForLogV10177(row||{}); if(s&&s!=='-') out=s.split('،').map(x=>S(x)).filter(Boolean); } }catch(_){}
+    const sup=S(row&&row.supervisor_name), proj=S(row&&row.project_name);
+    out=out.filter(n=>n && n!==sup && n!==proj);
+    return out.length?out.join('، '):'-';
+  }
+  window.buildLogWhatsAppMessage=function(row,type){
+    row=row||{}; type=type||((row&&row.check_out)?'out':'in');
+    const project=selectedText('logProject')||fallbackProject(row);
+    const supervisor=selectedText('logSupervisor')||fallbackSupervisor(row);
+    const date=selectedValue('logDate')||S(row.log_date||row.visit_date||row.attendance_date||row.date||row.work_date||S(row.check_in).slice(0,10)||S(row.created_at).slice(0,10))||today();
+    const formTime=type==='out' ? selectedValue('logOut') : selectedValue('logIn');
+    const time=formTime || (type==='out'?S(row.check_out):S(row.check_in));
+    const strictRow=Object.assign({},row,{project_name:project,supervisor_name:supervisor,log_date:date,project_id:selectedValue('logProject')||row.project_id,supervisor_id:selectedValue('logSupervisor')||row.supervisor_id});
+    return [
+      'اسم المشروع: '+project,
+      'اسم المشرف: '+supervisor,
+      'أسماء العمال: '+formWorkers(strictRow),
+      'اليوم: '+dayName(date),
+      'التاريخ: '+date,
+      'الساعة: '+cleanTime(time),
+      'نوع النظافة: '+visitLabel(selectedValue('logVisitType')||row.visit_type)
     ].join('\n');
   };
 })();
