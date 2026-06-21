@@ -9,7 +9,7 @@
   if(window.__tasneefOrdersReceiptSaveRefreshV10143) return;
   window.__tasneefOrdersReceiptSaveRefreshV10143=true;
 
-  const VERSION='v10146_orders_receipt_inventory_whatsapp';
+  const VERSION='v10179_orders_edit_history_visible';
   const SUPABASE_URL='https://zmjdqiswytxlbfgnfjfv.supabase.co';
   const SUPABASE_ANON_KEY='sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb';
   const TABLE='orders_shared';
@@ -21,6 +21,64 @@
   const $=id=>document.getElementById(id);
   const nowIso=()=>new Date().toISOString();
   const normalizeNo=v=>S(v).replace(/\s+/g,'').toUpperCase();
+
+  function orderCurrentUserNameV10179(){
+    try{
+      const u=(typeof window.session==='function' && window.session()) || window.currentUser || window.__currentUser || {};
+      return S(u.full_name||u.name||u.username||u.email||'مدير النظام') || 'مدير النظام';
+    }catch(_){ return 'مدير النظام'; }
+  }
+  function cleanHistoryKeyV10179(k){
+    k=S(k);
+    return k && !/^(__|orderNo$|order_no$|updated_at$|created_at$|source$|updated_by$|created_by$)/i.test(k);
+  }
+  function buildOrderEditHistoryV10179(oldData, newData, oldFlow){
+    oldData=oldData||{}; newData=newData||{}; oldFlow=oldFlow||{};
+    const keys=[...new Set(Object.keys(newData).concat(Object.keys(oldData))).values()].filter(cleanHistoryKeyV10179);
+    const changes=[];
+    keys.forEach(k=>{
+      const a=S(oldData[k]); const b=S(newData[k]);
+      if(a!==b) changes.push({field:k, before:a, after:b});
+    });
+    const previous = Array.isArray(oldFlow.history) ? oldFlow.history : (Array.isArray(oldFlow.edit_history) ? oldFlow.edit_history : (Array.isArray(oldData.__edit_history) ? oldData.__edit_history : []));
+    const next = Object.assign({}, oldFlow);
+    if(changes.length){
+      const entry={
+        at:new Date().toISOString(),
+        by:orderCurrentUserNameV10179(),
+        action: oldData && Object.keys(oldData).length ? 'تعديل أوردر' : 'إنشاء أوردر',
+        changes:changes.slice(0,80)
+      };
+      next.history = previous.concat([entry]).slice(-80);
+      next.edit_history = next.history;
+    }else{
+      next.history = previous.slice(-80);
+      next.edit_history = next.history;
+    }
+    return next;
+  }
+  function orderHistoryFromV10179(row, rec){
+    row=row||{}; rec=rec||{};
+    const f=row.__flow || rec.flow || {};
+    return A(f.history||f.edit_history||row.__edit_history||row.edit_history);
+  }
+  function historyHtmlV10179(history){
+    if(!history || !history.length) return '<div class="orders-history-empty-v10179">لا توجد تعديلات مسجلة حتى الآن لهذا السجل.</div>';
+    return history.slice().reverse().map(h=>{
+      const at=h.at ? new Date(h.at).toLocaleString('ar-SA') : '-';
+      const by=S(h.by||h.user||'-');
+      const action=S(h.action||'تعديل');
+      const changes=A(h.changes).slice(0,12).map(c=>`<li><b>${escHtmlV10179(c.field)}</b>: <span>${escHtmlV10179(c.before||'-')}</span> ← <span>${escHtmlV10179(c.after||'-')}</span></li>`).join('');
+      return `<div class="orders-history-item-v10179"><div><b>${escHtmlV10179(action)}</b> <small>${escHtmlV10179(at)} — ${escHtmlV10179(by)}</small></div>${changes?`<ul>${changes}</ul>`:''}</div>`;
+    }).join('');
+  }
+  function escHtmlV10179(v){ return S(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function ensureHistoryStyleV10179(){
+    if(document.getElementById('ordersHistoryStyleV10179')) return;
+    const st=document.createElement('style'); st.id='ordersHistoryStyleV10179';
+    st.textContent='.orders-history-list-v10179{margin-top:10px;display:grid;gap:8px}.orders-history-empty-v10179{border:1px dashed #dce6e2;border-radius:14px;padding:12px;color:#60706a;background:#fbfdfc}.orders-history-item-v10179{border:1px solid #dce6e2;border-radius:14px;padding:10px;background:#fbfdfc;line-height:1.7}.orders-history-item-v10179 small{color:#60706a}.orders-history-item-v10179 ul{margin:7px 0 0;padding-inline-start:22px}.orders-history-item-v10179 li{margin:3px 0}';
+    document.head.appendChild(st);
+  }
   const receiptCache=new Map();
   let serverRows=[];
 
@@ -269,7 +327,9 @@
       if(rec){ merged[RECEIPT_KEY]=rec; merged[RECEIPT_NAME_KEY]=rec.name; }
       else if(old&&old.data&&findReceipt(old.data)){ const oldRec=findReceipt(old.data); merged[RECEIPT_KEY]=oldRec; merged[RECEIPT_NAME_KEY]=old.data[RECEIPT_NAME_KEY]||(oldRec&&oldRec.name)||''; }
       delete merged.updated_by; delete merged.source; delete merged.created_by;
-      const payload={order_no:no,data:merged,flow:(old&&old.flow)||{},updated_at:nowIso()};
+      const flow=buildOrderEditHistoryV10179((old&&old.data)||{}, merged, (old&&old.flow)||{});
+      merged.__edit_history = A(flow.history).slice(-80);
+      const payload={order_no:no,data:merged,flow:flow,updated_at:nowIso()};
       if(old) await api('/rest/v1/'+TABLE+'?order_no=eq.'+encodeURIComponent(no),{method:'PATCH',body:JSON.stringify(payload)});
       else await api('/rest/v1/'+TABLE,{method:'POST',body:JSON.stringify(payload)});
       const f=receiptInput(); if(f) f.value='';
@@ -433,15 +493,56 @@
     if(window.__ordersRenderPatchV10143) return;
     const old=window.renderOrdersV233;
     if(typeof old==='function'){
-      window.renderOrdersV233=function(){ const r=old.apply(this,arguments); setTimeout(()=>{ cleanupInventoryCostFields(); cleanupCardReceiptButtons(); attachReceiptButtons(); patchOrderWhatsappButtons(); },100); return r; };
+      window.renderOrdersV233=function(){ const r=old.apply(this,arguments); setTimeout(()=>{ cleanupInventoryCostFields(); cleanupCardReceiptButtons(); attachReceiptButtons(); patchOrderWhatsappButtons(); injectOrderHistoryIntoOpenModalsV10179(); },100); return r; };
       window.__ordersRenderPatchV10143=true;
     }
   }
+
+  function modalOrderNoV10179(root){
+    const txt=S(root&&root.textContent);
+    const m=txt.match(/ORD\s*[-_]?\s*\d+/i);
+    return m ? normalizeNo(m[0]) : '';
+  }
+  async function injectOrderHistoryIntoOpenModalsV10179(){
+    try{
+      ensureHistoryStyleV10179();
+      const roots=[...document.querySelectorAll('body > div, .smart-modal-v129, .smart-modal-backdrop, .modal, [role="dialog"]')];
+      for(const root of roots){
+        const txt=S(root.textContent);
+        if(!/عرض\s*الأوردر|عرض\s*الاوردر|سجل\s*التعديلات/i.test(txt)) continue;
+        const no=modalOrderNoV10179(root); if(!no) continue;
+        let row=rowByNo(no);
+        let rec=null;
+        if(!row){ rec=await fetchRecord(no).catch(()=>null); row=rec&&Object.assign({}, rec.data||{}, {__flow:rec.flow||{}, order_no:rec.order_no}); }
+        const hist=orderHistoryFromV10179(row, rec);
+        const current=root.querySelector('.orders-history-list-v10179');
+        const html='<div class="orders-history-list-v10179" data-order-no="'+escHtmlV10179(no)+'">'+historyHtmlV10179(hist)+'</div>';
+        if(current){ current.outerHTML=html; continue; }
+        const titles=[...root.querySelectorAll('h1,h2,h3,h4,b,strong,div')].filter(x=>/^سجل\s*التعديلات$/i.test(S(x.textContent)));
+        if(titles.length){
+          const t=titles[titles.length-1];
+          const host=t.parentElement || t;
+          host.insertAdjacentHTML('beforeend', html);
+        }else{
+          const card=root.querySelector('.smart-modal-body-v129,.smart-invoice-body,.modal-body') || root;
+          card.insertAdjacentHTML('beforeend','<div style="margin-top:14px"><h3>سجل التعديلات</h3>'+html+'</div>');
+        }
+      }
+    }catch(e){ console.warn('orders history inject failed',e); }
+  }
+  function installHistoryObserverV10179(){
+    if(window.__ordersHistoryObserverV10179) return; window.__ordersHistoryObserverV10179=true;
+    let t=null;
+    const run=()=>{ clearTimeout(t); t=setTimeout(injectOrderHistoryIntoOpenModalsV10179,250); };
+    new MutationObserver(run).observe(document.body,{childList:true,subtree:true});
+    document.addEventListener('click',()=>setTimeout(injectOrderHistoryIntoOpenModalsV10179,350),true);
+  }
+
   async function boot(){
-    removeExtraReceiptInputs(); bindFormReceipt(); cleanupInventoryCostFields(); installSave(); patchRender(); installReceiptDedupeObserver();
+    removeExtraReceiptInputs(); bindFormReceipt(); cleanupInventoryCostFields(); installSave(); patchRender(); installReceiptDedupeObserver(); installHistoryObserverV10179();
     await fetchAllRows().catch(()=>[]);
     try{ if(typeof window.renderOrdersV233==='function') window.renderOrdersV233(); }catch(_){ }
-    attachReceiptButtons(); patchOrderWhatsappButtons(); cleanupInventoryCostFields();
+    attachReceiptButtons(); patchOrderWhatsappButtons(); cleanupInventoryCostFields(); injectOrderHistoryIntoOpenModalsV10179();
   }
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,900),{once:true});
