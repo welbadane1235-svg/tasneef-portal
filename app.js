@@ -21074,3 +21074,147 @@ function financePrintReport(kind){
   setTimeout(refreshMonthlyNow, 1800);
   console.log('Tasneef V10191 monthly current supervisors/workers auto update loaded');
 })();
+
+/* ===== V10193: Monthly must include current projects even with no logs + current supervisor grouping ===== */
+(function(){
+  'use strict';
+  if(window.__tasneefMonthlyProjectsAndTimesV10193) return;
+  window.__tasneefMonthlyProjectsAndTimesV10193 = true;
+
+  const S = v => String(v ?? '').trim();
+  const N = v => { const n = Number(v || 0); return Number.isFinite(n) ? n : 0; };
+  const $id = id => document.getElementById(id);
+  const D = () => window.data || data || {};
+  const esc = v => S(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const norm = v => S(v).replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[\u064B-\u0652]/g,'').replace(/\s+/g,' ').toLowerCase();
+  const monthVal = () => $id('monthlyMonth')?.value || (typeof today === 'function' ? today().slice(0,7) : new Date().toISOString().slice(0,7));
+  const logDate = l => S(l.log_date || l.date || l.check_in || l.created_at).slice(0,10);
+  const pRow = pid => (D().projects || []).find(p => S(p.id) === S(pid)) || {};
+  const pName = pid => { try { return projectName(pid); } catch(_) { return pRow(pid).name || '-'; } };
+  const sName = sid => { try { return supervisorName(sid); } catch(_) { const u=(D().supervisors||D().users||[]).find(x=>S(x.id)===S(sid))||{}; return u.full_name||u.name||'-'; } };
+  const currentSid = (pid, fallback='') => S(pRow(pid).supervisor_id || fallback || '');
+  const workerProject = w => { try { return workerProjectId(w); } catch(_) { return w.project_id || w.assigned_project_id || w.current_project_id || ''; } };
+  const actualMins = l => {
+    try { if(typeof logActualMinutes === 'function') return N(logActualMinutes(l)); } catch(_) {}
+    try { if(l.check_in && l.check_out && typeof minutesBetween === 'function') return N(minutesBetween(l.check_in,l.check_out)); } catch(_) {}
+    return N(l.duration_minutes || l.actual_minutes || l.minutes);
+  };
+  const requiredMins = l => {
+    try { if(typeof logRequiredMinutes === 'function') return N(logRequiredMinutes(l)); } catch(_) {}
+    return N(l.required_minutes || l.required_daily_minutes || l.daily_required_minutes);
+  };
+  const minsTxt = m => { try { return minsToText(m); } catch(_) { return Math.round(N(m)).toLocaleString('en-US') + ' دقيقة'; } };
+  const pctTxt = p => { try { return percentText(p); } catch(_) { return N(p).toFixed(1).replace(/\.0$/,'') + '%'; } };
+  function status(diff, required){
+    try{ if(typeof monthlyStatusFromDiffV60 === 'function') return monthlyStatusFromDiffV60(diff, required); }catch(_){}
+    if(!N(required)) return {text:'لا يوجد وقت مسجل', cls:'neutral'};
+    if(diff < -5) return {text:'ناقص وقت', cls:'bad'};
+    if(diff > 5) return {text:'زيادة وقت', cls:'warn'};
+    return {text:'ضمن الوقت', cls:'ok'};
+  }
+  function cClass(percent, required){
+    try{ if(typeof monthlyCommitmentClassV60 === 'function') return monthlyCommitmentClassV60(percent, required); }catch(_){}
+    if(!N(required)) return 'neutral';
+    return percent >= 95 && percent <= 105 ? 'green' : (percent > 105 ? 'amber' : 'red');
+  }
+  function workersForProject(pid){
+    const names = new Map();
+    (D().workers || []).forEach(w => {
+      const st = S(w.status || 'active').toLowerCase();
+      if(st === 'deleted' || st === 'inactive' || st === 'archived') return;
+      if(S(workerProject(w)) !== S(pid)) return;
+      const name = S(w.name || w.full_name || w.worker_name);
+      const key = norm(name);
+      if(key && !names.has(key)) names.set(key, name);
+    });
+    return [...names.values()].sort((a,b)=>a.localeCompare(b,'ar')).join('، ') || '-';
+  }
+  function isProjectActive(p){
+    const st = S(p.status || 'active').toLowerCase();
+    return !['inactive','deleted','archived','stopped','متوقف'].includes(st);
+  }
+
+  function buildMonthlyRowsV10193(){
+    const month = monthVal();
+    const selected = S($id('monthlySupervisor')?.value || '');
+    const map = new Map();
+
+    // 1) Start from current active projects, so a new project مثل العجلان 30 يظهر حتى لو ما له سجلات بعد.
+    (D().projects || []).filter(isProjectActive).forEach(p => {
+      const sid = S(p.supervisor_id || '');
+      if(selected && sid !== selected) return;
+      const pid = S(p.id);
+      if(!pid) return;
+      map.set(sid + '|' + pid, {s:sid, p:pid, a:0, r:0, t:0, c:0, hasProject:true});
+    });
+
+    // 2) Add actual logs by project_id, but group them under the CURRENT project supervisor, not the old supervisor in the log.
+    (D().logs || []).forEach(l => {
+      const d = logDate(l);
+      if(!d || d.slice(0,7) !== month) return;
+      const pid = S(l.project_id || '');
+      if(!pid) return;
+      const sid = currentSid(pid, l.supervisor_id);
+      if(selected && sid !== selected) return;
+      const key = sid + '|' + pid;
+      if(!map.has(key)) map.set(key, {s:sid, p:pid, a:0, r:0, t:0, c:0, hasProject:false});
+      const r = map.get(key);
+      r.a += actualMins(l);
+      r.r += requiredMins(l);
+      r.t += N(l.travel_minutes || l.transfer_minutes);
+      r.c += 1;
+    });
+
+    const rows = [...map.values()];
+    const supTotals = {};
+    rows.forEach(r => { supTotals[S(r.s)] = (supTotals[S(r.s)] || 0) + N(r.a); });
+    return rows.map(r => {
+      const supTotal = supTotals[S(r.s)] || 0;
+      const workPercent = supTotal ? N(r.a) / supTotal * 100 : 0;
+      const commitmentPercent = N(r.r) ? N(r.a) / N(r.r) * 100 : 0;
+      const diff = N(r.a) - N(r.r);
+      const st = status(diff, r.r);
+      return {...r, workers:workersForProject(r.p), supTotal, workPercent, commitmentPercent, diff, st:st.text, cls:st.cls, ccls:cClass(commitmentPercent, r.r)};
+    }).sort((a,b)=>sName(a.s).localeCompare(sName(b.s),'ar') || pName(a.p).localeCompare(pName(b.p),'ar'));
+  }
+
+  window.monthlyRowsV10193 = buildMonthlyRowsV10193;
+  window.monthlyRowsV60 = buildMonthlyRowsV10193;
+  window.monthlyRowsV284 = buildMonthlyRowsV10193;
+  window.monthlyBaseRowsV59 = buildMonthlyRowsV10193;
+  window.monthlyReportRowsV58 = buildMonthlyRowsV10193;
+
+  window.renderMonthly = function(){
+    const body = $id('monthlyBody');
+    if(!body) return;
+    const rows = buildMonthlyRowsV10193();
+    const table = body.closest('table');
+    if(table?.tHead) table.tHead.innerHTML = '<tr><th>المشرف الحالي</th><th>المشروع الحالي</th><th>أسماء العمال الحالية</th><th>عدد السجلات</th><th>الساعات المطلوبة</th><th>الساعات الفعلية</th><th>وقت الانتقال</th><th>نسبة العمل</th><th>نسبة الالتزام</th><th>الحالة</th></tr>';
+    body.innerHTML = rows.map(r => `<tr><td>${esc(sName(r.s))}</td><td>${esc(pName(r.p))}</td><td>${esc(r.workers)}</td><td>${Math.round(N(r.c)).toLocaleString('en-US')}</td><td>${minsTxt(r.r)}</td><td>${minsTxt(r.a)}</td><td>${Math.round(N(r.t)).toLocaleString('en-US')} دقيقة</td><td><span class="badge green">${pctTxt(r.workPercent)}</span></td><td><span class="badge ${r.ccls}">${pctTxt(r.commitmentPercent)}</span></td><td><span class="badge ${r.cls}">${esc(r.st)}</span></td></tr>`).join('') || '<tr><td colspan="10">لا توجد مشاريع أو سجلات لهذا الشهر</td></tr>';
+    const total = rows.reduce((a,r)=>a+N(r.a),0), required = rows.reduce((a,r)=>a+N(r.r),0), travel = rows.reduce((a,r)=>a+N(r.t),0);
+    const supCount = new Set(rows.map(r=>S(r.s)).filter(Boolean)).size;
+    const st = status(total-required, required);
+    const summary = $id('monthlySummary');
+    if(summary) summary.innerHTML = `<div class="kpi"><small>المشرفين</small><b>${supCount}</b></div><div class="kpi"><small>المشاريع الحالية</small><b>${rows.length}</b></div><div class="kpi"><small>الساعات المطلوبة</small><b>${minsTxt(required)}</b></div><div class="kpi"><small>الساعات الفعلية</small><b>${minsTxt(total)}</b></div><div class="kpi"><small>وقت الانتقال</small><b>${Math.round(travel).toLocaleString('en-US')} دقيقة</b></div><div class="kpi"><small>الحالة</small><b><span class="badge ${st.cls}">${esc(st.text)}</span></b></div>`;
+  };
+
+  const wrap = name => {
+    const old = window[name];
+    if(typeof old !== 'function' || old.__v10193Wrapped) return;
+    const fn = async function(){
+      const res = await old.apply(this, arguments);
+      try{ if(typeof refreshAll === 'function') await refreshAll(); }catch(_){}
+      setTimeout(()=>{ try{ if($id('monthlyBody')) window.renderMonthly(); }catch(_){} }, 120);
+      return res;
+    };
+    fn.__v10193Wrapped = true;
+    window[name] = fn;
+  };
+  ['saveProject','saveProjectManagerSupervisor','addExistingWorkerToProject','addWorkerInsideProject','removeWorkerFromProject','saveWorker','saveLog','closeLog','adminSaveLogEdit','deleteRow'].forEach(wrap);
+  ['monthlyMonth','monthlySupervisor','projectManageSupervisor','workerProject','workerSupervisor','manageProjectId'].forEach(id=>{
+    const el=$id(id); if(el && !el.__v10193Monthly){ el.__v10193Monthly='1'; el.addEventListener('change',()=>setTimeout(()=>window.renderMonthly && window.renderMonthly(),100)); }
+  });
+  ['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(()=>{ try{ if($id('monthlyBody')) window.renderMonthly(); }catch(_){} }, ev==='load'?1600:600)));
+  setTimeout(()=>{ try{ if($id('monthlyBody')) window.renderMonthly(); }catch(_){} }, 2000);
+  console.log('Tasneef V10193 monthly current projects and times loaded');
+})();
