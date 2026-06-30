@@ -13,7 +13,7 @@
   const E = v => S(v).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const arr = v => Array.isArray(v) ? v : [];
   const dataObj = () => window.data || (window.data={});
-  const titleOptions = ['صيانة','صهريج','سباكة','تعطير','تشجير','كهرباء','نظافة','دفاع مدني','مصاعد'];
+  const titleOptions = ['صيانة','سباكة','تعطير','تشجير','كهرباء','صواريخ','دفاع مدني','مصاعد'];
   const statusMap = {open:'مفتوح',processing:'تحت المعالجة',closed:'مغلق'};
   const priorityMap = {normal:'عادي',high:'مهم',urgent:'عاجل',low:'منخفض'};
   const NO_RECEIPT='__no_receipt__';
