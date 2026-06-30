@@ -21735,7 +21735,7 @@ function financePrintReport(kind){
 
 /* ===== V10222: unified ticket title dropdown + newest/oldest filters ===== */
 (function(){
-  const OPTIONS = ['صيانة','سباكة','تعطير','تشجير','كهرباء','صواريخ','دفاع مدني','مصاعد'];
+  const OPTIONS = ['صيانة','سباكة','تعطير','تشجير','كهرباء','صواريخ','دفاع مدني','مصاعد','مشكلة نظافة','صهاريج'];
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   function makeSelect(id, current){
     const sel = document.createElement('select');
