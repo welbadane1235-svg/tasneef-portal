@@ -21808,3 +21808,154 @@ function financePrintReport(kind){
   window.renderTechnicianTickets = function(){ ensureTicketTitleDropdowns(); ensureSortFilters(); return oldTechRender && oldTechRender.apply(this, arguments); };
   window.addEventListener('load',()=>{ setTimeout(()=>{ ensureTicketTitleDropdowns(); ensureSortFilters(); },200); setTimeout(()=>{ ensureTicketTitleDropdowns(); ensureSortFilters(); },1200); });
 })();
+
+/* ===== V10310: Tasneef approved report footer + date range + logo ===== */
+(function(){
+  'use strict';
+  if(window.__tasneefApprovedReportsV10310) return;
+  window.__tasneefApprovedReportsV10310 = true;
+
+  const DISCLAIMER_V10310 = 'تم إنشاء هذا التقرير من نظام شركة تصنيف لإدارة المرافق، ويعتبر معتمدًا ما لم يبرر العميل خلاف ذلك.';
+  const LOGO_V10310 = 'tasneef_logo_print.png';
+  const $ = id => document.getElementById(id);
+  const A = v => Array.isArray(v) ? v : [];
+  const S = v => String(v ?? '').trim();
+  const E = v => S(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function todayIso(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+  function rowDate(l){
+    const raw = S(l?.log_date || l?.check_in || l?.created_at || l?.date);
+    if(!raw) return '';
+    if(/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0,10);
+    const d = new Date(raw); if(isNaN(d.getTime())) return raw.slice(0,10);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  function inRange(date, from, to){ if(!date) return false; if(from && date < from) return false; if(to && date > to) return false; return true; }
+  function arDate(v){ if(!v) return 'غير محدد'; try{ return new Date(v+'T12:00:00').toLocaleDateString('ar-SA',{year:'numeric',month:'2-digit',day:'2-digit'}); }catch(_){ return v; } }
+  function minsTxt(m){ try{ return typeof window.minsToText==='function' ? window.minsToText(Number(m)||0) : ((Number(m)||0)+' دقيقة'); }catch(_){ return (Number(m)||0)+' دقيقة'; } }
+  function minutesBetweenSafe(a,b){ try{ return typeof window.minutesBetween==='function' ? window.minutesBetween(a,b) : 0; }catch(_){ return 0; } }
+  function projectNameSafe(id){ try{ return typeof window.projectName==='function' ? window.projectName(id) : '-'; }catch(_){ return '-'; } }
+  function supervisorNameSafe(id){ try{ return typeof window.supervisorName==='function' ? window.supervisorName(id) : '-'; }catch(_){ return '-'; } }
+  function visitTypeSafe(v){ try{ return typeof window.visitTypeText==='function' ? window.visitTypeText(v) : S(v||'-'); }catch(_){ return S(v||'-'); } }
+  function statusTextSafe(v){ try{ return typeof window.timeStatusText==='function' ? window.timeStatusText(v) : S(v||'-'); }catch(_){ return S(v||'-'); } }
+  function timeOnlySafe(v){ try{ return typeof window.timeOnly==='function' ? window.timeOnly(v) : S(v).slice(11,16); }catch(_){ return S(v).slice(11,16); } }
+  function logRequired(l){ try{ return Number((typeof window.logRequiredMinutes==='function'?window.logRequiredMinutes(l):l.required_minutes)||0); }catch(_){ return Number(l?.required_minutes||0); } }
+  function logActual(l){ return Number(l?.duration_minutes || minutesBetweenSafe(l?.check_in,l?.check_out) || 0); }
+  function logStatus(l){ const a=logActual(l), r=logRequired(l), diff=a-r; return l?.time_status || (diff<-5?'under':diff>5?'over':'ok'); }
+  function currentUser(){ try{ return typeof window.session==='function' ? window.session() : (window.currentUser||{}); }catch(_){ return window.currentUser||{}; } }
+  function dateRangeLabel(from,to){ return `من ${arDate(from)} إلى ${arDate(to)}`; }
+
+  function ensureLogoFallback(){
+    document.querySelectorAll('img[src="tasneef_logo_print.png"]').forEach(img=>{ img.onerror=function(){ this.style.display='none'; }; });
+  }
+
+  function ensureDailyRangeUi(){
+    const daily = $('dailyDate');
+    if(daily && ! $('dailyDateFromV10310')){
+      const from = document.createElement('input'); from.type='date'; from.id='dailyDateFromV10310'; from.title='من تاريخ'; from.onchange=()=>{ if(typeof window.renderTimeLogs==='function') window.renderTimeLogs(); };
+      const to = document.createElement('input'); to.type='date'; to.id='dailyDateToV10310'; to.title='إلى تاريخ'; to.onchange=()=>{ if(typeof window.renderTimeLogs==='function') window.renderTimeLogs(); };
+      from.value = daily.value || todayIso(); to.value = daily.value || todayIso();
+      daily.style.display='none';
+      daily.insertAdjacentElement('beforebegin', from);
+      from.insertAdjacentHTML('beforebegin','<span class="date-range-caption-v10310">من تاريخ</span>');
+      daily.insertAdjacentElement('beforebegin', to);
+      to.insertAdjacentHTML('beforebegin','<span class="date-range-caption-v10310">إلى تاريخ</span>');
+    }
+    const supLogsCard = $('logsBody')?.closest('.card');
+    if(supLogsCard && ! $('supDailyDateFromV10310') && !$('dailyDate')){
+      const bar=document.createElement('div'); bar.className='filters sup-date-range-v10310';
+      bar.innerHTML='<span>من تاريخ</span><input type="date" id="supDailyDateFromV10310"><span>إلى تاريخ</span><input type="date" id="supDailyDateToV10310"><button type="button" class="light" onclick="exportSupervisorDailyPDFV10310()">طباعة تقرير المشرف / PDF</button>';
+      const table=supLogsCard.querySelector('.table-wrap');
+      if(table) supLogsCard.insertBefore(bar, table);
+      const t=todayIso(); $('supDailyDateFromV10310').value=t; $('supDailyDateToV10310').value=t;
+      ['supDailyDateFromV10310','supDailyDateToV10310'].forEach(id=>$(id).onchange=()=>{ if(typeof window.renderTimeLogs==='function') window.renderTimeLogs(); });
+    }
+    if(!$('approvedReportsCssV10310')){
+      const st=document.createElement('style'); st.id='approvedReportsCssV10310'; st.textContent='.date-range-caption-v10310{font-weight:800;color:#0a4033;align-self:center}.filters .date-range-caption-v10310+input{min-width:145px}.sup-date-range-v10310{margin:8px 0 12px}'; document.head.appendChild(st);
+    }
+  }
+
+  const oldFilterLogsV10310 = window.filterLogs;
+  window.filterLogs = function(){
+    let rows = A(window.data && window.data.logs).filter(l => S(l.visit_type||'') !== 'technician_attendance');
+    const from = S($('dailyDateFromV10310')?.value || $('supDailyDateFromV10310')?.value || $('dailyDate')?.value || $('supLogDate')?.value || '');
+    const to = S($('dailyDateToV10310')?.value || $('supDailyDateToV10310')?.value || $('dailyDate')?.value || $('supLogDate')?.value || from);
+    const sup = S($('dailySupervisor')?.value || '');
+    const proj = S($('dailyProject')?.value || $('logProjectFilter')?.value || '');
+    const q = S($('dailySearch')?.value || '').toLowerCase();
+    const user = currentUser();
+    if(user && user.role === 'supervisor' && user.id) rows = rows.filter(l => S(l.supervisor_id) === S(user.id));
+    if(from || to) rows = rows.filter(l => inRange(rowDate(l), from, to || from));
+    if(sup) rows = rows.filter(l => S(l.supervisor_id) === sup);
+    if(proj) rows = rows.filter(l => S(l.project_id) === proj);
+    if(q) rows = rows.filter(l => [supervisorNameSafe(l.supervisor_id), projectNameSafe(l.project_id), visitTypeSafe(l.visit_type), statusTextSafe(l.time_status), l.notes].join(' ').toLowerCase().includes(q));
+    return rows;
+  };
+
+  const oldRenderTimeLogsV10310 = window.renderTimeLogs;
+  window.renderTimeLogs = function(){
+    ensureDailyRangeUi();
+    if(typeof oldRenderTimeLogsV10310 === 'function') return oldRenderTimeLogsV10310.apply(this, arguments);
+  };
+
+  function dailyRows(){ return typeof window.filterLogs==='function' ? window.filterLogs() : []; }
+  function reportTable(rows){
+    return rows.map((l,i)=>{
+      const a=logActual(l), r=logRequired(l), diff=a-r;
+      return `<tr><td>${i+1}</td><td>${E(rowDate(l))}</td><td>${E(supervisorNameSafe(l.supervisor_id))}</td><td>${E(projectNameSafe(l.project_id))}</td><td>${E(visitTypeSafe(l.visit_type))}</td><td>${E(timeOnlySafe(l.check_in))}</td><td>${E(timeOnlySafe(l.check_out))}</td><td>${E(minsTxt(r))}</td><td>${E(minsTxt(a))}</td><td>${diff>=0?'زيادة ':'نقص '}${E(minsTxt(Math.abs(diff)))}</td><td>${E(statusTextSafe(logStatus(l)))}</td><td>${E(l.notes||'')}</td></tr>`;
+    }).join('') || '<tr><td colspan="12" style="padding:25px;text-align:center">لا توجد بيانات حسب الفلاتر المحددة</td></tr>';
+  }
+  function openReport(title, copyLabel, rows, from, to){
+    let totalActual=0,totalReq=0,ok=0,over=0,under=0;
+    rows.forEach(l=>{ const a=logActual(l), r=logRequired(l), d=a-r; totalActual+=a; totalReq+=r; if(d<-5) under++; else if(d>5) over++; else ok++; });
+    const html=`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${E(title)}</title><style>@page{size:A4 landscape;margin:9mm}*{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial,sans-serif;color:#123d33;background:#fff;font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact}.sheet{border:2px solid #0a5a49;border-radius:16px;min-height:100vh;padding:14px}.head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #0a5a49;padding-bottom:10px;margin-bottom:10px}.brand{display:flex;align-items:center;gap:12px}.brand img{width:145px;max-height:58px;object-fit:contain}.brand h2{margin:0;color:#0a5a49;font-size:18px}.brand p,.title p{margin:3px 0 0;color:#65756f}.title{text-align:left}.title h1{margin:0;color:#0a5a49;font-size:25px}.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}.box,.kpi{border:1px solid #d9e6e1;border-radius:12px;background:#f8fbfa;padding:9px}.box b,.kpi b{display:block;color:#0a5a49;margin-bottom:4px}.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:10px 0}.kpi{text-align:center}.kpi strong{display:block;color:#0a5a49;font-size:18px}table{width:100%;border-collapse:collapse;margin-top:10px}th{background:#0a5a49;color:#fff;padding:7px;border:1px solid #0a5a49;white-space:nowrap}td{border:1px solid #d9e6e1;padding:6px;text-align:center;vertical-align:top}tbody tr:nth-child(even) td{background:#f7fbfa}.notes{border:1px solid #d9e6e1;border-radius:12px;margin-top:10px;padding:9px;min-height:55px}.footer{display:flex;align-items:center;justify-content:space-between;border-top:1px solid #d9e6e1;margin-top:10px;padding-top:8px;color:#0a5a49;font-weight:900}.copy{background:#0a5a49;color:white;border-radius:999px;padding:7px 18px}.disc{text-align:center;flex:1}@media print{.sheet{border-radius:0}tr,.kpi,.box{break-inside:avoid}}</style></head><body><div class="sheet"><div class="head"><div class="brand"><img src="${LOGO_V10310}" onerror="this.style.display='none'"><div><h2>شركة تصنيف لإدارة المرافق</h2><p>TASNEF FACILITIES MANAGEMENT</p></div></div><div class="title"><h1>${E(title)}</h1><p>تاريخ الإصدار: ${E(new Date().toLocaleString('ar-SA'))}</p></div></div><div class="meta"><div class="box"><b>الفترة</b>${E(dateRangeLabel(from,to))}</div><div class="box"><b>المشرف</b>${E($('dailySupervisor')?.value?supervisorNameSafe($('dailySupervisor').value):(currentUser()?.role==='supervisor'?supervisorNameSafe(currentUser().id):'الكل'))}</div><div class="box"><b>المشروع</b>${E($('dailyProject')?.value?projectNameSafe($('dailyProject').value):'الكل')}</div><div class="box"><b>عدد السجلات</b>${rows.length}</div></div><div class="kpis"><div class="kpi"><strong>${E(minsTxt(totalActual))}</strong><span>إجمالي الوقت الفعلي</span></div><div class="kpi"><strong>${E(minsTxt(totalReq))}</strong><span>إجمالي الوقت المطلوب</span></div><div class="kpi"><strong>${E(minsTxt(Math.abs(totalActual-totalReq)))}</strong><span>فرق الوقت</span></div><div class="kpi"><strong>${ok}</strong><span>ضمن الوقت</span></div><div class="kpi"><strong>${over} / ${under}</strong><span>زيادة / نقص</span></div></div><table><thead><tr><th>م</th><th>التاريخ</th><th>المشرف</th><th>المشروع</th><th>نوع الزيارة</th><th>الدخول</th><th>الخروج</th><th>المطلوب</th><th>الفعلي</th><th>الفرق</th><th>الحالة</th><th>ملاحظات</th></tr></thead><tbody>${reportTable(rows)}</tbody></table><div class="notes"><b>ملاحظات عامة</b><br><br></div><div class="footer"><span class="copy">${E(copyLabel)}</span><span class="disc">${E(DISCLAIMER_V10310)}</span></div></div><script>window.onload=function(){setTimeout(function(){window.print()},450)}<\/script></body></html>`;
+    const w=window.open('','_blank'); if(!w) return alert('المتصفح منع فتح نافذة الطباعة'); w.document.open(); w.document.write(html); w.document.close();
+  }
+
+  window.exportDailyManagerPDF = function(){
+    ensureDailyRangeUi();
+    const from = S($('dailyDateFromV10310')?.value || $('dailyDate')?.value || todayIso());
+    const to = S($('dailyDateToV10310')?.value || $('dailyDate')?.value || from);
+    openReport('تقرير التشغيل اليومي للإدارة', 'نسخة الإدارة', dailyRows(), from, to);
+  };
+  window.exportSupervisorDailyPDFV10310 = function(){
+    ensureDailyRangeUi();
+    const from = S($('supDailyDateFromV10310')?.value || todayIso());
+    const to = S($('supDailyDateToV10310')?.value || from);
+    openReport('تقرير التشغيل اليومي للمشرف', 'نسخة المشرف', dailyRows(), from, to);
+  };
+
+  // Supervisor tickets: add من/إلى and a print button when the supervisor page uses the built-in ticket renderer.
+  function ensureSupervisorTicketRangeUi(){
+    const filters = $('supTicketSearch')?.closest('.filters');
+    if(!filters || $('supTicketFromV10310')) return;
+    filters.insertAdjacentHTML('afterbegin','<span class="date-range-caption-v10310">من تاريخ</span><input type="date" id="supTicketFromV10310" onchange="renderTickets&&renderTickets()"><span class="date-range-caption-v10310">إلى تاريخ</span><input type="date" id="supTicketToV10310" onchange="renderTickets&&renderTickets()">');
+    filters.insertAdjacentHTML('beforeend','<button type="button" class="light" onclick="printSupervisorTicketsV10310()">طباعة تقرير المشرف / PDF</button>');
+  }
+  function ticketDate(t){ const raw=S(t?.created_at||t?.opened_at||t?.date||t?.updated_at); if(/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0,10); const d=new Date(raw); if(isNaN(d.getTime())) return ''; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+  function ticketNo(t){ return S(t?.ticket_number||t?.ticket_no||t?.no)||('T-'+String(t?.id||0).padStart(4,'0')); }
+  function ticketStatus(t){ const s=S(t?.status||'open'); return ({open:'مفتوح',processing:'تحت المعالجة',closed:'مغلق'})[s]||s; }
+  function ticketPriority(t){ const s=S(t?.priority||'normal'); return ({normal:'عادي',high:'مهم',urgent:'عاجل',low:'منخفض'})[s]||s; }
+  function supervisorTicketRows(){
+    const u=currentUser(); let rows=A(window.data && window.data.tickets).slice();
+    if(u?.role==='supervisor' && u?.id) rows=rows.filter(t=>S(t.supervisor_id)===S(u.id) || !S(t.supervisor_id));
+    const p=S($('supTicketFilterProject')?.value||''), st=S($('supTicketFilterStatus')?.value||''), q=S($('supTicketSearch')?.value||'').toLowerCase(), from=S($('supTicketFromV10310')?.value||''), to=S($('supTicketToV10310')?.value||from);
+    if(from||to) rows=rows.filter(t=>inRange(ticketDate(t),from,to));
+    if(p) rows=rows.filter(t=>S(t.project_id)===p);
+    if(st) rows=rows.filter(t=>S(t.status||'open')===st);
+    if(q) rows=rows.filter(t=>[ticketNo(t),t.title,t.description,projectNameSafe(t.project_id),supervisorNameSafe(t.supervisor_id),ticketStatus(t)].join(' ').toLowerCase().includes(q));
+    return rows.sort((a,b)=> (Date.parse(b.created_at||b.opened_at||'')||0)-(Date.parse(a.created_at||a.opened_at||'')||0));
+  }
+  const oldRenderTicketsV10310 = window.renderTickets;
+  window.renderTickets = function(){ ensureSupervisorTicketRangeUi(); if(typeof oldRenderTicketsV10310==='function') return oldRenderTicketsV10310.apply(this, arguments); };
+  window.printSupervisorTicketsV10310 = function(){
+    const rows=supervisorTicketRows(); const from=S($('supTicketFromV10310')?.value||''); const to=S($('supTicketToV10310')?.value||from);
+    const body=rows.map((t,i)=>`<tr><td>${i+1}</td><td>${E(ticketNo(t))}</td><td>${E(ticketDate(t))}</td><td>${E(projectNameSafe(t.project_id))}</td><td>${E(t.title||'-')}</td><td>${E(ticketPriority(t))}</td><td>${E(ticketStatus(t))}</td><td>${E(t.description||'-')}${t.closure_note?'<br><b>الإجراء:</b> '+E(t.closure_note):''}</td></tr>`).join('') || '<tr><td colspan="8" style="padding:25px;text-align:center">لا توجد تكتات حسب الفلاتر المحددة</td></tr>';
+    const html=`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير التكتات - نسخة المشرف</title><style>@page{size:A4 landscape;margin:9mm}*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;margin:0;color:#123d33;font-size:11px}.sheet{border:2px solid #0a5a49;padding:14px;min-height:100vh}.head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #0a5a49;padding-bottom:10px}.brand{display:flex;align-items:center;gap:12px}.brand img{width:145px;max-height:58px;object-fit:contain}.title{text-align:left}.title h1{margin:0;color:#0a5a49}.meta{border:1px solid #d9e6e1;background:#f8fbfa;border-radius:12px;padding:9px;margin:10px 0}table{width:100%;border-collapse:collapse}th{background:#0a5a49;color:white;padding:8px}td{border:1px solid #d9e6e1;padding:7px;vertical-align:top}tbody tr:nth-child(even)td{background:#f7fbfa}.footer{display:flex;justify-content:space-between;align-items:center;border-top:1px solid #d9e6e1;margin-top:10px;padding-top:8px;color:#0a5a49;font-weight:900}.copy{background:#0a5a49;color:white;border-radius:999px;padding:7px 18px}.disc{flex:1;text-align:center}</style></head><body><div class="sheet"><div class="head"><div class="brand"><img src="${LOGO_V10310}" onerror="this.style.display='none'"><div><h2>شركة تصنيف لإدارة المرافق</h2><p>TASNEF FACILITIES MANAGEMENT</p></div></div><div class="title"><h1>تقرير التكتات</h1><p>تاريخ الإصدار: ${E(new Date().toLocaleString('ar-SA'))}</p></div></div><div class="meta"><b>الفترة:</b> ${E(from||to?dateRangeLabel(from,to):'كل التواريخ')} — <b>عدد التكتات:</b> ${rows.length}</div><table><thead><tr><th>م</th><th>رقم التكت</th><th>التاريخ</th><th>المشروع</th><th>نوع المشكلة</th><th>الأولوية</th><th>الحالة</th><th>الوصف / الإجراء</th></tr></thead><tbody>${body}</tbody></table><div class="footer"><span class="copy">نسخة المشرف</span><span class="disc">${E(DISCLAIMER_V10310)}</span></div></div><script>window.onload=function(){setTimeout(function(){window.print()},450)}<\/script></body></html>`;
+    const w=window.open('','_blank'); if(!w) return alert('المتصفح منع فتح نافذة الطباعة'); w.document.open(); w.document.write(html); w.document.close();
+  };
+
+  function boot(){ ensureLogoFallback(); ensureDailyRangeUi(); ensureSupervisorTicketRangeUi(); }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,300));
+  window.addEventListener('load',()=>setTimeout(boot,700));
+  setTimeout(boot,1400);
+})();
