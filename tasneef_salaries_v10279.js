@@ -366,19 +366,19 @@
     return calcRow(r, dim);
   }
   function calcRow(r, dim){
+    // V10283: نفس معادلة ملف Excel المعتمد.
+    dim = num(dim) || 30;
     r.gross_salary=num(r.basic_salary)+num(r.allowance);
-    r.work_days=num(r.work_days);               // أيام الفترة المسجلة من الحضور والغياب
-    r.absent_days=num(r.absent_days);           // أيام الغياب داخل نفس الفترة
-    r.payable_days=Math.max(0, r.work_days-r.absent_days); // للعرض فقط
+    r.work_days=num(r.work_days);
+    r.absent_days=Math.max(0, Math.min(num(r.absent_days), num(r.work_days)));
+    r.payable_days=Math.max(0, r.work_days-r.absent_days);
     r.absence_deduction=(num(r.gross_salary)/dim)*r.absent_days;
-    // إجمالي الراتب على أيام الفترة = راتب الفترة كاملة، والغياب يظهر في الخصومات حتى يكون واضحًا.
-    r.salary_by_days=(num(r.gross_salary)/dim)*r.work_days;
+    r.salary_by_days=(num(r.gross_salary)/dim)*r.payable_days;
     if(!r._manual_deductions){
-      // خصم الغياب يدخل تلقائيًا في عمود الخصومات. لا يعتمد على خصومات محفوظة قديمة بقيمة صفر.
       const manualExtra=num(r.manual_extra_deductions||0);
       r.deductions=num(r.absence_deduction)+manualExtra;
     }
-    r.net_salary=num(r.salary_by_days)+num(r.commission)-num(r.deductions)-num(r.advance_deduction)+num(r.rounding);
+    r.net_salary=num(r.salary_by_days)+num(r.commission)-num(r.deductions)+num(r.rounding)-num(r.advance_deduction);
     return r;
   }
   function attendanceGroupKey(a){
@@ -1009,7 +1009,8 @@
       wb.creator='Tasneef System';
       wb.created=new Date();
       wb.modified=new Date();
-      wb.calcProperties.fullCalcOnLoad = false;
+      wb.calcProperties.fullCalcOnLoad = true;
+      wb.calcProperties.forceFullCalc = true;
       const ws=wb.addWorksheet('كشف الرواتب', {views:[{rightToLeft:true, state:'frozen', ySplit:3}]});
       ws.views=[{rightToLeft:true, state:'frozen', ySplit:3}];
 
@@ -1034,10 +1035,27 @@
       const widths=[7,12,12,26,20,16,18,26,12,14,14,11,11,13,16,12,12,19,12,12,12,12,12];
       widths.forEach((w,i)=>ws.getColumn(i+1).width=w);
 
-      const textCols=new Set([2,3,4,5,6,7,8,9,10,11]);
       const numericCols=new Set([1,12,13,14,15,16,17,18,19,20,21,22,23]);
       const dataRowNumbers=[];
       let excelRow=4;
+      function styleRow(row, idx){
+        row.height=22;
+        row.eachCell({includeEmpty:true},(cell,col)=>{
+          cell.alignment={horizontal:'center',vertical:'middle',wrapText:true};
+          cell.border={top:{style:'thin',color:{argb:'FFB8D6CD'}},left:{style:'thin',color:{argb:'FFB8D6CD'}},bottom:{style:'thin',color:{argb:'FFB8D6CD'}},right:{style:'thin',color:{argb:'FFB8D6CD'}}};
+          if((idx%2)===1) cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF7FBFA'}};
+        });
+      }
+      function writeDateCell(cell, raw){
+        const text=String(raw||'').trim();
+        const serial=excelSerialFromIsoDateV10276(text);
+        if(serial){ cell.value=serial; cell.numFmt='yyyy-mm-dd'; }
+        else { cell.value=text; cell.numFmt='@'; }
+      }
+      function fWithResult(formula, result){
+        const n=salaryParseNumberV10279(result);
+        return {formula, result:n===null?0:n};
+      }
       rows.forEach((item,idx)=>{
         const row=ws.getRow(excelRow);
         if(item.type==='group'){
@@ -1058,22 +1076,33 @@
           const c=i+1;
           const raw=vals[i] ?? '';
           const cell=row.getCell(c);
-          if(numericCols.has(c)){
+          if(c===10 || c===11){
+            writeDateCell(cell, raw);
+          }else if(numericCols.has(c)){
             const n=salaryParseNumberV10279(raw);
-            cell.value = n===null ? raw : n;
-            cell.numFmt = c===1 ? '0' : '#,##0.00;[Red]-#,##0.00;0';
+            cell.value=n===null ? raw : n;
+            cell.numFmt=c===1 ? '0' : '#,##0.00;[Red]-#,##0.00;0';
           }else{
             cell.value=String(raw ?? '');
             cell.numFmt='@';
           }
         });
+        const L=`L${excelRow}`, M=`M${excelRow}`, N=`N${excelRow}`, O=`O${excelRow}`, P=`P${excelRow}`, Q=`Q${excelRow}`, R=`R${excelRow}`, S=`S${excelRow}`, T=`T${excelRow}`, U=`U${excelRow}`, V=`V${excelRow}`, J=`J${excelRow}`, K=`K${excelRow}`;
+        row.getCell(12).value=fWithResult(`IF(OR(${J}="",${K}=""),0,${K}-${J}+1)`, vals[11]);
+        row.getCell(14).value=fWithResult(`MAX(0,${L}-${M})`, vals[13]);
+        row.getCell(17).value=fWithResult(`${O}+${P}`, vals[16]);
+        const currentGross=salaryParseNumberV10279(vals[16]);
+        const currentAbsent=salaryParseNumberV10279(vals[12]);
+        const currentDeductions=salaryParseNumberV10279(vals[19]);
+        const autoDeduction=(currentGross===null||currentAbsent===null)?0:Math.round((currentGross/30*currentAbsent)*100)/100;
+        const manualAdj=(currentDeductions===null?0:currentDeductions)-autoDeduction;
+        const adjPart=Math.abs(manualAdj)>0.004 ? (manualAdj>0?`+${manualAdj.toFixed(2)}`:`${manualAdj.toFixed(2)}`) : '';
+        row.getCell(20).value=fWithResult(`ROUND(${Q}/30*${M},2)${adjPart}`, vals[19]);
+        row.getCell(18).value=fWithResult(`${Q}/30*${N}`, vals[17]);
+        row.getCell(23).value=fWithResult(`${R}+${S}-${T}+${U}-${V}`, vals[22]);
+        [12,14,17,18,20,23].forEach(c=>{ row.getCell(c).numFmt='#,##0.00;[Red]-#,##0.00;0'; });
         dataRowNumbers.push(excelRow);
-        row.height=22;
-        row.eachCell({includeEmpty:true},(cell,col)=>{
-          cell.alignment={horizontal:'center',vertical:'middle',wrapText:true};
-          cell.border={top:{style:'thin',color:{argb:'FFB8D6CD'}},left:{style:'thin',color:{argb:'FFB8D6CD'}},bottom:{style:'thin',color:{argb:'FFB8D6CD'}},right:{style:'thin',color:{argb:'FFB8D6CD'}}};
-          if((idx%2)===1) cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF7FBFA'}};
-        });
+        styleRow(row, idx);
         excelRow++;
       });
 
@@ -1086,7 +1115,6 @@
       totalCols.forEach(c=>{
         const exact=footerVals ? salaryParseNumberV10279(footerVals[c-1]) : null;
         const letter=ws.getColumn(c).letter;
-        // صيغة تعتمد على نفس القيم المصدرة من الشاشة. والنتيجة الحالية تطابق السستم عند فتح الملف.
         tr.getCell(c).value={formula:`SUM(${dataRowNumbers.map(r=>`${letter}${r}`).join(',')})`, result: exact===null ? 0 : exact};
         tr.getCell(c).numFmt='#,##0.00;[Red]-#,##0.00;0';
       });
@@ -1097,13 +1125,12 @@
         cell.alignment={horizontal:'center',vertical:'middle'};
         cell.border={top:{style:'thin',color:{argb:'FFB8D6CD'}},left:{style:'thin',color:{argb:'FFB8D6CD'}},bottom:{style:'thin',color:{argb:'FFB8D6CD'}},right:{style:'thin',color:{argb:'FFB8D6CD'}}};
       });
-
       const signRow=totalRow+4;
       ws.getCell(`B${signRow}`).value='إدارة الحسابات';
       ws.getCell(`J${signRow}`).value='مدير التشغيل';
       ws.getCell(`R${signRow}`).value='المدير العام';
       ['B','J','R'].forEach(c=>{ ws.getCell(`${c}${signRow}`).font={bold:true}; ws.getCell(`${c}${signRow}`).alignment={horizontal:'center'}; ws.getCell(`${c}${signRow}`).border={top:{style:'thin'}}; });
-      ws.getCell(`A${signRow+2}`).value='ملاحظة V10279: تم بناء تصدير Excel من الصفر من نفس بيانات الجدول الظاهرة في السستم؛ لا توجد إعادة حساب من ملف Excel أو قاعدة البيانات قبل التصدير.';
+      ws.getCell(`A${signRow+2}`).value='ملاحظة V10283: تم تصدير Excel من بيانات السستم الظاهرة مع معادلات قابلة للتعديل مطابقة لملف الإكسل المعتمد.';
       ws.getCell(`A${signRow+2}`).font={italic:true,color:{argb:'FF666666'}};
       ws.pageSetup={orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0};
       const buffer=await wb.xlsx.writeBuffer();
@@ -1113,7 +1140,7 @@
       a.download=`كشف_الرواتب_${month}.xlsx`;
       a.click();
       setTimeout(()=>URL.revokeObjectURL(a.href),2000);
-      msg('تم تصدير Excel مطابق لبيانات السستم الظاهرة');
+      msg('تم تصدير Excel مطابق لبيانات السستم ومعادلة الإكسل المعتمد');
     }catch(e){
       console.error(e);
       msg('تعذر تصدير Excel: '+(e.message||e),'err');
@@ -1224,3 +1251,6 @@
 
 // V10274 alias
 window.tasneefSalariesV10274 = window.tasneefSalariesV10267;
+
+// V10283 alias
+window.tasneefSalariesV10283 = window.tasneefSalariesV10267;
