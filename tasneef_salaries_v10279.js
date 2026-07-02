@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const VERSION='V10281';
+  const VERSION='V10284';
   const $=(id)=>document.getElementById(id);
   const esc=(v)=>String(v??'').replace(/[&<>"]/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
   const num=(v)=>Number(String(v??'').replace(/,/g,''))||0;
@@ -1000,28 +1000,67 @@
     return {headers, rows, footerVals};
   }
   async function exportSalaryExcel(){
+    // V10284: تصدير Excel مبني من الصفر من بيانات الشاشة فقط.
+    // الهدف: ملف Excel يطابق السستم 100% في كل القيم الظاهرة، بدون إعادة حساب تغير الإجماليات.
     try{
+      syncSalaryRowsFromDom();
       const ExcelJS=await loadExcelJsV10268();
-      const {headers, rows, footerVals}=salaryDomExportMatrixV10279();
-      if(!headers.length || !rows.length) return msg('لا توجد بيانات ظاهرة للتصدير','err');
+      const table=document.querySelector('#salaries table.salary-table');
+      if(!table) return msg('لا يوجد جدول رواتب ظاهر للتصدير','err');
       const month=$('salaryMonth')?.value||today().slice(0,7);
+
+      const headers=[...table.querySelectorAll('thead th')].map(th=>salaryCellVisibleTextV10279(th));
+      if(!headers.length) return msg('لا توجد عناوين للتصدير','err');
+
+      const rows=[];
+      table.querySelectorAll('tbody tr').forEach(tr=>{
+        if(tr.classList.contains('salary-group-row')){
+          const title=salaryCellVisibleTextV10279(tr);
+          if(title) rows.push({type:'group', title});
+          return;
+        }
+        const values=[...tr.children].map(td=>salaryCellVisibleTextV10279(td));
+        if(values.some(v=>String(v||'').trim()!=='')){
+          while(values.length < headers.length) values.push('');
+          rows.push({type:'data', values:values.slice(0,headers.length)});
+        }
+      });
+      if(!rows.some(r=>r.type==='data')) return msg('لا توجد صفوف رواتب للتصدير','err');
+
+      // نقرأ إجمالي السستم كما هو من التذييل، ولا نحسبه من جديد.
+      let footerExact=new Array(headers.length).fill('');
+      const foot=table.querySelector('tfoot tr');
+      if(foot){
+        const footCells=[...foot.children];
+        const firstTxt=salaryCellVisibleTextV10279(footCells[0]||'');
+        footerExact[0]=firstTxt || 'الإجمالي';
+        const footerNums=footCells.slice(1).map(td=>salaryCellVisibleTextV10279(td));
+        // آخر 9 أعمدة مالية في الجدول: الأساسي، البدلات، الإجمالي، راتب الفترة، العمولات، الخصومات، الجبر، السلف، الصافي
+        const startIndex=Math.max(0, headers.length-9);
+        footerNums.forEach((v,i)=>{ if(startIndex+i < footerExact.length) footerExact[startIndex+i]=v; });
+      }
+
       const wb=new ExcelJS.Workbook();
       wb.creator='Tasneef System';
       wb.created=new Date();
       wb.modified=new Date();
-      wb.calcProperties.fullCalcOnLoad = true;
-      wb.calcProperties.forceFullCalc = true;
+      // لا نجبر Excel يعيد حساب الإجماليات؛ المصدر الرسمي هو السستم الظاهر.
+      wb.calcProperties.fullCalcOnLoad = false;
+      wb.calcProperties.forceFullCalc = false;
       const ws=wb.addWorksheet('كشف الرواتب', {views:[{rightToLeft:true, state:'frozen', ySplit:3}]});
       ws.views=[{rightToLeft:true, state:'frozen', ySplit:3}];
 
       ws.mergeCells(1,1,1,headers.length);
-      ws.getCell(1,1).value='كشف الرواتب';
-      ws.getCell(1,1).font={bold:true,size:22,color:{argb:'FF0B5D49'}};
-      ws.getCell(1,1).alignment={horizontal:'center',vertical:'middle'};
+      const titleCell=ws.getCell(1,1);
+      titleCell.value='كشف الرواتب';
+      titleCell.font={bold:true,size:22,color:{argb:'FF0B5D49'}};
+      titleCell.alignment={horizontal:'center',vertical:'middle'};
+
       ws.mergeCells(2,1,2,headers.length);
-      ws.getCell(2,1).value=`الشهر: ${month} - شركة تصنيف لإدارة المرافق`;
-      ws.getCell(2,1).font={bold:true,size:13,color:{argb:'FF111111'}};
-      ws.getCell(2,1).alignment={horizontal:'center',vertical:'middle'};
+      const metaCell=ws.getCell(2,1);
+      metaCell.value=`الشهر: ${month} - شركة تصنيف لإدارة المرافق`;
+      metaCell.font={bold:true,size:13,color:{argb:'FF111111'}};
+      metaCell.alignment={horizontal:'center',vertical:'middle'};
 
       const headerRow=ws.getRow(3);
       headerRow.values=headers;
@@ -1032,35 +1071,61 @@
         cell.alignment={horizontal:'center',vertical:'middle',wrapText:true};
         cell.border={top:{style:'thin',color:{argb:'FFB8D6CD'}},left:{style:'thin',color:{argb:'FFB8D6CD'}},bottom:{style:'thin',color:{argb:'FFB8D6CD'}},right:{style:'thin',color:{argb:'FFB8D6CD'}}};
       });
-      const widths=[7,12,12,26,20,16,18,26,12,14,14,11,11,13,16,12,12,19,12,12,12,12,12];
-      widths.forEach((w,i)=>ws.getColumn(i+1).width=w);
 
-      const numericCols=new Set([1,12,13,14,15,16,17,18,19,20,21,22,23]);
-      const dataRowNumbers=[];
-      let excelRow=4;
-      function styleRow(row, idx){
+      const defaultWidths=[7,12,12,26,20,16,18,26,12,14,14,11,11,13,16,12,12,19,12,12,12,12,12];
+      headers.forEach((h,i)=>{
+        const text=String(h||'');
+        let w=defaultWidths[i]||14;
+        if(text.includes('اسم الموظف في الإقامة')) w=28;
+        if(text.includes('اسم الموظف الحركي')) w=22;
+        if(text.includes('ملاحظات')) w=28;
+        if(text.includes('إجمالي الراتب')) w=22;
+        ws.getColumn(i+1).width=w;
+      });
+
+      const headerIndex={};
+      headers.forEach((h,i)=>{ headerIndex[String(h||'').trim()]=i+1; });
+      const dateHeaders=new Set(['بداية الخدمة','نهاية الخدمة','تاريخ البداية','تاريخ النهاية']);
+      const textHeaders=new Set(['أيدي الموظف','الشهر','اسم الموظف في الإقامة','اسم الموظف الحركي','رقم الإقامة','مكان العمل','ملاحظات','الوظيفة']);
+      function isNumberHeader(h){ return !dateHeaders.has(h) && !textHeaders.has(h); }
+      function writeExactCell(cell, raw, header){
+        const value=String(raw ?? '').trim();
+        if(dateHeaders.has(header)){
+          const serial=excelSerialFromIsoDateV10276(value);
+          if(serial){ cell.value=serial; cell.numFmt='yyyy-mm-dd'; }
+          else { cell.value=value; cell.numFmt='@'; }
+          return;
+        }
+        if(isNumberHeader(header)){
+          const n=salaryParseNumberV10279(value);
+          if(n===null || value===''){
+            cell.value=value;
+            cell.numFmt='@';
+          }else{
+            cell.value=n;
+            cell.numFmt=header==='رقم' ? '0' : '#,##0.00;[Red]-#,##0.00;0';
+          }
+          return;
+        }
+        cell.value=value;
+        cell.numFmt='@';
+      }
+      function styleNormalRow(row, zebra){
         row.height=22;
-        row.eachCell({includeEmpty:true},(cell,col)=>{
+        row.eachCell({includeEmpty:true},(cell)=>{
           cell.alignment={horizontal:'center',vertical:'middle',wrapText:true};
           cell.border={top:{style:'thin',color:{argb:'FFB8D6CD'}},left:{style:'thin',color:{argb:'FFB8D6CD'}},bottom:{style:'thin',color:{argb:'FFB8D6CD'}},right:{style:'thin',color:{argb:'FFB8D6CD'}}};
-          if((idx%2)===1) cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF7FBFA'}};
+          if(zebra) cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF7FBFA'}};
         });
       }
-      function writeDateCell(cell, raw){
-        const text=String(raw||'').trim();
-        const serial=excelSerialFromIsoDateV10276(text);
-        if(serial){ cell.value=serial; cell.numFmt='yyyy-mm-dd'; }
-        else { cell.value=text; cell.numFmt='@'; }
-      }
-      function fWithResult(formula, result){
-        const n=salaryParseNumberV10279(result);
-        return {formula, result:n===null?0:n};
-      }
-      rows.forEach((item,idx)=>{
+
+      let excelRow=4, dataCount=0;
+      rows.forEach(item=>{
         const row=ws.getRow(excelRow);
         if(item.type==='group'){
           ws.mergeCells(excelRow,1,excelRow,headers.length);
-          row.getCell(1).value=item.values[0] || '';
+          const c=row.getCell(1);
+          c.value=item.title;
           row.height=24;
           row.eachCell({includeEmpty:true},cell=>{
             cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFDFEEE9'}};
@@ -1071,68 +1136,38 @@
           excelRow++;
           return;
         }
-        const vals=item.values||[];
-        headers.forEach((_,i)=>{
-          const c=i+1;
-          const raw=vals[i] ?? '';
-          const cell=row.getCell(c);
-          if(c===10 || c===11){
-            writeDateCell(cell, raw);
-          }else if(numericCols.has(c)){
-            const n=salaryParseNumberV10279(raw);
-            cell.value=n===null ? raw : n;
-            cell.numFmt=c===1 ? '0' : '#,##0.00;[Red]-#,##0.00;0';
-          }else{
-            cell.value=String(raw ?? '');
-            cell.numFmt='@';
-          }
-        });
-        const L=`L${excelRow}`, M=`M${excelRow}`, N=`N${excelRow}`, O=`O${excelRow}`, P=`P${excelRow}`, Q=`Q${excelRow}`, R=`R${excelRow}`, S=`S${excelRow}`, T=`T${excelRow}`, U=`U${excelRow}`, V=`V${excelRow}`, J=`J${excelRow}`, K=`K${excelRow}`;
-        row.getCell(12).value=fWithResult(`IF(OR(${J}="",${K}=""),0,${K}-${J}+1)`, vals[11]);
-        row.getCell(14).value=fWithResult(`MAX(0,${L}-${M})`, vals[13]);
-        row.getCell(17).value=fWithResult(`${O}+${P}`, vals[16]);
-        const currentGross=salaryParseNumberV10279(vals[16]);
-        const currentAbsent=salaryParseNumberV10279(vals[12]);
-        const currentDeductions=salaryParseNumberV10279(vals[19]);
-        const autoDeduction=(currentGross===null||currentAbsent===null)?0:Math.round((currentGross/30*currentAbsent)*100)/100;
-        const manualAdj=(currentDeductions===null?0:currentDeductions)-autoDeduction;
-        const adjPart=Math.abs(manualAdj)>0.004 ? (manualAdj>0?`+${manualAdj.toFixed(2)}`:`${manualAdj.toFixed(2)}`) : '';
-        row.getCell(20).value=fWithResult(`ROUND(${Q}/30*${M},2)${adjPart}`, vals[19]);
-        row.getCell(18).value=fWithResult(`${Q}/30*${N}`, vals[17]);
-        row.getCell(23).value=fWithResult(`${R}+${S}-${T}+${U}-${V}`, vals[22]);
-        [12,14,17,18,20,23].forEach(c=>{ row.getCell(c).numFmt='#,##0.00;[Red]-#,##0.00;0'; });
-        dataRowNumbers.push(excelRow);
-        styleRow(row, idx);
+        dataCount++;
+        item.values.forEach((raw,i)=>writeExactCell(row.getCell(i+1), raw, headers[i]));
+        styleNormalRow(row, dataCount%2===0);
         excelRow++;
       });
 
       const totalRow=excelRow;
       const tr=ws.getRow(totalRow);
-      ws.mergeCells(totalRow,1,totalRow,13);
-      tr.getCell(1).value='الإجمالي';
-      tr.getCell(1).alignment={horizontal:'center',vertical:'middle'};
-      const totalCols=[15,16,17,18,19,20,21,22,23];
-      totalCols.forEach(c=>{
-        const exact=footerVals ? salaryParseNumberV10279(footerVals[c-1]) : null;
-        const letter=ws.getColumn(c).letter;
-        tr.getCell(c).value={formula:`SUM(${dataRowNumbers.map(r=>`${letter}${r}`).join(',')})`, result: exact===null ? 0 : exact};
-        tr.getCell(c).numFmt='#,##0.00;[Red]-#,##0.00;0';
-      });
+      footerExact.forEach((raw,i)=>writeExactCell(tr.getCell(i+1), raw, headers[i]||''));
+      if(!footerExact.some(v=>String(v||'').trim())) tr.getCell(1).value='الإجمالي';
       tr.height=24;
       tr.eachCell({includeEmpty:true},cell=>{
         cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFDFEEE9'}};
         cell.font={bold:true,color:{argb:'FF063F32'}};
-        cell.alignment={horizontal:'center',vertical:'middle'};
+        cell.alignment={horizontal:'center',vertical:'middle',wrapText:true};
         cell.border={top:{style:'thin',color:{argb:'FFB8D6CD'}},left:{style:'thin',color:{argb:'FFB8D6CD'}},bottom:{style:'thin',color:{argb:'FFB8D6CD'}},right:{style:'thin',color:{argb:'FFB8D6CD'}}};
       });
+
       const signRow=totalRow+4;
       ws.getCell(`B${signRow}`).value='إدارة الحسابات';
       ws.getCell(`J${signRow}`).value='مدير التشغيل';
       ws.getCell(`R${signRow}`).value='المدير العام';
-      ['B','J','R'].forEach(c=>{ ws.getCell(`${c}${signRow}`).font={bold:true}; ws.getCell(`${c}${signRow}`).alignment={horizontal:'center'}; ws.getCell(`${c}${signRow}`).border={top:{style:'thin'}}; });
-      ws.getCell(`A${signRow+2}`).value='ملاحظة V10283: تم تصدير Excel من بيانات السستم الظاهرة مع معادلات قابلة للتعديل مطابقة لملف الإكسل المعتمد.';
+      ['B','J','R'].forEach(col=>{
+        const cell=ws.getCell(`${col}${signRow}`);
+        cell.font={bold:true};
+        cell.alignment={horizontal:'center'};
+        cell.border={top:{style:'thin'}};
+      });
+      ws.getCell(`A${signRow+2}`).value='ملاحظة V10284: التصدير من بيانات السستم الظاهرة حرفيًا؛ لا يوجد إعادة حساب تغير الإجماليات.';
       ws.getCell(`A${signRow+2}`).font={italic:true,color:{argb:'FF666666'}};
       ws.pageSetup={orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0};
+
       const buffer=await wb.xlsx.writeBuffer();
       const blob=new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
       const a=document.createElement('a');
@@ -1140,7 +1175,7 @@
       a.download=`كشف_الرواتب_${month}.xlsx`;
       a.click();
       setTimeout(()=>URL.revokeObjectURL(a.href),2000);
-      msg('تم تصدير Excel مطابق لبيانات السستم ومعادلة الإكسل المعتمد');
+      msg('تم تصدير Excel مطابق 100% لبيانات السستم الظاهرة');
     }catch(e){
       console.error(e);
       msg('تعذر تصدير Excel: '+(e.message||e),'err');
@@ -1252,5 +1287,6 @@
 // V10274 alias
 window.tasneefSalariesV10274 = window.tasneefSalariesV10267;
 
-// V10283 alias
+// V10284 alias
+window.tasneefSalariesV10284 = window.tasneefSalariesV10267;
 window.tasneefSalariesV10283 = window.tasneefSalariesV10267;
