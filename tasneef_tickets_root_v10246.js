@@ -1,11 +1,11 @@
-/* Tasneef V10246 - Tickets root clean + one loader + filtered export
+/* Tasneef V10285 - Tickets date range filters + professional client print
    يعتمد على نسخة المستخدم. لا يلمس قاعدة البيانات. يعرض/يفلتر/يصدر من مصدر واحد فقط. */
 (function(){
   'use strict';
   if(window.__tasneefTicketsRootV10246) return;
   window.__tasneefTicketsRootV10246 = true;
 
-  const VERSION='V10246';
+  const VERSION='V10285';
   const TABLE='tickets';
   const $ = id => document.getElementById(id);
   const S = v => String(v ?? '').trim();
@@ -13,7 +13,7 @@
   const E = v => S(v).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const arr = v => Array.isArray(v) ? v : [];
   const dataObj = () => window.data || (window.data={});
-  const titleOptions = ['صيانة','نظافة','سباكة','تعطير','تشجير','كهرباء','صواريخ','دفاع مدني','مصاعد'];
+  const titleOptions = ['صيانة','نظافة','مشكلة نظافة','سباكة','تعطير','تشجير','كهرباء','صهاريج','دفاع مدني','مصاعد'];
   const statusMap = {open:'مفتوح',processing:'تحت المعالجة',closed:'مغلق'};
   const priorityMap = {normal:'عادي',high:'مهم',urgent:'عاجل',low:'منخفض'};
   const NO_RECEIPT='__no_receipt__';
@@ -57,6 +57,9 @@
   function ticketNo(t){ return S(t.ticket_number || t.ticket_no || t.no) || ('T-' + String(t.id || 0).padStart(4,'0')); }
   function dateRaw(t){ return S(t.created_at || t.createdAt || t.date || t.updated_at); }
   function dateMs(t){ const raw=dateRaw(t); const ms=raw?Date.parse(raw):NaN; return isNaN(ms) ? (Number(t.id)||0) : ms; }
+  function ticketDateOnly(t){ const ms=dateMs(t); if(!ms) return ''; const d=new Date(ms); if(isNaN(d.getTime())) return ''; const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; }
+  function todayIso(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+  function arDate(v){ if(!S(v)) return 'غير محدد'; const d=new Date(S(v)+'T12:00:00'); if(isNaN(d.getTime())) return S(v); try{return d.toLocaleDateString('ar-SA',{year:'numeric',month:'2-digit',day:'2-digit'});}catch(_){return S(v);} }
   function fmtDate(t){ const raw=dateRaw(t); if(!raw) return '-'; const dt=new Date(raw); if(isNaN(dt.getTime())) return raw; try{return dt.toLocaleString('ar-SA',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});}catch(_){return raw;} }
   function statusLabel(s){ return statusMap[S(s)] || S(s) || '-'; }
   function priorityLabel(p){ return priorityMap[S(p)] || S(p) || '-'; }
@@ -98,11 +101,13 @@
         <select id="ticketRootRecipientV10246"><option value="">كل المستلمين</option><option value="${NO_RECEIPT}">بدون استلام</option></select>
         <select id="ticketRootClosedByV10246"><option value="">كل المغلقين</option><option value="${NO_CLOSED}">بدون إغلاق</option></select>
         <select id="ticketRootSortV10246"><option value="newest">الأحدث أولاً</option><option value="oldest">الأقدم أولاً</option></select>
+        <label class="ticket-root-v10246-date-label">من تاريخ<input type="date" id="ticketRootDateFromV10246"></label>
+        <label class="ticket-root-v10246-date-label">إلى تاريخ<input type="date" id="ticketRootDateToV10246"></label>
         <input id="ticketRootSearchV10246" placeholder="بحث برقم التكت، المشروع، المشرف، المستلم، المغلق، العنوان أو الوصف">
-        <div class="ticket-root-v10246-actions"><button type="button" id="ticketRootPdfV10246">تنزيل PDF</button><button type="button" class="light" id="ticketRootCsvV10246">تصدير CSV</button><button type="button" class="light" id="ticketRootRefreshV10246">تحديث التكتات</button><span class="ticket-root-v10246-version">${VERSION}</span></div>`;
+        <div class="ticket-root-v10246-actions"><button type="button" id="ticketRootPdfV10246">طباعة / PDF للعميل</button><button type="button" class="light" id="ticketRootCsvV10246">تصدير CSV</button><button type="button" class="light" id="ticketRootRefreshV10246">تحديث التكتات</button><span class="ticket-root-v10246-version">${VERSION}</span></div>`;
       if(old) old.replaceWith(wrap); else card.insertBefore(wrap, $('ticketsSmartSummary') || body);
     }
-    ['ticketRootProjectV10246','ticketRootSupervisorV10246','ticketRootTitleV10246','ticketRootStatusV10246','ticketRootRecipientV10246','ticketRootClosedByV10246','ticketRootSortV10246'].forEach(id=>{ const el=$(id); if(el && !el.dataset.bound10246){ el.dataset.bound10246='1'; el.addEventListener('change',()=>renderTicketsRoot(),true); }});
+    ['ticketRootProjectV10246','ticketRootSupervisorV10246','ticketRootTitleV10246','ticketRootStatusV10246','ticketRootRecipientV10246','ticketRootClosedByV10246','ticketRootSortV10246','ticketRootDateFromV10246','ticketRootDateToV10246'].forEach(id=>{ const el=$(id); if(el && !el.dataset.bound10246){ el.dataset.bound10246='1'; el.addEventListener('change',()=>renderTicketsRoot(),true); }});
     const q=$('ticketRootSearchV10246'); if(q && !q.dataset.bound10246){ q.dataset.bound10246='1'; q.addEventListener('input',()=>renderTicketsRoot(),true); }
     const pdf=$('ticketRootPdfV10246'); if(pdf && !pdf.dataset.bound10246){ pdf.dataset.bound10246='1'; pdf.addEventListener('click',()=>exportFilteredPdf(),true); }
     const csv=$('ticketRootCsvV10246'); if(csv && !csv.dataset.bound10246){ csv.dataset.bound10246='1'; csv.addEventListener('click',()=>exportFilteredCsv(),true); }
@@ -115,7 +120,7 @@
     setOptions('ticketRootRecipientV10246','كل المستلمين', allTickets.map(ticketRecipient), `<option value="${NO_RECEIPT}">بدون استلام</option>`);
     setOptions('ticketRootClosedByV10246','كل المغلقين', allTickets.map(ticketClosedBy), `<option value="${NO_CLOSED}">بدون إغلاق</option>`);
   }
-  function filterState(){ return {project:K($('ticketRootProjectV10246')?.value), supervisor:K($('ticketRootSupervisorV10246')?.value), title:K($('ticketRootTitleV10246')?.value), status:S($('ticketRootStatusV10246')?.value), recipient:S($('ticketRootRecipientV10246')?.value), closed:S($('ticketRootClosedByV10246')?.value), sort:S($('ticketRootSortV10246')?.value||'newest'), search:K($('ticketRootSearchV10246')?.value)}; }
+  function filterState(){ return {project:K($('ticketRootProjectV10246')?.value), supervisor:K($('ticketRootSupervisorV10246')?.value), title:K($('ticketRootTitleV10246')?.value), status:S($('ticketRootStatusV10246')?.value), recipient:S($('ticketRootRecipientV10246')?.value), closed:S($('ticketRootClosedByV10246')?.value), sort:S($('ticketRootSortV10246')?.value||'newest'), from:S($('ticketRootDateFromV10246')?.value), to:S($('ticketRootDateToV10246')?.value), search:K($('ticketRootSearchV10246')?.value)}; }
   function cardText(t){ return [ticketNo(t), t.title, t.description, ticketProject(t), ticketSupervisor(t), statusLabel(t.status), priorityLabel(t.priority), ticketRecipient(t), ticketClosedBy(t), t.closure_note].join(' '); }
   function match(t,f){
     if(f.project && K(ticketProject(t))!==f.project) return false;
@@ -126,6 +131,9 @@
     else if(f.recipient && f.recipient!==NO_RECEIPT && K(ticketRecipient(t))!==K(f.recipient)) return false;
     if(f.closed===NO_CLOSED && hasClosedBy(t)) return false;
     else if(f.closed && f.closed!==NO_CLOSED && K(ticketClosedBy(t))!==K(f.closed)) return false;
+    const d=ticketDateOnly(t);
+    if(f.from && (!d || d < f.from)) return false;
+    if(f.to && (!d || d > f.to)) return false;
     if(f.search && !K(cardText(t)).includes(f.search)) return false;
     return true;
   }
@@ -172,7 +180,30 @@
   function csvEscape(v){ return '"'+S(v).replace(/"/g,'""')+'"'; }
   function rowsForExport(){ return filteredTickets && filteredTickets.length ? filteredTickets : allTickets.filter(t=>match(t,filterState())); }
   function exportFilteredCsv(){ const rows=rowsForExport(); const heads=['رقم التكت','التاريخ','المشروع','المشرف','نوع المشكلة','الأولوية','الحالة','المستلم','المغلق','الوصف','الحل']; const lines=[heads.map(csvEscape).join(',')].concat(rows.map(t=>[ticketNo(t),fmtDate(t),ticketProject(t),ticketSupervisor(t),t.title,priorityLabel(t.priority),statusLabel(t.status),ticketRecipient(t),ticketClosedBy(t),t.description,t.closure_note].map(csvEscape).join(','))); const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='tickets_filtered_'+new Date().toISOString().slice(0,10)+'.csv'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
-  function exportFilteredPdf(){ const rows=rowsForExport(); const filters=filterState(); const html=`<html dir="rtl"><head><meta charset="utf-8"><title>تقرير التكتات</title><style>body{font-family:Tahoma,Arial;padding:20px}h2{color:#064d3b}table{width:100%;border-collapse:collapse;font-size:12px}th{background:#064d3b;color:white}td,th{border:1px solid #ccc;padding:6px;text-align:right}.meta{margin:10px 0;color:#333}</style></head><body><h2>تقرير التكتات حسب الفلاتر</h2><div class="meta">التاريخ: ${new Date().toLocaleString('ar-SA')} - عدد النتائج: ${rows.length}</div><table><thead><tr><th>رقم التكت</th><th>التاريخ</th><th>المشروع</th><th>المشرف</th><th>نوع المشكلة</th><th>الحالة</th><th>المستلم</th><th>المغلق</th><th>الوصف</th></tr></thead><tbody>${rows.map(t=>`<tr><td>${E(ticketNo(t))}</td><td>${E(fmtDate(t))}</td><td>${E(ticketProject(t))}</td><td>${E(ticketSupervisor(t))}</td><td>${E(t.title)}</td><td>${E(statusLabel(t.status))}</td><td>${E(ticketRecipient(t))}</td><td>${E(ticketClosedBy(t))}</td><td>${E(t.description)}</td></tr>`).join('')}</tbody></table></body></html>`; const w=window.open('','_blank'); if(!w) return msgErr('المتصفح منع فتح نافذة الطباعة'); w.document.write(html); w.document.close(); setTimeout(()=>{try{w.print();}catch(_){}},600); }
+  function filterLabel(f){
+    const parts=[];
+    if(f.from || f.to) parts.push(`الفترة: من ${arDate(f.from)} إلى ${arDate(f.to)}`);
+    if(f.project) parts.push(`المشروع: ${$('ticketRootProjectV10246')?.value || 'الكل'}`);
+    if(f.supervisor) parts.push(`المشرف: ${$('ticketRootSupervisorV10246')?.value || 'الكل'}`);
+    if(f.title) parts.push(`نوع المشكلة: ${$('ticketRootTitleV10246')?.value || 'الكل'}`);
+    if(f.status) parts.push(`الحالة: ${statusLabel(f.status)}`);
+    if(f.recipient) parts.push(`المستلم: ${f.recipient===NO_RECEIPT?'بدون استلام':$('ticketRootRecipientV10246')?.value}`);
+    if(f.closed) parts.push(`المغلق: ${f.closed===NO_CLOSED?'بدون إغلاق':$('ticketRootClosedByV10246')?.value}`);
+    if(f.search) parts.push(`بحث: ${$('ticketRootSearchV10246')?.value}`);
+    return parts.length ? parts.join(' | ') : 'كل التكتات بدون فلاتر محددة';
+  }
+  function exportFilteredPdf(){
+    const rows=rowsForExport();
+    const f=filterState();
+    const generatedAt=new Date().toLocaleString('ar-SA');
+    const counts={total:rows.length, open:rows.filter(t=>S(t.status||'open')==='open').length, proc:rows.filter(t=>S(t.status)==='processing').length, closed:rows.filter(t=>S(t.status)==='closed').length};
+    const html=`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>تقرير التكتات - شركة تصنيف</title><style>
+      @page{size:A4 landscape;margin:9mm}*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;margin:0;background:#fff;color:#133d33;font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact}.sheet{padding:14px;border:2px solid #0b5a49;min-height:100vh}.head{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #0b5a49;padding-bottom:10px;margin-bottom:10px}.brand{display:flex;align-items:center;gap:10px}.logoBox{width:72px;height:58px;border:2px solid #d5b15d;border-radius:16px;display:grid;place-items:center;background:#f8fbfa;overflow:hidden}.logoBox img{max-width:68px;max-height:52px}.logoText{font-weight:900;color:#0b5a49;font-size:17px}.brand h1{font-size:18px;margin:0;color:#0b5a49}.brand p{margin:3px 0 0;color:#687b74}.title{text-align:left}.title h2{margin:0;font-size:24px;color:#0b5a49}.title p{margin:4px 0;color:#687b74}.meta{border:1px solid #dce9e4;background:#f3faf7;border-radius:12px;padding:9px;margin:10px 0;line-height:1.8}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}.kpi{border:1px solid #dce9e4;border-radius:12px;padding:10px;text-align:center;background:#fff}.kpi b{display:block;color:#0b5a49;font-size:18px;margin-top:3px}table{width:100%;border-collapse:collapse;margin-top:10px}th{background:#0b5a49;color:#fff;font-weight:900;padding:7px;border:1px solid #0b5a49;white-space:nowrap}td{border:1px solid #d9e6e1;padding:6px;vertical-align:top;color:#12382f}tbody tr:nth-child(even){background:#f7fbfa}.desc{max-width:270px;line-height:1.45}.status{font-weight:900}.closed{color:#06703b}.open{color:#b00020}.processing{color:#8a5a00}.foot{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}.sign{border:1px solid #d9e6e1;border-radius:12px;min-height:66px;padding:10px}.note{text-align:center;color:#687b74;margin-top:10px}.noPrint{display:none}@media print{.sheet{border-radius:0}.sign,tr{break-inside:avoid}}
+    </style></head><body><div class="sheet"><div class="head"><div class="brand"><div class="logoBox"><img src="tasneef_logo_print.png" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span class="logoText" style="display:none">تصنيف</span></div><div><h1>شركة تصنيف لإدارة المرافق</h1><p>تقرير تكتات العملاء حسب الفلاتر المحددة</p></div></div><div class="title"><h2>تقرير التكتات</h2><p>تاريخ الإصدار: ${E(generatedAt)}</p></div></div><div class="meta"><b>الفلاتر المطبقة:</b> ${E(filterLabel(f))}</div><div class="kpis"><div class="kpi">إجمالي النتائج<b>${counts.total}</b></div><div class="kpi">مفتوح<b>${counts.open}</b></div><div class="kpi">تحت المعالجة<b>${counts.proc}</b></div><div class="kpi">مغلق<b>${counts.closed}</b></div></div><table><thead><tr><th>م</th><th>رقم التكت</th><th>التاريخ</th><th>المشروع</th><th>المشرف</th><th>نوع المشكلة</th><th>الأولوية</th><th>الحالة</th><th>المستلم</th><th>المغلق</th><th>الوصف / الإجراء</th></tr></thead><tbody>${rows.map((t,i)=>`<tr><td>${i+1}</td><td>${E(ticketNo(t))}</td><td>${E(fmtDate(t))}</td><td>${E(ticketProject(t))}</td><td>${E(ticketSupervisor(t))}</td><td>${E(t.title||'-')}</td><td>${E(priorityLabel(t.priority))}</td><td class="status ${S(t.status)==='closed'?'closed':S(t.status)==='processing'?'processing':'open'}">${E(statusLabel(t.status))}</td><td>${E(ticketRecipient(t))}</td><td>${E(ticketClosedBy(t))}</td><td class="desc"><b>الوصف:</b> ${E(t.description||'-')}${t.closure_note?`<br><b>الإجراء:</b> ${E(t.closure_note)}`:''}</td></tr>`).join('') || '<tr><td colspan="11" style="text-align:center;padding:25px">لا توجد تكتات مطابقة للفلاتر</td></tr>'}</tbody></table><div class="foot"><div class="sign"><b>إعداد التقرير</b><br><br>الاسم: ____________</div><div class="sign"><b>مراجعة</b><br><br>الاسم: ____________</div><div class="sign"><b>اعتماد العميل</b><br><br>الاسم والتوقيع: ____________</div></div><div class="note">تم إنشاء هذا التقرير من نظام شركة تصنيف لإدارة المرافق، ويعكس الفلاتر المختارة وقت الطباعة.</div></div><script>window.onload=function(){setTimeout(function(){window.print()},650)}</script></body></html>`;
+    const w=window.open('','_blank');
+    if(!w) return msgErr('المتصفح منع فتح نافذة الطباعة');
+    w.document.open(); w.document.write(html); w.document.close();
+  }
   window.renderTickets=renderTicketsRoot;
   window.renderTicketsCleanV10229=renderTicketsRoot;
   window.renderTicketsRootV10246=renderTicketsRoot;
