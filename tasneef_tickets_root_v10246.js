@@ -175,7 +175,15 @@
     body.innerHTML=rows.map(card).join('') || '<div class="muted" style="padding:16px">لا توجد تكتات مطابقة للفلاتر الحالية</div>';
     updateSummary(rows);
   }
-  function whatsappText(t){ return ['تكت صيانة','','رقم التكت: '+ticketNo(t),'المشروع: '+ticketProject(t),'المشرف: '+ticketSupervisor(t),'العنوان: '+S(t.title||'-'),'الوصف: '+S(t.description||'-'),'الحالة: '+statusLabel(t.status),'المستلم: '+ticketRecipient(t),'المغلق: '+ticketClosedBy(t)].join('\n'); }
+  function ticketCloseMethodText(t){ return S(t.closure_note) || S(t.close_method) || S(t.closeMethod) || S(t.closing_method) || S(t.closingMethod) || S(t.resolution) || S(t.solution) || S(t.close_note) || S(t.closing_note) || S(t.close_description) || S(t['طريقة الإغلاق']) || S(t['حل المشكلة']) || S(t['وصف الإغلاق']); }
+  function whatsappText(t){
+    const lines=['تكت صيانة','','رقم التكت: '+ticketNo(t),'المشروع: '+ticketProject(t),'المشرف: '+ticketSupervisor(t),'العنوان: '+S(t.title||'-'),'الوصف: '+S(t.description||'-'),'الحالة: '+statusLabel(t.status),'المستلم: '+ticketRecipient(t),'المغلق: '+ticketClosedBy(t)];
+    const method=ticketCloseMethodText(t);
+    if(S(t.status)==='closed'){
+      lines.push('طريقة الإغلاق: '+(method||'-'));
+    }
+    return lines.join('\n');
+  }
   window.sendTicketWhatsappV10246=function(id){ const t=allTickets.find(x=>String(x.id)===String(id)); if(!t) return alert('لم يتم العثور على التكت'); window.open('https://wa.me/?text='+encodeURIComponent(whatsappText(t)),'_blank','noopener'); };
   function csvEscape(v){ return '"'+S(v).replace(/"/g,'""')+'"'; }
   function rowsForExport(){ return filteredTickets && filteredTickets.length ? filteredTickets : allTickets.filter(t=>match(t,filterState())); }
@@ -211,4 +219,36 @@
   document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,500));
   // يعمل مرة واحدة فقط بعد التحميل، بدون setInterval وبدون إعادة كتابة من نسخ قديمة.
   window.addEventListener('load',()=>setTimeout(boot,900));
+})();
+
+/* ===== V245 Abu Samer: تثبيت صيغة واتساب إغلاق التكت داخل ملف التكتات الجذري ===== */
+(function(){
+  function S(v){ return String(v ?? '').trim(); }
+  function A(v){ return Array.isArray(v) ? v : []; }
+  function D(){ return window.data || window.appData || {}; }
+  function tickets(){ try{ if(Array.isArray(allTickets)) return allTickets; }catch(_){ } return A(D().tickets); }
+  function findTicket(id){ return tickets().find(t => String(t.id) === String(id)); }
+  function no(t){ return S(t.ticket_number || t.ticket_no) || ('T-' + String(t.id || 0).padStart(4,'0')); }
+  function project(t){
+    try{ if(typeof ticketProject === 'function'){ const n=ticketProject(t); if(S(n)) return n; } }catch(_){ }
+    try{ if(typeof projectNameSafe === 'function'){ const n=projectNameSafe(t.project_id); if(S(n)) return n; } }catch(_){ }
+    try{ if(typeof projectName === 'function'){ const n=projectName(t.project_id); if(S(n)) return n; } }catch(_){ }
+    try{ const p=A(D().projects).find(p=>String(p.id)===String(t.project_id)); if(p && S(p.name)) return p.name; }catch(_){ }
+    return S(t.project_name) || '-';
+  }
+  function statusLabel(v){ v=S(v); return v==='closed'?'مغلق':(v==='processing'?'تحت المعالجة':'مفتوح'); }
+  function method(t){ return S(t.closure_note) || S(t.close_method) || S(t.closeMethod) || S(t.closing_method) || S(t.closingMethod) || S(t.resolution) || S(t.solution) || S(t.close_note) || S(t.closing_note) || S(t.close_description) || S(t['طريقة الإغلاق']) || S(t['حل المشكلة']) || S(t['وصف الإغلاق']); }
+  function dObj(v){ const d=v?new Date(v):new Date(); return isNaN(d)?new Date():d; }
+  function dateLabel(v){ const d=dObj(v); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function timeLabel(v){ try{ return dObj(v).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}); }catch(_){ return ''; } }
+  function build(t){
+    const closed=S(t.status)==='closed';
+    const dt=closed?(t.closed_at||t.updated_at||t.created_at):(t.created_at||t.updated_at);
+    if(closed){
+      return ['تم إغلاق التكت','','اسم المشروع: '+project(t),'رقم التكت: '+no(t),'وصف المشكلة: '+(S(t.description)||S(t.title)||'-'),'حالة المشكلة: مغلق','طريقة الإغلاق: '+(method(t)||'-'),'تم الإغلاق بواسطة: '+(S(t.closed_by_name)||'-'),'التاريخ: '+dateLabel(dt),'الوقت: '+timeLabel(dt)].join('\n');
+    }
+    return ['تم تسجيل تكت جديد','','اسم المشروع: '+project(t),'رقم التكت: '+no(t),'وصف المشكلة: '+(S(t.description)||S(t.title)||'-'),'حالة المشكلة: '+statusLabel(t.status),'التاريخ: '+dateLabel(dt),'الوقت: '+timeLabel(dt)].join('\n');
+  }
+  window.buildTicketWhatsappRootV245=build;
+  window.sendTicketWhatsappV10246=function(id){ const t=findTicket(id); if(!t) return alert('لم يتم العثور على التكت'); window.open('https://wa.me/?text='+encodeURIComponent(build(t)),'_blank','noopener'); };
 })();

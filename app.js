@@ -22242,7 +22242,7 @@ function financePrintReport(kind){
     ];
     if(isClosed){
       // الاسم المطلوب صراحة في رسالة الواتساب
-      lines.push('حل المشكلة: ' + (solution || '-'));
+      lines.push('طريقة الإغلاق: ' + (solution || '-'));
       // إبقاء المسمى القديم أيضًا حتى لا يختفي على أي قالب سابق
       lines.push('وصف الإغلاق: ' + (solution || '-'));
       lines.push('تم الإغلاق بواسطة: ' + (S(t.closed_by_name) || '-'));
@@ -22418,4 +22418,131 @@ function financePrintReport(kind){
   window.techCloseTicket = function(id){ return closeTicketWithMethod(id, true); };
 
   console.log('Tasneef V242 ticket WhatsApp close method loaded');
+})();
+
+/* ===== V243 Abu Samer: إضافة طريقة/حل/كيف تم الإغلاق إلى رسالة واتساب التكت الجذرية ===== */
+(function(){
+  if(window.__tasneefTicketWhatsappRootCloseMethodV243) return;
+  window.__tasneefTicketWhatsappRootCloseMethodV243 = true;
+  function S(v){ return String(v ?? '').trim(); }
+  function arr(v){ return Array.isArray(v) ? v : []; }
+  function dataObj(){ return window.data || window.appData || {}; }
+  function tickets(){ return arr(dataObj().tickets); }
+  function findTicket(id){ return tickets().find(t => String(t.id) === String(id)); }
+  function tNo(t){ return S(t.ticket_number || t.ticket_no) || ('T-' + String(t.id || 0).padStart(4,'0')); }
+  function statusLabel(v){ v=S(v); return v==='closed'?'مغلق':(v==='processing'?'تحت المعالجة':'مفتوح'); }
+  function projectLabel(t){
+    try{ if(typeof projectNameSafe === 'function'){ const n=projectNameSafe(t.project_id); if(S(n)) return n; } }catch(_){ }
+    try{ if(typeof projectName === 'function'){ const n=projectName(t.project_id); if(S(n)) return n; } }catch(_){ }
+    try{ const p=arr(dataObj().projects).find(p=>String(p.id)===String(t.project_id)); if(p && S(p.name)) return p.name; }catch(_){ }
+    return S(t.project_name) || '-';
+  }
+  function supervisorLabel(t){
+    try{ if(typeof supervisorNameSafe === 'function'){ const n=supervisorNameSafe(t.supervisor_id); if(S(n)) return n; } }catch(_){ }
+    try{ if(typeof supervisorName === 'function'){ const n=supervisorName(t.supervisor_id); if(S(n)) return n; } }catch(_){ }
+    return S(t.supervisor_name) || '-';
+  }
+  function closeMethod(t){ return S(t.closure_note) || S(t.close_method) || S(t.closeMethod) || S(t.closing_method) || S(t.closingMethod) || S(t.resolution) || S(t.solution) || S(t.close_note) || S(t.closing_note) || S(t.close_description) || S(t['طريقة الإغلاق']) || S(t['حل المشكلة']) || S(t['وصف الإغلاق']); }
+  function waText(t){
+    const method = closeMethod(t);
+    const lines = ['تكت صيانة','','رقم التكت: '+tNo(t),'المشروع: '+projectLabel(t),'المشرف: '+supervisorLabel(t),'العنوان: '+(S(t.title)||'-'),'الوصف: '+(S(t.description)||'-'),'الحالة: '+statusLabel(t.status),'المستلم: '+(S(t.claimed_by_name)||S(t.recipient_name)||'-'),'المغلق: '+(S(t.closed_by_name)||'-')];
+    if(S(t.status)==='closed'){
+      lines.push('طريقة الإغلاق: '+(method||'-'));
+    }
+    return lines.join('\n');
+  }
+  function install(){
+    window.buildTicketWhatsappRootV243 = waText;
+    window.sendTicketWhatsappV10246 = function(id){
+      const t = findTicket(id);
+      if(!t){ alert('لم يتم العثور على التكت'); return; }
+      window.open('https://wa.me/?text=' + encodeURIComponent(waText(t)), '_blank', 'noopener');
+    };
+  }
+  install();
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(install, 800); setTimeout(install, 1800); });
+  window.addEventListener('load', function(){ setTimeout(install, 1200); setTimeout(install, 3000); });
+  console.log('Tasneef V243 root ticket WhatsApp close method loaded');
+})();
+
+/* ===== V245 Abu Samer: رسالة إغلاق التكت بنفس الصيغة المطلوبة ===== */
+(function(){
+  if(window.__tasneefTicketWhatsappClosedFormatV245) return;
+  window.__tasneefTicketWhatsappClosedFormatV245 = true;
+
+  function S(v){ return String(v ?? '').trim(); }
+  function A(v){ return Array.isArray(v) ? v : []; }
+  function D(){ return window.data || window.appData || {}; }
+  function tickets(){ return A(D().tickets); }
+  function findTicket(id){ return tickets().find(t => String(t.id) === String(id)); }
+  function ticketNo(t){ return S(t.ticket_number || t.ticket_no) || ('T-' + String(t.id || 0).padStart(4,'0')); }
+  function statusLabel(v){ v = S(v); return v === 'closed' ? 'مغلق' : (v === 'processing' ? 'تحت المعالجة' : 'مفتوح'); }
+  function projectLabel(t){
+    try{ if(typeof projectNameSafe === 'function'){ const n = projectNameSafe(t.project_id); if(S(n)) return n; } }catch(_){ }
+    try{ if(typeof projectName === 'function'){ const n = projectName(t.project_id); if(S(n)) return n; } }catch(_){ }
+    try{ const p = A(D().projects).find(p => String(p.id) === String(t.project_id)); if(p && S(p.name)) return p.name; }catch(_){ }
+    return S(t.project_name) || '-';
+  }
+  function closeMethod(t){
+    return S(t.closure_note) || S(t.close_method) || S(t.closeMethod) || S(t.closing_method) || S(t.closingMethod) || S(t.resolution) || S(t.solution) || S(t.close_note) || S(t.closing_note) || S(t.close_description) || S(t['طريقة الإغلاق']) || S(t['حل المشكلة']) || S(t['وصف الإغلاق']);
+  }
+  function dObj(v){ const d = v ? new Date(v) : new Date(); return isNaN(d) ? new Date() : d; }
+  function dateLabel(v){ const d = dObj(v); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+  function timeLabel(v){ try{ return dObj(v).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}); }catch(_){ return ''; } }
+  function copy(text){
+    if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).catch(function(){});
+    try{ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }catch(_){ }
+    return Promise.resolve();
+  }
+  function openWA(text, closed){
+    copy(text).finally(function(){
+      window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
+      if(typeof msg === 'function') msg(closed ? 'تم تجهيز رسالة إغلاق التكت للواتساب' : 'تم تجهيز رسالة التكت للواتساب');
+    });
+  }
+  function build(t){
+    const closed = S(t.status) === 'closed';
+    const dt = closed ? (t.closed_at || t.updated_at || t.created_at) : (t.created_at || t.updated_at);
+    if(closed){
+      return [
+        'تم إغلاق التكت',
+        '',
+        'اسم المشروع: ' + projectLabel(t),
+        'رقم التكت: ' + ticketNo(t),
+        'وصف المشكلة: ' + (S(t.description) || S(t.title) || '-'),
+        'حالة المشكلة: مغلق',
+        'طريقة الإغلاق: ' + (closeMethod(t) || '-'),
+        'تم الإغلاق بواسطة: ' + (S(t.closed_by_name) || '-'),
+        'التاريخ: ' + dateLabel(dt),
+        'الوقت: ' + timeLabel(dt)
+      ].join('\n');
+    }
+    return [
+      'تم تسجيل تكت جديد',
+      '',
+      'اسم المشروع: ' + projectLabel(t),
+      'رقم التكت: ' + ticketNo(t),
+      'وصف المشكلة: ' + (S(t.description) || S(t.title) || '-'),
+      'حالة المشكلة: ' + statusLabel(t.status),
+      'التاريخ: ' + dateLabel(dt),
+      'الوقت: ' + timeLabel(dt)
+    ].join('\n');
+  }
+  function install(){
+    window.buildTicketWhatsAppTextV42 = build;
+    window.buildTicketWhatsAppTextV240 = build;
+    window.buildTicketWhatsAppTextV241 = build;
+    window.buildTicketWhatsAppTextV242 = build;
+    window.buildTicketWhatsappRootV243 = build;
+    window.buildTicketWhatsappClosedFormatV245 = build;
+    window.sendTicketWhatsApp = function(id){ const t = findTicket(id); if(!t){ if(typeof msg === 'function') msg('التكت غير موجود','err'); return; } openWA(build(t), S(t.status)==='closed'); };
+    window.sendTicketWhatsAppV43 = window.sendTicketWhatsApp;
+    window.sendSupervisorTicketWhatsAppV45 = window.sendTicketWhatsApp;
+    window.sendTicketWhatsAppObjectV240 = function(t){ openWA(build(t), S(t.status)==='closed'); };
+    window.sendTicketWhatsappV10246 = function(id){ const t = findTicket(id); if(!t){ alert('لم يتم العثور على التكت'); return; } openWA(build(t), S(t.status)==='closed'); };
+  }
+  install();
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(install, 500); setTimeout(install, 1500); setTimeout(install, 3000); });
+  window.addEventListener('load', function(){ setTimeout(install, 700); setTimeout(install, 2200); setTimeout(install, 4500); });
+  console.log('Tasneef V245 closed ticket WhatsApp format loaded');
 })();
