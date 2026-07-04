@@ -22076,3 +22076,118 @@ function financePrintReport(kind){
   window.TASNEEF_ATTENDANCE_MONTH_BUILD=BUILD;
   console.log('Tasneef '+BUILD+' loaded');
 })();
+
+/* ===== V240 Abu Samer: إظهار وصف الإغلاق في رسالة واتساب التكت ===== */
+(function(){
+  if(window.__tasneefTicketWhatsappClosureV240) return;
+  window.__tasneefTicketWhatsappClosureV240 = true;
+
+  function S(v){ return String(v ?? '').trim(); }
+  function ticketNo(t){ return S(t.ticket_number) || ('T-' + String(t.id || 0).padStart(4,'0')); }
+  function statusLabel(s){ return s === 'closed' ? 'مغلق' : (s === 'processing' ? 'تحت المعالجة' : 'مفتوح'); }
+  function projectLabel(t){
+    try { if(typeof projectName === 'function') return projectName(t.project_id) || t.project_name || '-'; }
+    catch(_){}
+    try { return (window.data?.projects || []).find(p => String(p.id) === String(t.project_id))?.name || t.project_name || '-'; }
+    catch(_) { return t.project_name || '-'; }
+  }
+  function validDate(v){ const d = v ? new Date(v) : new Date(); return isNaN(d) ? new Date() : d; }
+  function dateLabel(v){ const d = validDate(v); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+  function timeLabel(v){ try { return validDate(v).toLocaleTimeString('ar-SA', {hour:'2-digit', minute:'2-digit'}); } catch(_) { return ''; } }
+  function minutesBetween(a,b){ const da = a ? new Date(a) : null, db = b ? new Date(b) : null; if(!da || !db || isNaN(da) || isNaN(db)) return 0; return Math.max(0, Math.round((db - da) / 60000)); }
+  function currentUserName(fallback){
+    try { const u = typeof session === 'function' ? session() : null; return S(u?.full_name || u?.username) || fallback || 'غير محدد'; }
+    catch(_) { return fallback || 'غير محدد'; }
+  }
+  function copyText(text){
+    if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).catch(()=>{});
+    const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); }catch(_){} ta.remove(); return Promise.resolve();
+  }
+  function openWhatsapp(text, closed){
+    copyText(text).finally(function(){
+      window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+      if(typeof msg === 'function') msg(closed ? 'تم تجهيز رسالة إغلاق التكت للواتساب مع وصف الإغلاق' : 'تم تجهيز رسالة فتح التكت للواتساب');
+    });
+  }
+  function ticketWhatsappText(t){
+    const closed = S(t.status) === 'closed';
+    const dt = closed ? (t.closed_at || t.updated_at || t.created_at) : (t.created_at || t.updated_at);
+    const lines = [
+      closed ? 'تم إغلاق التكت' : 'تم تسجيل تكت جديد',
+      '',
+      'اسم المشروع: ' + projectLabel(t),
+      'رقم التكت: ' + ticketNo(t),
+      'وصف المشكلة: ' + (S(t.description) || S(t.title) || '-'),
+      'حالة المشكلة: ' + (closed ? 'مغلق' : statusLabel(t.status))
+    ];
+    if(closed){
+      lines.push('وصف الإغلاق: ' + (S(t.closure_note) || '-'));
+      lines.push('تم الإغلاق بواسطة: ' + (S(t.closed_by_name) || '-'));
+    }
+    lines.push('التاريخ: ' + dateLabel(dt));
+    lines.push('الوقت: ' + timeLabel(dt));
+    return lines.join('\n');
+  }
+
+  window.buildTicketWhatsAppTextV42 = ticketWhatsappText;
+  window.buildTicketWhatsAppTextV240 = ticketWhatsappText;
+  window.sendTicketWhatsApp = function(id){
+    const t = (window.data?.tickets || []).find(x => String(x.id) === String(id));
+    if(!t){ if(typeof msg === 'function') msg('التكت غير موجود','err'); return; }
+    openWhatsapp(ticketWhatsappText(t), S(t.status) === 'closed');
+  };
+  window.sendTicketWhatsAppV43 = function(id){
+    const t = (window.data?.tickets || []).find(x => String(x.id) === String(id));
+    if(!t){ if(typeof msg === 'function') msg('التكت غير موجود','err'); return; }
+    openWhatsapp(ticketWhatsappText(t), S(t.status) === 'closed');
+  };
+  window.sendTicketWhatsAppObjectV240 = function(t){ openWhatsapp(ticketWhatsappText(t), S(t.status) === 'closed'); };
+
+  window.closeTicket = async function(id){
+    const u = typeof session === 'function' ? session() : null;
+    if(!u){ if(typeof msg === 'function') msg('سجّل الدخول أولاً','err'); return; }
+    const t = (window.data?.tickets || []).find(x => String(x.id) === String(id));
+    if(!t){ if(typeof msg === 'function') msg('التكت غير موجود','err'); return; }
+    if(S(t.status) === 'closed'){ if(typeof msg === 'function') msg('التكت مغلق بالفعل','err'); return; }
+    const note = S(prompt('كيف تم إغلاق التكت؟\nاكتب الإجراء المنفذ أو وصف الإغلاق'));
+    if(!note){ if(typeof msg === 'function') msg('لا يمكن إغلاق التكت بدون وصف الإغلاق','err'); return; }
+    const closer = S(prompt('اسم الشخص الذي أغلق التكت', currentUserName())) || currentUserName();
+    if(!closer){ if(typeof msg === 'function') msg('اكتب اسم من أغلق التكت','err'); return; }
+    const now = new Date().toISOString();
+    const row = {status:'closed', closed_at:now, closed_by:u.id, closed_by_name:closer, closure_note:note, open_duration_minutes:minutesBetween(t.created_at, now), processing_duration_minutes:t.claimed_at ? minutesBetween(t.claimed_at, now) : null, updated_at:now};
+    if(!t.claimed_at){ row.claimed_by = u.id; row.claimed_by_name = closer; row.claimed_at = now; }
+    const res = await sb.from('tickets').update(row).eq('id', id);
+    if(res.error){ if(typeof msg === 'function') msg(res.error.message,'err'); return; }
+    const updatedTicket = Object.assign({}, t, row);
+    try { if(typeof playAppSound === 'function') playAppSound('ticket'); } catch(_){}
+    if(typeof msg === 'function') msg('تم إغلاق التكت وحفظ وصف الإغلاق');
+    openWhatsapp(ticketWhatsappText(updatedTicket), true);
+    const role = S(u.role);
+    if(role === 'supervisor' && typeof window.initSupervisor === 'function') await window.initSupervisor();
+    else if(typeof refreshAll === 'function') await refreshAll();
+  };
+
+  window.techCloseTicket = async function(id){
+    const u = typeof session === 'function' ? session() : null;
+    if(!u){ if(typeof msg === 'function') msg('سجل الدخول أولاً','err'); return; }
+    const t = (window.data?.tickets || []).find(x => String(x.id) === String(id));
+    if(!t){ if(typeof msg === 'function') msg('التكت غير موجود','err'); return; }
+    if(S(t.status) === 'closed'){ if(typeof msg === 'function') msg('التكت مغلق بالفعل','err'); return; }
+    const note = S(prompt('كيف تم إغلاق التكت؟\nاكتب الإجراء المنفذ أو وصف الإغلاق'));
+    if(!note){ if(typeof msg === 'function') msg('لا يمكن إغلاق التكت بدون وصف الإغلاق','err'); return; }
+    const now = new Date().toISOString();
+    const name = currentUserName('فني');
+    const row = {status:'closed', closed_at:now, closed_by:u.id, closed_by_name:name, closure_note:note, open_duration_minutes:minutesBetween(t.created_at, now), processing_duration_minutes:t.claimed_at ? minutesBetween(t.claimed_at, now) : null, updated_at:now};
+    if(!t.claimed_at){ row.claimed_by = u.id; row.claimed_by_name = name; row.claimed_at = now; }
+    const res = await sb.from('tickets').update(row).eq('id', id);
+    if(res.error){ if(typeof msg === 'function') msg(res.error.message,'err'); return; }
+    const updatedTicket = Object.assign({}, t, row);
+    try { if(typeof playAppSound === 'function') playAppSound('ticket'); } catch(_){}
+    if(typeof msg === 'function') msg('تم إغلاق التكت وحفظ وصف الإغلاق');
+    openWhatsapp(ticketWhatsappText(updatedTicket), true);
+    if(typeof loadAll === 'function') await loadAll();
+    if(typeof renderTechnicianTickets === 'function') renderTechnicianTickets();
+  };
+
+  console.log('Tasneef V240 ticket WhatsApp closure note loaded');
+})();
