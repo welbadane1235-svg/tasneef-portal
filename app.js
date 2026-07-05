@@ -22881,3 +22881,110 @@ try{ exportSupervisorDailyPDFV10310 = window.exportSupervisorDailyPDFV10310; }ca
   try{ exportDailyManagerPDF = window.exportDailyManagerPDF; }catch(_){ }
   try{ exportSupervisorDailyPDFV10310 = window.exportSupervisorDailyPDFV10310; }catch(_){ }
 })();
+
+/* ===== V10353: daily logs date range live fetch (previous months fix) ===== */
+(function(){
+  'use strict';
+  const BUILD='v10353-daily-range-fetch-previous-months';
+  const S = v => String(v ?? '').trim();
+  const A = v => Array.isArray(v) ? v : [];
+  const $ = id => document.getElementById(id);
+  function rowDate(l){
+    const raw = S(l && (l.log_date || l.visit_date || l.attendance_date || l.work_date || l.date || l.check_in || l.check_out || l.created_at));
+    if(!raw) return '';
+    const m = raw.match(/(20\d{2})[-\/](\d{1,2})[-\/](\d{1,2})/);
+    if(m) return m[1]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0');
+    const d = new Date(raw);
+    if(isNaN(d.getTime())) return '';
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  function todayLocal(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function range(){
+    let from = S($('dailyDateFromV10310')?.value || $('supDailyDateFromV10310')?.value || $('dailyDate')?.value || $('supLogDate')?.value || todayLocal());
+    let to = S($('dailyDateToV10310')?.value || $('supDailyDateToV10310')?.value || $('dailyDate')?.value || $('supLogDate')?.value || from);
+    if(from && to && from > to){ const x=from; from=to; to=x; }
+    return {from,to,key:from+'..'+to};
+  }
+  async function pageQuery(q){
+    const size=1000; let start=0, out=[];
+    while(true){
+      let res;
+      try{ res = await q.range(start, start+size-1); }catch(e){ break; }
+      if(res && res.error){ console.warn(BUILD, res.error.message || res.error); break; }
+      const rows = (res && res.data) || [];
+      out = out.concat(rows);
+      if(rows.length < size) break;
+      start += size;
+      if(start > 50000) break;
+    }
+    return out;
+  }
+  function mergeLogs(rows){
+    window.data = window.data || (typeof data !== 'undefined' ? data : {});
+    const d = window.data;
+    const map = new Map();
+    A(d.logs).forEach((r,i)=>{ const k = r && r.id != null ? 'id:'+r.id : 'old:'+i; map.set(k,r); });
+    A(rows).forEach((r,i)=>{ if(!r) return; const k = r.id != null ? 'id:'+r.id : ['new',r.log_date,r.check_in,r.project_id,r.supervisor_id,i].join('|'); map.set(k,r); });
+    d.logs = Array.from(map.values()).filter(l => S(l && l.visit_type) !== 'technician_attendance').sort((a,b)=>{
+      const da=rowDate(b), db=rowDate(a); if(da!==db) return da.localeCompare(db);
+      return S(b.check_in || b.created_at || '').localeCompare(S(a.check_in || a.created_at || ''));
+    });
+    try{ data.logs = d.logs; }catch(_){ }
+    return d.logs;
+  }
+  async function fetchRange(force){
+    if(!window.sb || !sb.from) return [];
+    const r = range();
+    if(!force && window.__tasneefDailyRangeLoadedV10353 === r.key) return A(window.data && data.logs);
+    if(window.__tasneefDailyRangeLoadingV10353 === r.key) return A(window.data && data.logs);
+    window.__tasneefDailyRangeLoadingV10353 = r.key;
+    const fromDT = r.from + 'T00:00:00';
+    const toNextDate = new Date(r.to + 'T00:00:00');
+    toNextDate.setDate(toNextDate.getDate()+1);
+    const toNext = toNextDate.getFullYear()+'-'+String(toNextDate.getMonth()+1).padStart(2,'0')+'-'+String(toNextDate.getDate()).padStart(2,'0')+'T00:00:00';
+    const sets=[];
+    try{
+      sets.push(await pageQuery(sb.from('time_logs').select('*').gte('log_date', r.from).lte('log_date', r.to).order('check_in',{ascending:false})));
+      sets.push(await pageQuery(sb.from('time_logs').select('*').gte('check_in', fromDT).lt('check_in', toNext).order('check_in',{ascending:false})));
+      sets.push(await pageQuery(sb.from('time_logs').select('*').gte('created_at', fromDT).lt('created_at', toNext).order('created_at',{ascending:false})));
+    }catch(e){ console.warn(BUILD, e); }
+    const rows = mergeLogs(sets.flat());
+    window.__tasneefDailyRangeLoadedV10353 = r.key;
+    window.__tasneefDailyRangeLoadingV10353 = '';
+    return rows;
+  }
+  window.refreshDailyRangeLogsV10353 = fetchRange;
+
+  const oldRender = window.renderTimeLogs || (typeof renderTimeLogs === 'function' ? renderTimeLogs : null);
+  window.renderTimeLogs = function(){
+    const args = arguments;
+    const ret = oldRender ? oldRender.apply(this,args) : undefined;
+    const r = range();
+    if(window.sb && window.__tasneefDailyRangeLoadedV10353 !== r.key){
+      fetchRange(false).then(function(){ try{ if(oldRender) oldRender.apply(window,args); }catch(e){ console.warn(BUILD,e); } });
+    }
+    return ret;
+  };
+  try{ renderTimeLogs = window.renderTimeLogs; }catch(_){ }
+
+  function bind(){
+    ['dailyDateFromV10310','dailyDateToV10310','supDailyDateFromV10310','supDailyDateToV10310','dailyDate','supLogDate','dailySupervisor','dailyProject'].forEach(function(id){
+      const el=$(id); if(!el || el.dataset.v10353Bound) return;
+      el.dataset.v10353Bound='1';
+      el.addEventListener('change', function(){ fetchRange(true).then(function(){ try{ if(oldRender) oldRender(); }catch(e){} }); });
+    });
+  }
+  const oldExportAdmin = window.exportDailyManagerPDF;
+  if(typeof oldExportAdmin === 'function'){
+    window.exportDailyManagerPDF = async function(){ await fetchRange(true); return oldExportAdmin.apply(this, arguments); };
+    try{ exportDailyManagerPDF = window.exportDailyManagerPDF; }catch(_){ }
+  }
+  const oldExportSup = window.exportSupervisorDailyPDFV10310 || window.exportDailySupervisorPDF;
+  if(typeof oldExportSup === 'function'){
+    window.exportSupervisorDailyPDFV10310 = async function(){ await fetchRange(true); return oldExportSup.apply(this, arguments); };
+    window.exportDailySupervisorPDF = window.exportSupervisorDailyPDFV10310;
+    try{ exportSupervisorDailyPDFV10310 = window.exportSupervisorDailyPDFV10310; }catch(_){ }
+  }
+  setInterval(bind, 800);
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind, {once:true}); else setTimeout(bind,0);
+})();
