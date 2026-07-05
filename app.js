@@ -23070,3 +23070,133 @@ try{ exportSupervisorDailyPDFV10310 = window.exportSupervisorDailyPDFV10310; }ca
   try{ exportSupervisorDailyPDFV10310=window.exportSupervisorDailyPDFV10310; }catch(_){ }
   try{ exportDailySupervisorPDF=window.exportDailySupervisorPDF; }catch(_){ }
 })();
+
+/* ===== V10355: تسريع ظهور سجلات الفترة ومنع العرض الناقص أثناء التحميل ===== */
+(function(){
+  'use strict';
+  const BUILD='v10355-fast-daily-range-load';
+  const $ = id => document.getElementById(id);
+  const S = v => String(v ?? '').trim();
+  const A = v => Array.isArray(v) ? v : [];
+  const pad = n => String(n).padStart(2,'0');
+  function todayLocal(){ const d=new Date(); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+  function rangeVals(){
+    let f=S($('dailyDateFromV10310')?.value || $('supDailyDateFromV10310')?.value || $('dailyDate')?.value || $('supLogDate')?.value || todayLocal());
+    let t=S($('dailyDateToV10310')?.value || $('supDailyDateToV10310')?.value || $('dailyDate')?.value || $('supLogDate')?.value || f);
+    if(f && t && f>t){ const x=f; f=t; t=x; }
+    return {from:f,to:t};
+  }
+  function rangeKey(){
+    const r=rangeVals();
+    const sup=S($('dailySupervisor')?.value || '');
+    const proj=S($('dailyProject')?.value || '');
+    const user=(function(){ try{ if(typeof window.currentUser==='function') return window.currentUser(); }catch(_){} return window.currentUser||null; })();
+    const forcedSup = user && user.role==='supervisor' && user.id ? S(user.id) : sup;
+    return [r.from,r.to,forcedSup||'all',proj||'all'].join('..');
+  }
+  function rowDate(l){
+    const raw=S(l && (l.log_date || l.visit_date || l.attendance_date || l.work_date || l.date || l.check_in || l.check_out || l.created_at));
+    const m=raw.match(/(20\d{2})[-\/](\d{1,2})[-\/](\d{1,2})/);
+    if(m) return m[1]+'-'+pad(m[2])+'-'+pad(m[3]);
+    const d=new Date(raw); if(isNaN(d.getTime())) return ''; return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  }
+  function mergeLogs(rows){
+    window.data = window.data || (typeof data !== 'undefined' ? data : {});
+    const d=window.data;
+    const map=new Map();
+    A(d.logs).forEach((r,i)=>{ if(r) map.set(r.id!=null?'id:'+r.id:'old:'+i, r); });
+    A(rows).forEach((r,i)=>{ if(r) map.set(r.id!=null?'id:'+r.id:['new',r.log_date,r.check_in,r.project_id,r.supervisor_id,i].join('|'), r); });
+    d.logs=Array.from(map.values()).filter(l=>S(l&&l.visit_type)!=='technician_attendance').sort((a,b)=>{
+      const da=rowDate(b), db=rowDate(a); if(da!==db) return da.localeCompare(db);
+      return S(b.check_in||b.created_at||'').localeCompare(S(a.check_in||a.created_at||''));
+    });
+    try{ data.logs=d.logs; }catch(_){}
+    return d.logs;
+  }
+  async function fastQuery(builder, limit){
+    try{ const res=await builder.limit(limit||5000); if(res && res.error){ console.warn(BUILD,res.error.message||res.error); return []; } return (res&&res.data)||[]; }
+    catch(e){ console.warn(BUILD,e); return []; }
+  }
+  async function fetchFast(force){
+    if(!window.sb || !sb.from) return A((window.data||{}).logs);
+    const r=rangeVals(); const key=rangeKey();
+    window.__tasneefDailyFastLoaded = window.__tasneefDailyFastLoaded || new Set();
+    window.__tasneefDailyFastInflight = window.__tasneefDailyFastInflight || {};
+    if(!force && window.__tasneefDailyFastLoaded.has(key)) return A((window.data||{}).logs);
+    if(window.__tasneefDailyFastInflight[key]) return window.__tasneefDailyFastInflight[key];
+
+    const user=(function(){ try{ if(typeof window.currentUser==='function') return window.currentUser(); }catch(_){} return window.currentUser||null; })();
+    const sup = user && user.role==='supervisor' && user.id ? S(user.id) : S($('dailySupervisor')?.value||'');
+    const proj = S($('dailyProject')?.value||'');
+    const fromDT=r.from+'T00:00:00';
+    const dt=new Date(r.to+'T00:00:00'); dt.setDate(dt.getDate()+1);
+    const toNext=dt.getFullYear()+'-'+pad(dt.getMonth()+1)+'-'+pad(dt.getDate())+'T00:00:00';
+
+    const p=(async()=>{
+      // الاستعلام الأساسي الأسرع: log_date مع تطبيق فلتر المشروع/المشرف في قاعدة البيانات.
+      let q1=sb.from('time_logs').select('*').gte('log_date',r.from).lte('log_date',r.to).order('check_in',{ascending:false});
+      if(sup) q1=q1.eq('supervisor_id',sup);
+      if(proj) q1=q1.eq('project_id',proj);
+      let rows=await fastQuery(q1,5000);
+      // استعلام احتياطي فقط عند الحاجة للبيانات القديمة التي لا تحتوي log_date مضبوط.
+      if(rows.length===0){
+        let q2=sb.from('time_logs').select('*').gte('check_in',fromDT).lt('check_in',toNext).order('check_in',{ascending:false});
+        if(sup) q2=q2.eq('supervisor_id',sup);
+        if(proj) q2=q2.eq('project_id',proj);
+        rows=await fastQuery(q2,5000);
+      }
+      mergeLogs(rows);
+      window.__tasneefDailyFastLoaded.add(key);
+      window.__tasneefDailyRangeLoadedV10353 = r.from+'..'+r.to;
+      return A((window.data||{}).logs);
+    })().finally(()=>{ delete window.__tasneefDailyFastInflight[key]; });
+    window.__tasneefDailyFastInflight[key]=p;
+    return p;
+  }
+
+  window.refreshDailyRangeLogsV10353 = fetchFast;
+  window.refreshDailyRangeLogsV10355 = fetchFast;
+
+  const oldRender = window.renderTimeLogs || (typeof renderTimeLogs==='function' ? renderTimeLogs : null);
+  window.renderTimeLogs = function(){
+    const key=rangeKey();
+    const loaded=window.__tasneefDailyFastLoaded && window.__tasneefDailyFastLoaded.has(key);
+    const inflight=window.__tasneefDailyFastInflight && window.__tasneefDailyFastInflight[key];
+    const body=$('logsBody');
+    if(window.sb && !loaded){
+      if(body && !inflight) body.innerHTML='<tr><td colspan="14" style="padding:25px;text-align:center;color:#0a5a49;font-weight:800">جاري تحميل سجلات الفترة بالكامل...</td></tr>';
+      fetchFast(false).then(()=>{ try{ if(oldRender) oldRender(); }catch(e){ console.warn(BUILD,e); } });
+      return;
+    }
+    return oldRender ? oldRender.apply(this,arguments) : undefined;
+  };
+  try{ renderTimeLogs=window.renderTimeLogs; }catch(_){}
+
+  function onChange(){
+    const key=rangeKey();
+    if(window.__tasneefDailyFastLoaded) window.__tasneefDailyFastLoaded.delete(key);
+    const body=$('logsBody');
+    if(body) body.innerHTML='<tr><td colspan="14" style="padding:25px;text-align:center;color:#0a5a49;font-weight:800">جاري تحميل سجلات الفترة بالكامل...</td></tr>';
+    fetchFast(true).then(()=>{ try{ if(oldRender) oldRender(); }catch(e){ console.warn(BUILD,e); } });
+  }
+  function bind(){
+    ['dailyDateFromV10310','dailyDateToV10310','supDailyDateFromV10310','supDailyDateToV10310','dailyDate','supLogDate','dailySupervisor','dailyProject'].forEach(id=>{
+      const el=$(id); if(!el || el.dataset.v10355Bound) return;
+      el.dataset.v10355Bound='1'; el.addEventListener('change', onChange);
+    });
+  }
+  const oldAdmin=window.exportDailyManagerPDF;
+  if(typeof oldAdmin==='function'){
+    window.exportDailyManagerPDF=async function(){ await fetchFast(true); return oldAdmin.apply(this,arguments); };
+    try{ exportDailyManagerPDF=window.exportDailyManagerPDF; }catch(_){}
+  }
+  const oldSup=window.exportSupervisorDailyPDFV10310 || window.exportDailySupervisorPDF;
+  if(typeof oldSup==='function'){
+    window.exportSupervisorDailyPDFV10310=async function(){ await fetchFast(true); return oldSup.apply(this,arguments); };
+    window.exportDailySupervisorPDF=window.exportSupervisorDailyPDFV10310;
+    try{ exportSupervisorDailyPDFV10310=window.exportSupervisorDailyPDFV10310; exportDailySupervisorPDF=window.exportDailySupervisorPDF; }catch(_){}
+  }
+  setInterval(bind,700);
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind,{once:true}); else setTimeout(bind,0);
+  console.log(BUILD+' loaded');
+})();
