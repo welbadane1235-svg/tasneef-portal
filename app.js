@@ -23072,287 +23072,153 @@ try{ exportSupervisorDailyPDFV10310 = window.exportSupervisorDailyPDFV10310; }ca
 })();
 
 
-/* ===== V10361 أبو سامر: حل جذري مستقر للسجلات اليومية + مدة إغلاق التكت في التقارير ===== */
+/* ===== V10363: Professional fast daily logs by selected date range ===== */
 (function(){
   'use strict';
-  if(window.__tasneefStableDailyTicketsV10361) return;
-  window.__tasneefStableDailyTicketsV10361 = true;
-
-  const BUILD='V10361_STABLE_DAILY_FAST_TICKETS_DURATION';
-  const $ = id => document.getElementById(id);
-  const S = v => String(v ?? '').trim();
-  const A = v => Array.isArray(v) ? v : [];
-  const E = v => S(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const pad = n => String(n).padStart(2,'0');
-
-  function todayLocal(){
-    const d=new Date();
-    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  if(window.__tasneefDailyRangeProfessionalV10363) return;
+  window.__tasneefDailyRangeProfessionalV10363=true;
+  const BUILD='v10363-fast-daily-logs-range';
+  const S=v=>String(v??'').trim();
+  const A=v=>Array.isArray(v)?v:[];
+  const $=id=>document.getElementById(id);
+  const cache=new Map();
+  let inflight=null;
+  function esc(v){ try{ if(typeof window.esc==='function') return window.esc(v); }catch(_){} return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function todayLocal(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function isoDate(v){
+    const s=S(v); if(!s) return '';
+    const m=s.match(/(20\d{2})[-\/](\d{1,2})[-\/](\d{1,2})/); if(m) return m[1]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0');
+    const d=new Date(s); if(isNaN(d)) return ''; return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   }
-  function nextDay(dateStr){
-    const d = new Date(S(dateStr || todayLocal())+'T00:00:00');
-    d.setDate(d.getDate()+1);
-    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
-  }
-  function getUser(){
-    try{ if(typeof window.session==='function') return window.session(); }catch(_){}
-    try{ return JSON.parse(localStorage.getItem('tasneef_user') || localStorage.getItem('tasneefUser') || 'null'); }catch(_){ return null; }
-  }
-  function dateOfLog(l){
-    const raw=S(l && (l.log_date || l.visit_date || l.date || l.check_in || l.created_at));
-    const m=raw.match(/(20\d{2})[-\/](\d{1,2})[-\/](\d{1,2})/);
-    if(m) return m[1]+'-'+pad(m[2])+'-'+pad(m[3]);
-    const d=new Date(raw);
-    if(isNaN(d.getTime())) return '';
-    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
-  }
+  function logDate(l){ return isoDate(l?.log_date)||isoDate(l?.check_in)||isoDate(l?.check_out)||isoDate(l?.created_at); }
+  function nextDate(d){ const x=new Date(d+'T00:00:00'); x.setDate(x.getDate()+1); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); }
   function rangeVals(){
-    // إنشاء حقول من/إلى إن لم تكن النسخ القديمة أضافتها بعد
-    ensureDailyRangeUiV10361();
-    let from=S($('dailyDateFromV10310')?.value || $('supDailyDateFromV10310')?.value || $('dailyDate')?.value || $('logDate')?.value || todayLocal());
-    let to=S($('dailyDateToV10310')?.value || $('supDailyDateToV10310')?.value || $('dailyDate')?.value || $('logDate')?.value || from);
-    if(from && to && from > to){ const x=from; from=to; to=x; }
+    let from=S($('dailyDateFromV10310')?.value || $('supDailyDateFromV10310')?.value || $('dailyDate')?.value || $('supLogDate')?.value || todayLocal());
+    let to=S($('dailyDateToV10310')?.value || $('supDailyDateToV10310')?.value || $('dailyDate')?.value || $('supLogDate')?.value || from);
+    if(from && to && from>to){ const t=from; from=to; to=t; }
     return {from,to};
   }
-  function projectFilter(){
-    return S($('dailyProject')?.value || $('logProjectFilter')?.value || '');
-  }
-  function supervisorFilter(){
-    const u=getUser();
-    if(u && u.role === 'supervisor' && u.id) return S(u.id);
-    return S($('dailySupervisor')?.value || '');
-  }
-  function cacheKey(){
+  function filterKey(){
     const r=rangeVals();
-    return [r.from,r.to,supervisorFilter()||'all',projectFilter()||'all'].join('|');
+    const sup=S($('dailySupervisor')?.value || '');
+    const proj=S($('dailyProject')?.value || '');
+    const user=(typeof window.currentUser==='function'?window.currentUser():null) || (typeof window.session==='function'?window.session():null) || null;
+    const roleSup=(user && user.role==='supervisor' && user.id) ? S(user.id) : '';
+    return {from:r.from,to:r.to,sup:sup||roleSup,proj, key:[r.from,r.to,sup||roleSup,proj].join('|')};
   }
-  function arrMergeById(oldRows,newRows){
-    const map=new Map();
-    A(oldRows).forEach((r,i)=>{ if(!r) return; map.set(r.id!=null?'id:'+r.id:'old:'+i,r); });
-    A(newRows).forEach((r,i)=>{ if(!r) return; map.set(r.id!=null?'id:'+r.id:['new',r.log_date,r.check_in,r.project_id,r.supervisor_id,i].join('|'),r); });
-    return [...map.values()];
-  }
-  function projectNameV(id){ try{ if(typeof window.projectName==='function') return window.projectName(id); }catch(_){} const p=A((window.data||{}).projects).find(x=>S(x.id)===S(id)); return p ? S(p.name||p.project_name||'-') : '-'; }
-  function supervisorNameV(id){ try{ if(typeof window.supervisorName==='function') return window.supervisorName(id); }catch(_){} const u=A((window.data||{}).users).find(x=>S(x.id)===S(id)); return u ? S(u.full_name||u.name||u.username||'-') : '-'; }
-  function visitText(v){ try{ if(typeof window.visitTypeText==='function') return window.visitTypeText(v); }catch(_){} return S(v)==='deep'?'نظافة عميقة':'نظافة سطحية'; }
-  function minsBetween(a,b){ try{ if(typeof window.minutesBetween==='function') return Number(window.minutesBetween(a,b))||0; }catch(_){} const da=new Date(a), db=new Date(b); return (!isNaN(da)&&!isNaN(db)&&db>da)?Math.round((db-da)/60000):0; }
-  function actualMins(l){ const n=Number(l && l.duration_minutes); return n>0 ? n : minsBetween(l && l.check_in, l && l.check_out); }
-  function requiredMins(l){
-    try{ if(typeof window.logRequiredMinutes==='function'){ const v=Number(window.logRequiredMinutes(l)); if(v>0) return v; } }catch(_){}
-    const p=A((window.data||{}).projects).find(x=>S(x.id)===S(l && l.project_id));
-    if(p){
-      const d=dateOfLog(l); const day=d?new Date(d+'T12:00:00').getDay():null;
-      const v=day===5 ? Number(p.friday_minutes) : Number(p.required_daily_minutes);
-      if(v>0) return v;
-    }
-    const n=Number(l && l.required_minutes); return n>0?n:0;
-  }
-  function minsText(v){
-    v=Math.round(Number(v)||0); const sign=v<0?'-':''; v=Math.abs(v);
-    const h=Math.floor(v/60), m=v%60;
-    return sign + h + ':' + pad(m);
-  }
-  function diffTextV(d){ if(Math.abs(d)<=5) return '0 دقيقة'; return (d>0?'زيادة ':'نقص ') + minsText(Math.abs(d)); }
-  function statusV(d){ if(d>5) return 'زيادة'; if(d<-5) return 'ناقص'; return 'ضمن الوقت'; }
-  function statusClassV(st){ return st==='زيادة'?'red':(st==='ناقص'?'amber':'green'); }
-  function time12(v){
-    if(!v) return '-';
-    const raw=S(v); let d=null;
-    if(/T\d{1,2}:\d{2}/.test(raw) || /Z$/.test(raw) || /[+-]\d{2}:?\d{2}$/.test(raw)) d=new Date(raw);
-    if(d && !isNaN(d.getTime())){ let h=d.getHours(), m=d.getMinutes(), s=h<12?'ص':'م'; h=h%12||12; return h+':'+pad(m)+' '+s; }
-    const m=raw.match(/(\d{1,2}):(\d{2})/); if(m){ let h=Number(m[1]), mm=Number(m[2]), s=h<12?'ص':'م'; h=h%12||12; return h+':'+pad(mm)+' '+s; }
-    return raw;
-  }
-
-  function ensureDailyRangeUiV10361(){
-    const daily = $('dailyDate');
-    if(daily && !$('dailyDateFromV10310')){
-      const from=document.createElement('input'); from.type='date'; from.id='dailyDateFromV10310'; from.title='من تاريخ';
-      const to=document.createElement('input'); to.type='date'; to.id='dailyDateToV10310'; to.title='إلى تاريخ';
-      from.value=daily.value||todayLocal(); to.value=daily.value||todayLocal();
-      daily.style.display='none';
-      daily.insertAdjacentElement('beforebegin', from);
-      from.insertAdjacentHTML('beforebegin','<span class="date-range-caption-v10361">من تاريخ</span>');
-      daily.insertAdjacentElement('beforebegin', to);
-      to.insertAdjacentHTML('beforebegin','<span class="date-range-caption-v10361">إلى تاريخ</span>');
-    }
-    const supCard=$('logsBody')?.closest('.card');
-    if(supCard && !$('dailyDate') && !$('supDailyDateFromV10310')){
-      const bar=document.createElement('div'); bar.className='filters sup-date-range-v10361';
-      bar.innerHTML='<span>من تاريخ</span><input type="date" id="supDailyDateFromV10310"><span>إلى تاريخ</span><input type="date" id="supDailyDateToV10310"><button type="button" class="light" onclick="exportSupervisorDailyPDFV10310()">طباعة تقرير المشرف / PDF</button>';
-      const table=supCard.querySelector('.table-wrap'); if(table) supCard.insertBefore(bar, table);
-      $('supDailyDateFromV10310').value=todayLocal(); $('supDailyDateToV10310').value=todayLocal();
-    }
-    if(!$('dailyFastStyleV10361')){
-      const st=document.createElement('style'); st.id='dailyFastStyleV10361'; st.textContent='.date-range-caption-v10361{font-weight:900;color:#0a4033;align-self:center}.daily-loading-v10361 td{text-align:center!important;color:#0a4033;font-weight:900;padding:18px!important}.badge.green{background:#dff7ea;color:#07622a}.badge.amber{background:#fff3cd;color:#7a4b00}.badge.red{background:#ffe4e4;color:#a70000}';
-      document.head.appendChild(st);
-    }
-  }
-
-  function loadingRow(){
-    const body=$('logsBody'); if(!body) return;
-    const isSup=!$('daily');
-    body.innerHTML = `<tr class="daily-loading-v10361"><td colspan="${isSup?8:14}">جاري تحميل سجلات الفترة المطلوبة فقط...</td></tr>`;
-  }
-
-  let currentFetch=null;
-  async function fetchDailyFast(force){
-    if(!window.sb || !sb.from){ return A((window.data||{}).logs); }
-    window.data = window.data || {};
-    const key=cacheKey();
-    window.__dailyFastCacheV10361 = window.__dailyFastCacheV10361 || {};
-    if(!force && window.__dailyFastCacheV10361[key]){
-      window.data.logs = arrMergeById(A(window.data.logs), window.__dailyFastCacheV10361[key]);
-      try{ data.logs=window.data.logs; }catch(_){}
-      return window.__dailyFastCacheV10361[key];
-    }
-    if(currentFetch && currentFetch.key===key) return currentFetch.promise;
-    const r=rangeVals(), sup=supervisorFilter(), proj=projectFilter();
-    loadingRow();
-    const select='id,user_id,supervisor_id,project_id,check_in,check_out,log_date,duration_minutes,travel_minutes,visit_type,required_minutes,time_difference_minutes,time_status,notes,created_at';
-    async function runBy(column){
-      let q=sb.from('time_logs').select(select);
-      if(column==='log_date') q=q.gte('log_date', r.from).lte('log_date', r.to).order('log_date',{ascending:false}).order('check_in',{ascending:false});
-      else q=q.gte('check_in', r.from+'T00:00:00').lt('check_in', nextDay(r.to)+'T00:00:00').order('check_in',{ascending:false});
-      if(sup) q=q.eq('supervisor_id', sup);
-      if(proj) q=q.eq('project_id', proj);
-      const res=await q.range(0,1999);
-      if(res.error){ console.warn(BUILD, column, res.error.message); return []; }
-      return A(res.data).filter(x=>S(x.visit_type)!=='technician_attendance');
-    }
-    const promise=(async()=>{
-      let rows=await runBy('log_date');
-      // سجلات قديمة قد لا يكون فيها log_date، لذلك نعمل fallback فقط إذا لم تظهر نتائج.
-      if(rows.length===0) rows=await runBy('check_in');
-      window.__dailyFastCacheV10361[key]=rows;
-      window.data.logs = arrMergeById(A(window.data.logs), rows);
-      try{ data.logs=window.data.logs; }catch(_){}
-      return rows;
-    })().finally(()=>{ currentFetch=null; });
-    currentFetch={key,promise};
-    return promise;
-  }
-
-  window.refreshDailyRangeLogsV10353 = fetchDailyFast;
-  window.refreshDailyRangeLogsV10361 = fetchDailyFast;
-
-  window.filterLogs = function(){
-    const r=rangeVals(), sup=supervisorFilter(), proj=projectFilter(), q=S($('dailySearch')?.value || '').toLowerCase();
-    let rows=A((window.data||{}).logs).filter(l=>S(l.visit_type)!=='technician_attendance');
-    rows=rows.filter(l=>{ const d=dateOfLog(l); return d && (!r.from || d>=r.from) && (!r.to || d<=r.to); });
-    if(sup) rows=rows.filter(l=>S(l.supervisor_id)===sup);
-    if(proj) rows=rows.filter(l=>S(l.project_id)===proj);
-    if(q) rows=rows.filter(l=>[supervisorNameV(l.supervisor_id),projectNameV(l.project_id),visitText(l.visit_type),l.notes].join(' ').toLowerCase().includes(q));
-    return rows.sort((a,b)=>S(dateOfLog(b)).localeCompare(S(dateOfLog(a))) || S(b.check_in||'').localeCompare(S(a.check_in||'')));
-  };
-
-  window.renderTimeLogs = async function(){
-    ensureDailyRangeUiV10361();
-    await fetchDailyFast(false);
-    const body=$('logsBody'); if(!body) return;
-    const isSup=!$('daily');
-    const rows=window.filterLogs();
-    body.innerHTML = rows.map(l=>{
-      const d=dateOfLog(l), a=actualMins(l), r=requiredMins(l), diff=a-r, st=statusV(diff);
-      const badge=`<span class="badge ${statusClassV(st)}">${E(st)}</span>`;
-      if(isSup){
-        return `<tr><td>${E(projectNameV(l.project_id))}</td><td>${E(visitText(l.visit_type))}</td><td>${E(time12(l.check_in))}</td><td>${E(time12(l.check_out))}</td><td>${E(minsText(r))}</td><td>${E(minsText(a))}</td><td>${badge}</td><td class="row-actions">${typeof logWhatsappButtons==='function'?logWhatsappButtons(l):''}</td></tr>`;
+  function applyFiltersClient(rows){
+    const fk=filterKey(); const q=S($('dailySearch')?.value||'').toLowerCase();
+    return A(rows).filter(function(l){
+      if(S(l?.visit_type)==='technician_attendance') return false;
+      const d=logDate(l); if(fk.from && d<fk.from) return false; if(fk.to && d>fk.to) return false;
+      if(fk.sup && S(l?.supervisor_id)!==fk.sup) return false;
+      if(fk.proj && S(l?.project_id)!==fk.proj) return false;
+      if(q){
+        let txt=[l?.notes,l?.visit_type,l?.time_status,l?.project_name,l?.supervisor_name].join(' ');
+        try{ if(typeof window.supervisorName==='function') txt+=' '+window.supervisorName(l.supervisor_id); }catch(_){}
+        try{ if(typeof window.projectName==='function') txt+=' '+window.projectName(l.project_id); }catch(_){}
+        if(!txt.toLowerCase().includes(q)) return false;
       }
-      return `<tr><td>${E(d)}</td><td>${E(supervisorNameV(l.supervisor_id))}</td><td>${E(projectNameV(l.project_id))}</td><td>${E(visitText(l.visit_type))}</td><td>${E(time12(l.check_in))}</td><td>${E(time12(l.check_out))}</td><td>${E(minsText(r))}</td><td>${E(minsText(a))}</td><td>${E(diffTextV(diff))}</td><td>${badge}</td><td>${E(l.travel_minutes||0)}</td><td>${E(l.notes||'')}</td><td class="row-actions">${typeof logWhatsappButtons==='function'?logWhatsappButtons(l):''}</td><td class="row-actions"><button onclick="editTimeLog(${Number(l.id)||0})">تعديل</button><button class="danger" onclick="deleteRow('time_logs',${Number(l.id)||0})">حذف</button></td></tr>`;
-    }).join('') || `<tr><td colspan="${isSup?8:14}">لا توجد بيانات حسب الفترة المحددة</td></tr>`;
+      return true;
+    }).sort((a,b)=>S(logDate(b)).localeCompare(S(logDate(a))) || S(b?.check_in||'').localeCompare(S(a?.check_in||'')) || Number(b?.id||0)-Number(a?.id||0));
+  }
+  function queryBaseByLogDate(fk){
+    let q=sb.from('time_logs').select('*').gte('log_date', fk.from).lte('log_date', fk.to).order('check_in',{ascending:false});
+    if(fk.sup) q=q.eq('supervisor_id', fk.sup);
+    if(fk.proj) q=q.eq('project_id', fk.proj);
+    return q;
+  }
+  function queryBaseByCheckIn(fk){
+    let q=sb.from('time_logs').select('*').gte('check_in', fk.from+'T00:00:00').lt('check_in', nextDate(fk.to)+'T00:00:00').order('check_in',{ascending:false});
+    if(fk.sup) q=q.eq('supervisor_id', fk.sup);
+    if(fk.proj) q=q.eq('project_id', fk.proj);
+    return q;
+  }
+  async function fetchPaged(q){
+    const size=1000; let from=0, out=[];
+    for(let loop=0; loop<10; loop++){
+      const res=await q.range(from, from+size-1);
+      if(res.error) throw res.error;
+      const rows=res.data||[]; out=out.concat(rows);
+      if(rows.length<size) break;
+      from+=size;
+    }
+    return out;
+  }
+  function mergeIntoData(rows){
+    window.data=window.data || (typeof data!=='undefined'?data:{});
+    const map=new Map();
+    A(window.data.logs).forEach((r,i)=>{ if(r) map.set(r.id!=null?'id:'+r.id:'old:'+i,r); });
+    A(rows).forEach((r,i)=>{ if(r) map.set(r.id!=null?'id:'+r.id:'new:'+i,r); });
+    window.data.logs=Array.from(map.values()).filter(r=>S(r?.visit_type)!=='technician_attendance');
+    try{ data.logs=window.data.logs; }catch(_){}
+  }
+  function showLoading(){
+    const body=$('logsBody'); if(!body) return;
+    const isSupervisorPage=!document.getElementById('daily');
+    body.innerHTML=`<tr><td colspan="${isSupervisorPage?8:14}" style="padding:22px;text-align:center;font-weight:900;color:#0a5a49">جاري تحميل سجلات الفترة المحددة...</td></tr>`;
+  }
+  async function ensureRange(force){
+    if(!window.sb || !sb.from) return [];
+    const fk=filterKey();
+    if(!force && cache.has(fk.key)) return cache.get(fk.key);
+    if(inflight && inflight.key===fk.key) return inflight.promise;
+    const promise=(async()=>{
+      let rows=await fetchPaged(queryBaseByLogDate(fk));
+      if(!rows.length) rows=await fetchPaged(queryBaseByCheckIn(fk));
+      rows=applyFiltersClient(rows);
+      cache.set(fk.key, rows);
+      mergeIntoData(rows);
+      return rows;
+    })();
+    inflight={key:fk.key,promise};
+    try{return await promise;}finally{ if(inflight && inflight.key===fk.key) inflight=null; }
+  }
+  function minutesBetweenLocal(a,b){ try{ if(typeof window.minutesBetween==='function') return Number(window.minutesBetween(a,b))||0; }catch(_){} const da=new Date(a), db=new Date(b); return (!isNaN(da)&&!isNaN(db)&&db>da)?Math.round((db-da)/60000):0; }
+  function requiredLocal(l){ try{ if(typeof window.logRequiredMinutes==='function') return Number(window.logRequiredMinutes(l))||0; }catch(_){} const p=A(window.data?.projects).find(x=>S(x.id)===S(l?.project_id)); const d=logDate(l); const day=d?new Date(d+'T12:00:00').getDay():null; return Number(l?.required_minutes || (day===5?p?.friday_minutes:p?.required_daily_minutes) || 0)||0; }
+  function statusFromDiff(d){ if(d>5) return 'over'; if(d<-5) return 'under'; return 'on_time'; }
+  function statusTextLocal(st){ try{ if(typeof window.timeStatusText==='function') return window.timeStatusText(st); }catch(_){} return st==='over'?'زيادة وقت':(st==='under'?'ناقص وقت':'ضمن الوقت'); }
+  function badgeClass(st){ try{ if(typeof window.timeStatusClass==='function') return window.timeStatusClass(st); }catch(_){} return st==='under'?'red':(st==='over'?'yellow':'green'); }
+  function minsTxt(m){ try{ if(typeof window.minsToText==='function') return window.minsToText(m); }catch(_){} m=Math.round(Number(m)||0); const h=Math.floor(Math.abs(m)/60), mm=Math.abs(m)%60; return (m<0?'-':'')+h+':'+String(mm).padStart(2,'0'); }
+  function diffTxt(d){ try{ if(typeof window.diffText==='function') return window.diffText(d); }catch(_){} return Math.abs(d)<=5?'0 دقيقة':(d>0?'زيادة ':'نقص ')+minsTxt(Math.abs(d)); }
+  function timeTxt(v){ try{ if(typeof window.timeOnly==='function') return window.timeOnly(v); }catch(_){} if(!v) return '-'; const d=new Date(v); if(!isNaN(d)){ let h=d.getHours(), m=d.getMinutes(), s=h<12?'ص':'م'; h=h%12||12; return h+':'+String(m).padStart(2,'0')+' '+s; } return S(v); }
+  function supName(id){ try{ if(typeof window.supervisorName==='function') return window.supervisorName(id)||'-'; }catch(_){} return '-'; }
+  function projName(id){ try{ if(typeof window.projectName==='function') return window.projectName(id)||'-'; }catch(_){} return '-'; }
+  function visitName(v){ try{ if(typeof window.visitTypeText==='function') return window.visitTypeText(v)||v||'-'; }catch(_){} return v||'-'; }
+  function waButtons(l){ try{ if(typeof window.logWhatsappButtons==='function') return window.logWhatsappButtons(l); }catch(_){} return ''; }
+  function renderRows(rows){
+    const body=$('logsBody'); if(!body) return;
+    const isSupervisorPage=!document.getElementById('daily');
+    rows=applyFiltersClient(rows);
+    body.innerHTML=rows.map(function(l){
+      const actual=Number(l.duration_minutes)||minutesBetweenLocal(l.check_in,l.check_out);
+      const req=requiredLocal(l);
+      const diff=actual-req;
+      const st=statusFromDiff(diff);
+      const badge=`<span class="badge ${badgeClass(st)}">${esc(statusTextLocal(st))}</span>`;
+      if(isSupervisorPage){
+        return `<tr><td>${esc(projName(l.project_id))}</td><td>${esc(visitName(l.visit_type))}</td><td>${esc(timeTxt(l.check_in))}</td><td>${esc(timeTxt(l.check_out))}</td><td>${esc(minsTxt(req))}</td><td>${esc(minsTxt(actual))}</td><td>${badge}</td><td class="row-actions">${waButtons(l)}</td></tr>`;
+      }
+      return `<tr><td>${esc(logDate(l))}</td><td>${esc(supName(l.supervisor_id))}</td><td>${esc(projName(l.project_id))}</td><td>${esc(visitName(l.visit_type))}</td><td>${esc(timeTxt(l.check_in))}</td><td>${esc(timeTxt(l.check_out))}</td><td>${esc(minsTxt(req))}</td><td>${esc(minsTxt(actual))}</td><td>${esc(diffTxt(diff))}</td><td>${badge}</td><td>${esc(l.travel_minutes||0)}</td><td>${esc(l.notes||'')}</td><td class="row-actions">${waButtons(l)}</td><td class="row-actions"><button onclick="editTimeLog(${Number(l.id)||0})">تعديل</button><button class="danger" onclick="deleteRow('time_logs',${Number(l.id)||0})">حذف</button></td></tr>`;
+    }).join('') || `<tr><td colspan="${isSupervisorPage?8:14}">لا توجد بيانات</td></tr>`;
+  }
+  const oldFilter=window.filterLogs;
+  window.filterLogs=function(){
+    const fk=filterKey();
+    const rows=cache.get(fk.key) || A(window.data?.logs);
+    return applyFiltersClient(rows);
   };
-  try{ renderTimeLogs=window.renderTimeLogs; filterLogs=window.filterLogs; }catch(_){}
-
-  // تحميل الصفحة الأساسي: لا نسحب كل time_logs. هذا أصل البطء.
-  const lightweightLoad = async function(){
-    if(!window.sb || !sb.from) return;
-    const page=(table, order='id', asc=true, size=2000)=>sb.from(table).select('*').order(order,{ascending:asc}).range(0,size-1);
-    const [users,projects,workers,attendance,tickets,services]=await Promise.all([
-      page('app_users','id',true,3000),
-      page('projects','id',true,3000),
-      page('workers','id',true,5000),
-      sb.from('attendance').select('*').gte('attendance_date', todayLocal().slice(0,7)+'-01').lte('attendance_date', todayLocal()).order('attendance_date',{ascending:false}).range(0,3000),
-      page('tickets','created_at',false,2000),
-      page('contract_services','id',false,3000)
-    ]);
-    [users,projects,workers,attendance,tickets,services].forEach(r=>{ if(r && r.error) console.warn(BUILD, r.error.message); });
-    window.data = window.data || {};
-    data.users=users.data||[];
-    data.supervisors=data.users.filter(u=>u.role==='supervisor' && u.is_active!==false);
-    data.technicians=data.users.filter(u=>u.role==='technician' && u.is_active!==false);
-    data.projects=projects.data||[];
-    data.workers=workers.data||[];
-    data.attendance=attendance.data||[];
-    data.tickets=tickets.data||[];
-    data.contractServices=services.data||[];
-    data.logs=[]; // يتم تحميلها عند فتح السجلات فقط
-    data.contractServicesError='';
+  window.renderTimeLogs=async function(){
+    const fk=filterKey();
+    if(cache.has(fk.key)){ renderRows(cache.get(fk.key)); return; }
+    showLoading();
+    try{ const rows=await ensureRange(false); renderRows(rows); }
+    catch(e){ console.error(BUILD,e); const fallback=typeof oldFilter==='function'?oldFilter():A(window.data?.logs); renderRows(fallback); try{ if(typeof msg==='function') msg('تعذر تحميل الفترة بسرعة: '+(e.message||e),'err'); }catch(_){} }
   };
-  window.loadAll = lightweightLoad;
-  try{ loadAll=window.loadAll; }catch(_){}
-
-  function bindDaily(){
-    ensureDailyRangeUiV10361();
-    ['dailyDateFromV10310','dailyDateToV10310','supDailyDateFromV10310','supDailyDateToV10310','dailyDate','dailySupervisor','dailyProject','dailySearch'].forEach(id=>{
-      const el=$(id); if(!el || el.dataset.fastV10361) return;
-      el.dataset.fastV10361='1';
-      const ev = id==='dailySearch' ? 'input' : 'change';
-      el.addEventListener(ev, function(){ window.renderTimeLogs(); }, true);
-    });
-  }
-
-  const oldShowPage = window.showPage;
-  if(typeof oldShowPage==='function'){
-    window.showPage=function(id, btn){
-      const ret=oldShowPage.apply(this, arguments);
-      if(id==='daily' || id==='supLogs') setTimeout(()=>{ bindDaily(); window.renderTimeLogs(); }, 80);
-      return ret;
-    };
-  }
-
-  function ticketStart(t){ return S(t.opened_at||t.created_at||t.createdAt||t.date||t.updated_at); }
-  function ticketEnd(t){
-    const closed=S(t.status)==='closed';
-    if(closed) return S(t.closed_at||t.closedAt||t.closed_date||t.closedDate||t.resolved_at||t.resolvedAt||t.updated_at||t.updatedAt) || ticketStart(t);
-    return new Date().toISOString();
-  }
-  function ticketDurationText(t){
-    const st=Date.parse(ticketStart(t)), en=Date.parse(ticketEnd(t));
-    if(isNaN(st)||isNaN(en)) return '-';
-    let mins=Math.max(0, Math.round((en-st)/60000));
-    const days=Math.floor(mins/1440); mins%=1440;
-    const hrs=Math.floor(mins/60), mm=mins%60;
-    const txt = days ? `${days} يوم ${hrs} س` : (hrs ? `${hrs} س ${mm} د` : `${mm} د`);
-    return S(t.status)==='closed' ? `أغلق خلال ${txt}` : `مفتوح منذ ${txt}`;
-  }
-  window.tasneefTicketDurationTextV10361 = ticketDurationText;
-
-  function tDate(t){ const raw=ticketStart(t); if(!raw) return ''; const d=new Date(raw); if(isNaN(d.getTime())) return ''; return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
-  function ticketNo(t){ return S(t.ticket_number||t.ticket_no||t.no) || ('T-'+String(t.id||0).padStart(4,'0')); }
-  function ticketStatus(t){ const s=S(t.status||'open'); return ({open:'مفتوح',processing:'تحت المعالجة',closed:'مغلق'})[s]||s; }
-  function ticketPriority(t){ const s=S(t.priority||'normal'); return ({normal:'عادي',high:'مهم',urgent:'عاجل',low:'منخفض'})[s]||s; }
-  function ticketProject(t){ return S(t.project_name)||projectNameV(t.project_id)||'-'; }
-  function ticketSupervisor(t){ return S(t.supervisor_name)||supervisorNameV(t.supervisor_id)||'-'; }
-  function issueText(t){ return S(t.description||t.title||'-'); }
-
-  window.printSupervisorTicketsV10310 = function(){
-    const u=getUser();
-    let rows=A((window.data||{}).tickets).slice();
-    if(u && u.role==='supervisor' && u.id) rows=rows.filter(t=>S(t.supervisor_id)===S(u.id) || !S(t.supervisor_id));
-    const from=S($('supTicketFromV10310')?.value||$('ticketRootDateFromV10246')?.value||''), to=S($('supTicketToV10310')?.value||$('ticketRootDateToV10246')?.value||from);
-    if(from||to) rows=rows.filter(t=>{ const d=tDate(t); return d && (!from||d>=from) && (!to||d<=to); });
-    const body=rows.map((t,i)=>`<tr><td>${i+1}</td><td>${E(ticketNo(t))}</td><td>${E(tDate(t))}</td><td>${E(ticketProject(t))}</td><td>${E(S(t.title||'-'))}</td><td>${E(ticketPriority(t))}</td><td>${E(ticketStatus(t))}</td><td>${E(ticketDurationText(t))}</td><td>${E(issueText(t))}${t.closure_note?'<br><b>الإجراء:</b> '+E(t.closure_note):''}</td></tr>`).join('') || '<tr><td colspan="9" style="padding:25px;text-align:center">لا توجد تكتات</td></tr>';
-    const html=`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير التكتات</title><style>@page{size:A4 landscape;margin:9mm}body{font-family:Tahoma,Arial,sans-serif;color:#123d33;font-size:11px}.sheet{border:2px solid #0a5a49;padding:14px;min-height:100vh}.head{display:flex;justify-content:space-between;border-bottom:3px solid #0a5a49;padding-bottom:10px}.brand{display:flex;gap:10px;align-items:center}.brand img{width:120px;max-height:55px}.title h1,.brand h2{color:#0a5a49;margin:0}.meta{background:#f3faf7;border:1px solid #dce9e4;border-radius:12px;padding:9px;margin:10px 0}table{width:100%;border-collapse:collapse}th{background:#0a5a49;color:white;padding:7px;border:1px solid #0a5a49}td{border:1px solid #d9e6e1;padding:6px;text-align:center;vertical-align:top}tbody tr:nth-child(even) td{background:#f7fbfa}.footer{margin-top:12px;border-top:1px solid #d9e6e1;padding-top:8px;color:#0a5a49;font-weight:900}.copy{background:#0a5a49;color:white;border-radius:999px;padding:7px 18px}</style></head><body><div class="sheet"><div class="head"><div class="brand"><img src="tasneef_logo_print.png" onerror="this.style.display='none'"><div><h2>شركة تصنيف لإدارة المرافق</h2><p>TASNEF FACILITIES MANAGEMENT</p></div></div><div class="title"><h1>تقرير التكتات</h1><p>تاريخ الإصدار: ${E(new Date().toLocaleString('ar-SA'))}</p></div></div><div class="meta"><b>الفترة:</b> ${from||to?('من '+E(from)+' إلى '+E(to||from)):'كل التواريخ'} — <b>عدد التكتات:</b> ${rows.length}</div><table><thead><tr><th>م</th><th>رقم التكت</th><th>التاريخ</th><th>المشروع</th><th>نوع المشكلة</th><th>الأولوية</th><th>الحالة</th><th>مدة إغلاق / فتح التكت</th><th>الوصف / الإجراء</th></tr></thead><tbody>${body}</tbody></table><div class="footer"><span class="copy">نسخة المشرف</span> تم إنشاء هذا التقرير من نظام شركة تصنيف لإدارة المرافق ويعتبر معتمدًا ما لم يبرر العميل خلاف ذلك.</div></div><script>window.onload=function(){setTimeout(function(){window.print()},500)}<\/script></body></html>`;
-    const w=window.open('','_blank'); if(!w) return alert('المتصفح منع فتح نافذة الطباعة'); w.document.open(); w.document.write(html); w.document.close();
-  };
-
-  window.addEventListener('load', function(){
-    setTimeout(function(){
-      bindDaily();
-      // لا نحمل السجلات إلا إذا صفحة السجلات ظاهرة فعلًا
-      const dailyVisible = $('daily') && !$('daily').classList.contains('hidden');
-      const supVisible = $('supLogs') && $('supLogs').classList.contains('active');
-      if(dailyVisible || supVisible) window.renderTimeLogs();
-    }, 900);
-  });
+  window.refreshDailyRangeLogsV10363=async function(force){ const rows=await ensureRange(!!force); renderRows(rows); return rows; };
+  window.refreshDailyRangeLogsV10353=window.refreshDailyRangeLogsV10363;
+  function bind(){ ['dailyDateFromV10310','dailyDateToV10310','supDailyDateFromV10310','supDailyDateToV10310','dailyDate','supLogDate','dailySupervisor','dailyProject'].forEach(function(id){ const el=$(id); if(el && !el.dataset.dailyFastV10363){ el.dataset.dailyFastV10363='1'; el.addEventListener('change',function(){ const fk=filterKey(); showLoading(); ensureRange(true).then(renderRows).catch(function(e){console.warn(BUILD,e); renderRows(A(window.data?.logs));}); }); } }); const q=$('dailySearch'); if(q && !q.dataset.dailyFastV10363){ q.dataset.dailyFastV10363='1'; q.addEventListener('input',function(){ renderRows(window.filterLogs()); }); } }
+  document.addEventListener('DOMContentLoaded',function(){ setTimeout(bind,800); });
+  window.addEventListener('load',function(){ setTimeout(bind,1200); });
+  console.log('Tasneef '+BUILD+' loaded');
 })();
