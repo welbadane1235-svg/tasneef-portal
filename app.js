@@ -23222,3 +23222,118 @@ try{ exportSupervisorDailyPDFV10310 = window.exportSupervisorDailyPDFV10310; }ca
   window.addEventListener('load',function(){ setTimeout(bind,1200); });
   console.log('Tasneef '+BUILD+' loaded');
 })();
+
+/* ===== V10364: Ticket priority SLA bars + required validation ===== */
+(function(){
+  'use strict';
+  if(window.__tasneefTicketSlaV10364) return;
+  window.__tasneefTicketSlaV10364 = true;
+  const BUILD='v10364-ticket-priority-sla-bars';
+  const STORE='tasneef_ticket_sla_hours_v10364';
+  const $=id=>document.getElementById(id);
+  const S=v=>String(v??'').trim();
+  const A=v=>Array.isArray(v)?v:[];
+  const E=v=>S(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  function D(){ window.data=window.data || {}; return window.data; }
+  function notify(text,type){ try{ if(typeof window.msg==='function') window.msg(text,type||'err'); else alert(text); }catch(_){ alert(text); } }
+  function cfg(){
+    let c={urgent:4, high:12, normal:24};
+    try{ c=Object.assign(c, JSON.parse(localStorage.getItem(STORE)||'{}')); }catch(_){ }
+    ['urgent','high','normal'].forEach(k=>{ c[k]=Math.max(1, Number(c[k])||({urgent:4,high:12,normal:24}[k])); });
+    return c;
+  }
+  function setCfg(k,v){ const c=cfg(); c[k]=Math.max(1, Number(v)||1); localStorage.setItem(STORE, JSON.stringify(c)); }
+  function priorityKey(p){ p=S(p); if(p==='urgent') return 'urgent'; if(p==='high') return 'high'; return 'normal'; }
+  function priorityLabel(p){ p=S(p); return p==='urgent'?'عاجل':(p==='high'?'مهم':(p==='low'?'منخفض':'عادي')); }
+  function statusLabel(s){ s=S(s||'open'); return s==='closed'?'مغلق':(s==='processing'?'تحت المعالجة':'مفتوح'); }
+  function ticketNo(t){ return S(t.ticket_number||t.ticket_no||t.no) || ('T-'+String(t.id||0).padStart(4,'0')); }
+  function projectNameSafe(id){ try{ if(typeof window.projectName==='function'){ const v=window.projectName(id); if(S(v)&&S(v)!=='-') return v; } }catch(_){ } const p=A(D().projects).find(x=>String(x.id)===String(id)); return S(p&&(p.name||p.project_name))||'-'; }
+  function supervisorNameSafe(id){ try{ if(typeof window.supervisorName==='function'){ const v=window.supervisorName(id); if(S(v)&&S(v)!=='-') return v; } }catch(_){ } const u=A(D().users||D().app_users).find(x=>String(x.id)===String(id)); return S(u&&(u.full_name||u.name||u.username))||'-'; }
+  function projectOf(t){ return S(t.project_name||t.projectName||t.project) || projectNameSafe(t.project_id||t.projectId); }
+  function supervisorOf(t){ return S(t.supervisor_name||t.supervisorName||t.supervisor) || supervisorNameSafe(t.supervisor_id||t.supervisorId); }
+  function recipientOf(t){ return S(t.claimed_by_name||t.received_by_name||t.recipient_name||t.assignee_name||t.technician_name) || supervisorNameSafe(t.claimed_by||t.assigned_to||t.technician_id) || '-'; }
+  function closedByOf(t){ return S(t.closed_by_name||t.closed_name||t.closer_name) || supervisorNameSafe(t.closed_by||t.closed_by_id) || '-'; }
+  function dateMs(t){ const raw=S(t.created_at||t.createdAt||t.date||t.updated_at); const n=Date.parse(raw); return isNaN(n)?(Number(t.id)||0):n; }
+  function fmtDate(v){ const d=v?new Date(v):null; if(!d||isNaN(d)) return '-'; try{return d.toLocaleString('ar-SA',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});}catch(_){return S(v).slice(0,16);} }
+  function durationText(min){ min=Math.max(0,Math.round(Number(min)||0)); const d=Math.floor(min/1440), h=Math.floor((min%1440)/60), m=min%60; if(d) return d+' يوم '+h+' س'; if(h) return h+' س '+m+' د'; return m+' د'; }
+  function slaInfo(t){
+    const c=cfg(); const key=priorityKey(t.priority); const dueH=Number(c[key]||24); const dueMin=dueH*60;
+    const start=Date.parse(S(t.created_at||t.createdAt||t.date||t.updated_at));
+    const closed=S(t.status)==='closed'; const end=closed?Date.parse(S(t.closed_at||t.updated_at)):Date.now();
+    const elapsed=(!isNaN(start)&&!isNaN(end))?Math.max(0,Math.round((end-start)/60000)):0;
+    let state='standard';
+    if(elapsed>dueMin) state='late';
+    else if(elapsed>=dueMin*0.8) state='near';
+    const pct=Math.max(4, Math.min(100, Math.round((elapsed/Math.max(1,dueMin))*100)));
+    const label=state==='late'?'متأخر':(state==='near'?'قارب':'قياسي');
+    return {key,dueH,dueMin,elapsed,state,label,pct,closed};
+  }
+  function stateClass(st){ return st==='late'?'sla-red':(st==='near'?'sla-yellow':'sla-green'); }
+  function normalizeFilterValue(v){ v=S(v); if(v==='red'||v==='late') return 'late'; if(v==='yellow'||v==='near') return 'near'; if(v==='green'||v==='standard') return 'standard'; return ''; }
+  function ensureStyle(){ if($('ticketSlaStyleV10364')) return; const st=document.createElement('style'); st.id='ticketSlaStyleV10364'; st.textContent=`
+    .ticket-sla-panel-v10364{border:1px solid #d8e9e3;background:#f7fbfa;border-radius:14px;padding:12px;margin:10px 0;display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:10px;align-items:end}
+    .ticket-sla-panel-v10364 label{font-weight:900;color:#063d32;font-size:12px;margin:0!important}.ticket-sla-panel-v10364 input,.ticket-sla-panel-v10364 select{width:100%;border:1px solid #cfe2dc;border-radius:10px;padding:9px;background:white;color:#062f26;font-weight:800}.ticket-sla-panel-title{grid-column:1/-1;font-weight:900;color:#075342;margin-bottom:0}.ticket-sla-help{grid-column:1/-1;color:#657b72;font-size:12px;font-weight:700}.ticket-sla-card{position:relative;overflow:hidden;border-top:0!important}.ticket-sla-strip{height:8px;border-radius:999px;background:#edf3f1;margin:0 0 10px;overflow:hidden}.ticket-sla-fill{display:block;height:100%;border-radius:999px}.ticket-sla-card.sla-red{border-color:#efb8b8!important;background:#fff8f8!important}.ticket-sla-card.sla-yellow{border-color:#f0d98c!important;background:#fffdf3!important}.ticket-sla-card.sla-green{border-color:#b9e1c7!important;background:#f8fff9!important}.ticket-sla-fill.sla-red{background:#d92d20}.ticket-sla-fill.sla-yellow{background:#f0b429}.ticket-sla-fill.sla-green{background:#168a43}.ticket-sla-badge{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:5px 10px;font-weight:900;font-size:12px}.ticket-sla-badge.sla-red{background:#ffe8e8;color:#a40000}.ticket-sla-badge.sla-yellow{background:#fff4cf;color:#7a4b00}.ticket-sla-badge.sla-green{background:#e8f8ef;color:#086b32}.ticket-sla-missing{outline:2px solid #d92d20!important;background:#fff8f8!important}@media(max-width:900px){.ticket-sla-panel-v10364{grid-template-columns:1fr 1fr}.ticket-sla-panel-title,.ticket-sla-help{grid-column:1/-1}}`;
+    document.head.appendChild(st);
+  }
+  function panelHtml(prefix){ const c=cfg(); return `<div id="${prefix}TicketSlaPanelV10364" class="ticket-sla-panel-v10364"><div class="ticket-sla-panel-title">أوقات الأولوية والتنبيه</div><label>عاجل / ساعة<input type="number" min="1" id="${prefix}SlaUrgentV10364" value="${E(c.urgent)}"></label><label>مهم / ساعة<input type="number" min="1" id="${prefix}SlaHighV10364" value="${E(c.high)}"></label><label>عادي / ساعة<input type="number" min="1" id="${prefix}SlaNormalV10364" value="${E(c.normal)}"></label><label>فلتر الشريط<select id="${prefix}TicketSlaFilterV10364"><option value="">كل الأشرطة</option><option value="late">متأخر</option><option value="near">قارب</option><option value="standard">قياسي</option></select></label><div class="ticket-sla-help">الأحمر: متأخر عن الوقت المحدد، الأصفر: قارب انتهاء الوقت، الأخضر: قياسي أو تم إنجازه في الوقت.</div></div>`; }
+  function bindPanel(prefix){
+    [['Urgent','urgent'],['High','high'],['Normal','normal']].forEach(([id,k])=>{ const el=$(prefix+'Sla'+id+'V10364'); if(el&&!el.dataset.slaBound){ el.dataset.slaBound='1'; el.addEventListener('change',()=>{ setCfg(k,el.value); renderTicketsSafe(); }); } });
+    const f=$(prefix+'TicketSlaFilterV10364'); if(f&&!f.dataset.slaBound){ f.dataset.slaBound='1'; f.addEventListener('change',()=>renderTicketsSafe()); }
+  }
+  function ensurePanels(){
+    ensureStyle();
+    const adminBody=$('ticketsBody'); if(adminBody && !$('admTicketSlaPanelV10364')){ const card=adminBody.closest('.card')||adminBody.parentElement; const target=$('ticketFiltersV10246') || (card&&card.querySelector('.filters')) || adminBody; if(target){ target.insertAdjacentHTML('beforebegin',panelHtml('adm')); } }
+    const supBody=$('supTicketsBody'); if(supBody && !$('supTicketSlaPanelV10364')){ const card=supBody.closest('.card')||supBody.parentElement; const target=card && card.querySelector('.filters'); if(target){ target.insertAdjacentHTML('afterend',panelHtml('sup')); } }
+    bindPanel('adm'); bindPanel('sup');
+  }
+  function selectedSlaFilter(){ return normalizeFilterValue($('admTicketSlaFilterV10364')?.value || $('supTicketSlaFilterV10364')?.value); }
+  async function loadTicketsQuick(){
+    if(A(D().tickets).length) return A(D().tickets);
+    if(!window.sb || !sb.from) return [];
+    const r=await sb.from('tickets').select('*').order('created_at',{ascending:false}).limit(1000);
+    if(r.error) throw r.error;
+    D().tickets=A(r.data);
+    return D().tickets;
+  }
+  function filterAdmin(rows){
+    const st=S($('ticketRootStatusV10246')?.value || $('ticketFilterStatus')?.value); const q=(S($('ticketRootSearchV10246')?.value || $('ticketSearch')?.value)).toLowerCase(); const title=S($('ticketRootTitleV10246')?.value); const sla=selectedSlaFilter();
+    const proj=S($('ticketRootProjectV10246')?.value).toLowerCase(); const sup=S($('ticketRootSupervisorV10246')?.value).toLowerCase();
+    return rows.filter(t=>{ if(st && S(t.status||'open')!==st) return false; if(title && S(t.title)!==title) return false; if(proj && projectOf(t).toLowerCase()!==proj) return false; if(sup && supervisorOf(t).toLowerCase()!==sup) return false; if(sla && slaInfo(t).state!==sla) return false; if(q && ![ticketNo(t),t.title,t.description,projectOf(t),supervisorOf(t),statusLabel(t.status),priorityLabel(t.priority),recipientOf(t),closedByOf(t),t.closure_note].join(' ').toLowerCase().includes(q)) return false; return true; });
+  }
+  function filterSup(rows){
+    const st=S($('supTicketFilterStatus')?.value); const pid=S($('supTicketFilterProject')?.value); const q=S($('supTicketSearch')?.value).toLowerCase(); const sla=normalizeFilterValue($('supTicketSlaFilterV10364')?.value);
+    return rows.filter(t=>{ if(pid && String(t.project_id)!==pid) return false; if(st && S(t.status||'open')!==st) return false; if(sla && slaInfo(t).state!==sla) return false; if(q && ![ticketNo(t),t.title,t.description,projectOf(t),supervisorOf(t),statusLabel(t.status),priorityLabel(t.priority),recipientOf(t),closedByOf(t),t.closure_note].join(' ').toLowerCase().includes(q)) return false; return true; });
+  }
+  function card(t, mode){
+    const id=Number(t.id)||0, inf=slaInfo(t), cls=stateClass(inf.state);
+    const canPdf=typeof window.ticketDownloadPdfV206==='function'; const canView=typeof window.viewTicketSmartV147==='function'; const canClaim=typeof window.claimTicket==='function'; const canClose=typeof window.closeTicket==='function'; const canSet=typeof window.setTicketStatus==='function';
+    const actions=[canView?`<button type="button" onclick="viewTicketSmartV147(${id})">عرض</button>`:'',canPdf?`<button type="button" class="light" onclick="ticketDownloadPdfV206(${id})">PDF</button>`:'',`<button type="button" class="light" onclick="editTicket(${id})">تعديل</button>`,S(t.status)==='closed'?(canSet?`<button type="button" class="light" onclick="setTicketStatus(${id},'open')">إعادة فتح</button>`:''):`${S(t.status)!=='processing'&&canClaim?`<button type="button" class="light" onclick="claimTicket(${id})">استلام</button>`:''}${canClose?`<button type="button" onclick="closeTicket(${id})">إغلاق</button>`:''}`,`<button type="button" class="light" onclick="${typeof window.sendTicketWhatsappV10246==='function'?'sendTicketWhatsappV10246':'sendTicketWhatsApp'}(${id})">واتساب</button>`,mode==='admin'?`<button type="button" class="danger" onclick="deleteRow('tickets',${id})">حذف</button>`:''].filter(Boolean).join(' ');
+    return `<article class="smart-ticket-card ticket-sla-card ${cls}" data-ticket-id="${E(id)}"><div class="ticket-sla-strip"><span class="ticket-sla-fill ${cls}" style="width:${inf.pct}%"></span></div><div class="smart-ticket-top"><div><strong>${E(ticketNo(t))}</strong><small>${E(fmtDate(t.created_at||t.updated_at))}</small></div><span class="smart-ticket-status ${S(t.status)==='closed'?'green':S(t.status)==='processing'?'amber':'red'}">${E(statusLabel(t.status))}</span></div><h3>${E(t.title||'-')}</h3><div class="smart-ticket-meta"><span>المشروع: <b>${E(projectOf(t))}</b></span><span>المشرف: <b>${E(supervisorOf(t))}</b></span><span>الأولوية: <b>${E(priorityLabel(t.priority))}</b></span><span>الوقت المحدد: <b>${E(inf.dueH)} س</b></span><span>المدة: <b>${E(durationText(inf.elapsed))}</b></span><span class="ticket-sla-badge ${cls}">${E(inf.label)}</span></div><p>${E(t.description||'لا يوجد وصف')}</p><div class="smart-ticket-mini"><span>المستلم: ${E(recipientOf(t))}</span><span>المغلق: ${E(closedByOf(t))}</span></div>${S(t.closure_note)?`<div class="smart-ticket-note">الحل: ${E(t.closure_note)}</div>`:''}<div class="smart-ticket-actions">${actions}</div></article>`;
+  }
+  function updateSummary(rows, all, mode){ const box=$(mode==='admin'?'ticketsSmartSummary':'supTicketsSmartSummary'); if(!box) return; const late=rows.filter(t=>slaInfo(t).state==='late').length, near=rows.filter(t=>slaInfo(t).state==='near').length, std=rows.filter(t=>slaInfo(t).state==='standard').length; box.innerHTML=`<div class="ticket-root-v10246-summary"><span class="ticket-root-v10246-kpi">الإجمالي: <b>${all.length}</b></span><span class="ticket-root-v10246-kpi">المعروض: <b>${rows.length}</b></span><span class="ticket-root-v10246-kpi">متأخر: <b>${late}</b></span><span class="ticket-root-v10246-kpi">قارب: <b>${near}</b></span><span class="ticket-root-v10246-kpi">قياسي: <b>${std}</b></span></div>`; }
+  async function renderTicketsNew(){
+    ensurePanels();
+    const adminBody=$('ticketsBody'), supBody=$('supTicketsBody'); if(!adminBody&&!supBody) return;
+    let rows=[]; try{ rows=await loadTicketsQuick(); }catch(e){ console.warn(BUILD,e); rows=A(D().tickets); }
+    const sort=S($('ticketRootSortV10246')?.value || $('ticketSortOrder')?.value || $('supTicketSortOrder')?.value || 'newest');
+    if(adminBody){ let list=filterAdmin(rows); list.sort((a,b)=>sort==='oldest'?dateMs(a)-dateMs(b):dateMs(b)-dateMs(a)); adminBody.classList.add('smart-ticket-grid'); adminBody.innerHTML=list.map(t=>card(t,'admin')).join('') || '<div class="muted" style="padding:16px">لا توجد تكتات مطابقة للفلاتر الحالية</div>'; updateSummary(list,rows,'admin'); }
+    if(supBody){ let list=filterSup(rows); list.sort((a,b)=>sort==='oldest'?dateMs(a)-dateMs(b):dateMs(b)-dateMs(a)); supBody.classList.add('smart-ticket-grid'); supBody.innerHTML=list.map(t=>card(t,'sup')).join('') || '<div class="muted" style="padding:16px">لا توجد تكتات مطابقة للفلاتر الحالية</div>'; updateSummary(list,rows,'sup'); }
+  }
+  async function renderTicketsSafe(){ try{ await renderTicketsNew(); }catch(e){ console.error(BUILD,e); } }
+  const oldSave=window.saveTicket;
+  window.saveTicket=async function(){
+    const projectEl=$('ticketProject'), supEl=$('ticketSupervisor');
+    const projectVal=S(projectEl?.value); const user=(typeof window.session==='function'?window.session():null)||{}; const supVal=S(supEl?.value || (user.role==='supervisor'?user.id:''));
+    [projectEl,supEl].forEach(el=>el&&el.classList.remove('ticket-sla-missing'));
+    const missing=[]; if(!projectVal){ missing.push('المشروع'); if(projectEl) projectEl.classList.add('ticket-sla-missing'); }
+    if(!supVal){ missing.push('المشرف'); if(supEl) supEl.classList.add('ticket-sla-missing'); }
+    if(missing.length){ notify('لا يمكن رفع التكت. يرجى تحديد: '+missing.join(' و '),'err'); return; }
+    if(typeof oldSave==='function') return await oldSave.apply(this,arguments);
+  };
+  window.renderTickets=renderTicketsNew;
+  window.renderTicketsSlaV10364=renderTicketsNew;
+  function bindExistingFilters(){ ['ticketFilterStatus','ticketSortOrder','ticketSearch','supTicketFilterProject','supTicketFilterStatus','supTicketSortOrder','supTicketSearch','ticketRootProjectV10246','ticketRootSupervisorV10246','ticketRootTitleV10246','ticketRootStatusV10246','ticketRootSortV10246','ticketRootSearchV10246'].forEach(id=>{ const el=$(id); if(el&&!el.dataset.slaV10364){ el.dataset.slaV10364='1'; el.addEventListener((el.tagName==='INPUT')?'input':'change',()=>renderTicketsSafe(),true); } }); }
+  function boot(){ ensurePanels(); bindExistingFilters(); setTimeout(renderTicketsSafe,150); }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,700)); window.addEventListener('load',()=>setTimeout(boot,1100)); setTimeout(boot,1800);
+  console.log('Tasneef '+BUILD+' loaded');
+})();
