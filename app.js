@@ -23337,3 +23337,80 @@ try{ exportSupervisorDailyPDFV10310 = window.exportSupervisorDailyPDFV10310; }ca
   document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,700)); window.addEventListener('load',()=>setTimeout(boot,1100)); setTimeout(boot,1800);
   console.log('Tasneef '+BUILD+' loaded');
 })();
+
+/* ===== V10365: Professional ticket report table with open/close duration ===== */
+(function(){
+  'use strict';
+  if(window.__tasneefTicketReportDurationV10365) return;
+  window.__tasneefTicketReportDurationV10365 = true;
+  const BUILD='V10365_TICKET_REPORT_DURATION_TABLE';
+  const $=id=>document.getElementById(id);
+  const A=v=>Array.isArray(v)?v:[];
+  const S=v=>String(v ?? '').trim();
+  const E=s=>S(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  function data(){ window.data=window.data||{}; return window.data; }
+  function arDate(v){ if(!v) return '-'; try{ const d=new Date(v); if(!isNaN(d)) return d.toLocaleString('ar-SA',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:true}); }catch(_){} return S(v).replace('T',' ').slice(0,16); }
+  function dateOnly(v){ if(!v) return ''; const raw=S(v); const m=raw.match(/(20\d{2})[-\/](\d{1,2})[-\/](\d{1,2})/); if(m) return m[1]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0'); const d=new Date(raw); if(isNaN(d)) return ''; return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function inRange(d,f,t){ if(!d) return true; if(f&&d<f) return false; if(t&&d>t) return false; return true; }
+  function no(t){ return S(t.ticket_number||t.ticket_no||t.no) || ('T-'+String(t.id||0).padStart(4,'0')); }
+  function projectName(id){ try{ if(typeof window.projectName==='function') return window.projectName(id)||'-'; }catch(_){} const r=A(data().projects).find(x=>S(x.id)===S(id)); return r?(r.name||'-'):'-'; }
+  function supervisorName(id){ try{ if(typeof window.supervisorName==='function') return window.supervisorName(id)||'-'; }catch(_){} const r=A(data().supervisors).find(x=>S(x.id)===S(id)); return r?(r.full_name||r.name||'-'):'-'; }
+  function prText(p){ const x=S(p||'normal').toLowerCase(); if(['urgent','عاجل'].includes(x)) return 'عاجل'; if(['high','important','مهم'].includes(x)) return 'مهم'; if(['low','منخفض'].includes(x)) return 'منخفض'; return 'عادي'; }
+  function stText(s){ const x=S(s||'open').toLowerCase(); if(x==='closed'||x==='مغلق') return 'مغلق'; if(x==='processing'||x==='in_progress'||x==='تحت المعالجة') return 'تحت المعالجة'; return 'مفتوح'; }
+  function stClass(s){ const x=S(s||'open').toLowerCase(); if(x==='closed'||x==='مغلق') return 'closed'; if(x==='processing'||x==='in_progress'||x==='تحت المعالجة') return 'processing'; return 'open'; }
+  function startMs(t){ return Date.parse(t.created_at||t.opened_at||t.date||t.updated_at||'')||0; }
+  function endMs(t){ return Date.parse(t.closed_at||t.closed_date||t.resolved_at||t.completed_at||'')||0; }
+  function durWords(mins){ mins=Math.max(0,Math.round(Number(mins)||0)); const d=Math.floor(mins/1440); mins%=1440; const h=Math.floor(mins/60); const m=mins%60; const parts=[]; if(d) parts.push(d+' يوم'); if(h) parts.push(h+' س'); if(m||!parts.length) parts.push(m+' د'); return parts.join(' و '); }
+  function durationCell(t){ const s=startMs(t); const e=(stClass(t.status)==='closed' && endMs(t)) ? endMs(t) : Date.now(); const label=stClass(t.status)==='closed'?'أغلق خلال':'مفتوح منذ'; const mins=s?Math.max(0,(e-s)/60000):0; return {label, text: label+' '+durWords(mins), mins}; }
+  function slaCfg(){ try{ return JSON.parse(localStorage.getItem('tasneef_ticket_sla_v10364')||'{}'); }catch(_){ return {}; } }
+  function dueHours(t){ const c=slaCfg(); const p=prText(t.priority); if(p==='عاجل') return Number(c.urgent||4); if(p==='مهم') return Number(c.high||24); return Number(c.normal||72); }
+  function slaState(t){ const d=durationCell(t); const due=dueHours(t)*60; if(stClass(t.status)==='closed') return d.mins<=due?'standard':'late'; if(d.mins>due) return 'late'; if(d.mins>=due*0.8) return 'near'; return 'standard'; }
+  function slaLabel(x){ return x==='late'?'متأخر':x==='near'?'قارب':'قياسي'; }
+  function normalize(v){ v=S(v).toLowerCase(); if(['late','red','متأخر'].includes(v)) return 'late'; if(['near','yellow','قارب'].includes(v)) return 'near'; if(['standard','green','قياسي'].includes(v)) return 'standard'; return ''; }
+  function currentRows(){
+    let rows=A(data().tickets).slice();
+    const isSup=!!$('supTicketsBody') && !$('ticketsBody');
+    const user=(typeof window.session==='function'?window.session():null)||window.currentUser||{};
+    if(isSup && user && user.role==='supervisor' && user.id) rows=rows.filter(t=>S(t.supervisor_id)===S(user.id)||!S(t.supervisor_id));
+    const from=S($('supTicketFromV10310')?.value||$('ticketFromV10310')?.value||'');
+    const to=S($('supTicketToV10310')?.value||$('ticketToV10310')?.value||from);
+    if(from||to) rows=rows.filter(t=>inRange(dateOnly(t.created_at||t.opened_at||t.updated_at),from,to));
+    const pid=S($('supTicketFilterProject')?.value||$('ticketRootProjectV10246')?.value||'');
+    if(pid) rows=rows.filter(t=>S(t.project_id)===pid || projectName(t.project_id)===pid);
+    const sid=S($('ticketRootSupervisorV10246')?.value||'');
+    if(sid) rows=rows.filter(t=>S(t.supervisor_id)===sid || supervisorName(t.supervisor_id)===sid);
+    const st=S($('supTicketFilterStatus')?.value||$('ticketRootStatusV10246')?.value||$('ticketFilterStatus')?.value||'');
+    if(st) rows=rows.filter(t=>S(t.status||'open')===st);
+    const sla=normalize($('supTicketSlaFilterV10364')?.value||$('admTicketSlaFilterV10364')?.value||'');
+    if(sla) rows=rows.filter(t=>slaState(t)===sla);
+    const q=S($('supTicketSearch')?.value||$('ticketRootSearchV10246')?.value||$('ticketSearch')?.value||'').toLowerCase();
+    if(q) rows=rows.filter(t=>[no(t),t.title,t.description,projectName(t.project_id),supervisorName(t.supervisor_id),prText(t.priority),stText(t.status),t.closure_note].join(' ').toLowerCase().includes(q));
+    const sort=S($('ticketRootSortV10246')?.value||$('ticketSortOrder')?.value||$('supTicketSortOrder')?.value||'newest');
+    rows.sort((a,b)=>sort==='oldest'?startMs(a)-startMs(b):startMs(b)-startMs(a));
+    return rows;
+  }
+  function titleKind(){ return $('supTicketsBody')&&!$('ticketsBody')?'نسخة المشرف':'نسخة الإدارة'; }
+  function buildRows(rows){
+    return rows.map((t,i)=>{ const d=durationCell(t), sl=slaState(t); const desc=`<b>الوصف:</b> ${E(t.description||'-')}${S(t.closure_note)?`<br><b>الإجراء:</b> ${E(t.closure_note)}`:''}`;
+      return `<tr class="sla-${sl}"><td class="num">${i+1}</td><td class="ticket-no">${E(no(t))}</td><td class="date">${E(arDate(t.created_at||t.opened_at||t.updated_at))}</td><td class="project">${E(projectName(t.project_id))}</td><td class="supervisor">${E(supervisorName(t.supervisor_id))}</td><td class="problem">${E(t.title||'-')}</td><td class="priority">${E(prText(t.priority))}</td><td><span class="pill status-${stClass(t.status)}">${E(stText(t.status))}</span></td><td class="duration"><span class="sla-dot ${sl}"></span><b>${E(d.text)}</b><small>${E(slaLabel(sl))} / المطلوب ${E(dueHours(t))} س</small></td><td class="desc">${desc}</td></tr>`;
+    }).join('') || '<tr><td colspan="10" class="empty">لا توجد تكتات حسب الفلاتر المحددة</td></tr>';
+  }
+  function openReport(rows){
+    const late=rows.filter(t=>slaState(t)==='late').length, near=rows.filter(t=>slaState(t)==='near').length, std=rows.filter(t=>slaState(t)==='standard').length;
+    const html=`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير التكتات</title><style>@page{size:A4 landscape;margin:7mm}*{box-sizing:border-box}body{margin:0;background:#fff;font-family:Tahoma,Arial,sans-serif;color:#123d33;font-size:10.5px;-webkit-print-color-adjust:exact;print-color-adjust:exact}.sheet{border:2px solid #0a5a49;min-height:100vh;padding:12px}.head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #0a5a49;padding-bottom:9px;margin-bottom:9px}.brand{display:flex;align-items:center;gap:10px}.brand img{width:132px;max-height:52px;object-fit:contain}.brand h2{margin:0;color:#0a5a49;font-size:17px}.brand p,.title p{margin:3px 0 0;color:#667872}.title{text-align:left}.title h1{margin:0;color:#0a5a49;font-size:24px}.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin:8px 0}.kpi{border:1px solid #d9e6e1;background:#f8fbfa;border-radius:12px;padding:8px;text-align:center}.kpi b{display:block;font-size:17px;color:#0a5a49}.kpi span{color:#667872}table{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:8px}th{background:#0a5a49;color:white;border:1px solid #0a5a49;padding:7px 5px;white-space:nowrap;font-size:10.5px}td{border:1px solid #d6e5df;padding:6px 5px;text-align:center;vertical-align:top;line-height:1.55;word-break:break-word}tbody tr:nth-child(even) td{background:#f7fbfa}tr.sla-late td{border-right:5px solid #c83434}tr.sla-near td{border-right:5px solid #d89b16}tr.sla-standard td{border-right:5px solid #159557}.num{width:3%}.ticket-no{width:7%;font-weight:900}.date{width:9%}.project{width:8%}.supervisor{width:7%}.problem{width:9%;font-size:10px}.priority{width:5%}.duration{width:13%;font-weight:800}.duration small{display:block;color:#667872;font-weight:700;margin-top:2px}.desc{width:24%;text-align:right}.pill{display:inline-block;border-radius:999px;padding:4px 9px;font-weight:900}.status-closed{background:#e4f6ec;color:#07833d}.status-processing{background:#fff2cf;color:#875600}.status-open{background:#ffe4e4;color:#a31818}.sla-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-left:5px}.sla-dot.late{background:#c83434}.sla-dot.near{background:#d89b16}.sla-dot.standard{background:#159557}.empty{padding:24px;text-align:center}.footer{display:flex;align-items:center;gap:10px;border-top:1px solid #d9e6e1;margin-top:9px;padding-top:8px;color:#0a5a49;font-weight:900}.copy{background:#0a5a49;color:#fff;border-radius:999px;padding:7px 18px}.disc{flex:1;text-align:center}@media print{.sheet{border-radius:0}tr,.kpi{break-inside:avoid}}</style></head><body><div class="sheet"><div class="head"><div class="brand"><img src="tasneef_logo_print.png" onerror="this.style.display='none'"><div><h2>شركة تصنيف لإدارة المرافق</h2><p>TASNEF FACILITIES MANAGEMENT</p></div></div><div class="title"><h1>تقرير التكتات</h1><p>تاريخ الإصدار: ${E(new Date().toLocaleString('ar-SA'))}</p></div></div><div class="kpis"><div class="kpi"><b>${rows.length}</b><span>إجمالي التكتات</span></div><div class="kpi"><b>${late}</b><span>متأخر</span></div><div class="kpi"><b>${near}</b><span>قارب</span></div><div class="kpi"><b>${std}</b><span>قياسي</span></div><div class="kpi"><b>${E(titleKind())}</b><span>نوع التقرير</span></div></div><table><thead><tr><th class="num">م</th><th class="ticket-no">رقم التكت</th><th class="date">التاريخ</th><th class="project">المشروع</th><th class="supervisor">المشرف</th><th class="problem">نوع المشكلة</th><th class="priority">الأولوية</th><th>الحالة</th><th class="duration">مدة الإغلاق / الفتح</th><th class="desc">الوصف / الإجراء</th></tr></thead><tbody>${buildRows(rows)}</tbody></table><div class="footer"><span class="copy">${E(titleKind())}</span><span class="disc">تم إنشاء هذا التقرير من نظام شركة تصنيف لإدارة المرافق ويعتبر معتمدًا ما لم يبرر العميل خلاف ذلك.</span></div></div><script>window.onload=function(){setTimeout(function(){window.print()},450)}<\/script></body></html>`;
+    const w=window.open('','_blank'); if(!w){ alert('المتصفح منع فتح نافذة التقرير. اسمح بالنوافذ المنبثقة.'); return; } w.document.open(); w.document.write(html); w.document.close();
+  }
+  function printReport(){ openReport(currentRows()); }
+  window.ticketsDownloadPdfV10365=printReport;
+  window.ticketsDownloadPdfV206=printReport;
+  window.ticketsDownloadPdfV207=printReport;
+  window.ticketsDownloadPdfV208=printReport;
+  window.ticketsDownloadPdfV209=printReport;
+  window.ticketsDownloadPdfV210=printReport;
+  window.ticketsDownloadPdfV211=printReport;
+  window.ticketsDownloadPdfV217=printReport;
+  window.printSupervisorTicketsV10310=printReport;
+  function bind(){ document.querySelectorAll('#ticketPdfBtnV206,#supTicketPdfBtnV206,.ticket-pdf-v206,.ticket-pdf-v207,.ticket-pdf-v208,[data-ticket-pdf]').forEach(b=>{ b.textContent='تقرير PDF'; b.onclick=printReport; }); }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(bind,500)); window.addEventListener('load',()=>setTimeout(bind,1000)); setTimeout(bind,1800);
+  console.log('Tasneef '+BUILD+' loaded');
+})();
