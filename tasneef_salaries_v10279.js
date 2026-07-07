@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const VERSION='V10371';
+  const VERSION='V10373';
   const $=(id)=>document.getElementById(id);
   const esc=(v)=>String(v??'').replace(/[&<>"]/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
   const num=(v)=>Number(String(v??'').replace(/,/g,''))||0;
@@ -716,58 +716,133 @@
     const pid=$('salaryProject')?.value||'';
     const q=($('salarySearch')?.value||'').trim();
 
-    // V10272: شهر 06-2026 يجب أن يطابق الإكسل الصحيح 100%، لذلك لا نبنيه من الحضور ولا من ملفات SQL السابقة.
-    if(isJuneBase(month)){
-      state.rows = filterExactJuneRowsV10272(orderSalaryRowsForView(exactJuneRowsV10272(month)), type, sid, pid, q)
-        .filter(r=>!salaryIsRemovedV10371(r, month));
-      renderSalary();
-      msg('تم تحميل شهر 06-2026 من ملف Excel المعتمد مع تطبيق أي تعديلات محفوظة: '+state.rows.length+' سجل');
-      return;
+    function payrollMetaFromWorkerV10373(w){
+      const notes=String(w?.notes||'');
+      const m=notes.match(/\[\[PAYROLL_META:([A-Za-z0-9+/=]+)\]\]/);
+      if(!m) return {};
+      try{
+        const txt=decodeURIComponent(escape(atob(m[1])));
+        return JSON.parse(txt)||{};
+      }catch(e){ return {}; }
+    }
+    function workerTypeCategoryV10373(w,m){
+      const raw=String(w.worker_type||w.type||w.position||m.job_title||'').trim();
+      const j=String(m.job_title||raw||'').trim();
+      if(raw==='supervisor' || j.includes('مشرف')) return 'supervisors';
+      if(raw==='technician' || j.includes('فني') || j.includes('صيانة')) return 'technicians';
+      if(raw==='guard' || j.includes('حارس')) return 'guards';
+      return 'workers';
+    }
+    function jobTitleFromWorkerV10373(w,m){
+      if(m.job_title) return m.job_title;
+      const cat=workerTypeCategoryV10373(w,m);
+      return cat==='supervisors'?'مشرف':(cat==='technicians'?'فني':(cat==='guards'?'حارس':(String(w.worker_type||'')==='employee'?'موظف':'عامل')));
+    }
+    function workerAttendanceStatsV10373(w, month){
+      const ids=new Set([w.id,w.worker_id].filter(v=>v!==undefined && v!==null && String(v)!=='').map(v=>String(v)));
+      const names=[w.name,w.full_name,w.worker_name,w.worker_identity].map(workerNameKey).filter(Boolean).map(normName);
+      const present=new Set(), absent=new Set(), all=new Set();
+      (state.attendance||[]).forEach(a=>{
+        const d=String(a.attendance_date||'').slice(0,10);
+        if(!d || !d.startsWith(month)) return;
+        const aid=String(a.worker_id||'');
+        const an=normName(a.worker_identity||a.worker_name||a.employee_name);
+        const ok=(aid && ids.has(aid)) || (an && names.some(n=>n===an || (n.length>2 && an.includes(n)) || (an.length>2 && n.includes(an))));
+        if(!ok) return;
+        all.add(d);
+        if(statusAbsent(a.status)) absent.add(d);
+        else if(statusPresent(a.status)) present.add(d);
+      });
+      absent.forEach(d=>present.delete(d));
+      return {dates:[...all].sort(), presentDates:[...present].sort(), absentDates:[...absent].sort()};
+    }
+    function projectNameByIdV10373(id){ return (state.projects||[]).find(p=>String(p.id)===String(id))?.name || ''; }
+    function supervisorNameByIdV10373(id){ return supervisorName(id)||''; }
+    function workerRowV10373(w, idx){
+      const m=payrollMetaFromWorkerV10373(w);
+      const cat=workerTypeCategoryV10373(w,m);
+      const sv=savedFor('worker', w.id, month) || {};
+      const stats=workerAttendanceStatsV10373(w, month);
+      const fullStart=monthStart(month), fullEnd=dateRangeEnd(month);
+      const totalSalary=num(sv.gross_salary || sv.salary || w.salary || m.total_salary || m.total || 0);
+      let basic=num(sv.basic_salary ?? m.basic_salary ?? w.basic_salary ?? 0);
+      let allowance=num(sv.allowance ?? m.allowances ?? m.allowance ?? w.allowances ?? 0);
+      if(!basic && totalSalary && allowance) basic=Math.max(0,totalSalary-allowance);
+      if(!basic && !allowance && totalSalary) basic=totalSalary;
+      if(!totalSalary && basic+allowance===0){
+        basic=cat==='supervisors'?2000:(cat==='technicians'?1500:(cat==='guards'?1200:1300));
+        allowance=cat==='supervisors'?300:200;
+      }
+      const projectId=workerProjectId(w);
+      const supervisorId=workerSupId(w) || projectSupId(projectId);
+      const start=sv.start_date || fullStart;
+      const end=sv.end_date || fullEnd;
+      const r={
+        entity_type:'worker',
+        entity_id:w.id,
+        worker_id:w.id,
+        profile_id:null,
+        row_order:idx+1,
+        salary_month:monthStart(month),
+        employee_ts_id:sv.employee_ts_id || m.employee_code || w.employee_code || '',
+        residency_name:sv.residency_name || m.iqama_name || w.iqama_name || '',
+        iqama_no:sv.iqama_no || m.iqama_number || w.iqama_number || '',
+        employee_name:sv.employee_name || w.name || w.full_name || m.motion_name || m.iqama_name || '',
+        work_location:sv.work_location || m.workplace || projectNameByIdV10373(projectId) || supervisorNameByIdV10373(supervisorId) || 'FM',
+        project_name:sv.project_name || projectNameByIdV10373(projectId) || m.workplace || '',
+        supervisor_id:supervisorId || null,
+        supervisor_name:sv.supervisor_name || supervisorNameByIdV10373(supervisorId) || '',
+        job_title:sv.job_title || jobTitleFromWorkerV10373(w,m),
+        start_date:String(start).slice(0,10),
+        end_date:String(end).slice(0,10),
+        work_days:0,
+        absent_days:0,
+        payable_days:0,
+        basic_salary:num(sv.basic_salary ?? basic),
+        allowance:num(sv.allowance ?? allowance),
+        gross_salary:0,
+        salary_by_days:0,
+        commission:num(sv.commission ?? 0),
+        deductions:num(sv.deductions ?? 0),
+        rounding:num(sv.rounding ?? 0),
+        advance_deduction:num(sv.advance_deduction ?? 0),
+        net_salary:0,
+        payment_method:sv.payment_method || '',
+        notes:sv.notes || '',
+        manual_extra_deductions:num(sv.manual_extra_deductions||0),
+        _allDates:stats.dates,
+        _absentDates:stats.absentDates,
+        _manual_deductions: !!sv.employee_name,
+        _manual_notes: !!(sv.notes && String(sv.notes).trim()),
+        _fromWorkersRegistryV10373:true
+      };
+      r.start_date=clampDateToMonth(r.start_date||fullStart,month)||fullStart;
+      r.end_date=clampDateToMonth(r.end_date||fullEnd,month)||fullEnd;
+      if(r.end_date<r.start_date){ const t=r.start_date; r.start_date=r.end_date; r.end_date=t; }
+      r.work_days=daysBetweenInclusive(r.start_date,r.end_date,month);
+      r.absent_days=countDatesInRange(stats.absentDates||[], r.start_date, r.end_date, month);
+      r.payable_days=Math.max(0,num(r.work_days)-num(r.absent_days));
+      if(!r._manual_deductions) r.manual_extra_deductions=0;
+      if(r.absent_days>0 && !r._manual_notes) r.notes=absenceNote(r.absent_days);
+      if(r.absent_days<=0 && !r._manual_notes) r.notes='راتب كامل';
+      return calcRow(r, daysInMonth(month));
     }
 
-    const supervisorFilterName = sid ? supervisorName(sid) : '';
-    const projectFilterName = pid ? (state.projects.find(p=>String(p.id)===String(pid))?.name||'') : '';
-    const rows=[]; const profileNameKeys=new Set();
-    const profiles=(state.profiles||[]).filter(validProfile).slice().sort((a,b)=>num(a.row_order||9999)-num(b.row_order||9999));
-    profiles.forEach((p,idx)=>{
-      const cat=jobCategory(p.job_title);
-      if(type!=='all' && type!==cat) return;
-      if(sid && cat==='workers' && normName(p.work_location)!==normName(supervisorFilterName)) return;
-      if(sid && cat==='supervisors' && normName(p.employee_name)!==normName(supervisorFilterName) && normName(p.residency_name)!==normName(supervisorFilterName)) return;
-      if(pid && ![p.work_location,p.project_name].some(x=>normName(x)===normName(projectFilterName))) return;
-      const row=makeSalaryRowFromProfile(p, month, idx+1);
-      if(!displayNameForRow(row)) return;
-      [p.employee_name,p.residency_name,row.employee_name,row.residency_name].map(normName).filter(Boolean).forEach(k=>profileNameKeys.add(k));
-      rows.push(row);
-    });
+    let rows=(state.workers||[])
+      .filter(w=>String(w.status||'active')!=='deleted' && String(w.status||'active')!=='inactive')
+      .map(workerRowV10373);
 
-    // إضافات جديدة من الحضور والغياب إذا لم تكن موجودة في ملف الإكسل/البروفايل
-    const attendanceMonth=(state.attendance||[]).filter(a=>String(a.attendance_date||'').slice(0,7)===month);
-    const groups=new Map();
-    attendanceMonth.forEach(a=>{
-      const nm=normName(a.worker_identity||a.worker_name||a.employee_name);
-      if(!nm || profileNameKeys.has(nm)) return;
-      const key=attendanceGroupKey(a); if(!key) return;
-      if(!groups.has(key)) groups.set(key,{records:[],worker:workerByAttendance(a)});
-      groups.get(key).records.push(a);
-    });
-    groups.forEach((g,key)=>{
-      const meta=groupMetaFromAttendance(g);
-      const cat=jobCategory(meta.profile?.job_title || meta.worker?.position || meta.worker?.job_title || 'عامل');
-      if(type!=='all' && type!==cat) return;
-      if(sid && String(meta.supervisor_id||'')!==String(sid) && normName(meta.supervisor_name)!==normName(supervisorFilterName)) return;
-      if(pid && !(g.records||[]).some(a=>String(a.project_id||'')===String(pid))) return;
-      const st=attendanceStats(g.records, month); if(!st.dates.length) return;
-      const r=makeSalaryRowFromAttendance(meta, st, month, 10000+rows.length, false);
-      if(displayNameForRow(r)) rows.push(r);
-    });
-
-    let final=sanitizeSalaryRows(rows);
-    final=orderSalaryRowsForView(final);
-    if(q) final=final.filter(r=>[r.employee_ts_id,r.residency_name,r.iqama_no,r.employee_name,r.work_location,r.supervisor_name,r.project_name,r.job_title].join(' ').includes(q));
-    final=final.filter(r=>!salaryIsRemovedV10371(r, month));
-    state.rows=final;
+    if(type && type!=='all') rows=rows.filter(r=>jobCategory(r.job_title)===type || (type==='workers' && !['supervisors','technicians','guards'].includes(jobCategory(r.job_title))));
+    if(sid) rows=rows.filter(r=>String(r.supervisor_id||'')===String(sid));
+    if(pid) rows=rows.filter(r=>String(workerProjectId((state.workers||[]).find(w=>String(w.id)===String(r.worker_id))||{})||'')===String(pid));
+    if(q){
+      const nq=normName(q), raw=String(q).trim();
+      rows=rows.filter(r=>[r.employee_ts_id,r.residency_name,r.iqama_no,r.employee_name,r.work_location,r.supervisor_name,r.project_name,r.job_title].some(v=>String(v||'').includes(raw) || normName(v).includes(nq)));
+    }
+    rows=rows.filter(r=>!salaryIsRemovedV10371(r, month));
+    state.rows=orderSalaryRowsForView(sanitizeSalaryRows(rows));
     renderSalary();
+    msg('تم توليد كشف الرواتب من قسم العمال والحضور والغياب لشهر '+month+' - عدد السجلات: '+state.rows.length);
   }
   function totals(rows){
     return rows.reduce((a,r)=>{ ['basic_salary','allowance','gross_salary','salary_by_days','commission','deductions','advance_deduction','rounding','net_salary','work_days','absent_days','payable_days'].forEach(k=>a[k]=(a[k]||0)+num(r[k])); return a; },{});
@@ -947,7 +1022,7 @@
         fetchAll('monthly_salaries','*',q=>q.eq('salary_month',start)).catch(()=>[]),
         fetchAll('salary_employee_profiles','*').catch(e=>{ console.warn('salary profiles load failed', e); return []; })
       ]);
-      state={workers,projects,users,attendance,settings,saved,profiles:mergeSalaryProfilesFromExcelV10363(profiles||[]),rows:[]}; fillSalaryFilters(); buildRows(); msg('تم تحميل الرواتب من ملف Excel المعتمد مع إضافات الحضور والغياب - بيانات الموظفين: '+(profiles||[]).length+' موظف');
+      state={workers,projects,users,attendance,settings,saved,profiles:profiles||[],rows:[]}; fillSalaryFilters(); buildRows(); msg('تم تحميل الرواتب من قسم العمال والحضور والغياب - العمال: '+(workers||[]).length+'، سجلات الحضور للشهر: '+(attendance||[]).length);
     }catch(e){ console.error(e); msg('فشل تحميل الرواتب: '+(e.message||e),'err'); }
   }
   function fillSalaryFilters(){
@@ -1383,7 +1458,7 @@
     if(side) side.insertBefore(btn, ref?ref.nextSibling:side.querySelector('.nav.danger'));
     const main=document.querySelector('main.content'); const sec=document.createElement('section'); sec.id='salaries'; sec.className='page hidden'; sec.innerHTML=`
       <style>.salary-table-wrap{max-height:640px;overflow:auto}.salary-table{min-width:2600px}.salary-group-row td{background:#dfeee9;color:#064537;font-weight:900;text-align:right;font-size:13px}.salary-table th{position:sticky;top:0;z-index:2}.sal-input{width:110px;border:1px solid var(--line);border-radius:8px;padding:6px;text-align:center}.salary-actions{display:flex;gap:8px;flex-wrap:wrap}.salary-note{background:#eef8f4;border:1px solid var(--line);border-radius:14px;padding:10px;color:var(--brand);font-weight:800}</style>
-      <div class="card"><div class="table-head"><h2>الرواتب</h2><span class="badge green">${VERSION}</span></div><div class="salary-note">تم بناء كشف الرواتب من ملف Excel المعتمد، مع مطابقة تلقائية للأسماء: موجود بالنظام / يدوي / يحتاج مراجعة. كل الخانات الأساسية قابلة للتعديل قبل الحفظ أو الاعتماد.</div><div id="salaryMsg" class="msg hidden"></div>
+      <div class="card"><div class="table-head"><h2>الرواتب</h2><span class="badge green">${VERSION}</span></div><div class="salary-note">تم تنظيف قسم الرواتب: الكشف الآن يُبنى من قسم العمال مباشرة، والغياب يُحسب من الحضور والغياب حسب الشهر. كل الخانات قابلة للتعديل قبل الحفظ أو الاعتماد.</div><div id="salaryMsg" class="msg hidden"></div>
       <div class="filters"><div><label>الشهر</label><input type="month" id="salaryMonth" value="${today().slice(0,7)}" onchange="tasneefSalariesV10267.load()"></div><div><label>نوع الكشف</label><select id="salaryType" onchange="tasneefSalariesV10267.buildRows()"><option value="all">الكل</option><option value="supervisors">رواتب المشرفين</option><option value="workers">رواتب العمال</option><option value="technicians">رواتب الفنيين</option><option value="guards">رواتب الحراس</option></select></div><div><label>المشرف</label><select id="salarySupervisor" onchange="tasneefSalariesV10267.buildRows()"><option value="">كل المشرفين</option></select></div><div><label>المشروع</label><select id="salaryProject" onchange="tasneefSalariesV10267.buildRows()"><option value="">كل المشاريع</option></select></div><div><label>بحث</label><input id="salarySearch" oninput="tasneefSalariesV10267.buildRows()" placeholder="اسم/إقامة/TS"></div></div>
       <div class="salary-actions"><button onclick="tasneefSalariesV10267.load()">تحديث الرواتب</button><button class="light" onclick="tasneefSalariesV10267.restoreDeletedRows()">إرجاع المحذوف لهذا الشهر</button><button class="light" onclick="tasneefSalariesV10267.save(false)">حفظ التعديلات</button><button class="light" onclick="tasneefSalariesV10267.save(true)">اعتماد الرواتب</button><button class="light" onclick="tasneefSalariesV10267.print()">طباعة</button><button class="light" onclick="tasneefSalariesV10267.exportExcel()">تصدير Excel</button><button class="light" onclick="tasneefSalariesV10267.exportPdf()">تصدير PDF</button></div><div id="salaryKpis" class="kpis small"></div>
       <div class="table-wrap salary-table-wrap"><table class="salary-table"><thead><tr><th>رقم</th><th>أيدي الموظف</th><th>الشهر</th><th>اسم الموظف في الإقامة</th><th>اسم الموظف الحركي</th><th>حالة الاسم</th><th>رقم الإقامة</th><th>مكان العمل</th><th>ملاحظات تلقائية/إضافية</th><th>الوظيفة</th><th>بداية الخدمة</th><th>نهاية الخدمة</th><th>أيام العمل</th><th>أيام الغياب</th><th>الأيام المستحقة</th><th>قيمة الرواتب الأساسية</th><th>البدلات</th><th>الإجمالي</th><th>إجمالي الراتب على أيام الفترة</th><th>العمولات</th><th>الخصومات</th><th>جبر الكسور</th><th>خصم السلف</th><th>الصافي</th><th>الإجراء</th></tr></thead><tbody id="salaryBody"></tbody><tfoot id="salaryFoot"></tfoot></table></div></div>`;
