@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const VERSION='V10370';
+  const VERSION='V10371';
   const $=(id)=>document.getElementById(id);
   const esc=(v)=>String(v??'').replace(/[&<>"]/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
   const num=(v)=>Number(String(v??'').replace(/,/g,''))||0;
@@ -167,6 +167,28 @@
       const a=normName(p.employee_name), b=normName(p.residency_name), d=normName(p.employee_ts_id), e=normName(p.iqama_no);
       return a===key || b===key || d===key || e===key || (a && key.includes(a)) || (key && a.includes(key)) || (b && key.includes(b)) || (key && b.includes(key));
     }) || null;
+  }
+
+  function salaryCurrentMonthV10371(){
+    return String($('salaryMonth')?.value || today().slice(0,7)).slice(0,7);
+  }
+  function salaryMonthlyDraftKeyV10371(month){ return 'tasneef_salary_removed_rows_'+String(month||salaryCurrentMonthV10371()).slice(0,7); }
+  function salaryRowStableKeyV10371(r){
+    return [r?.employee_ts_id,r?.iqama_no,r?.employee_name,r?.residency_name,r?.entity_type,r?.entity_id]
+      .map(normName).filter(Boolean).join('|') || String(r?.entity_id||'');
+  }
+  function salaryRemovedSetV10371(month){
+    try{ return new Set(JSON.parse(localStorage.getItem(salaryMonthlyDraftKeyV10371(month))||'[]')); }catch(e){ return new Set(); }
+  }
+  function salaryIsRemovedV10371(r, month){ return salaryRemovedSetV10371(month).has(salaryRowStableKeyV10371(r)); }
+  function salaryMarkRemovedV10371(r, month){
+    const set=salaryRemovedSetV10371(month); set.add(salaryRowStableKeyV10371(r));
+    localStorage.setItem(salaryMonthlyDraftKeyV10371(month), JSON.stringify([...set]));
+  }
+  function salaryUnremoveAllV10371(month){ localStorage.removeItem(salaryMonthlyDraftKeyV10371(month)); }
+  function monthlyExcelDefaultsAllowedV10371(month){
+    // شهر 06-2026 هو الملف المعتمد الذي أرسله أبو سامر. أي شهر آخر لا يحمل عمولات/غيابات/ملاحظات شهر 6.
+    return isJuneBase(month);
   }
 
   function excelProfileRowsV10363(){
@@ -395,6 +417,7 @@
     const end = sv.end_date || (base ? String(xp.default_end_date||p.default_end_date||monthSpan.end).slice(0,10) : (stats.dates.length ? attSpan.end : monthSpan.end));
     const basicDefault = cat==='supervisors' ? 2000 : (cat==='guards'?1200:1300);
     const allowanceDefault = cat==='supervisors' ? 300 : 200;
+    const allowMonthlyExcel = monthlyExcelDefaultsAllowedV10371(month);
     let r={
       entity_type:'profile', entity_id:ts, profile_id:p.id||null, row_order:num(p.row_order||idx||9999),
       salary_month:monthStart(month), employee_ts_id:sv.employee_ts_id||p.employee_ts_id||`TS-${String(idx).padStart(2,'0')}`,
@@ -403,9 +426,9 @@
       supervisor_id:null, supervisor_name:p.work_location||'', job_title:sv.job_title||p.job_title||'عامل',
       start_date:start, end_date:end, work_days:0, absent_days:0, payable_days:0,
       basic_salary:sv.basic_salary ?? xp.basic_salary ?? p.basic_salary ?? basicDefault, allowance:sv.allowance ?? xp.allowance ?? p.allowance ?? allowanceDefault,
-      commission:sv.commission ?? xp.default_commission ?? p.default_commission ?? 0, deductions:sv.deductions ?? 0, rounding:0,
-      advance_deduction:sv.advance_deduction ?? xp.default_advance_deduction ?? p.default_advance_deduction ?? 0, payment_method:'', notes:sv.notes || p.notes || xp.notes || '',
-      manual_extra_deductions:sv.manual_extra_deductions ?? xp.default_manual_extra_deductions ?? 0,
+      commission:sv.commission ?? (allowMonthlyExcel ? (xp.default_commission ?? p.default_commission ?? 0) : 0), deductions:sv.deductions ?? 0, rounding:0,
+      advance_deduction:sv.advance_deduction ?? (allowMonthlyExcel ? (xp.default_advance_deduction ?? p.default_advance_deduction ?? 0) : 0), payment_method:'', notes:sv.notes || (allowMonthlyExcel ? (p.notes || xp.notes || '') : ''),
+      manual_extra_deductions:sv.manual_extra_deductions ?? (allowMonthlyExcel ? (xp.default_manual_extra_deductions ?? 0) : 0),
       _allDates:stats.dates, _absentDates:stats.absentDates, _manual_deductions: !!sv.employee_name
     };
     if(base && !sv.employee_name){
@@ -517,6 +540,7 @@
     const jobTitle = sv.job_title || p?.job_title || (isSupervisor?'مشرف':(cat==='technicians'?'فني':(cat==='guards'?'حارس':'عامل')));
     const basicDefault = cat==='supervisors' ? 2000 : (cat==='guards' ? 1200 : 1300);
     const allowanceDefault = cat==='supervisors' ? 300 : 200;
+    const allowMonthlyExcel = monthlyExcelDefaultsAllowedV10371(month);
     let r={
       entity_type:isSupervisor?'supervisor':'attendance',
       entity_id:entityId,
@@ -540,13 +564,13 @@
       payable_days:0,
       basic_salary:sv.basic_salary ?? p?.basic_salary ?? basicDefault,
       allowance:sv.allowance ?? p?.allowance ?? allowanceDefault,
-      commission:sv.commission ?? p?.default_commission ?? 0,
+      commission:sv.commission ?? (allowMonthlyExcel ? (p?.default_commission ?? 0) : 0),
       deductions:sv.deductions ?? 0,
       rounding:0,
-      advance_deduction:sv.advance_deduction ?? p?.default_advance_deduction ?? 0,
-      manual_extra_deductions:sv.manual_extra_deductions ?? p?.default_manual_extra_deductions ?? 0,
+      advance_deduction:sv.advance_deduction ?? (allowMonthlyExcel ? (p?.default_advance_deduction ?? 0) : 0),
+      manual_extra_deductions:sv.manual_extra_deductions ?? (allowMonthlyExcel ? (p?.default_manual_extra_deductions ?? 0) : 0),
       payment_method:sv.payment_method || '',
-      notes:sv.notes || p?.notes || '',
+      notes:sv.notes || (allowMonthlyExcel ? (p?.notes || '') : ''),
       _allDates:stats.dates || [],
       _absentDates:stats.absentDates || [],
       _manual_deductions: !!sv.employee_name
@@ -694,7 +718,8 @@
 
     // V10272: شهر 06-2026 يجب أن يطابق الإكسل الصحيح 100%، لذلك لا نبنيه من الحضور ولا من ملفات SQL السابقة.
     if(isJuneBase(month)){
-      state.rows = filterExactJuneRowsV10272(orderSalaryRowsForView(exactJuneRowsV10272(month)), type, sid, pid, q);
+      state.rows = filterExactJuneRowsV10272(orderSalaryRowsForView(exactJuneRowsV10272(month)), type, sid, pid, q)
+        .filter(r=>!salaryIsRemovedV10371(r, month));
       renderSalary();
       msg('تم تحميل شهر 06-2026 من ملف Excel المعتمد مع تطبيق أي تعديلات محفوظة: '+state.rows.length+' سجل');
       return;
@@ -740,6 +765,7 @@
     let final=sanitizeSalaryRows(rows);
     final=orderSalaryRowsForView(final);
     if(q) final=final.filter(r=>[r.employee_ts_id,r.residency_name,r.iqama_no,r.employee_name,r.work_location,r.supervisor_name,r.project_name,r.job_title].join(' ').includes(q));
+    final=final.filter(r=>!salaryIsRemovedV10371(r, month));
     state.rows=final;
     renderSalary();
   }
@@ -802,6 +828,29 @@
     if(old && !parts.some(p=>normName(p)===normName(old)) && !old.startsWith('خصم غياب')) parts.push(old);
     return parts.length ? parts.join('، ') : 'راتب كامل';
   }
+  function editSalaryRowV10371(type,id){
+    const tr=document.querySelector(`tr[data-sal-row="${CSS.escape(String(type+'_'+id))}"]`);
+    if(tr){ tr.scrollIntoView({behavior:'smooth',block:'center'}); const inp=tr.querySelector('input'); if(inp){ inp.focus(); inp.select?.(); } }
+    msg('الخانات في هذا الصف قابلة للتعديل. عدّل ثم اضغط حفظ التعديلات.');
+  }
+  function deleteSalaryRowV10371(type,id){
+    const month=salaryCurrentMonthV10371();
+    const r=(state.rows||[]).find(x=>x.entity_type===type && String(x.entity_id)===String(id));
+    if(!r) return;
+    if(!confirm('هل تريد حذف هذا الاسم من كشف شهر '+month+' فقط؟')) return;
+    salaryMarkRemovedV10371(r, month);
+    state.rows=(state.rows||[]).filter(x=>!(x.entity_type===type && String(x.entity_id)===String(id)));
+    renderSalary();
+    msg('تم حذف الاسم من كشف شهر '+month+' فقط. لن يؤثر على الأشهر الأخرى.');
+  }
+  function restoreDeletedSalaryRowsV10371(){
+    const month=salaryCurrentMonthV10371();
+    salaryUnremoveAllV10371(month);
+    loadSalary();
+    msg('تم إرجاع الأسماء المحذوفة من كشف شهر '+month);
+  }
+
+  function jsArgV10371(v){ return String(v??'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/[\r\n]/g,' '); }
   function renderSalaryRowHtml(r,i,month){
     if(!r._manual_notes) r.notes=autoPayrollNoteV10370(r);
     return `<tr data-sal-row="${r.entity_type}_${r.entity_id}">
@@ -814,6 +863,7 @@
       <td>${money(r.work_days)}</td><td>${rowInput(r,'absent_days','sal-input money')}</td><td>${money(r.payable_days)}</td><td>${rowInput(r,'basic_salary')}</td><td>${rowInput(r,'allowance')}</td><td>${money(r.gross_salary)}</td><td>${money(r.salary_by_days)}</td>
       <td>${rowInput(r,'commission')}</td><td>${rowInput(r,'deductions')}</td><td>${rowInput(r,'rounding')}</td><td>${rowInput(r,'advance_deduction')}</td>
       <td><b>${money(r.net_salary)}</b></td>
+      <td class="row-actions salary-row-actions"><button class="light" onclick="tasneefSalariesV10267.editRow('${jsArgV10371(r.entity_type)}','${jsArgV10371(r.entity_id)}')">تعديل</button><button class="danger" onclick="tasneefSalariesV10267.deleteRow('${jsArgV10371(r.entity_type)}','${jsArgV10371(r.entity_id)}')">حذف</button></td>
     </tr>`;
   }
   function renderRowsGroupedHtml(rows, month){
@@ -822,14 +872,14 @@
     b.groups.forEach(g=>{
       const s=g.supervisor;
       const title=s.employee_name||s.residency_name||s.supervisor_name||'مشرف';
-      html += `<tr class="salary-group-row"><td colspan="24">المشرف: ${esc(title)}</td></tr>`;
+      html += `<tr class="salary-group-row"><td colspan="25">المشرف: ${esc(title)}</td></tr>`;
       html += renderSalaryRowHtml(s, ++n, month);
       g.workers.forEach(r=>{ html+=renderSalaryRowHtml(r, ++n, month); });
     });
-    if(b.techs.length){ html += `<tr class="salary-group-row"><td colspan="24">الفنيين</td></tr>`; b.techs.forEach(r=>{ html+=renderSalaryRowHtml(r, ++n, month); }); }
-    if(b.guards.length){ html += `<tr class="salary-group-row"><td colspan="24">الحراس</td></tr>`; b.guards.forEach(r=>{ html+=renderSalaryRowHtml(r, ++n, month); }); }
-    if(b.unlinked.length){ html += `<tr class="salary-group-row"><td colspan="24">إضافات جديدة تحتاج ربط مشرف</td></tr>`; b.unlinked.forEach(r=>{ html+=renderSalaryRowHtml(r, ++n, month); }); }
-    if(b.other.length){ html += `<tr class="salary-group-row"><td colspan="24">أخرى</td></tr>`; b.other.forEach(r=>{ html+=renderSalaryRowHtml(r, ++n, month); }); }
+    if(b.techs.length){ html += `<tr class="salary-group-row"><td colspan="25">الفنيين</td></tr>`; b.techs.forEach(r=>{ html+=renderSalaryRowHtml(r, ++n, month); }); }
+    if(b.guards.length){ html += `<tr class="salary-group-row"><td colspan="25">الحراس</td></tr>`; b.guards.forEach(r=>{ html+=renderSalaryRowHtml(r, ++n, month); }); }
+    if(b.unlinked.length){ html += `<tr class="salary-group-row"><td colspan="25">إضافات جديدة تحتاج ربط مشرف</td></tr>`; b.unlinked.forEach(r=>{ html+=renderSalaryRowHtml(r, ++n, month); }); }
+    if(b.other.length){ html += `<tr class="salary-group-row"><td colspan="25">أخرى</td></tr>`; b.other.forEach(r=>{ html+=renderSalaryRowHtml(r, ++n, month); }); }
     return html;
   }
   function renderSalary(){
@@ -844,7 +894,7 @@
       <div class="kpi"><small>البدلات</small><b>${money(t.allowance)}</b></div>
       <div class="kpi"><small>الخصومات والسلف</small><b>${money(num(t.deductions)+num(t.advance_deduction))}</b></div>
       <div class="kpi"><small>الصافي</small><b>${money(t.net_salary)}</b></div>`;
-    body.innerHTML=renderRowsGroupedHtml(rows, month) || '<tr><td colspan="24">لا توجد بيانات رواتب</td></tr>';
+    body.innerHTML=renderRowsGroupedHtml(rows, month) || '<tr><td colspan="25">لا توجد بيانات رواتب</td></tr>';
     const foot=$('salaryFoot'); if(foot) foot.innerHTML=`<tr><td colspan="15"><b>الإجمالي</b></td><td>${money(t.basic_salary)}</td><td>${money(t.allowance)}</td><td>${money(t.gross_salary)}</td><td>${money(t.salary_by_days)}</td><td>${money(t.commission)}</td><td>${money(t.deductions)}</td><td>${money(t.rounding)}</td><td>${money(t.advance_deduction)}</td><td>${money(t.net_salary)}</td><td></td></tr>`;
   }
   function update(type,id,key,value){
@@ -1335,8 +1385,8 @@
       <style>.salary-table-wrap{max-height:640px;overflow:auto}.salary-table{min-width:2600px}.salary-group-row td{background:#dfeee9;color:#064537;font-weight:900;text-align:right;font-size:13px}.salary-table th{position:sticky;top:0;z-index:2}.sal-input{width:110px;border:1px solid var(--line);border-radius:8px;padding:6px;text-align:center}.salary-actions{display:flex;gap:8px;flex-wrap:wrap}.salary-note{background:#eef8f4;border:1px solid var(--line);border-radius:14px;padding:10px;color:var(--brand);font-weight:800}</style>
       <div class="card"><div class="table-head"><h2>الرواتب</h2><span class="badge green">${VERSION}</span></div><div class="salary-note">تم بناء كشف الرواتب من ملف Excel المعتمد، مع مطابقة تلقائية للأسماء: موجود بالنظام / يدوي / يحتاج مراجعة. كل الخانات الأساسية قابلة للتعديل قبل الحفظ أو الاعتماد.</div><div id="salaryMsg" class="msg hidden"></div>
       <div class="filters"><div><label>الشهر</label><input type="month" id="salaryMonth" value="${today().slice(0,7)}" onchange="tasneefSalariesV10267.load()"></div><div><label>نوع الكشف</label><select id="salaryType" onchange="tasneefSalariesV10267.buildRows()"><option value="all">الكل</option><option value="supervisors">رواتب المشرفين</option><option value="workers">رواتب العمال</option><option value="technicians">رواتب الفنيين</option><option value="guards">رواتب الحراس</option></select></div><div><label>المشرف</label><select id="salarySupervisor" onchange="tasneefSalariesV10267.buildRows()"><option value="">كل المشرفين</option></select></div><div><label>المشروع</label><select id="salaryProject" onchange="tasneefSalariesV10267.buildRows()"><option value="">كل المشاريع</option></select></div><div><label>بحث</label><input id="salarySearch" oninput="tasneefSalariesV10267.buildRows()" placeholder="اسم/إقامة/TS"></div></div>
-      <div class="salary-actions"><button onclick="tasneefSalariesV10267.load()">تحديث الرواتب</button><button class="light" onclick="tasneefSalariesV10267.save(false)">حفظ التعديلات</button><button class="light" onclick="tasneefSalariesV10267.save(true)">اعتماد الرواتب</button><button class="light" onclick="tasneefSalariesV10267.print()">طباعة</button><button class="light" onclick="tasneefSalariesV10267.exportExcel()">تصدير Excel</button><button class="light" onclick="tasneefSalariesV10267.exportPdf()">تصدير PDF</button></div><div id="salaryKpis" class="kpis small"></div>
-      <div class="table-wrap salary-table-wrap"><table class="salary-table"><thead><tr><th>رقم</th><th>أيدي الموظف</th><th>الشهر</th><th>اسم الموظف في الإقامة</th><th>اسم الموظف الحركي</th><th>حالة الاسم</th><th>رقم الإقامة</th><th>مكان العمل</th><th>ملاحظات تلقائية/إضافية</th><th>الوظيفة</th><th>بداية الخدمة</th><th>نهاية الخدمة</th><th>أيام العمل</th><th>أيام الغياب</th><th>الأيام المستحقة</th><th>قيمة الرواتب الأساسية</th><th>البدلات</th><th>الإجمالي</th><th>إجمالي الراتب على أيام الفترة</th><th>العمولات</th><th>الخصومات</th><th>جبر الكسور</th><th>خصم السلف</th><th>الصافي</th></tr></thead><tbody id="salaryBody"></tbody><tfoot id="salaryFoot"></tfoot></table></div></div>`;
+      <div class="salary-actions"><button onclick="tasneefSalariesV10267.load()">تحديث الرواتب</button><button class="light" onclick="tasneefSalariesV10267.restoreDeletedRows()">إرجاع المحذوف لهذا الشهر</button><button class="light" onclick="tasneefSalariesV10267.save(false)">حفظ التعديلات</button><button class="light" onclick="tasneefSalariesV10267.save(true)">اعتماد الرواتب</button><button class="light" onclick="tasneefSalariesV10267.print()">طباعة</button><button class="light" onclick="tasneefSalariesV10267.exportExcel()">تصدير Excel</button><button class="light" onclick="tasneefSalariesV10267.exportPdf()">تصدير PDF</button></div><div id="salaryKpis" class="kpis small"></div>
+      <div class="table-wrap salary-table-wrap"><table class="salary-table"><thead><tr><th>رقم</th><th>أيدي الموظف</th><th>الشهر</th><th>اسم الموظف في الإقامة</th><th>اسم الموظف الحركي</th><th>حالة الاسم</th><th>رقم الإقامة</th><th>مكان العمل</th><th>ملاحظات تلقائية/إضافية</th><th>الوظيفة</th><th>بداية الخدمة</th><th>نهاية الخدمة</th><th>أيام العمل</th><th>أيام الغياب</th><th>الأيام المستحقة</th><th>قيمة الرواتب الأساسية</th><th>البدلات</th><th>الإجمالي</th><th>إجمالي الراتب على أيام الفترة</th><th>العمولات</th><th>الخصومات</th><th>جبر الكسور</th><th>خصم السلف</th><th>الصافي</th><th>الإجراء</th></tr></thead><tbody id="salaryBody"></tbody><tfoot id="salaryFoot"></tfoot></table></div></div>`;
     if(main) main.appendChild(sec);
   }
   // V10266: حماية إضافية لو المتصفح لم ينفذ onchange داخل حقل التاريخ.
@@ -1350,7 +1400,7 @@
     if(!el || !el.classList || !el.classList.contains('salary-date-input')) return;
     update(el.dataset.type, el.dataset.id, el.dataset.key, el.value);
   });
-  window.tasneefSalariesV10267={inject,load:loadSalary,buildRows,update,save:saveSalary,print:printSalary,exportExcel:exportSalaryExcel,exportPdf:exportSalaryPdfV10281,sync:syncSalaryRowsFromDom};
+  window.tasneefSalariesV10267={inject,load:loadSalary,buildRows,update,save:saveSalary,print:printSalary,exportExcel:exportSalaryExcel,exportPdf:exportSalaryPdfV10281,sync:syncSalaryRowsFromDom,editRow:editSalaryRowV10371,deleteRow:deleteSalaryRowV10371,restoreDeletedRows:restoreDeletedSalaryRowsV10371};
   window.tasneefSalariesV10281=window.tasneefSalariesV10267;
   window.tasneefSalariesV10278=window.tasneefSalariesV10267;
   window.tasneefSalariesV10272=window.tasneefSalariesV10267;
