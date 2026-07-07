@@ -330,18 +330,24 @@ body .tasneef-version-badge, body .version-badge, body .build-badge, body #versi
       </div>
       <div class="grid two">
         <div class="card">
-          <h2 id="workerFormTitle">إضافة عامل</h2>
+          <h2 id="workerFormTitle">إضافة عامل / موظف</h2>
           <input type="hidden" id="workerId">
-          <label>اسم العامل</label><input id="workerName" placeholder="مثال: ياسر">
+          <label>رقم الموظف</label><input id="workerEmployeeCode" placeholder="مثال: TS-01">
+          <label>اسم العامل / الاسم الحركي</label><input id="workerName" placeholder="مثال: ياسر">
+          <label>اسم الموظف في الإقامة</label><input id="workerIqamaName" placeholder="الاسم حسب الإقامة">
+          <label>رقم الإقامة</label><input id="workerIqamaNumber" placeholder="رقم الإقامة">
           <label>الجوال</label><input id="workerPhone" placeholder="اختياري">
-          <label>الراتب</label><input type="number" id="workerSalary" value="1500">
+          <label>مكان العمل من الكشف</label><input id="workerWorkplace" placeholder="مكان العمل">
+          <label>الوظيفة من الكشف</label><input id="workerJobTitle" placeholder="الوظيفة">
+          <div class="grid two"><div><label>الراتب الأساسي</label><input type="number" id="workerBasicSalary" value="0"></div><div><label>البدلات</label><input type="number" id="workerAllowances" value="0"></div></div>
+          <label>إجمالي الراتب</label><input type="number" id="workerSalary" value="1500">
           <label>المشرف</label><select id="workerSupervisor" onchange="onWorkerSupervisorChange()"></select>
           <label>المشروع المرتبط</label><select id="workerProject"></select>
-          <label>نوع العامل</label><select id="workerType"><option value="primary">أساسي</option><option value="support">بديل / مساند</option></select>
+          <label>النوع</label><select id="workerType"><option value="worker">عامل</option><option value="employee">موظف</option><option value="guard">حارس</option><option value="technician">فني</option><option value="supervisor">مشرف</option><option value="support">بديل / مساند</option></select>
           <label>الحالة</label><select id="workerStatus"><option value="active">نشط</option><option value="inactive">موقوف</option></select>
           <label>ملاحظات</label><textarea id="workerNotes" placeholder="أي ملاحظة تخص العامل أو توزيعه"></textarea>
           <div class="actions">
-            <button id="workerSaveBtn" onclick="saveWorker()">حفظ العامل</button>
+            <button id="workerSaveBtn" onclick="saveWorker()">حفظ البيانات</button>
             <button id="workerCancelBtn" class="light hidden" onclick="clearWorkerForm()">إلغاء التعديل</button>
           </div>
         </div>
@@ -355,9 +361,9 @@ body .tasneef-version-badge, body .version-badge, body .build-badge, body #versi
             <select id="workerFilterSupervisor" onchange="renderWorkers()"></select>
             <select id="workerFilterProject" onchange="renderWorkers()"></select>
             <select id="workerFilterStatus" onchange="renderWorkers()"><option value="">كل الحالات</option><option value="active">نشط</option><option value="inactive">موقوف</option></select>
-            <select id="workerFilterType" onchange="renderWorkers()"><option value="">كل الأنواع</option><option value="primary">أساسي</option><option value="support">بديل / مساند</option></select>
+            <select id="workerFilterType" onchange="renderWorkers()"><option value="">كل الأنواع</option><option value="worker">عامل</option><option value="employee">موظف</option><option value="guard">حارس</option><option value="technician">فني</option><option value="supervisor">مشرف</option><option value="support">بديل / مساند</option></select>
           </div>
-          <div class="table-wrap"><table><thead><tr><th>العامل</th><th>المشرف</th><th>المشروع</th><th>النوع</th><th>الجوال</th><th>الراتب</th><th>الحالة</th><th>ملاحظات</th><th>واتساب</th><th>إجراء</th></tr></thead><tbody id="workersBody"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>الاسم الحركي</th><th>رقم الموظف</th><th>اسم الإقامة</th><th>رقم الإقامة</th><th>المشرف</th><th>المشروع</th><th>النوع</th><th>مكان العمل</th><th>الراتب الأساسي</th><th>البدلات</th><th>الإجمالي</th><th>الحالة</th><th>مطابقة</th><th>ملاحظات</th><th>إجراء</th></tr></thead><tbody id="workersBody"></tbody></table></div>
         </div>
       </div>
     </section>
@@ -852,7 +858,7 @@ window.__tasneefFinanceProExclusive=true;
 window.__tasneefUnifiedPermissionsOnly=true;
 window.__tasneefV201Loaded=true;
 </script>
-<script src="app.js?v=10369" defer></script>
+<script src="app.js?v=10372" defer></script>
 <script src="tasneef_contracts_core_v10107.js?v=10107" defer></script>
 <script src="tasneef_finance_inventory_pro_v15.js?v=10089" defer></script>
 <script src="tasneef_worker_distribution_unified_v51.js?v=51" defer></script>

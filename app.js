@@ -23649,3 +23649,254 @@ try{ exportSupervisorDailyPDFV10310 = window.exportSupervisorDailyPDFV10310; }ca
   setInterval(boot,2500);
   console.log('Tasneef '+BUILD+' loaded');
 })();
+
+
+/* === Tasneef Workers Registry + Payroll Matching v10372 === */
+(function(){
+  const BUILD='v10372-workers-registry-payroll-match';
+  const PAYROLL_WORKERS=[{"employee_code": "TS-01", "month": "2026-06", "iqama_name": "شاه فهد شاه فهد", "motion_name": "فهد", "iqama_number": "2590242596", "workplace": "FM", "job_title": "مشرف", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1800.0, "allowances": 200.0, "total_salary": 2000.0, "raw_notes": "زيادة راتبه 100 ريال"}, {"employee_code": "TS-02", "month": "2026-06", "iqama_name": "محمد جاسم الدين", "motion_name": "جاشيم", "iqama_number": "2631728975", "workplace": "فهد", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1100.0, "allowances": 200.0, "total_salary": 1300.0, "raw_notes": "33"}, {"employee_code": "TS-03", "month": "2026-06", "iqama_name": "سوزان داري", "motion_name": "سوجان", "iqama_number": "2596960688", "workplace": "فهد", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": "33"}, {"employee_code": "TS-04", "month": "2026-06", "iqama_name": "عليم الدين عليم الدين", "motion_name": "عليم", "iqama_number": "2604544011", "workplace": "فهد", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": "خصم غياب: 1 يوم"}, {"employee_code": "TS-05", "month": "2026-06", "iqama_name": "مد مهدي حسن", "motion_name": "مهيد", "iqama_number": "2632053159", "workplace": "فهد", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": "خصم غياب: 1 يوم"}, {"employee_code": "TS-06", "month": "2026-06", "iqama_name": "حسن عبدالحميد حسن", "motion_name": "حسن", "iqama_number": "2503201192", "workplace": "FM", "job_title": "مشرف", "start_date": "2026-06-14", "end_date": "2026-06-30", "basic_salary": 2000.0, "allowances": 300.0, "total_salary": 2300.0, "raw_notes": ""}, {"employee_code": "TS-07", "month": "2026-06", "iqama_name": "مد دلوار حوسان", "motion_name": "ديلوار", "iqama_number": "2610965622", "workplace": "حسن", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": ""}, {"employee_code": "TS-08", "month": "2026-06", "iqama_name": "روبل محمد تورا علي", "motion_name": "روبيول", "iqama_number": "2568699892", "workplace": "حسن", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1100.0, "allowances": 200.0, "total_salary": 1300.0, "raw_notes": ""}, {"employee_code": "TS-09", "month": "2026-06", "iqama_name": "علي النور راشد", "motion_name": "علي", "iqama_number": "2625986555", "workplace": "حسن", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": ""}, {"employee_code": "TS-10", "month": "2026-06", "iqama_name": "مد كوثر مياه", "motion_name": "كوثر", "iqama_number": "2510373091", "workplace": "حسن", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": ""}, {"employee_code": "TS-11", "month": "2026-06", "iqama_name": "صالح احمد علي صالح", "motion_name": "صالح", "iqama_number": "2138086331", "workplace": "برج جوديا مساء", "job_title": "مشرف", "start_date": "2026-06-12", "end_date": "2026-06-30", "basic_salary": 2000.0, "allowances": 300.0, "total_salary": 2300.0, "raw_notes": ""}, {"employee_code": "TS-12", "month": "2026-06", "iqama_name": "عبدالرحيم باد ساه", "motion_name": "بتشا", "iqama_number": "262733392", "workplace": "برج جوديا مساء", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": ""}, {"employee_code": "TS-13", "month": "2026-06", "iqama_name": "ديدار ال عالم", "motion_name": "علم", "iqama_number": "2605133442", "workplace": "برج جوديا مساء", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": ""}, {"employee_code": "TS-14", "month": "2026-06", "iqama_name": "لطفي", "motion_name": "لطفي", "iqama_number": "33", "workplace": "برج جوديا صباج", "job_title": "مشرف", "start_date": "2026-06-12", "end_date": "2026-06-30", "basic_salary": 2000.0, "allowances": 300.0, "total_salary": 2300.0, "raw_notes": "اخر دوام نهاية الشهر"}, {"employee_code": "TS-15", "month": "2026-06", "iqama_name": "إبراهيم ميا", "motion_name": "ابراهيم", "iqama_number": "A12575180", "workplace": "برج جوديا صباج", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": "خصم غياب: 1 يوم"}, {"employee_code": "TS-16", "month": "2026-06", "iqama_name": "فل ميه", "motion_name": "فلومية", "iqama_number": "A08052496", "workplace": "برج جوديا صباج", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": ""}, {"employee_code": "TS-17", "month": "2026-06", "iqama_name": "مازن محمود  الخطيب", "motion_name": "مازن الخطيب", "iqama_number": "2632941221", "workplace": "وجود الياسمين", "job_title": "مشرف", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 2300.0, "allowances": 200.0, "total_salary": 2500.0, "raw_notes": ""}, {"employee_code": "TS-18", "month": "2026-06", "iqama_name": "محمد ارفال علام", "motion_name": "اشرف", "iqama_number": "2591983834", "workplace": "وجود الياسمين", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1100.0, "allowances": 200.0, "total_salary": 1300.0, "raw_notes": ""}, {"employee_code": "TS-19", "month": "2026-06", "iqama_name": "مد المغير", "motion_name": "الونجير", "iqama_number": "2611721362", "workplace": "وجود الياسمين", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1100.0, "allowances": 200.0, "total_salary": 1300.0, "raw_notes": ""}, {"employee_code": "TS-20", "month": "2026-06", "iqama_name": "أنور حسين", "motion_name": "أنور", "iqama_number": "A02459151", "workplace": "وجود الياسمين", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": ""}, {"employee_code": "TS-21", "month": "2026-06", "iqama_name": "طيب ال رحمن", "motion_name": "تيفور", "iqama_number": "2582069692", "workplace": "وجود الياسمين", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": ""}, {"employee_code": "TS-22", "month": "2026-06", "iqama_name": "بروديب مد محمحد مد", "motion_name": "جابيت", "iqama_number": "2621483334", "workplace": "وجود الياسمين", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1100.0, "allowances": 200.0, "total_salary": 1300.0, "raw_notes": ""}, {"employee_code": "TS-23", "month": "2026-06", "iqama_name": "مد راشد مد كازي", "motion_name": "رشيد", "iqama_number": "2628904696", "workplace": "وجود الياسمين", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1100.0, "allowances": 200.0, "total_salary": 1300.0, "raw_notes": ""}, {"employee_code": "TS-24", "month": "2026-06", "iqama_name": "شميم مياه", "motion_name": "شميم", "iqama_number": "2594630317", "workplace": "وجود الياسمين", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": ""}, {"employee_code": "TS-25", "month": "2026-06", "iqama_name": "مد نجح الحق الحق", "motion_name": "ناظمون", "iqama_number": "2572167886", "workplace": "وجود الياسمين", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": ""}, {"employee_code": "TS-26", "month": "2026-06", "iqama_name": "محمد هلال احمد", "motion_name": "هلال", "iqama_number": "2559093071", "workplace": "وجود الياسمين", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1100.0, "allowances": 200.0, "total_salary": 1300.0, "raw_notes": ""}, {"employee_code": "TS-27", "month": "2026-06", "iqama_name": "محمد إبراهيم محمد", "motion_name": "محمد إبراهيم", "iqama_number": "2623949415", "workplace": "FM", "job_title": "مشرف", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 2000.0, "allowances": 300.0, "total_salary": 2300.0, "raw_notes": ""}, {"employee_code": "TS-28", "month": "2026-06", "iqama_name": "مد فك شان", "motion_name": "ديكسان", "iqama_number": "A17270467", "workplace": "محمد إبراهيم", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1100.0, "allowances": 200.0, "total_salary": 1300.0, "raw_notes": ""}, {"employee_code": "TS-29", "month": "2026-06", "iqama_name": "ميزان مياه ميزان مياه", "motion_name": "ميزان", "iqama_number": "2607714272", "workplace": "محمد إبراهيم", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": ""}, {"employee_code": "TS-30", "month": "2026-06", "iqama_name": "محمد ياسر محمد ياسر", "motion_name": "محمد  ياسر", "iqama_number": "2590242224", "workplace": "محمد إبراهيم", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1400.0, "allowances": 200.0, "total_salary": 1600.0, "raw_notes": ""}, {"employee_code": "TS-31", "month": "2026-06", "iqama_name": "عبدال روف عبد ال روف", "motion_name": "رؤوف", "iqama_number": "2588414587", "workplace": "محمد إبراهيم", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1400.0, "allowances": 200.0, "total_salary": 1600.0, "raw_notes": ""}, {"employee_code": "TS-32", "month": "2026-06", "iqama_name": "اوسيس شاندر", "motion_name": "اوسيس", "iqama_number": "A12772701", "workplace": "محمد إبراهيم", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": ""}, {"employee_code": "TS-33", "month": "2026-06", "iqama_name": "اوميت شيك خليل", "motion_name": "اوميت", "iqama_number": "2598201024", "workplace": "محمد إبراهيم", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": ""}, {"employee_code": "TS-34", "month": "2026-06", "iqama_name": "راهي احمد شودري", "motion_name": "راهي", "iqama_number": "2600892497", "workplace": "محمد إبراهيم", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1100.0, "allowances": 200.0, "total_salary": 1300.0, "raw_notes": ""}, {"employee_code": "TS-35", "month": "2026-06", "iqama_name": "مد عريف سردل", "motion_name": "عاريف", "iqama_number": "2597129754", "workplace": "محمد إبراهيم", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": "خصم غياب: 1 يوم"}, {"employee_code": "TS-36", "month": "2026-06", "iqama_name": "مد رقيب مياه", "motion_name": "رقيب", "iqama_number": "2588109567", "workplace": "محمد إبراهيم", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": ""}, {"employee_code": "TS-37", "month": "2026-06", "iqama_name": "عجائب دليل فيتا", "motion_name": "عجائب", "iqama_number": "2612512877", "workplace": "محمد إبراهيم", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": ""}, {"employee_code": "TS-38", "month": "2026-06", "iqama_name": "المغير رحمن المغير", "motion_name": "رحمن", "iqama_number": "2588414447", "workplace": "محمد إبراهيم", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": ""}, {"employee_code": "TS-39", "month": "2026-06", "iqama_name": "محمد عبدالحق عباس", "motion_name": "محمد عبده", "iqama_number": "2630045207", "workplace": "FM", "job_title": "مشرف", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 2000.0, "allowances": 300.0, "total_salary": 2300.0, "raw_notes": ""}, {"employee_code": "TS-40", "month": "2026-06", "iqama_name": "مد راسل مد مياه", "motion_name": "راسيل", "iqama_number": "2612619300", "workplace": "صفاء 28 + جمال الاندلس", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": ""}, {"employee_code": "TS-41", "month": "2026-06", "iqama_name": "مد اكرامول ال اوسين", "motion_name": "اكرامول", "iqama_number": "2525556508", "workplace": "صفاء 28", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": "خصم غياب: 1 يوم"}, {"employee_code": "TS-42", "month": "2026-06", "iqama_name": "محمد ليبو مياه", "motion_name": "ديلوا", "iqama_number": "2593116243", "workplace": "صفاء 28", "job_title": "عامل", "start_date": "2026-06-10", "end_date": "2026-06-30", "basic_salary": 1100.0, "allowances": 200.0, "total_salary": 1300.0, "raw_notes": "33"}, {"employee_code": "TS-43", "month": "2026-06", "iqama_name": "مد عريف فقر", "motion_name": "عريف", "iqama_number": "2615559057", "workplace": "صفاء 28", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": "33"}, {"employee_code": "TS-44", "month": "2026-06", "iqama_name": "مد مهيب الرحمن", "motion_name": "مهيب", "iqama_number": "2562201745", "workplace": "صفاء 65+ جمال الاندلس", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": "33"}, {"employee_code": "TS-45", "month": "2026-06", "iqama_name": "مد ليتون ميا", "motion_name": "ليتون", "iqama_number": "2558253262", "workplace": "صفاء 65", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": "خصم غياب: 1 يوم"}, {"employee_code": "TS-46", "month": "2026-06", "iqama_name": "هيمونتو داش", "motion_name": "همينتو", "iqama_number": "2609947433", "workplace": "صفاء 65", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": "خصم غياب: 1 يوم"}, {"employee_code": "TS-47", "month": "2026-06", "iqama_name": "محمود احمد مصطفي", "motion_name": "محمود", "iqama_number": "po 8978741", "workplace": "FM", "job_title": "مشرف", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 2000.0, "allowances": 300.0, "total_salary": 2300.0, "raw_notes": ""}, {"employee_code": "TS-48", "month": "2026-06", "iqama_name": "راجو احمد", "motion_name": "راجو", "iqama_number": "2589141064", "workplace": "محمود", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": "خصم غياب: 1 يوم"}, {"employee_code": "TS-49", "month": "2026-06", "iqama_name": "محمد سال محمد بهير", "motion_name": "اجارول", "iqama_number": "2618749085", "workplace": "محمود", "job_title": "عامل", "start_date": "2026-06-19", "end_date": "2026-06-30", "basic_salary": 1100.0, "allowances": 200.0, "total_salary": 1300.0, "raw_notes": "33"}, {"employee_code": "TS-50", "month": "2026-06", "iqama_name": "ثابت شودري", "motion_name": "ثابت", "iqama_number": "2578931400", "workplace": "محمود", "job_title": "عامل", "start_date": "2026-06-19", "end_date": "2026-06-30", "basic_salary": 1100.0, "allowances": 200.0, "total_salary": 1300.0, "raw_notes": "33"}, {"employee_code": "TS-51", "month": "2026-06", "iqama_name": "برانتو داش", "motion_name": "شانتو", "iqama_number": "2635435221", "workplace": "محمود", "job_title": "عامل", "start_date": "2026-06-19", "end_date": "2026-06-30", "basic_salary": 1100.0, "allowances": 200.0, "total_salary": 1300.0, "raw_notes": "33"}, {"employee_code": "TS-52", "month": "2026-06", "iqama_name": "مد عبد السلام", "motion_name": "عبد السلام", "iqama_number": "2596102935", "workplace": "محمود", "job_title": "عامل", "start_date": "2026-06-19", "end_date": "2026-06-30", "basic_salary": 1100.0, "allowances": 200.0, "total_salary": 1300.0, "raw_notes": "33"}, {"employee_code": "TS-53", "month": "2026-06", "iqama_name": "مسال ميا", "motion_name": "مساد", "iqama_number": "2629057650", "workplace": "محمود", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1100.0, "allowances": 200.0, "total_salary": 1300.0, "raw_notes": "خصم غياب: 11 أيام"}, {"employee_code": "TS-54", "month": "2026-06", "iqama_name": "مفتاح اباريا اباموغا", "motion_name": "مختار", "iqama_number": "2639003512", "workplace": "محمود", "job_title": "عامل", "start_date": "2026-06-19", "end_date": "2026-06-30", "basic_salary": 1100.0, "allowances": 200.0, "total_salary": 1300.0, "raw_notes": "33"}, {"employee_code": "TS-55", "month": "2026-06", "iqama_name": "ميزانر الرحمن الرحمن", "motion_name": "ميزان 2", "iqama_number": "2588512703", "workplace": "محمود", "job_title": "عامل", "start_date": "2026-06-19", "end_date": "2026-06-30", "basic_salary": 1100.0, "allowances": 200.0, "total_salary": 1300.0, "raw_notes": "خصم غياب: 1 يوم"}, {"employee_code": "TS-56", "month": "2026-06", "iqama_name": "اختار حسين", "motion_name": "اكتار", "iqama_number": "2569565041", "workplace": "مكين 37", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": "خصم غياب: 1 يوم"}, {"employee_code": "TS-57", "month": "2026-06", "iqama_name": "محمد جايدر رحمن", "motion_name": "جهيد", "iqama_number": "2563858634", "workplace": "مكين 37", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": "33"}, {"employee_code": "TS-58", "month": "2026-06", "iqama_name": "محمد جوناب علي", "motion_name": "جوناب علي", "iqama_number": "2525413676", "workplace": "مكين 37", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": "خصم غياب: 1 يوم"}, {"employee_code": "TS-59", "month": "2026-06", "iqama_name": "مد رقيب مد رقيب", "motion_name": "ركيب", "iqama_number": "2609445594", "workplace": "مكين 37", "job_title": "عامل", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": ""}, {"employee_code": "TS-60", "month": "2026-06", "iqama_name": "محمد حمدي يوسف", "motion_name": "محمد حمدي", "iqama_number": "2502281229", "workplace": "بررج جوديا", "job_title": "مشرف", "start_date": "2026-06-27", "end_date": "2026-06-30", "basic_salary": 2000.0, "allowances": 300.0, "total_salary": 2300.0, "raw_notes": ""}, {"employee_code": "TS-61", "month": "2026-06", "iqama_name": "مازن محمد", "motion_name": "مازن محمد", "iqama_number": "2637099629", "workplace": "حسن", "job_title": "مشرف", "start_date": "2026-05-31", "end_date": "2026-06-13", "basic_salary": 2000.0, "allowances": 300.0, "total_salary": 2300.0, "raw_notes": "رحل - تم التحويل"}, {"employee_code": "TS-62", "month": "2026-06", "iqama_name": "اسعد مدني", "motion_name": "اسعد", "iqama_number": "2547694634", "workplace": "صيانة", "job_title": "فني", "start_date": "2026-05-31", "end_date": "2026-06-24", "basic_salary": 2500.0, "allowances": 300.0, "total_salary": 2800.0, "raw_notes": "رحل"}, {"employee_code": "TS-63", "month": "2026-06", "iqama_name": "ابازر جعفر يوسف", "motion_name": "ابازر", "iqama_number": "2607828155", "workplace": "صيانة", "job_title": "فني", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1800.0, "allowances": 200.0, "total_salary": 2000.0, "raw_notes": "خصم مخالفة مرورية"}, {"employee_code": "TS-64", "month": "2026-06", "iqama_name": "تشابيل حسين", "motion_name": "حسين", "iqama_number": "2495945905", "workplace": "صيانة", "job_title": "فني", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1700.0, "allowances": 200.0, "total_salary": 1900.0, "raw_notes": "33"}, {"employee_code": "TS-65", "month": "2026-06", "iqama_name": "يعقوب", "motion_name": "يعقوب", "iqama_number": "2489866166", "workplace": "صيانة", "job_title": "فني", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 2700.0, "allowances": 300.0, "total_salary": 3000.0, "raw_notes": "33"}, {"employee_code": "TS-66", "month": "2026-06", "iqama_name": "رحيم حسين رحيم", "motion_name": "رحيم", "iqama_number": "2622548283", "workplace": "صيانة", "job_title": "فني", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1300.0, "allowances": 200.0, "total_salary": 1500.0, "raw_notes": "خصم غياب: 1 يوم"}, {"employee_code": "TS-67", "month": "2026-06", "iqama_name": "مد الإسلام", "motion_name": "شريف", "iqama_number": "2489590048", "workplace": "صيانة", "job_title": "فني", "start_date": "2026-05-31", "end_date": "2026-06-10", "basic_salary": 2700.0, "allowances": 300.0, "total_salary": 3000.0, "raw_notes": "رحل"}, {"employee_code": "TS-68", "month": "2026-06", "iqama_name": "مد جويل ميا", "motion_name": "جويل", "iqama_number": "6431428926", "workplace": "صيانة", "job_title": "فني", "start_date": "2026-06-14", "end_date": "2026-06-30", "basic_salary": 1500.0, "allowances": 200.0, "total_salary": 1700.0, "raw_notes": ""}, {"employee_code": "TS-69", "month": "2026-06", "iqama_name": "عبد الرحمن", "motion_name": "عبد الرحمن", "iqama_number": "2478838143", "workplace": "صفاء 65", "job_title": "حارس", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 200.0, "allowances": 200.0, "total_salary": 400.0, "raw_notes": ""}, {"employee_code": "TS-70", "month": "2026-06", "iqama_name": "سورت عين كازي علي", "motion_name": "علي", "iqama_number": "2471022208", "workplace": "الماجدية 107", "job_title": "حارس", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1200.0, "allowances": 200.0, "total_salary": 1400.0, "raw_notes": ""}, {"employee_code": "TS-71", "month": "2026-06", "iqama_name": "وهيب محمد عبدالحميد", "motion_name": "وهيب", "iqama_number": "2538397818", "workplace": "أثل 12", "job_title": "حارس", "start_date": "2026-05-31", "end_date": "2026-06-30", "basic_salary": 1500.0, "allowances": 300.0, "total_salary": 1800.0, "raw_notes": ""}];
+  const $=id=>document.getElementById(id);
+  const S=v=>String(v==null?'':v).trim();
+  const E=s=>String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const norm=s=>S(s).replace(/[أإآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/ؤ/g,'و').replace(/ئ/g,'ي').replace(/[ـ\u064B-\u065F\u0670]/g,'').replace(/\s+/g,' ').toLowerCase();
+  const META_RE=/\[\[PAYROLL_META:([^\]]+)\]\]/;
+  function enc(obj){ try{ return btoa(unescape(encodeURIComponent(JSON.stringify(obj||{})))); }catch(e){ return ''; } }
+  function dec(s){ try{ return JSON.parse(decodeURIComponent(escape(atob(s||'')))); }catch(e){ return {}; } }
+  function getMeta(wOrNotes){ const notes=typeof wOrNotes==='string'?wOrNotes:S(wOrNotes&&wOrNotes.notes); const m=notes.match(META_RE); return m?dec(m[1]):{}; }
+  function cleanNotes(notes){ return S(notes).replace(META_RE,'').trim(); }
+  function joinNotes(visible, meta){ const c=cleanNotes(visible); const e=enc(meta||{}); return (c?c+' ':'')+(e?'[[PAYROLL_META:'+e+']]':''); }
+  function workerSupIdLocal(w){ try{ return typeof window.workerSupId==='function'?window.workerSupId(w):(w.app_supervisor_id||w.supervisor_id); }catch(_){ return w.app_supervisor_id||w.supervisor_id; } }
+  function workerProjectIdLocal(w){ try{ return typeof window.workerProjectId==='function'?window.workerProjectId(w):(w.project_id||w.assigned_project_id||''); }catch(_){ return w.project_id||w.assigned_project_id||''; } }
+  function supName(id){ try{ return typeof window.supervisorName==='function'?window.supervisorName(id):'-'; }catch(_){ return '-'; } }
+  function projName(id){ try{ return typeof window.projectName==='function'?window.projectName(id):'-'; }catch(_){ return '-'; } }
+  function showMsg(t,kind){ try{ if(typeof window.msg==='function') return window.msg(t,kind); }catch(_){} alert(t); }
+  function typeText(t){
+    t=S(t)||'worker';
+    return {primary:'عامل',worker:'عامل',support:'بديل / مساند',employee:'موظف',guard:'حارس',technician:'فني',supervisor:'مشرف'}[t]||t;
+  }
+  function typeBadge(t){ t=S(t)||'worker'; if(t==='guard') return 'amber'; if(t==='technician') return 'blue'; if(t==='employee'||t==='supervisor') return 'green'; if(t==='support') return 'amber'; return 'green'; }
+  function jobToType(job){ const j=norm(job); if(j.includes('حارس')) return 'guard'; if(j.includes('فني')) return 'technician'; if(j.includes('مشرف')) return 'supervisor'; if(j.includes('اداري')||j.includes('ادارة')||j.includes('مدير')||j.includes('موظف')) return 'employee'; return 'worker'; }
+  function matchRefByName(name){
+    const k=norm(name);
+    if(!k) return null;
+    let r=PAYROLL_WORKERS.find(x=>norm(x.motion_name)===k);
+    if(r) return r;
+    r=PAYROLL_WORKERS.find(x=>norm(x.iqama_name)===k);
+    if(r) return r;
+    r=PAYROLL_WORKERS.find(x=>{ const m=norm(x.motion_name); return m && (m.includes(k)||k.includes(m)); });
+    return r||null;
+  }
+  window.tasneefPayrollWorkersV10372=PAYROLL_WORKERS;
+  window.workerTypeText=function(t){ return typeText(t); };
+
+  function ensureWorkerRegistryUI(){
+    const formTitle=$('workerFormTitle');
+    if(formTitle && !$('workerEmployeeCode')){
+      const nameEl=$('workerName');
+      const phoneEl=$('workerPhone');
+      if(nameEl){
+        nameEl.insertAdjacentHTML('beforebegin', '<label>رقم الموظف</label><input id="workerEmployeeCode" placeholder="مثال: TS-01">');
+      }
+      if(phoneEl){
+        phoneEl.insertAdjacentHTML('beforebegin', '<label>اسم الموظف في الإقامة</label><input id="workerIqamaName" placeholder="الاسم حسب الإقامة"><label>رقم الإقامة</label><input id="workerIqamaNumber" placeholder="رقم الإقامة"><label>مكان العمل من الكشف</label><input id="workerWorkplace" placeholder="مكان العمل"><label>الوظيفة من الكشف</label><input id="workerJobTitle" placeholder="الوظيفة"><div class="grid two"><div><label>الراتب الأساسي</label><input type="number" id="workerBasicSalary" value="0"></div><div><label>البدلات</label><input type="number" id="workerAllowances" value="0"></div></div>');
+      }
+      const salary=$('workerSalary');
+      if(salary) salary.previousElementSibling && (salary.previousElementSibling.textContent='إجمالي الراتب');
+      const type=$('workerType');
+      if(type){
+        type.innerHTML='<option value="worker">عامل</option><option value="employee">موظف</option><option value="guard">حارس</option><option value="technician">فني</option><option value="supervisor">مشرف</option><option value="support">بديل / مساند</option>';
+      }
+    }
+    const filter=$('workerFilterType');
+    if(filter && !filter.dataset.v10372){
+      filter.innerHTML='<option value="">كل الأنواع</option><option value="worker">عامل</option><option value="primary">عامل - قديم</option><option value="employee">موظف</option><option value="guard">حارس</option><option value="technician">فني</option><option value="supervisor">مشرف</option><option value="support">بديل / مساند</option>';
+      filter.dataset.v10372='1';
+    }
+    const search=$('workerSearch');
+    if(search && !search.dataset.v10372){
+      search.placeholder='بحث باسم العامل أو اسم الإقامة أو رقم الإقامة أو رقم الموظف أو المشرف أو المشروع';
+      search.dataset.v10372='1';
+    }
+    const listTitle=[...document.querySelectorAll('#workers h2')].find(h=>S(h.textContent).includes('قائمة العمال'));
+    if(listTitle && !$('workerPayrollMatchBoxV10372')){
+      listTitle.parentElement.insertAdjacentHTML('afterend', `<div id="workerPayrollMatchBoxV10372" class="card" style="margin:10px 0;background:#f7fbfa;border:1px solid var(--line);">
+        <div class="row" style="align-items:end">
+          <div><h3 style="margin:0;color:var(--brand)">مطابقة بيانات الإقامة والرواتب</h3><p class="footer-note">يطابق الاسم الحركي في التطبيق مع كشف الرواتب المرفوع، ثم يحدّث رقم الموظف، اسم الإقامة، رقم الإقامة، مكان العمل، الوظيفة، الراتب الأساسي، البدلات، وإجمالي الراتب.</p></div>
+          <button onclick="applyPayrollWorkerMatchV10372()">تطبيق المطابقة على العمال الموجودين</button>
+          <button class="light" onclick="showUnmatchedPayrollWorkersV10372()">عرض أسماء الإكسل غير الموجودة</button>
+        </div>
+        <div id="workerMatchSummaryV10372" class="footer-note"></div>
+      </div>`);
+    }
+    const table=$('workersBody')?.closest('table');
+    if(table && !table.dataset.v10372){
+      const head=table.querySelector('thead tr');
+      if(head) head.innerHTML='<th>الاسم الحركي</th><th>رقم الموظف</th><th>اسم الإقامة</th><th>رقم الإقامة</th><th>المشرف</th><th>المشروع</th><th>النوع</th><th>مكان العمل</th><th>الراتب الأساسي</th><th>البدلات</th><th>الإجمالي</th><th>الحالة</th><th>مطابقة</th><th>ملاحظات</th><th>إجراء</th>';
+      table.dataset.v10372='1';
+    }
+  }
+  function metaFromForm(){
+    return {
+      employee_code:S($('workerEmployeeCode')?.value),
+      iqama_name:S($('workerIqamaName')?.value),
+      iqama_number:S($('workerIqamaNumber')?.value),
+      workplace:S($('workerWorkplace')?.value),
+      job_title:S($('workerJobTitle')?.value),
+      basic_salary:Number($('workerBasicSalary')?.value||0),
+      allowances:Number($('workerAllowances')?.value||0),
+      total_salary:Number($('workerSalary')?.value||0),
+      source:'manual-or-excel-v10372'
+    };
+  }
+  function fillMetaForm(meta){ 
+    if($('workerEmployeeCode')) $('workerEmployeeCode').value=S(meta.employee_code);
+    if($('workerIqamaName')) $('workerIqamaName').value=S(meta.iqama_name);
+    if($('workerIqamaNumber')) $('workerIqamaNumber').value=S(meta.iqama_number);
+    if($('workerWorkplace')) $('workerWorkplace').value=S(meta.workplace);
+    if($('workerJobTitle')) $('workerJobTitle').value=S(meta.job_title);
+    if($('workerBasicSalary')) $('workerBasicSalary').value=Number(meta.basic_salary||0);
+    if($('workerAllowances')) $('workerAllowances').value=Number(meta.allowances||0);
+  }
+  function suggestFromName(){
+    const r=matchRefByName($('workerName')?.value);
+    if(!r) return;
+    const meta={employee_code:r.employee_code,iqama_name:r.iqama_name,iqama_number:r.iqama_number,workplace:r.workplace,job_title:r.job_title,basic_salary:r.basic_salary,allowances:r.allowances,total_salary:r.total_salary,source:'excel-payroll-v10372'};
+    fillMetaForm(meta);
+    if($('workerSalary')) $('workerSalary').value=Number(r.total_salary||0);
+    if($('workerType')) $('workerType').value=jobToType(r.job_title);
+  }
+  function clearExtraForm(){
+    ['workerEmployeeCode','workerIqamaName','workerIqamaNumber','workerWorkplace','workerJobTitle'].forEach(id=>{ if($(id)) $(id).value=''; });
+    if($('workerBasicSalary')) $('workerBasicSalary').value=0;
+    if($('workerAllowances')) $('workerAllowances').value=0;
+  }
+  const prevClear=window.clearWorkerForm;
+  window.clearWorkerForm=function(){
+    const r=typeof prevClear==='function'?prevClear.apply(this,arguments):undefined;
+    setTimeout(()=>{ ensureWorkerRegistryUI(); clearExtraForm(); if($('workerType')) $('workerType').value='worker'; },30);
+    return r;
+  };
+  window.saveWorker=async function(){
+    ensureWorkerRegistryUI();
+    const id=S($('workerId')?.value);
+    const name=S($('workerName')?.value);
+    if(!name) return showMsg('اسم العامل / الموظف مطلوب','err');
+    let meta=metaFromForm();
+    const ref=matchRefByName(name);
+    if(ref && !meta.employee_code){
+      meta={employee_code:ref.employee_code,iqama_name:ref.iqama_name,iqama_number:ref.iqama_number,workplace:ref.workplace,job_title:ref.job_title,basic_salary:ref.basic_salary,allowances:ref.allowances,total_salary:ref.total_salary,source:'excel-payroll-v10372'};
+      fillMetaForm(meta);
+      if($('workerSalary')) $('workerSalary').value=Number(ref.total_salary||0);
+      if($('workerType')) $('workerType').value=jobToType(ref.job_title);
+    }
+    const supId=Number($('workerSupervisor')?.value)||null;
+    const projectId=Number($('workerProject')?.value)||null;
+    const row={
+      name:name,
+      phone:S($('workerPhone')?.value),
+      salary:Number($('workerSalary')?.value||meta.total_salary||0),
+      supervisor_id:supId,
+      app_supervisor_id:supId,
+      project_id:projectId,
+      worker_type:S($('workerType')?.value)||jobToType(meta.job_title)||'worker',
+      status:S($('workerStatus')?.value)||'active',
+      notes:joinNotes($('workerNotes')?.value||'', meta)
+    };
+    const res=id?await sb.from('workers').update(row).eq('id',id):await sb.from('workers').insert(row);
+    if(res.error) return showMsg(res.error.message,'err');
+    showMsg(id?'تم تحديث البيانات':'تم حفظ العامل / الموظف');
+    if(typeof window.clearWorkerForm==='function') window.clearWorkerForm();
+    if(typeof window.refreshAll==='function') await window.refreshAll();
+  };
+  window.renderWorkers=function(){
+    ensureWorkerRegistryUI();
+    const b=$('workersBody'); if(!b) return;
+    const d=window.data||{workers:[]};
+    const s=S($('workerFilterSupervisor')?.value), p=S($('workerFilterProject')?.value), st=S($('workerFilterStatus')?.value), tp=S($('workerFilterType')?.value), q=norm($('workerSearch')?.value);
+    let rows=Array.isArray(d.workers)?d.workers.slice():[];
+    if(s) rows=rows.filter(w=>S(workerSupIdLocal(w))===s);
+    if(p) rows=rows.filter(w=>S(workerProjectIdLocal(w))===p);
+    if(st) rows=rows.filter(w=>(S(w.status)||'active')===st);
+    if(tp) rows=rows.filter(w=>(S(w.worker_type)||'worker')===tp);
+    if(q) rows=rows.filter(w=>{ const m=getMeta(w); return norm([w.name,w.phone,supName(workerSupIdLocal(w)),projName(workerProjectIdLocal(w)),cleanNotes(w.notes),m.employee_code,m.iqama_name,m.iqama_number,m.workplace,m.job_title].join(' ')).includes(q); });
+    b.innerHTML=rows.map(w=>{
+      const m=getMeta(w); const ref=matchRefByName(w.name); const match=ref?'موجود في الإكسل':'غير مطابق';
+      const notes=cleanNotes(w.notes)||'-';
+      const total=Number(w.salary||m.total_salary||0);
+      return `<tr>
+        <td><b>${E(w.name)}</b></td>
+        <td>${E(m.employee_code||'-')}</td>
+        <td>${E(m.iqama_name||'-')}</td>
+        <td>${E(m.iqama_number||'-')}</td>
+        <td>${E(supName(workerSupIdLocal(w)))}</td>
+        <td>${E(projName(workerProjectIdLocal(w)))}</td>
+        <td><span class="badge ${typeBadge(w.worker_type)}">${E(typeText(w.worker_type))}</span></td>
+        <td>${E(m.workplace||'-')}</td>
+        <td>${Number(m.basic_salary||0)}</td>
+        <td>${Number(m.allowances||0)}</td>
+        <td><b>${total}</b></td>
+        <td><span class="badge ${w.status==='inactive'?'red':'green'}">${w.status==='inactive'?'موقوف':'نشط'}</span></td>
+        <td><span class="badge ${ref?'green':'amber'}">${match}</span></td>
+        <td>${E(notes)}</td>
+        <td class="row-actions"><button onclick="editWorker(${w.id})">تعديل</button><button class="light" onclick="toggleWorkerStatus(${w.id})">${w.status==='inactive'?'تفعيل':'إيقاف'}</button><button class="danger" onclick="deleteRow('workers',${w.id})">حذف</button></td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="15">لا توجد بيانات</td></tr>';
+  };
+  window.editWorker=function(id){
+    ensureWorkerRegistryUI();
+    const w=(window.data?.workers||[]).find(x=>S(x.id)===S(id)); if(!w) return;
+    $('workerId')&&($('workerId').value=w.id);
+    $('workerName')&&($('workerName').value=w.name||'');
+    $('workerPhone')&&($('workerPhone').value=w.phone||'');
+    $('workerSalary')&&($('workerSalary').value=Number(w.salary||0));
+    const m=getMeta(w); fillMetaForm(m);
+    if($('workerSupervisor')) $('workerSupervisor').value=workerSupIdLocal(w)||'';
+    try{ if(typeof window.onWorkerSupervisorChange==='function') window.onWorkerSupervisorChange(); }catch(_){}
+    if($('workerProject')) $('workerProject').value=workerProjectIdLocal(w)||'';
+    if($('workerType')) $('workerType').value=S(w.worker_type)||jobToType(m.job_title)||'worker';
+    if($('workerStatus')) $('workerStatus').value=w.status||'active';
+    if($('workerNotes')) $('workerNotes').value=cleanNotes(w.notes);
+    if($('workerFormTitle')) $('workerFormTitle').textContent='تعديل عامل / موظف';
+    if($('workerSaveBtn')) $('workerSaveBtn').textContent='تحديث البيانات';
+    $('workerCancelBtn')&&$('workerCancelBtn').classList.remove('hidden');
+    if(typeof window.showPage==='function') window.showPage('workers', document.querySelector('.nav[onclick*="workers"]'));
+    setTimeout(()=>window.scrollTo({top:0,behavior:'smooth'}),50);
+  };
+  window.applyPayrollWorkerMatchV10372=async function(){
+    ensureWorkerRegistryUI();
+    const workers=window.data?.workers||[];
+    let matched=0, skipped=0, errors=0;
+    for(const w of workers){
+      const r=matchRefByName(w.name);
+      if(!r){ skipped++; continue; }
+      const oldMeta=getMeta(w);
+      const meta={...oldMeta, employee_code:r.employee_code, iqama_name:r.iqama_name, iqama_number:r.iqama_number, workplace:r.workplace, job_title:r.job_title, basic_salary:r.basic_salary, allowances:r.allowances, total_salary:r.total_salary, source:'excel-payroll-v10372'};
+      const row={salary:Number(r.total_salary||w.salary||0), worker_type:S(w.worker_type)||jobToType(r.job_title), notes:joinNotes(cleanNotes(w.notes), meta)};
+      const res=await sb.from('workers').update(row).eq('id',w.id);
+      if(res.error) errors++; else matched++;
+    }
+    const box=$('workerMatchSummaryV10372');
+    if(box) box.textContent=`تمت مطابقة ${matched} اسم، غير مطابق ${skipped}، أخطاء ${errors}.`;
+    showMsg(`تمت مطابقة ${matched} اسم من كشف الرواتب`);
+    if(typeof window.refreshAll==='function') await window.refreshAll();
+  };
+  window.showUnmatchedPayrollWorkersV10372=function(){
+    const workers=window.data?.workers||[];
+    const existing=new Set(workers.map(w=>norm(w.name)));
+    const missing=PAYROLL_WORKERS.filter(r=>!existing.has(norm(r.motion_name)));
+    const box=$('workerMatchSummaryV10372');
+    const html=missing.slice(0,80).map(r=>`${E(r.motion_name)} - ${E(r.iqama_name)} - ${E(r.employee_code)}`).join('<br>');
+    if(box) box.innerHTML= missing.length ? `<b>أسماء موجودة في الإكسل وغير موجودة في قسم العمال (${missing.length}):</b><br>${html}` : 'كل أسماء الإكسل مطابقة تقريبًا مع قسم العمال.';
+  };
+  function boot(){
+    ensureWorkerRegistryUI();
+    const name=$('workerName');
+    if(name && !name.dataset.v10372){ name.addEventListener('change',suggestFromName); name.addEventListener('blur',suggestFromName); name.dataset.v10372='1'; }
+    try{ if(typeof window.renderWorkers==='function' && $('workersBody')) window.renderWorkers(); }catch(_){}
+  }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,700));
+  window.addEventListener('load',()=>{ setTimeout(boot,900); setTimeout(boot,1800); });
+  setInterval(()=>{ if($('workersBody')) boot(); },3500);
+  console.log('Tasneef workers registry payroll match '+BUILD+' loaded');
+})();
+
