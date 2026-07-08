@@ -3342,8 +3342,6 @@ function financeResetFilters(){ ['financeSearch','financeProjectFilter','finance
     ['can_attendance','الحضور والغياب'],
     ['can_monthly','الأوقات الشهرية'],
     ['can_tickets','التكتات'],
-    ['can_client_reports','تقارير العملاء'],
-    ['can_client_ratings','تقييمات العملاء'],
     ['can_alerts','التنبيهات'],
     ['can_assistant','مساعد تصنيف'],
     ['can_export','التصدير']
@@ -3359,8 +3357,6 @@ function financeResetFilters(){ ['financeSearch','financeProjectFilter','finance
     attendance:'can_attendance',
     monthly:'can_monthly',
     tickets:'can_tickets',
-    clientReports:'can_client_reports',
-    clientRatings:'can_client_ratings',
     alerts:'can_alerts',
     assistant:'can_assistant',
     export:'can_export'
@@ -3614,8 +3610,6 @@ function financeResetFilters(){ ['financeSearch','financeProjectFilter','finance
     ['can_attendance','الحضور والغياب'],
     ['can_monthly','الأوقات الشهرية'],
     ['can_tickets','التكتات'],
-    ['can_client_reports','تقارير العملاء'],
-    ['can_client_ratings','تقييمات العملاء'],
     ['can_alerts','التنبيهات'],
     ['can_assistant','مساعد تصنيف'],
     ['can_export','التصدير']
@@ -3631,8 +3625,6 @@ function financeResetFilters(){ ['financeSearch','financeProjectFilter','finance
     attendance:'can_attendance',
     monthly:'can_monthly',
     tickets:'can_tickets',
-    clientReports:'can_client_reports',
-    clientRatings:'can_client_ratings',
     alerts:'can_alerts',
     assistant:'can_assistant',
     export:'can_export'
@@ -3654,11 +3646,11 @@ function financeResetFilters(){ ['financeSearch','financeProjectFilter','finance
     if(role === 'operations_manager') return {
       can_dashboard:true, can_time_logs:true, can_projects:true, can_contracts:true,
       can_manage_workers:true, can_attendance:true, can_monthly:true, can_tickets:true,
-      can_client_reports:true, can_client_ratings:true, can_expenses_inventory:true,
+      can_expenses_inventory:true,
       can_inventory_requests:true, can_manage_inventory:false, can_alerts:true,
       can_assistant:true, can_export:true
     };
-    if(role === 'financial_manager') return { can_dashboard:true, can_client_reports:true, can_client_ratings:true, can_expenses_inventory:true, can_inventory_requests:true, can_export:true };
+    if(role === 'financial_manager') return { can_dashboard:true, can_expenses_inventory:true, can_inventory_requests:true, can_export:true };
     if(role === 'technician') return { can_dashboard:true, can_tickets:true, can_inventory_requests:true };
     return { can_dashboard:true, can_time_logs:true, can_attendance:true, can_tickets:true, can_inventory_requests:true };
   }
@@ -8545,7 +8537,6 @@ function financePrintReport(kind){
     }
   }
 
-  // تحميل تقارير العملاء بأمان بدون تعطيل الأزرار أو تكرار الجلب.
   let reportsLoading = null;
   window.loadPremiumReportsOnly = async function(showMessage=false){
     if(reportsLoading) return reportsLoading;
@@ -9999,7 +9990,7 @@ function financePrintReport(kind){
   }
   document.addEventListener('DOMContentLoaded',stabilizeFileInputs); setInterval(stabilizeFileInputs,2500);
   // Faster page switching: render only the opened page instead of every heavy section.
-  const pageRenderers={dashboard:['renderDashboard','renderAlerts'],daily:['renderTimeLogs'],users:['renderUsers'],projects:['renderProjects'],workers:['renderWorkers'],attendance:['renderAttendance'],monthly:['renderMonthly'],tickets:['renderTickets'],contracts:['renderContractServices'],financeDashboard:['financeRenderAll'],premiumReports:['renderPremiumReports'],clientRatings:['renderClientRatings']};
+  const pageRenderers={dashboard:['renderDashboard','renderAlerts'],daily:['renderTimeLogs'],users:['renderUsers'],projects:['renderProjects'],workers:['renderWorkers'],attendance:['renderAttendance'],monthly:['renderMonthly'],tickets:['renderTickets'],contracts:['renderContractServices'],financeDashboard:['financeRenderAll'],premiumReports:['renderPremiumReports'],};
   window.showPage=function(id,btn){
     document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden'));
     const page=$id(id); if(page) page.classList.remove('hidden');
@@ -13916,7 +13907,7 @@ function financePrintReport(kind){
     ensureStyles(); sec.classList.add('client-reports-clean-v213');
     if(!$id('clientReportToolbarV213')){
       const toolbar=document.createElement('div'); toolbar.id='clientReportToolbarV213'; toolbar.className='client-report-toolbar-v213';
-      toolbar.innerHTML=`<div class="title"><h2>تقارير العملاء</h2></div><div class="actions"><button type="button" onclick="tasneefOpenReportModal213('new')">+ إنشاء تقرير جديد</button><button type="button" class="light" onclick="tasneefOpenGatewayModal213()">إدارة خدمات التقارير</button><button type="button" class="light" onclick="loadPremiumReportsOnly(true).then(()=>renderPremiumReports())">تحديث</button></div>`;
+      toolbar.innerHTML=`<div class="title"><h2>القسم القديم</h2></div><div class="actions"><button type="button" onclick="tasneefOpenReportModal213('new')">+ إنشاء تقرير جديد</button><button type="button" class="light" onclick="tasneefOpenGatewayModal213()">إدارة خدمات التقارير</button><button type="button" class="light" onclick="loadPremiumReportsOnly(true).then(()=>renderPremiumReports())">تحديث</button></div>`;
       const kpis=sec.querySelector('.report-kpis') || sec.querySelector('.card') || sec.firstElementChild;
       (kpis?.parentNode||sec).insertBefore(toolbar, kpis?.nextSibling||sec.firstChild);
     }
@@ -14075,7 +14066,7 @@ function financePrintReport(kind){
   function boot(){
     ensureCleanUI(); loadGateways(); refreshGatewaySelects();
     // make sure current visible title confirms new version without changing old content.
-    [...document.querySelectorAll('h2,h3')].forEach(h=>{ if(/بوابة تقارير العملاء/.test(h.textContent||'') && !/V213/.test(h.textContent)) h.textContent='تقارير العملاء - V213'; });
+    [...document.querySelectorAll('h2,h3')].forEach(h=>{ if(/القسم القديم/.test(h.textContent||'') && !/V213/.test(h.textContent)) h.textContent='القسم القديم'; });
   }
   const oldShow=window.showPage;
   if(typeof oldShow==='function'){
@@ -14277,7 +14268,7 @@ function financePrintReport(kind){
   function updateClientReportsTitle(){
     document.querySelectorAll('#clientReports h2,#clientReports h3').forEach(h=>{
       const t=S(h.textContent);
-      if(t.includes('بوابة تقارير العملاء') || t.includes('تقارير العملاء - V213')) h.textContent='تقارير العملاء - V217';
+      if(t.includes('القسم القديم') || t.includes('القسم القديم')) h.textContent='القسم القديم';
     });
   }
   function groupReports(list){
@@ -14961,7 +14952,7 @@ function financePrintReport(kind){
     const totalMins=logs.reduce((a,l)=>a+N(l.duration_minutes||mins(l.check_in,l.check_out)),0);
     const expTotal=exp.reduce((a,e)=>a+N(e.total||e.amount),0);
     const stockValue=items.reduce((a,i)=>a+N(i.quantity)*N(i.unit_cost||i.cost||i.price),0);
-    return [['المؤشر','القيمة','ملاحظة'],['تاريخ التصدير',labelDate(),''],['الشهر',currentFilters().month||'كل الأشهر',''],['عدد المشاريع',projects.length,'حسب الفلتر الحالي'],['عدد المشرفين',(dset().supervisors||[]).length,''],['عدد العمال',(dset().workers||[]).length,'بدون تكرار في شاشة العمال'],['سجلات التشغيل',logs.length,''],['إجمالي دقائق التشغيل',Math.round(totalMins),''],['التكتات',tickets.length,`مفتوحة: ${open} / مغلقة: ${closed}`],['المصروفات',exp.length,expTotal],['أصناف المخزون',items.length,stockValue],['تقارير العملاء',reports.length,''],['تقييمات العملاء',ratings.length,'']];
+    return [['المؤشر','القيمة','ملاحظة'],['تاريخ التصدير',labelDate(),''],['الشهر',currentFilters().month||'كل الأشهر',''],['عدد المشاريع',projects.length,'حسب الفلتر الحالي'],['عدد المشرفين',(dset().supervisors||[]).length,''],['عدد العمال',(dset().workers||[]).length,'بدون تكرار في شاشة العمال'],['سجلات التشغيل',logs.length,''],['إجمالي دقائق التشغيل',Math.round(totalMins),''],['التكتات',tickets.length,`مفتوحة: ${open} / مغلقة: ${closed}`],['المصروفات',exp.length,expTotal],['أصناف المخزون',items.length,stockValue]];
   }
   function projectsRows(){ return [['اسم المشروع','المشرف الحالي','نوع التشغيل','الحالة','الدقائق اليومية','دقائق الجمعة','الموقع','ملاحظات'], ...filterProjects().map(p=>[p.name,sName(p.supervisor_id),opText(p.operation_type),statusText(p.status),N(p.required_daily_minutes||180),N(p.friday_minutes||90),p.location||'',p.notes||''])]; }
   function supervisorsRows(){ const projects=filterProjects(), tickets=filteredTickets(); return [['المشرف','عدد المشاريع الحالية','عدد العمال','التكتات المفتوحة','التكتات المغلقة'], ...(dset().supervisors||[]).filter(s=>!currentFilters().supervisor||String(s.id)===String(currentFilters().supervisor)).map(s=>{ const pids=projects.filter(p=>String(p.supervisor_id)===String(s.id)).map(p=>String(p.id)); const workers=(dset().workers||[]).filter(w=>pids.includes(String(wProjectId(w)))||String(wSupId(w))===String(s.id)); const ts=tickets.filter(t=>pids.includes(String(t.project_id))); const open=ts.filter(t=>!['closed','done','مغلق'].includes(String(t.status||'').toLowerCase())).length; return [s.full_name||s.username,pids.length,workers.length,open,ts.length-open]; })]; }
@@ -14998,8 +14989,6 @@ function financePrintReport(kind){
       sheetXml('المخزون', inventoryRows(), {title:'المخزون', subtitle:sub}),
       sheetXml('حركة المخزون', movementRows(), {title:'حركة المخزون', subtitle:sub}),
       sheetXml('المصروفات', expensesRows(), {title:'المصروفات', subtitle:sub}),
-      sheetXml('تقارير العملاء', clientReportsRows(), {title:'تقارير العملاء', subtitle:sub}),
-      sheetXml('تقييمات العملاء', ratingsRows(), {title:'تقييمات العملاء', subtitle:sub}),
       sheetXml('التنبيهات', alertsRows(), {title:'التنبيهات', subtitle:sub})
     ]; }
   window.exportMeetingExcelV222 = async function(btn){
@@ -16026,7 +16015,7 @@ function financePrintReport(kind){
   }
   function executiveRows(){
     const projects=filteredProjects(), logs=filteredLogs(), tickets=filteredTickets(), moves=filteredMovements(), expenses=filteredExpenses(), reports=filteredClientReports();
-    return [['المؤشر','القيمة'],['الشهر',currentExportFilters().month||'كل الأشهر'],['المشاريع ضمن الفلتر',projects.length],['المشرفون',A(D().supervisors).length||A(D().users).filter(u=>S(u.role)==='supervisor').length],['العمال',A(D().workers).length],['السجلات اليومية',logs.length],['التكتات',tickets.length],['تكتات مفتوحة',tickets.filter(t=>!['closed','done','مغلق'].includes(S(t.status).toLowerCase())).length],['حركات المخزون',moves.length],['إجمالي المصروفات',expenses.reduce((s,e)=>s+N(e.total||e.amount),0)],['تقارير العملاء',reports.length]];
+    return [['المؤشر','القيمة'],['الشهر',currentExportFilters().month||'كل الأشهر'],['المشاريع ضمن الفلتر',projects.length],['المشرفون',A(D().supervisors).length||A(D().users).filter(u=>S(u.role)==='supervisor').length],['العمال',A(D().workers).length],['السجلات اليومية',logs.length],['التكتات',tickets.length],['تكتات مفتوحة',tickets.filter(t=>!['closed','done','مغلق'].includes(S(t.status).toLowerCase())).length],['حركات المخزون',moves.length],['إجمالي المصروفات',expenses.reduce((s,e)=>s+N(e.total||e.amount),0)]];
   }
   function projectsRows(){ return [['اسم المشروع','المشرف الحالي','نوع التشغيل','الدقائق اليومية','دقائق الجمعة','بداية العقد','نهاية العقد','الحالة','الموقع','ملاحظات'], ...filteredProjects().map(p=>[p.name,sName(p.supervisor_id),p.operation_type||p.type||'',N(p.daily_minutes||p.required_minutes||0),N(p.friday_minutes||0),p.contract_start||p.start_date||'',p.contract_end||p.end_date||'',p.status||'',p.location||'',p.notes||''])]; }
   function supervisorsRows(){ return [['المشرف','اسم المستخدم','عدد المشاريع الحالية','عدد العمال','الحالة','ملاحظات'], ...A(D().supervisors).concat(A(D().users).filter(u=>S(u.role)==='supervisor')).filter((u,i,arr)=>arr.findIndex(x=>S(x.id)===S(u.id))===i).map(u=>[u.full_name||u.name||u.username,u.username||'',A(D().projects).filter(p=>S(p.supervisor_id)===S(u.id)).length,supWorkers(u.id).length,u.status||'نشط',u.notes||''])]; }
@@ -16059,8 +16048,6 @@ function financePrintReport(kind){
     sheetXml('دفعات FIFO',fifoRows(),{title:'دفعات الشراء وأسعارها الحقيقية FIFO',subtitle:sub}),
     sheetXml('الموردون',suppliersRows(),{title:'الموردون',subtitle:sub}),
     sheetXml('المصروفات',expensesRows(),{title:'المصروفات',subtitle:sub}),
-    sheetXml('تقارير العملاء',clientReportsRows(),{title:'تقارير العملاء',subtitle:sub}),
-    sheetXml('تقييمات العملاء',ratingsRows(),{title:'تقييمات العملاء',subtitle:sub}),
     sheetXml('التنبيهات',alertsRows(),{title:'التنبيهات',subtitle:sub})
   ]; }
   async function ensureExportData(){ try{ if(typeof refreshAll==='function') await refreshAll(); }catch(e){} try{ if(typeof financeLoadAll==='function') await financeLoadAll(false); }catch(e){} try{ if(typeof loadPremiumReportsOnly==='function') await loadPremiumReportsOnly(false); }catch(e){} }
@@ -23866,4 +23853,33 @@ try{ exportSupervisorDailyPDFV10310 = window.exportSupervisorDailyPDFV10310; }ca
   window.addEventListener('load',()=>{ setTimeout(boot,600); setTimeout(boot,1800); });
   setInterval(boot,3000);
   console.log('Tasneef '+BUILD+' loaded');
+})();
+
+
+/* ===================== V372 Remove Old Client Sections ===================== */
+(function(){
+  function removeOldClientSectionsV372(){
+    try{
+      document.querySelectorAll("button.nav[onclick*=\"clientReports\"],button.nav[onclick*=\"clientRatings\"],[data-page=\"clientReports\"],[data-page=\"clientRatings\"]").forEach(el=>el.remove());
+      document.querySelectorAll('#clientReports,#clientRatings,#clientReportsPage,.client-reports-page').forEach(el=>el.remove());
+      document.querySelectorAll('#userPermissionsBoxV72 label,#userPermissionsBoxV72 .perm-row,.perm-grid-v72 label,.perm-u-grid label').forEach(el=>{
+        const t=(el.textContent||'');
+        if(t.includes('القسم القديم') || t.includes('تقييم القسم القديم') || t.includes('can_client_reports') || t.includes('can_client_ratings')) el.remove();
+      });
+    }catch(e){ console.warn('V372 remove old client sections', e); }
+  }
+  window.addEventListener('DOMContentLoaded', removeOldClientSectionsV372);
+  window.addEventListener('load', function(){ setTimeout(removeOldClientSectionsV372,100); setTimeout(removeOldClientSectionsV372,900); });
+  const oldShow=window.showPage;
+  if(typeof oldShow==='function'){
+    window.showPage=function(page,btn){
+      if(page==='clientReports' || page==='clientRatings'){
+        if(typeof msg==='function') msg('تمت إزالة القسم القديم، وسيتم بناء قسم العملاء الجديد من الصفر.','ok');
+        page='dashboard'; btn=document.querySelector("button.nav[onclick*=\"dashboard\"]")||btn;
+      }
+      const r=oldShow.apply(this,[page,btn]);
+      setTimeout(removeOldClientSectionsV372,50);
+      return r;
+    };
+  }
 })();

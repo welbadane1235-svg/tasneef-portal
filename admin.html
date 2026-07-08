@@ -167,8 +167,6 @@ body .tasneef-version-badge, body .version-badge, body .build-badge, body #versi
     <button class="nav" onclick="showPage('tickets',this)">التكتات</button>
     <button class="nav" onclick="showPage('orders',this)">الأوردرات</button>
     <button class="nav" data-page="inventoryAudit" onclick="showPage('inventoryAudit',this); setTimeout(function(){ window.tasneefInventoryAuditV10059 && tasneefInventoryAuditV10059.load && tasneefInventoryAuditV10059.load(); },80);">الجرد</button>
-    <button class="nav" onclick="showPage('clientReports',this)">تقارير العملاء</button>
-    <button class="nav" onclick="showPage('clientRatings',this)">تقييمات العملاء</button>
     <button class="nav" onclick="showPage('alerts',this)">التنبيهات</button>
     <button class="nav" onclick="showPage('assistant',this)">مساعد تصنيف</button>
     <button class="nav" onclick="showPage('export',this)">التصدير والاستيراد</button>
@@ -608,92 +606,6 @@ body .tasneef-version-badge, body .version-badge, body .build-badge, body #versi
       </div>
     </section>
 
-    <section id="clientReports" class="page hidden">
-      <div class="card section-head">
-        <div>
-          <h2>بوابة تقارير العملاء - شرائح ذكية</h2>
-          <p>نظام شرائح ذكية: المشرف يرفع الصور، والإدارة تتحكم في النص والترتيب والإضافة والاعتماد والنشر.</p>
-        </div>
-        <button class="light" onclick="clearPremiumReportForm(); document.getElementById('premiumReportFormCard')?.scrollIntoView({behavior:'smooth'})">تقرير جديد</button>
-      </div>
-
-      <div class="report-kpis">
-        <div class="kpi"><small>إجمالي التقارير</small><b id="reportsTotalKpi">0</b></div>
-        <div class="kpi"><small>هذا الشهر</small><b id="reportsMonthKpi">0</b></div>
-        <div class="kpi"><small>مسودات</small><b id="reportsDraftKpi">0</b></div>
-        <div class="kpi"><small>منشورة</small><b id="reportsPublishedKpi">0</b></div>
-        <div class="kpi"><small>تحتاج متابعة</small><b id="reportsFollowKpi">0</b></div>
-      </div>
-
-      <div class="report-premium-wrap">
-        <div class="card report-form-card" id="premiumReportFormCard">
-          <h2 id="premiumReportFormTitle">إنشاء تقرير جديد</h2>
-          <input type="hidden" id="premiumReportId">
-          <div class="split"><div><label>المشروع</label><select id="premiumReportProject" onchange="syncPremiumProjectInfo()"></select></div><div><label>تاريخ التنفيذ</label><input type="date" id="premiumReportDate"></div></div>
-          <label>عنوان التقرير</label><input id="premiumReportTitle" placeholder="مثال: تقرير مكافحة الحشرات وتنظيف المرافق">
-          <div class="split"><div><label>نوع التقرير العام</label><select id="premiumReportType"><option>تقرير خدمات</option><option>مكافحة الحشرات</option><option>غسيل خزانات</option><option>نظافة عامة</option><option>صيانة</option><option>تقرير شهري</option></select></div><div><label>رئيس الجمعية / المستلم</label><input id="premiumChairmanName" placeholder="اختياري"></div></div>
-          <label>رقم واتساب رئيس الجمعية</label><input id="premiumChairmanPhone" placeholder="9665xxxxxxxx">
-          <label>الملخص التنفيذي</label><textarea id="premiumSummary" placeholder="اكتب ملخص مختصر يظهر في أول التقرير"></textarea>
-          <div class="add-service-panel">
-            <div>
-              <label>إضافة خدمة داخل التقرير</label>
-              <select id="premiumAddServiceType">
-                <option>مكافحة الحشرات</option><option>غسيل الخزانات</option><option>تنظيف الأسطح</option><option>تنظيف البيسمنت</option><option>تنظيف المناور</option><option>تنظيف المكيفات</option><option>صيانة كهرباء</option><option>صيانة سباكة</option><option>صيانة مصعد</option><option>أعمال زراعة</option><option>شريحة مخصصة</option><option>أخرى</option>
-              </select>
-            </div>
-            <button onclick="addSelectedPremiumService()">+ إضافة الشريحة المختارة</button><button type="button" class="light" onclick="addCustomPremiumSlide()">+ شريحة من الإدارة</button>
-          </div>
-          <div class="quick-service-row">
-            <button class="light" onclick="addPremiumService('مكافحة الحشرات')">+ مكافحة</button>
-            <button class="light" onclick="addPremiumService('تنظيف الأسطح')">+ أسطح</button>
-            <button class="light" onclick="addPremiumService('تنظيف البيسمنت')">+ بيسمنت</button>
-            <button class="light" onclick="addPremiumService('غسيل الخزانات')">+ خزانات</button>
-          </div>
-          <div class="footer-note">كل خدمة لها صورها الخاصة. إذا تركت قبل/أثناء/بعد بدون صور فلن يظهر هذا القسم للعميل.</div>
-          <div id="premiumServicesEditor" class="service-builder"></div>
-          <div class="actions">
-            <button class="light" onclick="savePremiumReport('draft')">حفظ كمسودة</button>
-            <button onclick="savePremiumReport('published')">اعتماد ونشر</button>
-            <button class="light" onclick="previewPremiumReport()">معاينة</button>
-            <button class="danger" onclick="clearPremiumReportForm()">تفريغ</button>
-          </div>
-          <div class="footer-note">لن يظهر التقرير لرئيس الجمعية إلا بعد حالة: معتمد ومنشور.</div>
-        </div>
-
-        <div>
-          <div class="card">
-            <h2>البحث والفلاتر</h2>
-            <div class="report-filters-panel">
-              <input id="premiumReportSearch" oninput="renderPremiumReports()" placeholder="بحث باسم المشروع، رقم التقرير، العنوان أو الخدمة">
-              <select id="premiumReportFilterProject" onchange="renderPremiumReports()"><option value="">كل المشاريع</option></select>
-              <select id="premiumReportFilterService" onchange="renderPremiumReports()"><option value="">كل الخدمات</option><option>مكافحة الحشرات</option><option>غسيل الخزانات</option><option>تنظيف الأسطح</option><option>تنظيف البيسمنت</option><option>تنظيف المناور</option><option>تنظيف المكيفات</option><option>صيانة كهرباء</option><option>صيانة سباكة</option><option>صيانة مصعد</option><option>أعمال زراعة</option><option>شريحة مخصصة</option><option>أخرى</option></select>
-              <select id="premiumReportFilterStatus" onchange="renderPremiumReports()"><option value="">كل الحالات</option><option value="draft">مسودة</option><option value="published">معتمد ومنشور</option><option value="unpublished">غير منشور</option></select>
-              <select id="premiumReportFilterRating" onchange="renderPremiumReports()"><option value="">كل التقييمات</option><option value="ممتاز">ممتاز</option><option value="جيد جدًا">جيد جدًا</option><option value="جيد">جيد</option><option value="يحتاج تحسين">يحتاج تحسين</option><option value="none">لم يتم التقييم</option></select>
-              <input type="month" id="premiumReportFilterMonth" onchange="renderPremiumReports()"><input id="premiumServiceSmartSearch" list="premiumServiceSmartList" oninput="renderPremiumReports()" placeholder="بحث ذكي: خدمة / مشروع"><datalist id="premiumServiceSmartList"></datalist>
-            </div>
-            <div class="actions">
-              <button class="light" onclick="toggleProjectsWithoutReports()">المشاريع بدون تقارير هذا الشهر</button>
-              <button class="light" onclick="resetPremiumReportFilters()">إعادة تعيين</button>
-              <button class="light" onclick="exportPremiumReportsCSV()">تصدير CSV</button>
-            </div>
-            <div id="projectsWithoutReportsBox" class="hidden"></div>
-          </div>
-          <div class="card">
-            <div class="table-head"><h2>سجل التقارير</h2><button class="light" onclick="loadPremiumReportsOnly()">تحديث التقارير</button></div>
-            <div class="table-wrap"><table><thead><tr><th>رقم التقرير</th><th>التاريخ</th><th>المشروع</th><th>الخدمات</th><th>الحالة</th><th>التقييم</th><th>رابط العميل</th><th>إجراء</th></tr></thead><tbody id="premiumReportsBody"></tbody></table></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="clientRatings" class="page hidden">
-      <div class="card section-head"><div><h2>تقييمات العملاء</h2><p>متابعة رضا رؤساء الجمعيات عن كل خدمة وإظهار التقييمات التي تحتاج متابعة.</p></div><button class="light" onclick="loadPremiumReportsOnly()">تحديث</button></div>
-      <div class="card">
-        <div class="filters"><input id="ratingSearch" oninput="renderClientRatings()" placeholder="بحث بالمشروع أو الخدمة أو الملاحظة"><select id="ratingFilterValue" onchange="renderClientRatings()"><option value="">كل التقييمات</option><option>ممتاز</option><option>جيد جدًا</option><option>جيد</option><option>يحتاج تحسين</option></select><select id="ratingFilterFollow" onchange="renderClientRatings()"><option value="">كل الحالات</option><option value="yes">يريد زيارة متابعة</option><option value="low">تحتاج تحسين</option></select></div>
-        <div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المشروع</th><th>التقرير</th><th>الخدمة</th><th>التقييم</th><th>ملاحظة العميل</th><th>زيارة متابعة</th></tr></thead><tbody id="clientRatingsBody"></tbody></table></div>
-      </div>
-    </section>
-
     <section id="alerts" class="page hidden"><div class="card"><h2>التنبيهات وأخطاء التوزيع</h2><div id="alertsList" class="alerts"></div></div></section>
 
 
@@ -757,7 +669,7 @@ body .tasneef-version-badge, body .version-badge, body .build-badge, body #versi
           <article class="export-slide-v222">
             <div class="slide-no-v222">02</div>
             <h3>تصدير ملف اجتماع شامل</h3>
-            <p>ينزل ملف Excel واحد يحتوي على الملخص التنفيذي، المشاريع، المشرفين، العمال، السجلات اليومية، الحضور والغياب، الأوقات الشهرية، التكتات، تقارير العملاء، التقييمات والتنبيهات.</p>
+            <p>ينزل ملف Excel واحد يحتوي على الملخص التنفيذي، المشاريع، المشرفين، العمال، السجلات اليومية، الحضور والغياب، الأوقات الشهرية، التكتات والتنبيهات.</p>
             <div class="actions export-actions-v222">
               <button onclick="exportMeetingExcelV229(this)">تنزيل ملف الاجتماع Excel</button>
               <button class="light" onclick="previewMeetingExportV223()">معاينة قبل التنزيل</button>
@@ -893,5 +805,6 @@ window.__tasneefV201Loaded=true;
 <script src="tasneef_salaries_v10279.js?v=10364" defer></script>
 
 <script src="tasneef_tickets_root_v10246.js?v=10369" defer></script>
+<script src="tasneef_client_portal_v373.js?v=373" defer></script>
 </body>
 </html>
