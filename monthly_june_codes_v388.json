@@ -1,0 +1,1043 @@
+[
+  {
+    "projectId": "excel-2026-06-001",
+    "projectName": "برج جوديا مساء",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-14+TS-11",
+    "supervisorName": "TS-14 + TS-11 - صالح",
+    "supervisorCodes": [
+      "TS-14",
+      "TS-11"
+    ],
+    "workerCodes": [
+      "TS-12",
+      "TS-13",
+      "TS-15",
+      "TS-16"
+    ],
+    "workers": [
+      "TS-12 - بتشا",
+      "TS-13 - علم",
+      "TS-15 - ابراهيم",
+      "TS-16 - فلومية"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 14322,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 100.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-002",
+    "projectName": "اتحاد العاصمة",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-06",
+    "supervisorName": "TS-06 - حسن",
+    "supervisorCodes": [
+      "TS-06"
+    ],
+    "workerCodes": [
+      "TS-07",
+      "TS-08",
+      "TS-09",
+      "TS-10"
+    ],
+    "workers": [
+      "TS-07 - ديلوار",
+      "TS-08 - روبيول",
+      "TS-09 - علي",
+      "TS-10 - كوثر"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 3003,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 27.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-003",
+    "projectName": "أثل 12",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-06",
+    "supervisorName": "TS-06 - حسن",
+    "supervisorCodes": [
+      "TS-06"
+    ],
+    "workerCodes": [
+      "TS-07",
+      "TS-08",
+      "TS-09",
+      "TS-10"
+    ],
+    "workers": [
+      "TS-07 - ديلوار",
+      "TS-08 - روبيول",
+      "TS-09 - علي",
+      "TS-10 - كوثر"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 3612,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 33.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-004",
+    "projectName": "الين 32",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-06",
+    "supervisorName": "TS-06 - حسن",
+    "supervisorCodes": [
+      "TS-06"
+    ],
+    "workerCodes": [
+      "TS-07",
+      "TS-08",
+      "TS-09",
+      "TS-10"
+    ],
+    "workers": [
+      "TS-07 - ديلوار",
+      "TS-08 - روبيول",
+      "TS-09 - علي",
+      "TS-10 - كوثر"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 1773,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 16.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-005",
+    "projectName": "جادة 39",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-06",
+    "supervisorName": "TS-06 - حسن",
+    "supervisorCodes": [
+      "TS-06"
+    ],
+    "workerCodes": [
+      "TS-07",
+      "TS-08",
+      "TS-09",
+      "TS-10"
+    ],
+    "workers": [
+      "TS-07 - ديلوار",
+      "TS-08 - روبيول",
+      "TS-09 - علي",
+      "TS-10 - كوثر"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 444,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 4.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-006",
+    "projectName": "فرساي 10",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-06",
+    "supervisorName": "TS-06 - حسن",
+    "supervisorCodes": [
+      "TS-06"
+    ],
+    "workerCodes": [
+      "TS-07",
+      "TS-08",
+      "TS-09",
+      "TS-10"
+    ],
+    "workers": [
+      "TS-07 - ديلوار",
+      "TS-08 - روبيول",
+      "TS-09 - علي",
+      "TS-10 - كوثر"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 877,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 8.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-007",
+    "projectName": "فرساي 11",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-06",
+    "supervisorName": "TS-06 - حسن",
+    "supervisorCodes": [
+      "TS-06"
+    ],
+    "workerCodes": [
+      "TS-07",
+      "TS-08",
+      "TS-09",
+      "TS-10"
+    ],
+    "workers": [
+      "TS-07 - ديلوار",
+      "TS-08 - روبيول",
+      "TS-09 - علي",
+      "TS-10 - كوثر"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 613,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 6.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-008",
+    "projectName": "فرساي 4",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-06",
+    "supervisorName": "TS-06 - حسن",
+    "supervisorCodes": [
+      "TS-06"
+    ],
+    "workerCodes": [
+      "TS-07",
+      "TS-08",
+      "TS-09",
+      "TS-10"
+    ],
+    "workers": [
+      "TS-07 - ديلوار",
+      "TS-08 - روبيول",
+      "TS-09 - علي",
+      "TS-10 - كوثر"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 733,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 7.000000000000001,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-009",
+    "projectName": "آفاق العربية",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-01",
+    "supervisorName": "TS-01 - فهد",
+    "supervisorCodes": [
+      "TS-01"
+    ],
+    "workerCodes": [
+      "TS-02",
+      "TS-03",
+      "TS-04",
+      "TS-05"
+    ],
+    "workers": [
+      "TS-02 - جاشيم",
+      "TS-03 - سوجان",
+      "TS-04 - عليم",
+      "TS-05 - مهيد"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 2103,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 17.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-010",
+    "projectName": "تعمير 17",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-01",
+    "supervisorName": "TS-01 - فهد",
+    "supervisorCodes": [
+      "TS-01"
+    ],
+    "workerCodes": [
+      "TS-02",
+      "TS-03",
+      "TS-04",
+      "TS-05"
+    ],
+    "workers": [
+      "TS-02 - جاشيم",
+      "TS-03 - سوجان",
+      "TS-04 - عليم",
+      "TS-05 - مهيد"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 2240,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 18.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-011",
+    "projectName": "رؤيا 1",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-01",
+    "supervisorName": "TS-01 - فهد",
+    "supervisorCodes": [
+      "TS-01"
+    ],
+    "workerCodes": [
+      "TS-02",
+      "TS-03",
+      "TS-04",
+      "TS-05"
+    ],
+    "workers": [
+      "TS-02 - جاشيم",
+      "TS-03 - سوجان",
+      "TS-04 - عليم",
+      "TS-05 - مهيد"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 999,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 8.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-012",
+    "projectName": "رايات نجد 5",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-01",
+    "supervisorName": "TS-01 - فهد",
+    "supervisorCodes": [
+      "TS-01"
+    ],
+    "workerCodes": [
+      "TS-02",
+      "TS-03",
+      "TS-04",
+      "TS-05"
+    ],
+    "workers": [
+      "TS-02 - جاشيم",
+      "TS-03 - سوجان",
+      "TS-04 - عليم",
+      "TS-05 - مهيد"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 919,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 7.000000000000001,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-013",
+    "projectName": "عالم الابتكار 47",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-01",
+    "supervisorName": "TS-01 - فهد",
+    "supervisorCodes": [
+      "TS-01"
+    ],
+    "workerCodes": [
+      "TS-02",
+      "TS-03",
+      "TS-04",
+      "TS-05"
+    ],
+    "workers": [
+      "TS-02 - جاشيم",
+      "TS-03 - سوجان",
+      "TS-04 - عليم",
+      "TS-05 - مهيد"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 2367,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 19.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-014",
+    "projectName": "فارهين 11",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-01",
+    "supervisorName": "TS-01 - فهد",
+    "supervisorCodes": [
+      "TS-01"
+    ],
+    "workerCodes": [
+      "TS-02",
+      "TS-03",
+      "TS-04",
+      "TS-05"
+    ],
+    "workers": [
+      "TS-02 - جاشيم",
+      "TS-03 - سوجان",
+      "TS-04 - عليم",
+      "TS-05 - مهيد"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 733,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 6.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-015",
+    "projectName": "فرساي 7",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-01",
+    "supervisorName": "TS-01 - فهد",
+    "supervisorCodes": [
+      "TS-01"
+    ],
+    "workerCodes": [
+      "TS-02",
+      "TS-03",
+      "TS-04",
+      "TS-05"
+    ],
+    "workers": [
+      "TS-02 - جاشيم",
+      "TS-03 - سوجان",
+      "TS-04 - عليم",
+      "TS-05 - مهيد"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 1418,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 11.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-016",
+    "projectName": "مغنى 29",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-01",
+    "supervisorName": "TS-01 - فهد",
+    "supervisorCodes": [
+      "TS-01"
+    ],
+    "workerCodes": [
+      "TS-02",
+      "TS-03",
+      "TS-04",
+      "TS-05"
+    ],
+    "workers": [
+      "TS-02 - جاشيم",
+      "TS-03 - سوجان",
+      "TS-04 - عليم",
+      "TS-05 - مهيد"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 1141,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 9.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-017",
+    "projectName": "هاجر 32",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-01",
+    "supervisorName": "TS-01 - فهد",
+    "supervisorCodes": [
+      "TS-01"
+    ],
+    "workerCodes": [
+      "TS-02",
+      "TS-03",
+      "TS-04",
+      "TS-05"
+    ],
+    "workers": [
+      "TS-02 - جاشيم",
+      "TS-03 - سوجان",
+      "TS-04 - عليم",
+      "TS-05 - مهيد"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 709,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 6.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-018",
+    "projectName": "وجود الياسمين",
+    "projectType": "دوام كامل",
+    "supervisorId": "TS-17",
+    "supervisorName": "TS-17 - مازن الخطيب",
+    "supervisorCodes": [
+      "TS-17"
+    ],
+    "workerCodes": [
+      "TS-18",
+      "TS-19",
+      "TS-20",
+      "TS-21",
+      "TS-22",
+      "TS-23",
+      "TS-24",
+      "TS-25",
+      "TS-26"
+    ],
+    "workers": [
+      "TS-18 - اشرف",
+      "TS-19 - الونجير",
+      "TS-20 - أنور",
+      "TS-21 - تيفور",
+      "TS-22 - جابيت",
+      "TS-23 - رشيد",
+      "TS-24 - شميم",
+      "TS-25 - ناظمون",
+      "TS-26 - هلال"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 16183,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 100.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-019",
+    "projectName": "الرمز 17 A",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-27",
+    "supervisorName": "TS-27 - محمد إبراهيم",
+    "supervisorCodes": [
+      "TS-27"
+    ],
+    "workerCodes": [
+      "TS-28",
+      "TS-29",
+      "TS-30"
+    ],
+    "workers": [
+      "TS-28 - ديكسان",
+      "TS-29 - ميزان",
+      "TS-30 - محمد  ياسر"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 16139,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 31.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-020",
+    "projectName": "العجلان ريفيرا 19",
+    "projectType": "دوام كامل",
+    "supervisorId": "TS-27",
+    "supervisorName": "TS-27 - محمد إبراهيم",
+    "supervisorCodes": [
+      "TS-27"
+    ],
+    "workerCodes": [
+      "TS-31",
+      "TS-33"
+    ],
+    "workers": [
+      "TS-31 - رؤوف",
+      "TS-33 - اوميت"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 15655,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 30.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-021",
+    "projectName": "الماجدية 107",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-27",
+    "supervisorName": "TS-27 - محمد إبراهيم",
+    "supervisorCodes": [
+      "TS-27"
+    ],
+    "workerCodes": [
+      "TS-32",
+      "TS-34",
+      "TS-35",
+      "TS-38"
+    ],
+    "workers": [
+      "TS-32 - اوسيس",
+      "TS-34 - راهي",
+      "TS-35 - عاريف",
+      "TS-38 - رحمن"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 4774,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 9.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-022",
+    "projectName": "الماجدية 88",
+    "projectType": "دوام كامل",
+    "supervisorId": "TS-27",
+    "supervisorName": "TS-27 - محمد إبراهيم",
+    "supervisorCodes": [
+      "TS-27"
+    ],
+    "workerCodes": [
+      "TS-36",
+      "TS-37"
+    ],
+    "workers": [
+      "TS-36 - رقيب",
+      "TS-37 - عجائب"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 9462,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 18.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-023",
+    "projectName": "صفاء 50",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-27",
+    "supervisorName": "TS-27 - محمد إبراهيم",
+    "supervisorCodes": [
+      "TS-27"
+    ],
+    "workerCodes": [
+      "TS-32",
+      "TS-34",
+      "TS-35",
+      "TS-38"
+    ],
+    "workers": [
+      "TS-32 - اوسيس",
+      "TS-34 - راهي",
+      "TS-35 - عاريف",
+      "TS-38 - رحمن"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 2788,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 5.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-024",
+    "projectName": "كاف A",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-27",
+    "supervisorName": "TS-27 - محمد إبراهيم",
+    "supervisorCodes": [
+      "TS-27"
+    ],
+    "workerCodes": [
+      "TS-32",
+      "TS-34",
+      "TS-35",
+      "TS-38"
+    ],
+    "workers": [
+      "TS-32 - اوسيس",
+      "TS-34 - راهي",
+      "TS-35 - عاريف",
+      "TS-38 - رحمن"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 1144,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 2.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-025",
+    "projectName": "كاف B",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-27",
+    "supervisorName": "TS-27 - محمد إبراهيم",
+    "supervisorCodes": [
+      "TS-27"
+    ],
+    "workerCodes": [
+      "TS-32",
+      "TS-34",
+      "TS-35",
+      "TS-38"
+    ],
+    "workers": [
+      "TS-32 - اوسيس",
+      "TS-34 - راهي",
+      "TS-35 - عاريف",
+      "TS-38 - رحمن"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 724,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 1.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-026",
+    "projectName": "كاف c",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-27",
+    "supervisorName": "TS-27 - محمد إبراهيم",
+    "supervisorCodes": [
+      "TS-27"
+    ],
+    "workerCodes": [
+      "TS-32",
+      "TS-34",
+      "TS-35",
+      "TS-38"
+    ],
+    "workers": [
+      "TS-32 - اوسيس",
+      "TS-34 - راهي",
+      "TS-35 - عاريف",
+      "TS-38 - رحمن"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 887,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 2.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-027",
+    "projectName": "مغنى 14",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-27",
+    "supervisorName": "TS-27 - محمد إبراهيم",
+    "supervisorCodes": [
+      "TS-27"
+    ],
+    "workerCodes": [
+      "TS-32",
+      "TS-34",
+      "TS-35",
+      "TS-38"
+    ],
+    "workers": [
+      "TS-32 - اوسيس",
+      "TS-34 - راهي",
+      "TS-35 - عاريف",
+      "TS-38 - رحمن"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 682,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 1.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-028",
+    "projectName": "واجهة قرطبة",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-27",
+    "supervisorName": "TS-27 - محمد إبراهيم",
+    "supervisorCodes": [
+      "TS-27"
+    ],
+    "workerCodes": [
+      "TS-32",
+      "TS-34",
+      "TS-35",
+      "TS-38"
+    ],
+    "workers": [
+      "TS-32 - اوسيس",
+      "TS-34 - راهي",
+      "TS-35 - عاريف",
+      "TS-38 - رحمن"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 591,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 1.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-029",
+    "projectName": "جمال الأندلس",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-39",
+    "supervisorName": "TS-39 - محمد عبده",
+    "supervisorCodes": [
+      "TS-39"
+    ],
+    "workerCodes": [
+      "TS-40",
+      "TS-44"
+    ],
+    "workers": [
+      "TS-40 - راسيل",
+      "TS-44 - مهيب"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 1734,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 5.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-030",
+    "projectName": "صفاء 28",
+    "projectType": "دوام كامل",
+    "supervisorId": "TS-39",
+    "supervisorName": "TS-39 - محمد عبده",
+    "supervisorCodes": [
+      "TS-39"
+    ],
+    "workerCodes": [
+      "TS-43",
+      "TS-42",
+      "TS-40",
+      "TS-41"
+    ],
+    "workers": [
+      "TS-43 - عريف",
+      "TS-42 - ديلوا",
+      "TS-40 - راسيل",
+      "TS-41 - اكرامول"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 14594,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 43.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-031",
+    "projectName": "صفاء 65",
+    "projectType": "دوام كامل",
+    "supervisorId": "TS-39",
+    "supervisorName": "TS-39 - محمد عبده",
+    "supervisorCodes": [
+      "TS-39"
+    ],
+    "workerCodes": [
+      "TS-44",
+      "TS-45",
+      "TS-46"
+    ],
+    "workers": [
+      "TS-44 - مهيب",
+      "TS-45 - ليتون",
+      "TS-46 - همينتو"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 17789,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 52.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-032",
+    "projectName": "الشعلان 50",
+    "projectType": "دوام كامل",
+    "supervisorId": "TS-47",
+    "supervisorName": "TS-47 - محمود",
+    "supervisorCodes": [
+      "TS-47"
+    ],
+    "workerCodes": [
+      "TS-48",
+      "TS-49"
+    ],
+    "workers": [
+      "TS-48 - راجو",
+      "TS-49 - اجارول"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 13670,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 28.000000000000004,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-033",
+    "projectName": "الشعلان 51",
+    "projectType": "دوام كامل",
+    "supervisorId": "TS-47",
+    "supervisorName": "TS-47 - محمود",
+    "supervisorCodes": [
+      "TS-47"
+    ],
+    "workerCodes": [
+      "TS-48",
+      "TS-49"
+    ],
+    "workers": [
+      "TS-48 - راجو",
+      "TS-49 - اجارول"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 13409,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 27.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-034",
+    "projectName": "العجلان 30",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-47",
+    "supervisorName": "TS-47 - محمود",
+    "supervisorCodes": [
+      "TS-47"
+    ],
+    "workerCodes": [
+      "TS-50",
+      "TS-51",
+      "TS-52",
+      "TS-53",
+      "TS-54",
+      "TS-55"
+    ],
+    "workers": [
+      "TS-50 - ثابت",
+      "TS-51 - شانتو",
+      "TS-52 - عبد السلام",
+      "TS-53 - مساد",
+      "TS-54 - مختار",
+      "TS-55 - ميزان 2"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 6120,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 13.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  },
+  {
+    "projectId": "excel-2026-06-035",
+    "projectName": "مكين 37",
+    "projectType": "زيارة يومية",
+    "supervisorId": "TS-47",
+    "supervisorName": "TS-47 - محمود",
+    "supervisorCodes": [
+      "TS-47"
+    ],
+    "workerCodes": [
+      "TS-56",
+      "TS-57",
+      "TS-58",
+      "TS-59"
+    ],
+    "workers": [
+      "TS-56 - اكتار",
+      "TS-57 - جهيد",
+      "TS-58 - جوناب علي",
+      "TS-59 - ركيب"
+    ],
+    "logsCount": 0,
+    "totalMinutes": 15715,
+    "requiredMinutes": 0,
+    "transferMinutes": 0,
+    "percentage": 32.0,
+    "commitment": 0,
+    "source": "Excel شهر 6 - أكواد العمال",
+    "lastUpdated": "2026-06-30T23:59:00+03:00"
+  }
+]
