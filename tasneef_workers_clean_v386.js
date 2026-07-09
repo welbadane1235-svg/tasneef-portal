@@ -86,3 +86,78 @@
   window.tasneefWorkersCleanV386={install,refreshAll,loadEmployees,loadLinks,editEmployee,editLink,showTab};
   console.log('Tasneef Workers Clean V386 loaded');
 })();
+
+/* Quick Distribution V403 - شاشة مبسطة لربط العامل بالمشرف والمشروع حسب الشهر */
+(function(){
+  'use strict';
+  if(window.__tasneefQuickDistributionV403) return;
+  window.__tasneefQuickDistributionV403 = true;
+  const EMP='employees_master_v386', LINK='worker_project_links_v386';
+  const S=v=>String(v??'').trim();
+  const N=v=>{const n=Number(v||0);return Number.isFinite(n)?n:0};
+  const $=id=>document.getElementById(id);
+  const sbc=()=>window.sb || window.supabaseClient || window.tasneefSupabase || null;
+  const esc=v=>S(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const norm=v=>S(v).replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[\u064B-\u0652]/g,'').replace(/\s+/g,' ').toLowerCase();
+  const today=()=>new Date().toISOString().slice(0,10);
+  const monthNow=()=>new Date().toISOString().slice(0,7);
+  function addMonths(m,delta){const d=new Date((m||monthNow())+'-01T00:00:00'); d.setMonth(d.getMonth()+delta); return d.toISOString().slice(0,7);}
+  function startOfMonth(m){return (m||monthNow())+'-01'}
+  function empName(e){return S(e.app_name||e.employee_name||e.name||e.iqama_name||'-')}
+  function empCode(e){return S(e.employee_code||e.code||e.id||'')}
+  function empLabel(e){const c=empCode(e), n=empName(e); return c?`${c} - ${n}`:n}
+  function jobClass(j){const x=norm(j); if(x.includes('مشرف'))return 'supervisor'; if(x.includes('فني'))return 'tech'; if(x.includes('حارس'))return 'guard'; return 'worker'}
+  function isWorker(e){return jobClass(e.job_title||e.link_role)==='worker' && S(e.status||'نشط')!=='موقوف' && S(e.status||'نشط')!=='خارج العمل'}
+  function isSupervisorEmp(e){return jobClass(e.job_title)==='supervisor' && S(e.status||'نشط')!=='موقوف'}
+  function projectName(p){return S(p.name||p.project_name||p.title||'-')}
+  function projectType(p){const t=norm(p.operation_type||p.project_type||p.work_type||p.type||p.contract_type||''); return (t.includes('دوام')||t.includes('كامل')||t.includes('دائم')||t.includes('full')||t.includes('permanent'))?'دوام كامل':'زيارة يومية'}
+  function userName(u){return S(u.full_name||u.name||u.username||'-')}
+  function msg(t,kind='ok'){const el=$('qd403Msg'); if(el){el.textContent=t; el.className='qd403-msg '+kind;} try{ if(kind==='err' && typeof window.msg==='function') window.msg(t,'err'); }catch(_){}}
+  let employees=[], projects=[], users=[], links=[], selected=new Set();
+  async function safe(label,query){try{const r=await query; if(r.error){console.warn('qd403',label,r.error.message); return [];} return r.data||[]}catch(e){console.warn('qd403 catch',label,e); return []}}
+  async function loadAll(){const sb=sbc(); if(!sb){msg('الاتصال بقاعدة البيانات غير جاهز.','err'); return;} const [e,p,u,l]=await Promise.all([
+      safe(EMP,sb.from(EMP).select('*').order('serial_no',{ascending:true}).limit(5000)),
+      safe('projects',sb.from('projects').select('*').order('name').limit(5000)),
+      safe('app_users',sb.from('app_users').select('*').limit(3000)),
+      safe(LINK,sb.from(LINK).select('*').limit(20000))
+    ]);
+    employees=e; projects=p.filter(x=>S(x.status||'active')!=='inactive' && x.is_active!==false); users=u; links=l;
+    fillSelects(); loadSelected(); renderWorkers(); renderSummary(); msg('جاهز للتوزيع السريع.');
+  }
+  function supervisorOptions(){
+    const emps=employees.filter(isSupervisorEmp).map(e=>({key:empCode(e),name:empName(e),label:empLabel(e),source:'emp'}));
+    users.filter(u=>S(u.role)==='supervisor'||norm(u.role).includes('مشرف')).forEach(u=>{const name=userName(u); if(!emps.some(x=>norm(x.name)===norm(name))) emps.push({key:'user:'+S(u.id),name,label:name,source:'user',userId:S(u.id)});});
+    return emps.sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+  }
+  function selectedSupervisor(){const val=S($('qd403Supervisor')?.value); return supervisorOptions().find(x=>x.key===val) || null;}
+  function supMatchesProject(s,p){if(!s||!p) return true; const psid=S(p.supervisor_id||p.current_supervisor_id||p.app_supervisor_id||p.manager_id||''); if(s.source==='user' && psid===S(s.userId)) return true; const u=users.find(x=>S(x.id)===psid); if(u && norm(userName(u))===norm(s.name)) return true; if(norm(S(p.supervisor_name||p.manager_name||'')).includes(norm(s.name))) return true; const m=S($('qd403Month')?.value||monthNow()); return links.some(l=>S(l.month_key)===m && (S(l.supervisor_id)===s.key || norm(l.supervisor_name)===norm(s.name)) && S(l.project_id)===S(p.id));}
+  function fillSelects(){
+    const sm=$('qd403Month'); if(sm && !sm.value) sm.value=monthNow();
+    const sup=$('qd403Supervisor'); if(sup){const cur=sup.value; sup.innerHTML='<option value="">اختر المشرف</option>'+supervisorOptions().map(s=>`<option value="${esc(s.key)}">${esc(s.label)}</option>`).join(''); if(cur) sup.value=cur;}
+    fillProjects();
+  }
+  function fillProjects(){const pr=$('qd403Project'); if(!pr) return; const cur=pr.value; const s=selectedSupervisor(); let rows=projects.filter(p=>supMatchesProject(s,p)); if(!rows.length) rows=projects; pr.innerHTML='<option value="">اختر المشروع</option>'+rows.sort((a,b)=>projectName(a).localeCompare(projectName(b),'ar')).map(p=>`<option value="${esc(p.id)}">${esc(projectName(p))} - ${esc(projectType(p))}</option>`).join(''); if(cur) pr.value=cur;}
+  function currentProject(){return projects.find(p=>S(p.id)===S($('qd403Project')?.value))||null}
+  function loadSelected(){selected=new Set(); const m=S($('qd403Month')?.value||monthNow()), p=currentProject(), s=selectedSupervisor(); if(!m||!p) return; links.forEach(l=>{if(S(l.month_key)===m && S(l.project_id)===S(p.id) && S(l.status||'نشط')!=='منتهي'){ if(!s || S(l.supervisor_id)===s.key || norm(l.supervisor_name)===norm(s.name)) selected.add(S(l.employee_code)); }});}
+  function workerConflict(code){const m=S($('qd403Month')?.value||monthNow()), p=currentProject(); const hits=links.filter(l=>S(l.month_key)===m && S(l.employee_code)===S(code) && S(l.status||'نشط')!=='منتهي' && (!p || S(l.project_id)!==S(p.id))); return hits[0]||null;}
+  function renderWorkers(){const box=$('qd403Workers'); if(!box) return; const q=norm($('qd403Search')?.value||''); const list=employees.filter(isWorker).filter(e=>!q||norm(empLabel(e)).includes(q)); box.innerHTML=list.map(e=>{const code=empCode(e), on=selected.has(code), c=workerConflict(code); return `<button type="button" class="qd403-worker ${on?'on':''}" data-code="${esc(code)}"><b>${esc(empLabel(e))}</b>${c?`<small>مربوط في ${esc(c.project_name||'مشروع آخر')}</small>`:''}</button>`}).join('')||'<div class="qd403-empty">لا يوجد عمال.</div>'; box.querySelectorAll('[data-code]').forEach(b=>b.onclick=()=>{const code=b.dataset.code; selected.has(code)?selected.delete(code):selected.add(code); renderWorkers(); renderSelected();}); renderSelected();}
+  function renderSelected(){const box=$('qd403SelectedWorkers'); if(!box) return; const list=[...selected].map(code=>employees.find(e=>empCode(e)===code)).filter(Boolean); box.innerHTML=list.map(e=>`<span class="qd403-pill">${esc(empLabel(e))}</span>`).join('') || '<span class="qd403-muted">لم يتم اختيار عمال بعد.</span>'; const count=$('qd403SelectedCount'); if(count) count.textContent=list.length;}
+  async function saveDistribution(){const sb=sbc(); if(!sb) return msg('الاتصال بقاعدة البيانات غير جاهز.','err'); const m=S($('qd403Month')?.value||monthNow()), p=currentProject(), s=selectedSupervisor(); if(!m||!p||!s) return msg('اختر الشهر والمشرف والمشروع أولًا.','err'); const active=[...selected].map(code=>employees.find(e=>empCode(e)===code)).filter(Boolean); const old=links.filter(l=>S(l.month_key)===m && S(l.project_id)===S(p.id) && (S(l.supervisor_id)===s.key||norm(l.supervisor_name)===norm(s.name)) && jobClass(l.job_title||l.link_role)==='worker'); const unselected=old.filter(l=>!selected.has(S(l.employee_code)));
+    if(unselected.length){await Promise.all(unselected.map(l=>sb.from(LINK).update({status:'منتهي',end_date:today(),updated_at:new Date().toISOString()}).eq('id',l.id)));}
+    const rows=active.map(e=>({month_key:m,employee_code:empCode(e),employee_name:empName(e),job_title:S(e.job_title||'عامل'),project_id:S(p.id),project_name:projectName(p),project_type:projectType(p),supervisor_id:s.key,supervisor_name:s.label||s.name,link_role:'عامل أساسي',start_date:startOfMonth(m),end_date:null,status:'نشط',notes:'توزيع سريع',updated_at:new Date().toISOString()}));
+    if(rows.length){const r=await sb.from(LINK).upsert(rows,{onConflict:'month_key,employee_code,project_id'}).select('*'); if(r.error) return msg(r.error.message,'err');}
+    msg('تم حفظ توزيع المشروع لهذا الشهر.'); await loadAll();
+  }
+  async function copyPrevious(){const sb=sbc(); if(!sb)return msg('الاتصال بقاعدة البيانات غير جاهز.','err'); const m=S($('qd403Month')?.value||monthNow()), prev=addMonths(m,-1); if(!confirm('نسخ توزيع شهر '+prev+' إلى شهر '+m+'؟ سيتم تحديث الربط الحالي لنفس العمال والمشاريع.')) return; const prevRows=await safe(LINK,sb.from(LINK).select('*').eq('month_key',prev).neq('status','منتهي').limit(20000)); if(!prevRows.length) return msg('لا يوجد توزيع في الشهر السابق.','warn'); const rows=prevRows.map(r=>({month_key:m,employee_code:S(r.employee_code),employee_name:S(r.employee_name),job_title:S(r.job_title),project_id:S(r.project_id),project_name:S(r.project_name),project_type:S(r.project_type),supervisor_id:S(r.supervisor_id),supervisor_name:S(r.supervisor_name),link_role:S(r.link_role||'عامل أساسي'),start_date:startOfMonth(m),end_date:null,status:'نشط',notes:'منسوخ من '+prev,updated_at:new Date().toISOString()})); const res=await sb.from(LINK).upsert(rows,{onConflict:'month_key,employee_code,project_id'}).select('*'); if(res.error) return msg(res.error.message,'err'); msg('تم نسخ '+rows.length+' ربط من الشهر السابق.'); await loadAll();}
+  function renderSummary(){const box=$('qd403Summary'); if(!box) return; const m=S($('qd403Month')?.value||monthNow()); const rows=links.filter(l=>S(l.month_key)===m && S(l.status||'نشط')!=='منتهي'); const bySup=new Map(); rows.forEach(l=>{const k=S(l.supervisor_name||l.supervisor_id||'-'); if(!bySup.has(k)) bySup.set(k,[]); bySup.get(k).push(l);}); box.innerHTML=[...bySup.entries()].map(([sup,list])=>{const projects=[...new Set(list.map(x=>x.project_name||x.project_id))]; return `<div class="qd403-summary-card"><b>${esc(sup)}</b><small>${projects.length} مشروع / ${list.length} عامل</small><div>${projects.slice(0,6).map(p=>`<span>${esc(p)}</span>`).join('')}</div></div>`}).join('') || '<div class="qd403-empty">لا يوجد توزيع محفوظ لهذا الشهر.</div>';}
+  function inject(){const root=document.querySelector('#workers .wk386-root'); if(!root || $('qd403Box')) return false; const style=document.createElement('style'); style.id='qd403Css'; style.textContent=`.qd403-card{background:#fff;border:2px solid #0A4033;border-radius:22px;padding:16px;margin:12px 0;box-shadow:0 10px 28px rgba(10,64,51,.06)}.qd403-head{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}.qd403-head h3{margin:0;color:#0A4033}.qd403-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}.qd403-grid label{font-weight:900;color:#0A4033}.qd403-grid input,.qd403-grid select{width:100%;border:1px solid #d6e7df;border-radius:12px;padding:10px}.qd403-actions{display:flex;gap:8px;flex-wrap:wrap}.qd403-actions button{border:0;border-radius:12px;padding:11px 16px;background:#0A4033;color:#fff;font-weight:900}.qd403-actions button.light{background:#eef8f5;color:#0A4033;border:1px solid #d6e7df}.qd403-msg{background:#eef8f5;border:1px solid #d6e7df;color:#0A4033;border-radius:14px;padding:10px;margin-top:10px;font-weight:800}.qd403-msg.err{background:#ffe8e8;color:#9d2020}.qd403-msg.warn{background:#fff8e8;color:#7b5a00}.qd403-work-area{display:grid;grid-template-columns:1.5fr 1fr;gap:12px}.qd403-workers{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-height:360px;overflow:auto;border:1px solid #d6e7df;border-radius:16px;padding:10px;background:#fbfffd}.qd403-worker{background:#fff!important;color:#10231d!important;border:1px solid #d6e7df!important;border-radius:14px!important;padding:10px!important;text-align:right!important}.qd403-worker.on{background:#0A4033!important;color:#fff!important}.qd403-worker small{display:block;color:#7a8a85;margin-top:4px}.qd403-worker.on small{color:#eaf7f2}.qd403-selected{border:1px solid #d6e7df;border-radius:16px;padding:12px;background:#fbfffd;min-height:160px}.qd403-pill{display:inline-block;background:#eef8f5;border:1px solid #d6e7df;color:#0A4033;border-radius:999px;padding:6px 10px;margin:4px;font-weight:900}.qd403-muted{color:#60706a}.qd403-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.qd403-summary-card{background:#fbfffd;border:1px solid #d6e7df;border-radius:16px;padding:12px}.qd403-summary-card b{display:block;color:#0A4033}.qd403-summary-card small{display:block;color:#60706a;margin:5px 0}.qd403-summary-card span{display:inline-block;background:#eef8f5;border-radius:999px;padding:4px 8px;margin:3px}.qd403-empty{padding:18px;text-align:center;color:#60706a}@media(max-width:1100px){.qd403-grid,.qd403-work-area,.qd403-summary{grid-template-columns:1fr}.qd403-workers{grid-template-columns:1fr}}`;
+    document.head.appendChild(style);
+    const box=document.createElement('div'); box.id='qd403Box'; box.className='qd403-card'; box.innerHTML=`<div class="qd403-head"><div><h3>توزيع سريع للعمال على المشرف والمشروع</h3><small>اختر الشهر ثم المشرف ثم المشروع، واضغط على أسماء العمال ثم حفظ. كل شهر يبقى محفوظًا لوحده.</small></div><div class="qd403-actions"><button type="button" class="light" id="qd403CopyPrev">نسخ توزيع الشهر السابق</button><button type="button" id="qd403Save">حفظ توزيع المشروع</button></div></div><div class="qd403-grid"><div><label>الشهر</label><input type="month" id="qd403Month"></div><div><label>المشرف</label><select id="qd403Supervisor"><option>جاري التحميل...</option></select></div><div><label>المشروع</label><select id="qd403Project"><option>اختر المشرف أولًا</option></select></div><div><label>بحث في العمال</label><input id="qd403Search" placeholder="اكتب اسم العامل أو الكود"></div></div><div class="qd403-work-area"><div><b>العمال</b><div id="qd403Workers" class="qd403-workers"><div class="qd403-empty">جاري التحميل...</div></div></div><div><b>العمال المختارون: <span id="qd403SelectedCount">0</span></b><div id="qd403SelectedWorkers" class="qd403-selected"></div></div></div><div id="qd403Msg" class="qd403-msg">جاهز</div><div id="qd403Summary" class="qd403-summary"></div>`;
+    const tabs=root.querySelector('.wk386-tabs'); root.insertBefore(box,tabs||root.children[1]);
+    $('qd403Month').value=monthNow(); $('qd403Supervisor').onchange=()=>{fillProjects(); loadSelected(); renderWorkers();}; $('qd403Project').onchange=()=>{loadSelected(); renderWorkers();}; $('qd403Month').onchange=()=>{loadSelected(); renderWorkers(); renderSummary();}; $('qd403Search').oninput=renderWorkers; $('qd403Save').onclick=saveDistribution; $('qd403CopyPrev').onclick=copyPrevious;
+    setTimeout(loadAll,300); return true;
+  }
+  const oldShow=window.showPage; window.showPage=function(id,btn){const r=oldShow?oldShow.apply(this,arguments):undefined; if(id==='workers') setTimeout(()=>{inject(); loadAll();},350); return r;};
+  function boot(){setTimeout(()=>{inject();},900);}
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+})();
