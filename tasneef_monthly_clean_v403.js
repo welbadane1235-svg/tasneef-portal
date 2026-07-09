@@ -1,7 +1,7 @@
 /* V403 clean monthly times - approved version: reads other months from time_logs and worker names/codes from workers section */
 (function(){
   'use strict';
-  const VERSION='403';
+  const VERSION='403'; // approved same-version hotfix: worker codes for all months
   const JUNE_URL='monthly_times_june_2026_v401.json?v=403-' + Date.now();
   let JUNE_DATA=[];
   let DYNAMIC_DATA=[];
@@ -25,6 +25,8 @@
   function employeeCode(x){return S(x?.employee_code||x?.code||x?.worker_code||x?.employee_id_code||x?.employee_id||'')}
   function workerName(w){const code=employeeCode(w); const name=S(w?.app_name||w?.employee_name||w?.name||w?.full_name||w?.worker_name||w?.iqama_name||'-'); return code && !name.includes(code) ? `${code} - ${name}` : name;}
   function employeeDisplayByCode(code, empByCode){const c=S(code); if(!c) return ''; const e=empByCode&&empByCode.get(c); const name=S(e?.app_name||e?.employee_name||e?.name||e?.iqama_name||''); return name ? `${c} - ${name}` : c;}
+  function employeeDisplayByName(name, empByName){const n=S(name); if(!n) return ''; const e=empByName&&empByName.get(norm(n)); if(!e) return ''; const c=employeeCode(e); const app=S(e.app_name||e.employee_name||e.name||e.iqama_name||n); return c ? `${c} - ${app}` : app;}
+  function nameWithoutCode(v){return S(v).replace(/TS-\d+\s*-\s*/i,'').replace(/TS-\d+/ig,'').replace(/[()（）]/g,'').trim();}
   function linkActiveInMonth(a, month){const r=monthRange(month); const st=S(a.start_date||a.from_date||'0000-01-01').slice(0,10); const en=S(a.end_date||a.to_date||'9999-12-31').slice(0,10); if(en && en<r.from) return false; if(st && st>=r.to) return false; const mk=S(a.month_key||a.month||''); return !mk || mk===month || (st<r.to && (!en || en>=r.from));}
   function projectSupervisorId(p){return S(p?.supervisor_id||p?.current_supervisor_id||p?.app_supervisor_id||p?.manager_id||'')}
   function forcedType(name, raw){const n=norm(name); if(dailyNames.some(x=>n.includes(norm(x)))) return 'زيارة يومية'; if(fullNames.some(x=>n.includes(norm(x)))) return 'دوام كامل'; const t=norm(raw||''); return (t.includes('دوام')||t.includes('full')||t.includes('permanent')||t.includes('fixed')||t.includes('24'))?'دوام كامل':'زيارة يومية';}
@@ -87,11 +89,12 @@
     const pById=new Map(projects.map(p=>[S(p.id),p]));
     const uById=new Map(users.map(u=>[S(u.id),u]));
     const wById=new Map(workers.map(w=>[S(w.id),w]));
-    const empByCode=new Map(); employees.forEach(e=>{const c=employeeCode(e); if(c) empByCode.set(c,e);});
+    const empByCode=new Map(); const empByName=new Map(); employees.forEach(e=>{const c=employeeCode(e); if(c) empByCode.set(c,e); [e.app_name,e.employee_name,e.name,e.full_name,e.iqama_name].forEach(n=>{n=S(n); if(n) empByName.set(norm(n),e);});});
     const linksForMonth=(monthLinks||[]).filter(a=>S(a.status||'نشط')!=='خارج العمل' && linkActiveInMonth(a,month));
     const linksByProject=new Map();
     linksForMonth.forEach(a=>{const k=S(a.project_id); if(!k) return; if(!linksByProject.has(k)) linksByProject.set(k,[]); linksByProject.get(k).push(a);});
-    function displayEmployeeFromLink(a){const c=S(a.employee_code||a.worker_code||a.code||''); const byCode=employeeDisplayByCode(c,empByCode); if(byCode) return byCode; const name=S(a.employee_name||a.app_name||a.worker_name||a.name||''); return c && name && !name.includes(c) ? `${c} - ${name}` : (name||c);}
+    function displayEmployeeFromLink(a){const c=S(a.employee_code||a.worker_code||a.code||''); const byCode=employeeDisplayByCode(c,empByCode); if(byCode) return byCode; const name=S(a.employee_name||a.app_name||a.worker_name||a.name||''); const byName=employeeDisplayByName(nameWithoutCode(name),empByName); if(byName) return byName; return c && name && !name.includes(c) ? `${c} - ${name}` : (name||c);}
+    function supervisorDisplay(raw){const n=nameWithoutCode(raw); return employeeDisplayByName(n,empByName) || S(raw||'-');}
     function workersForProject(pid){
       const names=new Map();
       // المصدر الأول: قسم العمال الجديد v386، لأنه يحفظ الكود واسم التطبيق حسب الشهر.
@@ -106,10 +109,10 @@
           if(en && en<r.from) return; if(st && st>=r.to) return;
           const w=wById.get(S(a.worker_id));
           const c=employeeCode(w)||S(a.employee_code||a.worker_code||'');
-          const n=employeeDisplayByCode(c,empByCode) || (w?workerName(w):S(a.worker_name||a.name||a.worker_code||''));
+          const rawName=w?workerName(w):S(a.worker_name||a.name||a.worker_code||''); const n=employeeDisplayByCode(c,empByCode) || employeeDisplayByName(nameWithoutCode(rawName),empByName) || rawName;
           if(n) names.set(norm(n),n);
         });
-        workers.forEach(w=>{const ids=[w.project_id,w.assigned_project_id,w.current_project_id,w.main_project_id].map(S).filter(Boolean); if(ids.includes(S(pid))){const c=employeeCode(w); const n=employeeDisplayByCode(c,empByCode)||workerName(w); if(n&&n!=='-') names.set(norm(n),n);}});
+        workers.forEach(w=>{const ids=[w.project_id,w.assigned_project_id,w.current_project_id,w.main_project_id].map(S).filter(Boolean); if(ids.includes(S(pid))){const c=employeeCode(w); const raw=workerName(w); const n=employeeDisplayByCode(c,empByCode)||employeeDisplayByName(nameWithoutCode(raw),empByName)||raw; if(n&&n!=='-') names.set(norm(n),n);}});
       }
       return [...names.values()].sort((a,b)=>a.localeCompare(b,'ar'));
     }
@@ -121,7 +124,7 @@
         const mLinks=linksByProject.get(S(pid))||[];
         const linkSup=S(mLinks.find(x=>S(x.supervisor_name))?.supervisor_name||'');
         const linkSupId=S(mLinks.find(x=>S(x.supervisor_id))?.supervisor_id||'')||sid;
-        rowsByProject.set(k,{month,projectId:pid,projectName:name,projectType:forcedType(name,p.operation_type||p.project_type||p.type),supervisorId:linkSupId,supervisorName:linkSup||(sup?userName(sup):S(p.supervisor_name||'-')),workers:workersForProject(pid),workerCodes:[],totalMinutes:0,requiredDailyMinutes:requiredFromProject(p),requiredMinutes:0,logsCount:0});
+        rowsByProject.set(k,{month,projectId:pid,projectName:name,projectType:forcedType(name,p.operation_type||p.project_type||p.type),supervisorId:linkSupId,supervisorName:supervisorDisplay(linkSup||(sup?userName(sup):S(p.supervisor_name||'-'))),workers:workersForProject(pid),workerCodes:[],totalMinutes:0,requiredDailyMinutes:requiredFromProject(p),requiredMinutes:0,logsCount:0});
       }
       const row=rowsByProject.get(k); row.totalMinutes+=actualMinutes(l); row.requiredMinutes+=N(l.required_minutes||l.required_daily_minutes||0); row.logsCount+=1;
     });
