@@ -6,7 +6,7 @@
   if(window.__tasneefCoreUnifiedV413) return;
   window.__tasneefCoreUnifiedV413 = true;
 
-  const VERSION='442';
+  const VERSION='444';
   const S=v=>String(v??'').trim();
   const N=v=>{const n=Number(v||0);return Number.isFinite(n)?n:0};
   const $=id=>document.getElementById(id);
@@ -17,7 +17,7 @@
   const prevMonth=m=>{const d=new Date((m||todayMonth())+'-01T00:00:00'); d.setMonth(d.getMonth()-1); return d.toISOString().slice(0,7);};
   const monthEnd=m=>{const d=new Date((m||todayMonth())+'-01T00:00:00'); d.setMonth(d.getMonth()+1); d.setDate(0); return d.toISOString().slice(0,10);};
 
-  const state={workers:[],projects:[],dist:{},att:{},loaded:false,tab:'distribution',selected:new Map(),selectedProjects:new Set()};
+  const state={workers:[],projects:[],dist:{},borrow:{},att:{},loaded:false,tab:'distribution',selected:new Map(),selectedProjects:new Set(),borrowSelected:new Set()};
 
   function client(){const c=sb(); if(!c) showMsg('لا يوجد اتصال Supabase في الصفحة.', true); return c;}
   async function safe(label, p){try{const r=await p; if(r?.error){console.warn(label,r.error); return {data:[],error:r.error};} return r;}catch(e){console.warn(label,e); return {data:[],error:e};}}
@@ -77,6 +77,7 @@
           <button data-tab="projects" type="button">المشاريع</button>
           <button data-tab="distribution" type="button" class="active">التوزيع</button>
           <button data-tab="attendance" type="button">الحضور والغياب</button>
+          <button data-tab="borrowing" type="button">الاستعارة</button>
           <button data-tab="salaries" type="button">الرواتب</button>
         </div>
         <div class="cu413-actions"><button id="cu413Reload" type="button">تحديث من السيرفر</button><button class="light" id="cu413Print" type="button">طباعة التوزيع</button></div>
@@ -84,6 +85,7 @@
         <div id="cu413ProjectsTab" class="cu413-tab hidden"></div>
         <div id="cu413DistributionTab" class="cu413-tab"></div>
         <div id="cu413AttendanceTab" class="cu413-tab hidden"></div>
+        <div id="cu413BorrowingTab" class="cu413-tab hidden"></div>
       </div>`;
     main.appendChild(sec);
     document.querySelectorAll('#coreUnified [data-tab]').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
@@ -100,7 +102,7 @@
   }
 
   function showMsg(t,err){const el=$('cu413Msg'); if(el){el.textContent=t; el.className='cu413-msg '+(err?'err':'');}}
-  function setTab(tab){state.tab=tab; document.querySelectorAll('#coreUnified [data-tab]').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab)); ['workers','projects','distribution','attendance','salaries'].forEach(t=>$('cu413'+cap(t)+'Tab')?.classList.toggle('hidden', t!==tab)); render();}
+  function setTab(tab){state.tab=tab; document.querySelectorAll('#coreUnified [data-tab]').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab)); ['workers','projects','distribution','attendance','borrowing','salaries'].forEach(t=>$('cu413'+cap(t)+'Tab')?.classList.toggle('hidden', t!==tab)); render();}
   function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
 
   async function loadWorkers(force){
@@ -126,15 +128,68 @@
     state.dist[m]=(r.data||[]).filter(statusActive);
     return state.dist[m];
   }
+  async function loadBorrowings(month, force){
+    const m=month||$('cu413Month')?.value||todayMonth();
+    if(state.borrow[m]&&!force) return state.borrow[m];
+    const c=client(); if(!c) return [];
+    const start=m+'-01T00:00:00';
+    const end=monthEnd(m)+'T23:59:59';
+    let r=await safe('worker_borrowings', c.from('worker_borrowings').select('*').lte('start_at',end).gte('end_at',start).limit(10000));
+    state.borrow[m]=(r.data||[]).filter(statusActive);
+    return state.borrow[m];
+  }
+  function activeBorrowings(month, when){
+    const m=month||todayMonth();
+    const t=new Date(when||new Date()).getTime();
+    return (state.borrow[m]||[]).filter(b=>{
+      const st=norm(b.status||'active');
+      if(['cancelled','canceled','ended','inactive','ملغي','منتهي','موقوف'].includes(st)) return false;
+      const a=new Date(b.start_at||b.start_time||b.from_time||0).getTime();
+      const z=new Date(b.end_at||b.end_time||b.to_time||0).getTime();
+      return Number.isFinite(a)&&Number.isFinite(z)&&a<=t&&t<=z;
+    });
+  }
+  function effectiveDistributionRows(month, when){
+    const m=month||$('cu413Month')?.value||todayMonth();
+    const base=(state.dist[m]||[]).filter(statusActive);
+    const active=activeBorrowings(m, when);
+    if(!active.length) return base;
+    const borrowedCodes=new Set(active.map(b=>S(b.worker_employee_code||b.worker_code)).filter(Boolean));
+    const out=base.filter(r=>!borrowedCodes.has(S(r.worker_employee_code||r.worker_code||r.employee_code)));
+    active.forEach(b=>{
+      const code=S(b.worker_employee_code||b.worker_code);
+      const source=base.find(r=>S(r.worker_employee_code||r.worker_code||r.employee_code)===code)||{};
+      const p=state.projects.find(x=>projectId(x)===S(b.project_id||b.borrow_project_id||source.project_id))||{};
+      out.push(Object.assign({}, source, {
+        id:'borrow_'+S(b.id||code),
+        is_borrowed:true,
+        borrowing_id:S(b.id||''),
+        borrowed_from_supervisor_employee_code:S(b.original_supervisor_employee_code||source.supervisor_employee_code||''),
+        borrowed_from_supervisor_name:S(b.original_supervisor_name||source.supervisor_name||''),
+        supervisor_employee_code:S(b.borrowing_supervisor_employee_code||b.to_supervisor_employee_code||''),
+        supervisor_name:S(b.borrowing_supervisor_name||b.to_supervisor_name||''),
+        project_id:S(b.project_id||b.borrow_project_id||source.project_id||''),
+        project_name:S(b.project_name||projectName(p)||source.project_name||''),
+        worker_employee_code:code,
+        worker_name:S(b.worker_name||source.worker_name||''),
+        worker_display_name:S(b.worker_display_name||source.worker_display_name||((code?code+' - ':'')+S(b.worker_name||source.worker_name||''))),
+        start_date:S(source.start_date||m+'-01'),
+        end_date:S(source.end_date||null),
+        status:'active'
+      }));
+    });
+    return out;
+  }
   async function reload(force){
     showMsg('جاري تحميل البيانات من السيرفر...');
     await Promise.all([loadWorkers(force), loadProjects(force)]);
     await loadDistribution(force);
+    await loadBorrowings(($('cu413Month')?.value||todayMonth()),force);
     fillSelects(); render(); showMsg('تم تحميل البيانات من السيرفر بدون كاش.');
   }
 
   function render(){
-    renderWorkersTab(); renderProjectsTab(); renderDistributionTab(); renderAttendanceTab();
+    renderWorkersTab(); renderProjectsTab(); renderDistributionTab(); renderAttendanceTab(); renderBorrowingTab();
   }
   function renderWorkersTab(){
     const box=$('cu413WorkersTab'); if(!box) return;
@@ -156,7 +211,7 @@
     return n||c||'-';
   }
   function projectDistributionRows(pid, m){
-    const id=S(pid), rows=state.dist[m]||[];
+    const id=S(pid), rows=effectiveDistributionRows(m);
     return rows.filter(r=>S(distProjectId(r))===id || norm(S(r.project_name||r.project_display_name))===norm(projectName(state.projects.find(p=>projectId(p)===id)||{})));
   }
   function projectDistributionSummary(p){
@@ -170,6 +225,7 @@
     const m=projectViewMonth();
     if($('cu413Month')) $('cu413Month').value=m;
     await loadDistribution(true);
+    await loadBorrowings(m,true);
     renderProjectsTab();
   }
   function openProjectDistribution(pid){
@@ -218,7 +274,7 @@
     const m=$('cu413Month')?.value||todayMonth();
     box.innerHTML=`<div class="cu413-grid"><div class="cu413-card"><h3>توزيع سريع بضغطة زر</h3><div class="cu413-form"><label>الشهر</label><input type="month" id="cu413Month" value="${esc(m)}"><label>المشرف</label><select id="cu413Sup"></select><div class="cu413-two"><div><label>بحث عن مشروع</label><input id="cu413ProjectSearchPick" placeholder="اسم المشروع أو النوع"></div><div><label>بحث عن عامل</label><input id="cu413PickSearch" placeholder="اسم العامل أو الكود"></div></div><div class="cu413-two"><div><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>المشاريع</b><button type="button" class="light" onclick="tasneefCoreUnifiedV413.selectVisibleProjects()">تحديد المشاريع الظاهرة</button></div><div id="cu413ProjectPick" class="cu413-project-pick"></div></div><div><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>العمال</b><button type="button" class="light" onclick="tasneefCoreUnifiedV413.selectVisibleWorkers()">تحديد العمال الظاهرين</button></div><div id="cu413WorkerPick" class="cu413-worker-pick"></div></div></div><label>المحدد</label><div id="cu413Selected" class="cu413-list" style="max-height:140px"></div><div class="cu413-two"><button type="button" onclick="tasneefCoreUnifiedV413.saveQuickDistribution()">ربط المحدد</button><button type="button" class="light" onclick="tasneefCoreUnifiedV413.clearDistributionSelection()">مسح الاختيار</button></div><button type="button" class="light" onclick="tasneefCoreUnifiedV413.copyPreviousMonth()">نسخ الشهر السابق</button></div></div><div class="cu413-card"><h3>توزيع الشهر</h3><div class="cu413-two"><select id="cu413FilterSup"><option value="">كل المشرفين</option></select><select id="cu413FilterProject"><option value="">كل المشاريع</option></select></div><div id="cu413DistBox" class="cu413-list"></div></div></div>`;
     fillSelects(); renderPickProjects(); renderPickWorkers(); renderSelected(); renderDistBox();
-    ['cu413Month'].forEach(id=>$(id)?.addEventListener('change',async()=>{await loadDistribution(true); fillSelects(); renderDistBox();}));
+    ['cu413Month'].forEach(id=>$(id)?.addEventListener('change',async()=>{await loadDistribution(true); await loadBorrowings($('cu413Month')?.value||todayMonth(),true); fillSelects(); renderDistBox();}));
     ['cu413ProjectSearchPick'].forEach(id=>$(id)?.addEventListener('input', renderPickProjects));
     ['cu413PickSearch'].forEach(id=>$(id)?.addEventListener('input', renderPickWorkers));
     ['cu413FilterSup','cu413FilterProject'].forEach(id=>$(id)?.addEventListener('change', renderDistBox));
@@ -255,9 +311,9 @@
   function renderDistBox(){
     const box=$('cu413DistBox'); if(!box) return;
     const m=$('cu413Month')?.value||todayMonth(), fs=$('cu413FilterSup')?.value||'', fp=$('cu413FilterProject')?.value||'';
-    let rows=state.dist[m]||[]; rows=rows.filter(r=>(!fs||S(r.supervisor_name||r.supervisor_display_name)===fs)&&(!fp||S(r.project_name||r.project_display_name)===fp));
+    let rows=effectiveDistributionRows(m); rows=rows.filter(r=>(!fs||S(r.supervisor_name||r.supervisor_display_name)===fs)&&(!fp||S(r.project_name||r.project_display_name)===fp));
     const groups=new Map(); rows.forEach(r=>{const k=S(r.supervisor_name||r.supervisor_display_name||r.supervisor_employee_code||'-')+'||'+S(r.project_name||r.project_display_name||r.project_id||'-'); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(r);});
-    box.innerHTML=[...groups.entries()].map(([k,list])=>{const [sup,proj]=k.split('||'); const first=list[0]||{}; return `<div class="cu413-dist-card"><div class="cu413-dist-head"><div><h4>${esc(proj)}</h4><small>${esc(sup)}</small></div><div style="display:flex;gap:6px;align-items:center"><b>${list.length} عامل</b><button type="button" class="light" onclick="tasneefCoreUnifiedV413.editDistribution('${esc(S(first.project_id))}')">تعديل</button></div></div>${list.map(r=>`<span class="cu413-chip">${esc(S(r.worker_display_name||((r.worker_employee_code||'')+' - '+(r.worker_name||''))))}</span>`).join('')}</div>`}).join('')||'<div class="cu413-row">لا يوجد توزيع لهذا الشهر</div>';
+    box.innerHTML=[...groups.entries()].map(([k,list])=>{const [sup,proj]=k.split('||'); const first=list[0]||{}; return `<div class="cu413-dist-card"><div class="cu413-dist-head"><div><h4>${esc(proj)}</h4><small>${esc(sup)}</small></div><div style="display:flex;gap:6px;align-items:center"><b>${list.length} عامل</b><button type="button" class="light" onclick="tasneefCoreUnifiedV413.editDistribution('${esc(S(first.project_id))}')">تعديل</button></div></div>${list.map(r=>`<span class="cu413-chip" style="${r.is_borrowed?'background:#fff7df;border-color:#e5c76b':''}">${esc(S(r.worker_display_name||((r.worker_employee_code||'')+' - '+(r.worker_name||''))))}${r.is_borrowed?' <small>(استعارة من '+esc(S(r.borrowed_from_supervisor_name||'-'))+')</small>':''}</span>`).join('')}</div>`}).join('')||'<div class="cu413-row">لا يوجد توزيع لهذا الشهر</div>';
   }
 
   async function saveWorker(){
@@ -293,7 +349,7 @@
     projects.forEach(p=>chosen.forEach(w=>rows.push({month_key:m, supervisor_employee_code:workerCode(sup), supervisor_name:workerName(sup), project_id:projectId(p), project_name:projectName(p), worker_employee_code:workerCode(w), worker_name:workerName(w), role_type:workerRole(w)||'عامل', shift_name:'default', required_minutes:projectRequired(p), start_date:m+'-01', end_date:null, status:'active'})));
     const r=await c.from('monthly_distribution').upsert(rows,{onConflict:'month_key,project_id,worker_employee_code'}).select();
     if(r.error){showMsg('تعذر حفظ التوزيع: '+r.error.message,true);return;}
-    delete state.dist[m]; await loadDistribution(true); fillSelects(); renderDistBox(); showMsg('تم ربط '+chosen.length+' عامل مع '+projects.length+' مشروع بنجاح.');
+    delete state.dist[m]; await loadDistribution(true); await loadBorrowings($('cu413Month')?.value||todayMonth(),true); fillSelects(); renderDistBox(); showMsg('تم ربط '+chosen.length+' عامل مع '+projects.length+' مشروع بنجاح.');
   }
   async function saveDistribution(){ return saveQuickDistribution(); }
   async function copyPreviousMonth(){
@@ -314,7 +370,7 @@
   }
   function attendanceRows(){
     const d=attendanceDate(), m=d.slice(0,7), fs=$('cu413AttSup')?.value||'', fp=$('cu413AttProject')?.value||'';
-    const dist=(state.dist[m]||[]).filter(r=>(!fs||S(r.supervisor_employee_code)===fs||S(r.supervisor_name)===fs)&&(!fp||S(r.project_id)===fp));
+    const dist=effectiveDistributionRows(m).filter(r=>(!fs||S(r.supervisor_employee_code)===fs||S(r.supervisor_name)===fs)&&(!fp||S(r.project_id)===fp));
     const att=state.att[d]||[]; const amap=new Map(att.map(a=>[attKey(a),a]));
     const seen=new Set();
     return dist.filter(r=>{
@@ -337,7 +393,7 @@
     await refreshAttendance(false);
   }
   function fillAttendanceFilters(){
-    const m=attendanceMonth(); const rows=state.dist[m]||[];
+    const m=attendanceMonth(); const rows=effectiveDistributionRows(m);
     const sup=$('cu413AttSup'), pr=$('cu413AttProject');
     if(sup){const cur=sup.value; const vals=[...new Map(rows.map(r=>[S(r.supervisor_employee_code||r.supervisor_name), S(r.supervisor_name||r.supervisor_employee_code)]).filter(x=>x[0])).entries()]; sup.innerHTML='<option value="">كل المشرفين</option>'+vals.map(([v,n])=>`<option value="${esc(v)}">${esc(n)}</option>`).join(''); sup.value=cur;}
     if(pr){const cur=pr.value; const vals=[...new Map(rows.map(r=>[S(r.project_id), S(r.project_name||r.project_id)]).filter(x=>x[0])).entries()]; pr.innerHTML='<option value="">كل المشاريع</option>'+vals.map(([v,n])=>`<option value="${esc(v)}">${esc(n)}</option>`).join(''); pr.value=cur;}
@@ -346,6 +402,7 @@
     const d=attendanceDate(), m=d.slice(0,7);
     if($('cu413Month')) $('cu413Month').value=m;
     await loadDistribution(force);
+    await loadBorrowings(m,force);
     await loadAttendance(d,force);
     fillAttendanceFilters(); renderAttendanceBox();
   }
@@ -411,10 +468,75 @@
     if(!silent){delete state.att[d]; await loadAttendance(d,true); renderAttendanceBox(); showMsg('تم حفظ الحضور بدون حذف أي بيانات.');}
   }
 
+  function borrowMonth(){return $('cu413BorrowMonth')?.value || $('cu413Month')?.value || todayMonth();}
+  function borrowSupOptions(selected){return state.workers.filter(isSupervisor).map(w=>`<option value="${esc(workerCode(w))}" ${selected===workerCode(w)?'selected':''}>${esc(workerDisplay(w))}</option>`).join('');}
+  function borrowWorkerRows(){
+    const m=borrowMonth(), from=$('cu413BorrowFromSup')?.value||'', q=norm($('cu413BorrowSearch')?.value||'');
+    const rows=(state.dist[m]||[]).filter(statusActive).filter(r=>!from||S(r.supervisor_employee_code)===from||S(r.supervisor_name)===from);
+    const map=new Map();
+    rows.forEach(r=>{
+      const code=S(r.worker_employee_code||r.worker_code||r.employee_code); if(!code) return;
+      const label=S(r.worker_display_name||((code?code+' - ':'')+S(r.worker_name||'')));
+      if(q&&!norm(label+' '+S(r.project_name)).includes(q)) return;
+      if(!map.has(code)) map.set(code,{code,label,rows:[]});
+      map.get(code).rows.push(r);
+    });
+    return [...map.values()].sort((a,b)=>a.label.localeCompare(b.label,'ar'));
+  }
+  async function renderBorrowingTab(){
+    const box=$('cu413BorrowingTab'); if(!box) return;
+    const m=borrowMonth();
+    if(!$('cu413BorrowMonth')){
+      const now=new Date(), later=new Date(Date.now()+2*60*60*1000);
+      const dt=v=>{const z=new Date(v.getTime()-v.getTimezoneOffset()*60000); return z.toISOString().slice(0,16);};
+      box.innerHTML=`<div class="cu413-grid"><div class="cu413-card"><h3>استعارة عامل مؤقتة</h3><div class="cu413-form"><label>الشهر</label><input type="month" id="cu413BorrowMonth" value="${esc($('cu413Month')?.value||todayMonth())}"><label>المشرف المستعير</label><select id="cu413BorrowToSup"><option value="">اختر المشرف الذي يحتاج العامل</option>${borrowSupOptions('')}</select><label>اختر مشرف آخر لعرض عماله</label><select id="cu413BorrowFromSup"><option value="">اختر المشرف الأصلي</option>${borrowSupOptions('')}</select><div class="cu413-two"><div><label>من الوقت</label><input type="datetime-local" id="cu413BorrowStart" value="${esc(dt(now))}"></div><div><label>إلى الوقت</label><input type="datetime-local" id="cu413BorrowEnd" value="${esc(dt(later))}"></div></div><label>بحث في عمال المشرف الأصلي</label><input id="cu413BorrowSearch" placeholder="اسم العامل أو الكود أو المشروع"><div id="cu413BorrowWorkers" class="cu413-worker-pick"></div><button type="button" onclick="tasneefCoreUnifiedV413.saveBorrowing()">حفظ الاستعارة</button></div></div><div class="cu413-card"><h3>الاستعارات الحالية والمجدولة</h3><div id="cu413BorrowList" class="cu413-list"></div></div></div>`;
+      ['cu413BorrowMonth','cu413BorrowFromSup','cu413BorrowSearch'].forEach(id=>$(id)?.addEventListener(id==='cu413BorrowSearch'?'input':'change', async()=>{ if(id==='cu413BorrowMonth'){ if($('cu413Month')) $('cu413Month').value=borrowMonth(); await loadDistribution(true); await loadBorrowings(borrowMonth(),true);} renderBorrowWorkers(); renderBorrowList(); }));
+      $('cu413BorrowToSup')?.addEventListener('change', renderBorrowList);
+    }
+    await loadBorrowings(m,false); renderBorrowWorkers(); renderBorrowList();
+  }
+  function renderBorrowWorkers(){
+    const box=$('cu413BorrowWorkers'); if(!box) return;
+    const rows=borrowWorkerRows();
+    box.innerHTML=rows.map(x=>`<button type="button" class="cu413-worker ${state.borrowSelected.has(x.code)?'on':''}" onclick="tasneefCoreUnifiedV413.toggleBorrowWorker('${esc(x.code)}')"><b>${esc(x.label)}</b><small>${esc([...new Set(x.rows.map(r=>S(r.project_name)).filter(Boolean))].join('، '))}</small></button>`).join('')||'<div class="cu413-row">اختر مشرفًا أصليًا لعرض عماله</div>';
+  }
+  function toggleBorrowWorker(code){ if(state.borrowSelected.has(code)) state.borrowSelected.delete(code); else state.borrowSelected.add(code); renderBorrowWorkers(); }
+  function borrowStatusText(b){
+    const now=Date.now(), a=new Date(b.start_at).getTime(), z=new Date(b.end_at).getTime();
+    if(['cancelled','canceled','ملغي'].includes(norm(b.status))) return 'ملغية';
+    if(now<a) return 'مجدولة'; if(now>z) return 'انتهت ورجع العامل لمشرفه'; return 'نشطة الآن';
+  }
+  function renderBorrowList(){
+    const box=$('cu413BorrowList'); if(!box) return;
+    const m=borrowMonth();
+    const rows=(state.borrow[m]||[]).slice().sort((a,b)=>S(b.start_at).localeCompare(S(a.start_at)));
+    box.innerHTML=rows.map(b=>`<div class="cu413-row"><div><b>${esc(S(b.worker_display_name||((b.worker_employee_code||'')+' - '+(b.worker_name||''))))}</b><small>من: ${esc(S(b.original_supervisor_name||'-'))} ← إلى: ${esc(S(b.borrowing_supervisor_name||'-'))}</small><small>${esc(S(b.start_at||'').replace('T',' ').slice(0,16))} إلى ${esc(S(b.end_at||'').replace('T',' ').slice(0,16))} | ${esc(borrowStatusText(b))}</small></div><button type="button" class="light" onclick="tasneefCoreUnifiedV413.cancelBorrowing('${esc(S(b.id))}')">إلغاء</button></div>`).join('')||'<div class="cu413-row">لا توجد استعارات لهذا الشهر</div>';
+  }
+  async function saveBorrowing(){
+    const c=client(); if(!c) return;
+    const m=borrowMonth(), from=$('cu413BorrowFromSup')?.value||'', to=$('cu413BorrowToSup')?.value||'', start=$('cu413BorrowStart')?.value||'', end=$('cu413BorrowEnd')?.value||'';
+    if(!m||!from||!to||!start||!end){showMsg('اختر المشرف المستعير والمشرف الأصلي والوقت.',true);return;}
+    if(from===to){showMsg('لا يمكن استعارة العامل من نفس المشرف.',true);return;}
+    if(new Date(end)<=new Date(start)){showMsg('وقت النهاية يجب أن يكون بعد وقت البداية.',true);return;}
+    const all=borrowWorkerRows().filter(x=>state.borrowSelected.has(x.code));
+    if(!all.length){showMsg('حدد عاملًا واحدًا على الأقل للاستعارة.',true);return;}
+    const fromW=state.workers.find(w=>workerCode(w)===from)||{}, toW=state.workers.find(w=>workerCode(w)===to)||{};
+    const rows=all.map(x=>{const src=x.rows[0]||{}; const code=x.code; const name=S(src.worker_name||x.label.replace(code,'').replace('-','').trim()); return {month_key:m, worker_employee_code:code, worker_name:name, worker_display_name:x.label, original_supervisor_employee_code:from, original_supervisor_name:workerName(fromW)||S(src.supervisor_name||''), borrowing_supervisor_employee_code:to, borrowing_supervisor_name:workerName(toW), project_id:S(src.project_id||''), project_name:S(src.project_name||''), start_at:start, end_at:end, status:'active'};});
+    const r=await c.from('worker_borrowings').insert(rows).select();
+    if(r.error){showMsg('تعذر حفظ الاستعارة: '+r.error.message,true);return;}
+    state.borrowSelected.clear(); delete state.borrow[m]; await loadBorrowings(m,true); renderBorrowWorkers(); renderBorrowList(); renderDistBox(); renderAttendanceBox(); showMsg('تم حفظ الاستعارة. خلال الوقت المحدد يظهر العامل مع المشرف المستعير، وبعد الوقت يرجع لمشرفه الأصلي تلقائيًا.');
+  }
+  async function cancelBorrowing(id){
+    const c=client(); if(!c)return; if(!confirm('إلغاء الاستعارة؟')) return;
+    const r=await c.from('worker_borrowings').update({status:'cancelled',updated_at:new Date().toISOString()}).eq('id',id).select();
+    if(r.error){showMsg('تعذر إلغاء الاستعارة: '+r.error.message,true);return;}
+    const m=borrowMonth(); delete state.borrow[m]; await loadBorrowings(m,true); renderBorrowList(); renderDistBox(); renderAttendanceBox(); showMsg('تم إلغاء الاستعارة.');
+  }
+
   function printDistribution(){window.print();}
 
   async function init(){installCss(); installNav(); installSection(); await reload(false); setTab(state.tab||'distribution');}
-  window.tasneefCoreUnifiedV413={init,reload,saveWorker,saveProject,saveDistribution,saveQuickDistribution,copyPreviousMonth,toggleWorker,toggleProject,selectVisibleProjects,selectVisibleWorkers,clearDistributionSelection,printDistribution,editWorker,clearWorkerForm,editProject,clearProjectForm,editDistribution,renderWorkersTab,renderProjectsTab,openProjectDistribution,refreshProjectsMonthDistribution,calcWorkerTotal,renderAttendanceTab,refreshAttendance,saveAttendanceRow,setAllAttendanceStatus,saveAllAttendanceRows};
+  window.tasneefCoreUnifiedV413={init,reload,saveWorker,saveProject,saveDistribution,saveQuickDistribution,copyPreviousMonth,toggleWorker,toggleProject,selectVisibleProjects,selectVisibleWorkers,clearDistributionSelection,printDistribution,editWorker,clearWorkerForm,editProject,clearProjectForm,editDistribution,renderWorkersTab,renderProjectsTab,openProjectDistribution,refreshProjectsMonthDistribution,calcWorkerTotal,renderAttendanceTab,refreshAttendance,saveAttendanceRow,setAllAttendanceStatus,saveAllAttendanceRows,renderBorrowingTab,toggleBorrowWorker,saveBorrowing,cancelBorrowing,effectiveDistributionRows};
   document.addEventListener('DOMContentLoaded',()=>setTimeout(init,1200));
   setInterval(installNav,2000);
 })();
