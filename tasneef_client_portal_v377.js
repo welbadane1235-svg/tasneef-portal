@@ -276,3 +276,143 @@ ${finalUrl}
   }
   if(document.readyState==='complete') hook(); else window.addEventListener('load', hook);
 })();
+
+
+/* V449 - تثبيت رابط العميل داخل قاعدة البيانات وعدم الاعتماد على الكاش */
+(function(){
+  'use strict';
+  if(window.__tasneefClientPortalPersistentV449) return;
+  window.__tasneefClientPortalPersistentV449 = true;
+  const $ = (id)=>document.getElementById(id);
+  const esc = (v)=>String(v ?? '').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const msg = (t,bad)=>{ try{ if(typeof window.msg==='function') window.msg(t,bad?'err':'ok'); }catch(_){} };
+  const pid = ()=>String($('cpProjectV373')?.value || '').trim();
+  const baseUrl = ()=>{
+    const href = location.href.split('#')[0].split('?')[0];
+    if(/admin\.html$/i.test(href)) return href.replace(/admin\.html$/i,'client-report.html');
+    return href.replace(/[^\/]*$/,'client-report.html');
+  };
+  const stableUrl = (projectId=pid())=> projectId ? (baseUrl()+'?project_id='+encodeURIComponent(projectId)) : '';
+  function projectRow(projectId=pid()){
+    return (window.data?.projects||[]).find(p=>String(p.id)===String(projectId)) || null;
+  }
+  function setProjectRowFields(projectId, fields){
+    const p=projectRow(projectId); if(p) Object.assign(p, fields||{});
+  }
+  function tokenFor(projectId){
+    try{ return btoa(unescape(encodeURIComponent(JSON.stringify({project_id:String(projectId), stable:true, v:449})))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+    catch(_){ return 'project_'+String(projectId); }
+  }
+  function renderPersistentLink(longUrl, shortUrl, saved){
+    const box=$('cpLinkBoxV373'); if(!box) return;
+    if(!longUrl){ box.textContent='اختر مشروعًا لإنشاء الرابط.'; return; }
+    box.innerHTML = `<div style="direction:rtl;text-align:right;font-weight:900;color:#073e31;margin-bottom:6px">رابط العميل الثابت محفوظ في السيرفر</div>
+      <div style="direction:ltr;text-align:left;word-break:break-all"><small style="color:#60706a">الرابط المستخدم:</small><br><b>${esc(shortUrl || longUrl)}</b></div>
+      ${shortUrl?`<div style="direction:ltr;text-align:left;word-break:break-all;margin-top:8px"><small style="color:#60706a">الرابط الأصلي الثابت:</small><br>${esc(longUrl)}</div>`:''}
+      <div style="direction:rtl;text-align:right;margin-top:8px;color:${saved?'#137a4b':'#9a6b00'};font-weight:800">${saved?'محفوظ ولن يختفي بعد التحديث.':'يظهر الآن كرابط ثابت، وشغّل SQL V449 ليتم حفظه في السيرفر.'}</div>`;
+  }
+  async function saveProjectLink(projectId=pid(), extra={}){
+    if(!projectId) return '';
+    const p=projectRow(projectId) || {};
+    const longUrl = p.client_portal_url || stableUrl(projectId);
+    const payload = {
+      client_portal_token: p.client_portal_token || tokenFor(projectId),
+      client_portal_url: longUrl,
+      client_portal_updated_at: new Date().toISOString(),
+      ...extra
+    };
+    if(!payload.client_portal_short_url && p.client_portal_short_url) payload.client_portal_short_url = p.client_portal_short_url;
+    setProjectRowFields(projectId, payload);
+    if(window.sb){
+      const r=await window.sb.from('projects').update(payload).eq('id', projectId);
+      if(r.error){ console.warn('V449 project link save skipped:', r.error.message); return longUrl; }
+    }
+    return longUrl;
+  }
+  async function ensureAndRender(){
+    const projectId=pid();
+    if(!projectId){ renderPersistentLink('', '', false); return ''; }
+    const p=projectRow(projectId) || {};
+    const longUrl = p.client_portal_url || stableUrl(projectId);
+    const shortUrl = p.client_portal_short_url || '';
+    let saved=!!p.client_portal_url;
+    renderPersistentLink(longUrl, shortUrl, saved);
+    if(!saved){
+      try{ await saveProjectLink(projectId); saved=true; }catch(e){ console.warn(e); }
+      const pp=projectRow(projectId)||{};
+      renderPersistentLink(pp.client_portal_url||longUrl, pp.client_portal_short_url||shortUrl, saved);
+    }
+    return (projectRow(projectId)?.client_portal_short_url || projectRow(projectId)?.client_portal_url || longUrl);
+  }
+  function shortAlias(projectId=pid()){
+    const name=(projectRow(projectId)?.name || 'project').toString().trim().toLowerCase()
+      .replace(/[إأآا]/g,'a').replace(/[ىىي]/g,'y').replace(/[^a-z0-9]+/g,'-').replace(/-+/g,'-').replace(/^-+|-+$/g,'').slice(0,20) || 'project';
+    return 'tasneef-'+name+'-'+String(projectId).replace(/\D/g,'').slice(-4);
+  }
+  async function createShort(longUrl, projectId=pid()){
+    const alias=shortAlias(projectId);
+    const tries=[
+      'https://is.gd/create.php?format=simple&shorturl='+encodeURIComponent(alias)+'&url='+encodeURIComponent(longUrl),
+      'https://is.gd/create.php?format=simple&url='+encodeURIComponent(longUrl),
+      'https://tinyurl.com/api-create.php?url='+encodeURIComponent(longUrl)
+    ];
+    for(const u of tries){
+      try{
+        const r=await fetch(u,{cache:'no-store'}); const txt=(await r.text()).trim();
+        if(r.ok && /^https?:\/\//.test(txt) && !/error|invalid/i.test(txt)) return txt;
+      }catch(e){ console.warn(e); }
+    }
+    return longUrl;
+  }
+  const oldLoad=window.loadClientPortalV373;
+  if(typeof oldLoad==='function'){
+    window.loadClientPortalV373 = async function(btn){
+      const res = await oldLoad.apply(this, arguments);
+      setTimeout(ensureAndRender, 50);
+      return res;
+    };
+  }
+  const oldRender=window.renderClientPortalV373;
+  if(typeof oldRender==='function'){
+    window.renderClientPortalV373 = function(){
+      const res = oldRender.apply(this, arguments);
+      setTimeout(ensureAndRender, 120);
+      return res;
+    };
+  }
+  window.createShortClientPortalLinkV376 = async function(){
+    const projectId=pid(); if(!projectId) return msg('اختر المشروع أولًا', true);
+    const longUrl = await saveProjectLink(projectId);
+    renderPersistentLink(longUrl, 'جاري إنشاء الرابط المختصر...', true);
+    const shortUrl = await createShort(longUrl, projectId);
+    await saveProjectLink(projectId, {client_portal_short_url: shortUrl});
+    renderPersistentLink(longUrl, shortUrl, true);
+    msg(shortUrl && shortUrl!==longUrl ? 'تم إنشاء وحفظ الرابط المختصر' : 'تم حفظ الرابط الأصلي الثابت');
+    return shortUrl || longUrl;
+  };
+  window.copyClientPortalLinkV373 = async function(){
+    const projectId=pid(); if(!projectId) return msg('اختر المشروع أولًا', true);
+    await ensureAndRender();
+    const p=projectRow(projectId)||{};
+    const finalUrl=p.client_portal_short_url || p.client_portal_url || stableUrl(projectId);
+    try{ await navigator.clipboard.writeText(finalUrl); }catch(_){}
+    renderPersistentLink(p.client_portal_url||stableUrl(projectId), p.client_portal_short_url||'', !!p.client_portal_url);
+    msg('تم نسخ رابط العميل الثابت');
+  };
+  window.openClientPortalLinkV373 = async function(){
+    const projectId=pid(); if(!projectId) return msg('اختر المشروع أولًا', true);
+    await ensureAndRender();
+    const p=projectRow(projectId)||{};
+    window.open(p.client_portal_short_url || p.client_portal_url || stableUrl(projectId), '_blank');
+  };
+  window.sendClientPortalWhatsappV373 = async function(){
+    const projectId=pid(); if(!projectId) return msg('اختر المشروع أولًا', true);
+    await ensureAndRender();
+    const p=projectRow(projectId)||{};
+    const finalUrl=p.client_portal_short_url || p.client_portal_url || stableUrl(projectId);
+    const txt=`السيد رئيس الجمعية المحترم،\n\nيسر شركة تصنيف لإدارة المرافق تزويدكم برابط بوابة مشروعكم للاطلاع على التقرير والتسجيلات اليومية والتذاكر والأعمال السنوية.\n\nرابط بوابة العميل:\n${finalUrl}\n\nوتقبلوا تحياتنا،\nشركة تصنيف لإدارة المرافق`;
+    window.open('https://wa.me/?text='+encodeURIComponent(txt),'_blank');
+  };
+  document.addEventListener('change', e=>{ if(e.target && e.target.id==='cpProjectV373') setTimeout(ensureAndRender, 80); });
+  setTimeout(ensureAndRender, 900);
+})();
