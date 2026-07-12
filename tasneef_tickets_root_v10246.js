@@ -1,11 +1,11 @@
-/* Tasneef V10285 - Tickets date range filters + professional client print
+/* Tasneef V10286 - Tickets date range filters + professional client print
    يعتمد على نسخة المستخدم. لا يلمس قاعدة البيانات. يعرض/يفلتر/يصدر من مصدر واحد فقط. */
 (function(){
   'use strict';
   if(window.__tasneefTicketsRootV10246) return;
   window.__tasneefTicketsRootV10246 = true;
 
-  const VERSION='V10285';
+  const VERSION='V10286';
   const TABLE='tickets';
   const $ = id => document.getElementById(id);
   const S = v => String(v ?? '').trim();
@@ -258,7 +258,7 @@
   'use strict';
   if(window.__tasneefTicketSlaV10364) return;
   window.__tasneefTicketSlaV10364 = true;
-  const BUILD='v10366-ticket-sla-filter-roles';
+  const BUILD='v10370-ticket-sla-date-range-fix';
   const STORE='tasneef_ticket_sla_hours_v10364';
   const $=id=>document.getElementById(id);
   const S=v=>String(v??'').trim();
@@ -284,6 +284,12 @@
   function recipientOf(t){ return S(t.claimed_by_name||t.received_by_name||t.recipient_name||t.assignee_name||t.technician_name) || supervisorNameSafe(t.claimed_by||t.assigned_to||t.technician_id) || '-'; }
   function closedByOf(t){ return S(t.closed_by_name||t.closed_name||t.closer_name) || supervisorNameSafe(t.closed_by||t.closed_by_id) || '-'; }
   function dateMs(t){ const raw=S(t.created_at||t.createdAt||t.date||t.updated_at); const n=Date.parse(raw); return isNaN(n)?(Number(t.id)||0):n; }
+  function ticketDateOnlyV10370(t){
+    const raw=S(t.created_at||t.createdAt||t.date||t.updated_at);
+    const d=raw?new Date(raw):null;
+    if(!d || isNaN(d.getTime())) return '';
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
   function fmtDate(v){ const d=v?new Date(v):null; if(!d||isNaN(d)) return '-'; try{return d.toLocaleString('ar-SA',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});}catch(_){return S(v).slice(0,16);} }
   function durationText(min){ min=Math.max(0,Math.round(Number(min)||0)); const d=Math.floor(min/1440), h=Math.floor((min%1440)/60), m=min%60; if(d) return d+' يوم '+h+' س'; if(h) return h+' س '+m+' د'; return m+' د'; }
   function slaInfo(t){
@@ -328,7 +334,13 @@
   function filterAdmin(rows){
     const st=S($('ticketRootStatusV10246')?.value || $('ticketFilterStatus')?.value); const q=(S($('ticketRootSearchV10246')?.value || $('ticketSearch')?.value)).toLowerCase(); const title=S($('ticketRootTitleV10246')?.value); const sla=selectedSlaFilter();
     const proj=S($('ticketRootProjectV10246')?.value).toLowerCase(); const sup=S($('ticketRootSupervisorV10246')?.value).toLowerCase();
-    return rows.filter(t=>{ if(st && S(t.status||'open')!==st) return false; if(title && S(t.title)!==title) return false; if(proj && projectOf(t).toLowerCase()!==proj) return false; if(sup && supervisorOf(t).toLowerCase()!==sup) return false; if(sla && slaInfo(t).state!==sla) return false; if(q && ![ticketNo(t),t.title,t.description,projectOf(t),supervisorOf(t),statusLabel(t.status),priorityLabel(t.priority),recipientOf(t),closedByOf(t),t.closure_note].join(' ').toLowerCase().includes(q)) return false; return true; });
+    let from=S($('ticketRootDateFromV10246')?.value), to=S($('ticketRootDateToV10246')?.value);
+    if(from && to && from>to){ const tmp=from; from=to; to=tmp; }
+    return rows.filter(t=>{
+      const dd=ticketDateOnlyV10370(t);
+      if(from && (!dd || dd<from)) return false;
+      if(to && (!dd || dd>to)) return false;
+      if(st && S(t.status||'open')!==st) return false; if(title && S(t.title)!==title) return false; if(proj && projectOf(t).toLowerCase()!==proj) return false; if(sup && supervisorOf(t).toLowerCase()!==sup) return false; if(sla && slaInfo(t).state!==sla) return false; if(q && ![ticketNo(t),t.title,t.description,projectOf(t),supervisorOf(t),statusLabel(t.status),priorityLabel(t.priority),recipientOf(t),closedByOf(t),t.closure_note].join(' ').toLowerCase().includes(q)) return false; return true; });
   }
   function filterSup(rows){
     const st=S($('supTicketFilterStatus')?.value); const pid=S($('supTicketFilterProject')?.value); const q=S($('supTicketSearch')?.value).toLowerCase(); const sla=normalizeFilterValue($('supTicketSlaFilterV10364')?.value);
@@ -362,7 +374,7 @@
   };
   window.renderTickets=renderTicketsNew;
   window.renderTicketsSlaV10364=renderTicketsNew;
-  function bindExistingFilters(){ ['ticketFilterStatus','ticketSortOrder','ticketSearch','supTicketFilterProject','supTicketFilterStatus','supTicketSortOrder','supTicketSearch','ticketRootProjectV10246','ticketRootSupervisorV10246','ticketRootTitleV10246','ticketRootStatusV10246','ticketRootSortV10246','ticketRootSearchV10246'].forEach(id=>{ const el=$(id); if(el&&!el.dataset.slaV10364){ el.dataset.slaV10364='1'; el.addEventListener((el.tagName==='INPUT')?'input':'change',()=>renderTicketsSafe(),true); } }); }
+  function bindExistingFilters(){ ['ticketFilterStatus','ticketSortOrder','ticketSearch','supTicketFilterProject','supTicketFilterStatus','supTicketSortOrder','supTicketSearch','ticketRootProjectV10246','ticketRootSupervisorV10246','ticketRootTitleV10246','ticketRootStatusV10246','ticketRootSortV10246','ticketRootSearchV10246','ticketRootDateFromV10246','ticketRootDateToV10246'].forEach(id=>{ const el=$(id); if(el&&!el.dataset.slaV10364){ el.dataset.slaV10364='1'; el.addEventListener((el.tagName==='INPUT' && el.type!=='date')?'input':'change',()=>renderTicketsSafe(),true); } }); }
   function boot(){ ensurePanels(); bindExistingFilters(); setTimeout(renderTicketsSafe,150); }
   document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,700)); window.addEventListener('load',()=>setTimeout(boot,1100)); setTimeout(boot,1800);
   console.log('Tasneef '+BUILD+' loaded');
