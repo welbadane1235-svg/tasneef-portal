@@ -6,7 +6,7 @@
   if(window.__tasneefCoreUnifiedV413) return;
   window.__tasneefCoreUnifiedV413 = true;
 
-  const VERSION='444';
+  const VERSION='446';
   const S=v=>String(v??'').trim();
   const N=v=>{const n=Number(v||0);return Number.isFinite(n)?n:0};
   const $=id=>document.getElementById(id);
@@ -469,10 +469,30 @@
   }
 
   function borrowMonth(){return $('cu413BorrowMonth')?.value || $('cu413Month')?.value || todayMonth();}
-  function borrowSupOptions(selected){return state.workers.filter(isSupervisor).map(w=>`<option value="${esc(workerCode(w))}" ${selected===workerCode(w)?'selected':''}>${esc(workerDisplay(w))}</option>`).join('');}
+  
+  function distSupervisorOptions(selected){
+    const m=borrowMonth();
+    const map=new Map();
+    (state.dist[m]||[]).filter(statusActive).forEach(r=>{
+      const code=S(r.supervisor_employee_code||r.supervisor_code||r.supervisor_id||'');
+      const name=S(r.supervisor_name||'');
+      if(!code && !name) return;
+      const key=code||name;
+      if(!map.has(key)) map.set(key,{code:key,name:name||key});
+    });
+    if(!map.size){
+      state.workers.filter(statusActive).filter(isSupervisor).forEach(w=>{
+        const code=workerCode(w), name=workerDisplay(w);
+        if(code && !map.has(code)) map.set(code,{code,name});
+      });
+    }
+    return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'ar')).map(x=>`<option value="${esc(x.code)}" ${selected===x.code?'selected':''}>${esc(x.name)}</option>`).join('');
+  }
+  function borrowSupOptions(selected){return distSupervisorOptions(selected);} 
+
   function borrowWorkerRows(){
     const m=borrowMonth(), from=$('cu413BorrowFromSup')?.value||'', q=norm($('cu413BorrowSearch')?.value||'');
-    const rows=(state.dist[m]||[]).filter(statusActive).filter(r=>!from||S(r.supervisor_employee_code)===from||S(r.supervisor_name)===from);
+    const rows=(state.dist[m]||[]).filter(statusActive).filter(r=>!from||S(r.supervisor_employee_code||r.supervisor_code||r.supervisor_id)===from||S(r.supervisor_name)===from);
     const map=new Map();
     rows.forEach(r=>{
       const code=S(r.worker_employee_code||r.worker_code||r.employee_code); if(!code) return;
@@ -490,7 +510,7 @@
       const now=new Date(), later=new Date(Date.now()+2*60*60*1000);
       const dt=v=>{const z=new Date(v.getTime()-v.getTimezoneOffset()*60000); return z.toISOString().slice(0,16);};
       box.innerHTML=`<div class="cu413-grid"><div class="cu413-card"><h3>استعارة عامل مؤقتة</h3><div class="cu413-form"><label>الشهر</label><input type="month" id="cu413BorrowMonth" value="${esc($('cu413Month')?.value||todayMonth())}"><label>المشرف المستعير</label><select id="cu413BorrowToSup"><option value="">اختر المشرف الذي يحتاج العامل</option>${borrowSupOptions('')}</select><label>اختر مشرف آخر لعرض عماله</label><select id="cu413BorrowFromSup"><option value="">اختر المشرف الأصلي</option>${borrowSupOptions('')}</select><div class="cu413-two"><div><label>من الوقت</label><input type="datetime-local" id="cu413BorrowStart" value="${esc(dt(now))}"></div><div><label>إلى الوقت</label><input type="datetime-local" id="cu413BorrowEnd" value="${esc(dt(later))}"></div></div><label>بحث في عمال المشرف الأصلي</label><input id="cu413BorrowSearch" placeholder="اسم العامل أو الكود أو المشروع"><div id="cu413BorrowWorkers" class="cu413-worker-pick"></div><button type="button" onclick="tasneefCoreUnifiedV413.saveBorrowing()">حفظ الاستعارة</button></div></div><div class="cu413-card"><h3>الاستعارات الحالية والمجدولة</h3><div id="cu413BorrowList" class="cu413-list"></div></div></div>`;
-      ['cu413BorrowMonth','cu413BorrowFromSup','cu413BorrowSearch'].forEach(id=>$(id)?.addEventListener(id==='cu413BorrowSearch'?'input':'change', async()=>{ if(id==='cu413BorrowMonth'){ if($('cu413Month')) $('cu413Month').value=borrowMonth(); await loadDistribution(true); await loadBorrowings(borrowMonth(),true);} renderBorrowWorkers(); renderBorrowList(); }));
+      ['cu413BorrowMonth','cu413BorrowFromSup','cu413BorrowSearch'].forEach(id=>$(id)?.addEventListener(id==='cu413BorrowSearch'?'input':'change', async()=>{ if(id==='cu413BorrowMonth'){ if($('cu413Month')) $('cu413Month').value=borrowMonth(); await loadDistribution(true); await loadBorrowings(borrowMonth(),true); const to=$('cu413BorrowToSup'), from=$('cu413BorrowFromSup'); const tv=to?.value||'', fv=from?.value||''; if(to) to.innerHTML='<option value="">اختر المشرف الذي يحتاج العامل</option>'+borrowSupOptions(tv); if(from) from.innerHTML='<option value="">اختر المشرف الأصلي</option>'+borrowSupOptions(fv); } renderBorrowWorkers(); renderBorrowList(); }));
       $('cu413BorrowToSup')?.addEventListener('change', renderBorrowList);
     }
     await loadBorrowings(m,false); renderBorrowWorkers(); renderBorrowList();
@@ -520,7 +540,7 @@
     if(new Date(end)<=new Date(start)){showMsg('وقت النهاية يجب أن يكون بعد وقت البداية.',true);return;}
     const all=borrowWorkerRows().filter(x=>state.borrowSelected.has(x.code));
     if(!all.length){showMsg('حدد عاملًا واحدًا على الأقل للاستعارة.',true);return;}
-    const fromW=state.workers.find(w=>workerCode(w)===from)||{}, toW=state.workers.find(w=>workerCode(w)===to)||{};
+    const fromW=state.workers.find(w=>workerCode(w)===from||workerName(w)===from||workerDisplay(w)===from)||{}, toW=state.workers.find(w=>workerCode(w)===to||workerName(w)===to||workerDisplay(w)===to)||{};
     const rows=all.map(x=>{const src=x.rows[0]||{}; const code=x.code; const name=S(src.worker_name||x.label.replace(code,'').replace('-','').trim()); return {month_key:m, worker_employee_code:code, worker_name:name, worker_display_name:x.label, original_supervisor_employee_code:from, original_supervisor_name:workerName(fromW)||S(src.supervisor_name||''), borrowing_supervisor_employee_code:to, borrowing_supervisor_name:workerName(toW), project_id:S(src.project_id||''), project_name:S(src.project_name||''), start_at:start, end_at:end, status:'active'};});
     const r=await c.from('worker_borrowings').insert(rows).select();
     if(r.error){showMsg('تعذر حفظ الاستعارة: '+r.error.message,true);return;}
