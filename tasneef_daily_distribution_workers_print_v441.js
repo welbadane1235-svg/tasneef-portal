@@ -3,7 +3,7 @@
   'use strict';
   if(window.__tasneefDailyDistributionWorkersPrintV441) return;
   window.__tasneefDailyDistributionWorkersPrintV441 = true;
-  const VERSION='V442 ثابت';
+  const VERSION='V447 سريع';
   const S=v=>String(v??'').trim();
   const N=v=>Number(v)||0;
   const $=id=>document.getElementById(id);
@@ -215,7 +215,82 @@
     window.exportDailyManagerPDF=exportPdfV441;
     try{exportDailyManagerPDF=exportPdfV441;}catch(_){ }
   }
-  function install(){css(); wrapRender(); bindFilters(); patchPrint(); setTimeout(decorateDailyRows,80); setTimeout(decorateDailyRows,450);}
+
+
+  /* V447: حل timeout في التسجيلات اليومية - استعلام خفيف ومفهرس بدل تحميل الفترة الكبيرة */
+  function dayPlusOne(d){ try{const x=new Date(String(d)+'T12:00:00'); x.setDate(x.getDate()+1); return x.toISOString().slice(0,10);}catch(_){return d;} }
+  function rangeDays(from,to){ try{const a=new Date(String(from)+'T12:00:00'), b=new Date(String(to)+'T12:00:00'); return Math.max(1, Math.round((b-a)/86400000)+1);}catch(_){return 1;} }
+  function getRangeV447(){
+    let from=S($('dailyDateFromV10310')?.value || $('dailyDate')?.value || dailyDate() || today());
+    let to=S($('dailyDateToV10310')?.value || $('dailyDate')?.value || from);
+    if(!from) from=today(); if(!to) to=from;
+    if(to<from){ const t=from; from=to; to=t; }
+    return {from,to};
+  }
+  function setDailyMsgV447(t,bad){
+    let el=$('dailyFastMsgV447');
+    const card=$('logsBody')?.closest('.card') || $('daily');
+    if(card && !el){ el=document.createElement('div'); el.id='dailyFastMsgV447'; el.className='msg'; const anchor=card.querySelector('.filters')||card.firstChild; anchor?.insertAdjacentElement('afterend', el); }
+    if(el){ el.textContent=t; el.className='msg '+(bad?'err':''); el.classList.remove('hidden'); }
+  }
+  async function loadLogsFastV447(){
+    const c=window.sb; if(!c) return [];
+    const {from,to}=getRangeV447();
+    const sup=S($('dailySupervisor')?.value||'');
+    const proj=S($('dailyProject')?.value||'');
+    const cols='id,user_id,supervisor_id,project_id,log_date,check_in,check_out,duration_minutes,travel_minutes,visit_type,required_minutes,time_difference_minutes,time_status,notes,created_at,updated_at';
+    let q=c.from('time_logs').select(cols).gte('log_date',from).lte('log_date',to).order('log_date',{ascending:false}).order('id',{ascending:false}).limit(1200);
+    if(sup) q=q.eq('supervisor_id',sup);
+    if(proj) q=q.eq('project_id',proj);
+    const r=await q;
+    if(r.error) throw r.error;
+    return r.data||[];
+  }
+  function renderDailyFastRowsV447(rows){
+    const body=$('logsBody'); if(!body) return;
+    const q=norm($('dailySearch')?.value||'');
+    let dataRows=(rows||[]).filter(l=>S(l.visit_type||'')!=='technician_attendance');
+    if(q){ dataRows=dataRows.filter(l=>norm([supervisorNameFromId(l.supervisor_id),projectNameFromId(l.project_id),visitText(l.visit_type),l.notes].join(' ')).includes(q)); }
+    try{ window.data=window.data||{}; window.data.logs=dataRows; }catch(_){ }
+    body.innerHTML=dataRows.map(l=>{
+      const logDate=S(l.log_date||S(l.check_in).slice(0,10));
+      const actual=logActual(l), required=logRequired(l), diff=(l.time_difference_minutes!==null&&l.time_difference_minutes!==undefined)?N(l.time_difference_minutes):(actual-required);
+      const status=l.time_status || (diff<-5?'under_time':diff>5?'over_time':'within_time');
+      const badge=`<span class="badge ${status==='under_time'?'red':status==='over_time'?'yellow':'green'}">${esc(status==='under_time'?'ناقص وقت':status==='over_time'?'زيادة وقت':'ضمن الوقت')}</span>`;
+      return `<tr><td>${esc(logDate)}</td><td>${esc(supervisorNameFromId(l.supervisor_id))}</td><td>${esc(projectNameFromId(l.project_id))}</td><td>${esc(visitText(l.visit_type))}</td><td>${esc(timeOnlySafe(l.check_in))}</td><td>${esc(timeOnlySafe(l.check_out))}</td><td>${esc(minsText(required))}</td><td>${esc(minsText(actual))}</td><td>${diff>=0?'زيادة ':'نقص '}${esc(minsText(Math.abs(diff)))}</td><td>${badge}</td><td>${esc(l.travel_minutes||0)}</td><td>${esc(l.notes||'')}</td><td class="row-actions"></td><td class="row-actions"><button onclick="editTimeLog(${N(l.id)})">تعديل</button><button class="danger" onclick="deleteRow('time_logs',${N(l.id)})">حذف</button></td></tr>`;
+    }).join('') || '<tr><td colspan="14">لا توجد بيانات</td></tr>';
+    setTimeout(decorateDailyRows,60); setTimeout(decorateDailyRows,250);
+  }
+  async function renderTimeLogsFastV447(){
+    try{
+      css(); bindFilters();
+      const r=getRangeV447();
+      const days=rangeDays(r.from,r.to);
+      if(days>31){
+        setDailyMsgV447('الفترة كبيرة جدًا. اختر شهر واحد كحد أقصى حتى لا يعلق السيرفر.', true);
+        return;
+      }
+      setDailyMsgV447('جاري تحميل التسجيلات بطريقة سريعة...', false);
+      const rows=await loadLogsFastV447();
+      renderDailyFastRowsV447(rows);
+      setDailyMsgV447(`تم تحميل ${rows.length} سجل للفترة ${r.from} إلى ${r.to} بدون ضغط على السيرفر.`, false);
+    }catch(e){
+      console.warn('V447 fast daily failed',e);
+      setDailyMsgV447('تعذر تحميل الفترة بسرعة: '+(e.message||e), true);
+    }
+  }
+  function installFastRenderV447(){
+    window.renderTimeLogs=renderTimeLogsFastV447;
+    try{ renderTimeLogs=renderTimeLogsFastV447; }catch(_){ }
+    ['dailyDate','dailyDateFromV10310','dailyDateToV10310','dailySupervisor','dailyProject','dailySearch'].forEach(id=>{
+      const el=$(id); if(el && el.dataset.td447!=='1'){
+        el.dataset.td447='1';
+        el.addEventListener(id==='dailySearch'?'input':'change',()=>{ cache.attendance={}; setTimeout(renderTimeLogsFastV447,30); });
+      }
+    });
+  }
+
+  function install(){css(); wrapRender(); bindFilters(); patchPrint(); installFastRenderV447(); setTimeout(renderTimeLogsFastV447,80); setTimeout(decorateDailyRows,450);}
   document.addEventListener('DOMContentLoaded',()=>setTimeout(install,900));
   window.addEventListener('load',()=>setTimeout(install,1200));
   [1800,3000,5000,8000].forEach(t=>setTimeout(install,t));
