@@ -705,10 +705,10 @@
     const fromDate=new Date().toISOString().slice(0,10);
     let result={dist:0,projects:0,logs:0,attendance:0,users:newUser?1:0};
 
-    // V464 الحل الجذري العام: نقل واحد كامل من قاعدة البيانات نفسها.
+    // V465 الحل الجذري العام: نقل واحد كامل من قاعدة البيانات نفسها.
     // ينقل المشاريع وحساب المشرف والتوزيع الحالي/المستقبلي والسجلات اليومية الحالية/المستقبلية.
     try{
-      const rpc=await c.rpc('tasneef_transfer_supervisor_any_v464',{
+      const rpc=await c.rpc('tasneef_transfer_supervisor_any_v465',{
         p_old_code:S(oldCode),
         p_new_code:S(newCode),
         p_old_name:S(oldName),
