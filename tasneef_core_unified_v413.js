@@ -618,7 +618,7 @@
 /* ===================== V458 Smart stop + visible status + no duplicates ===================== */
 (function(){
   'use strict';
-  const VERSION='V462';
+  const VERSION='V463';
   const S=v=>String(v??'').trim();
   const N=v=>Number(v)||0;
   const $=id=>document.getElementById(id);
@@ -708,7 +708,7 @@
     // V462 الحل الجذري الفعلي: نقل واحد كامل من قاعدة البيانات نفسها.
     // ينقل المشاريع وحساب المشرف والتوزيع الحالي/المستقبلي والسجلات اليومية الحالية/المستقبلية.
     try{
-      const rpc=await c.rpc('tasneef_transfer_supervisor_root_v462',{
+      const rpc=await c.rpc('tasneef_transfer_supervisor_all_history_v463',{
         p_old_code:S(oldCode),
         p_new_code:S(newCode),
         p_old_name:S(oldName),
@@ -716,7 +716,8 @@
         p_old_user_id:oldUser&&oldUser.id!=null?Number(oldUser.id):null,
         p_new_user_id:newUser&&newUser.id!=null?Number(newUser.id):null,
         p_from_month:month,
-        p_from_date:fromDate
+        p_from_date:fromDate,
+        p_transfer_all_history:true
       });
       if(!rpc.error && rpc.data){
         const d=Array.isArray(rpc.data)?rpc.data[0]:rpc.data;
