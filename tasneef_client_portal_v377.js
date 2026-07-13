@@ -416,3 +416,79 @@ ${finalUrl}
   document.addEventListener('change', e=>{ if(e.target && e.target.id==='cpProjectV373') setTimeout(ensureAndRender, 80); });
   setTimeout(ensureAndRender, 900);
 })();
+
+
+/* V471 - رابط داخلي مختصر دائم بدون TinyURL */
+(function(){
+  'use strict';
+  if(window.__tasneefClientShortInternalV471) return;
+  window.__tasneefClientShortInternalV471 = true;
+  const $=(id)=>document.getElementById(id);
+  const esc=(v)=>String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const msg=(t,bad)=>{try{ if(typeof window.msg==='function') window.msg(t,bad?'err':'ok'); }catch(_){}};
+  const pid=()=>String($('cpProjectV373')?.value||'').trim();
+  function projectRow(projectId=pid()){return (window.data?.projects||[]).find(p=>String(p.id)===String(projectId))||null;}
+  function baseShort(){
+    const href=location.href.split('#')[0].split('?')[0];
+    if(/admin\.html$/i.test(href)) return href.replace(/admin\.html$/i,'c.html');
+    return href.replace(/[^\/]*$/,'c.html');
+  }
+  function baseLong(){
+    const href=location.href.split('#')[0].split('?')[0];
+    if(/admin\.html$/i.test(href)) return href.replace(/admin\.html$/i,'client-report.html');
+    return href.replace(/[^\/]*$/,'client-report.html');
+  }
+  function internalShortUrl(projectId=pid()){
+    return projectId ? (baseShort()+'?p='+encodeURIComponent(projectId)) : '';
+  }
+  function internalLongUrl(projectId=pid()){
+    return projectId ? (baseLong()+'?project_id='+encodeURIComponent(projectId)) : '';
+  }
+  function renderBox(){
+    const projectId=pid(); const box=$('cpLinkBoxV373'); if(!box) return '';
+    if(!projectId){box.textContent='اختر مشروعًا لإنشاء الرابط.'; return '';}
+    const shortUrl=internalShortUrl(projectId), longUrl=internalLongUrl(projectId);
+    box.innerHTML=`<div style="direction:rtl;text-align:right;font-weight:900;color:#073e31;margin-bottom:6px">رابط عميل مختصر داخلي ودائم</div>
+    <div style="direction:ltr;text-align:left;word-break:break-all"><small style="color:#60706a">الرابط المختصر:</small><br><b>${esc(shortUrl)}</b></div>
+    <div style="direction:ltr;text-align:left;word-break:break-all;margin-top:8px"><small style="color:#60706a">الرابط الطويل الاحتياطي:</small><br>${esc(longUrl)}</div>
+    <div style="direction:rtl;text-align:right;margin-top:8px;color:#137a4b;font-weight:800">هذا الرابط لا يعتمد على TinyURL، ويظل يعمل طالما الموقع وقاعدة البيانات شغالة.</div>`;
+    return shortUrl;
+  }
+  async function saveShort(projectId=pid()){
+    if(!projectId) return '';
+    const p=projectRow(projectId)||{};
+    const payload={
+      client_portal_url: internalLongUrl(projectId),
+      client_portal_short_url: internalShortUrl(projectId),
+      client_portal_updated_at: new Date().toISOString()
+    };
+    Object.assign(p,payload);
+    if(window.sb){try{await window.sb.from('projects').update(payload).eq('id', projectId);}catch(e){console.warn('V471 save short skipped',e);}}
+    return payload.client_portal_short_url;
+  }
+  window.createShortClientPortalLinkV376 = async function(){
+    const projectId=pid(); if(!projectId){msg('اختر المشروع أولًا',true); return '';}
+    const u=await saveShort(projectId); renderBox(); msg('تم إنشاء الرابط المختصر الداخلي'); return u;
+  };
+  window.copyClientPortalLinkV373 = async function(){
+    const projectId=pid(); if(!projectId){msg('اختر المشروع أولًا',true); return;}
+    const u=await saveShort(projectId); renderBox(); try{await navigator.clipboard.writeText(u);}catch(_){} msg('تم نسخ الرابط المختصر');
+  };
+  window.openClientPortalLinkV373 = async function(){
+    const projectId=pid(); if(!projectId){msg('اختر المشروع أولًا',true); return;}
+    const u=await saveShort(projectId); renderBox(); window.open(u,'_blank');
+  };
+  window.sendClientPortalWhatsappV373 = async function(){
+    const projectId=pid(); if(!projectId){msg('اختر المشروع أولًا',true); return;}
+    const u=await saveShort(projectId); renderBox();
+    const txt=`السيد رئيس الجمعية المحترم،\n\nرابط بوابة مشروعكم لدى شركة تصنيف لإدارة المرافق:\n${u}\n\nوتقبلوا تحياتنا،\nشركة تصنيف لإدارة المرافق`;
+    window.open('https://wa.me/?text='+encodeURIComponent(txt),'_blank');
+  };
+  const oldLoad=window.loadClientPortalV373;
+  if(typeof oldLoad==='function' && !oldLoad.__v471){
+    window.loadClientPortalV373=async function(){const r=await oldLoad.apply(this,arguments); setTimeout(()=>{saveShort().then(renderBox).catch(()=>renderBox());},150); return r;};
+    window.loadClientPortalV373.__v471=true;
+  }
+  document.addEventListener('change',e=>{if(e.target&&e.target.id==='cpProjectV373') setTimeout(()=>{saveShort().then(renderBox).catch(()=>renderBox());},120);});
+  setTimeout(()=>{saveShort().then(renderBox).catch(()=>renderBox());},1200);
+})();
