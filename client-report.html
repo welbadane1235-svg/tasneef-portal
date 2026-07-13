@@ -321,3 +321,47 @@ function openModal(title,sub,body,detailMode=false){$('modalTitle').textContent=
 
 </body>
 </html>
+
+<script>
+/* V472 - تذاكر العميل بدون وصف + وقت إنجليزي + تثبيت عرض التذاكر */
+(function(){
+  'use strict';
+  if(window.__tasneefClientTicketsV472) return;
+  window.__tasneefClientTicketsV472 = true;
+  const E=(v)=>String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  function raw(s){s=String(s||'open').trim().toLowerCase(); if(['closed','close','done','resolved','مغلق','مغلقة','منتهية'].includes(s))return 'closed'; if(['pending','requested','request','under_request','تحت الطلب','قيد الطلب'].includes(s))return 'pending'; if(['processing','in_progress','under_process','تحت المعالجة','قيد التنفيذ','reopened'].includes(s))return 'processing'; return 'open';}
+  function label(s){const x=raw(s); return x==='closed'?'مغلقة':x==='pending'?'تحت الطلب':x==='processing'?'تحت المعالجة':'مفتوحة';}
+  function cls(s){const x=raw(s); return x==='closed'?'green':(x==='open'?'red':'amber');}
+  function no(t){return t.ticket_number||t.ticket_no||(t.id?('T-'+String(t.id).padStart(4,'0')):'-');}
+  function close(t){return t.closed_at||t.close_date||t.closed_date||t.resolved_at||'';}
+  function fmtEN(v){if(!v)return '-'; try{return new Date(v).toLocaleString('en-US',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:true});}catch(_){return String(v||'-');}}
+  function diff(a,b){const x=new Date(a),y=new Date(b);const m=Math.max(0,Math.round((y-x)/60000));return isFinite(m)?m:0;}
+  function durText(m){m=Math.round(Number(m)||0);const d=Math.floor(m/1440),h=Math.floor((m%1440)/60),r=m%60; if(d)return `${d} d ${h} h`; if(h)return `${h} h ${r} m`; return `${r} m`;}
+  function age(t){const start=t.created_at||t.opened_at||t.date||''; if(!start)return '-'; const c=close(t); if(raw(t.status)==='closed'&&c)return 'Closed in: '+durText(diff(start,c)); return 'Open for: '+durText(diff(start,new Date().toISOString()));}
+  function typeOnly(t){
+    const fields=[t.type,t.category,t.service_type,t.issue_type,t.ticket_type,t.title,t.ticket_title].map(x=>String(x||'').trim()).filter(Boolean);
+    const joined=fields.join(' ');
+    const cats=['كهرباء','سباكة','نظافة','مصاعد','صيانة','مياه','تكييف','إنارة','حدائق','مسبح','أمن','بوابات','كاميرات','أخرى'];
+    for(const c of cats){ if(joined.includes(c)) return c; }
+    return fields[0]||'تذكرة';
+  }
+  function ticketsHtmlV472(){
+    const arr=(window.portal&&Array.isArray(window.portal.tickets))?window.portal.tickets:[];
+    const rows=arr.map(t=>`<tr><td><b>${E(no(t))}</b></td><td><b>${E(typeOnly(t))}</b></td><td><span class="badge ${cls(t.status)}">${E(label(t.status))}</span></td><td>${E(age(t))}</td><td>${E(fmtEN(t.created_at||t.opened_at||t.date))}</td><td>${E(close(t)?fmtEN(close(t)):'-')}</td></tr>`).join('');
+    return `<section class="card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">التذاكر الخاصة بالمشروع</h2><button onclick="openClientTicketFormV466()">رفع تذكرة</button></div>${rows?`<div class="table-wrap"><table style="min-width:860px"><thead><tr><th>رقم التذكرة</th><th>نوع التذكرة</th><th>حالة التذكرة</th><th>مدة التذكرة</th><th>تاريخ الفتح</th><th>تاريخ الإغلاق</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">لا توجد تذاكر ضمن الفترة المحددة.</div>'}</section>`;
+  }
+  window.ticketsHtml=ticketsHtmlV472;
+  const oldShow=window.showMain;
+  window.showMain=function(tab){
+    if(tab==='tickets'){
+      const box=document.getElementById('mainContent');
+      if(box){
+        const tabs=`<div class="tabs"><button class="tab ${tab==='summary'?'active':''}" onclick="showMain('summary')">الملخص</button><button class="tab ${tab==='logs'?'active':''}" onclick="showMain('logs')">التسجيلات اليومية</button><button class="tab ${tab==='works'?'active':''}" onclick="showMain('works')">الأعمال المنفذة</button><button class="tab ${tab==='tickets'?'active':''}" onclick="showMain('tickets')">التذاكر</button><button class="tab ${tab==='rating'?'active':''}" onclick="showMain('rating')">التقييم</button></div>`;
+        box.innerHTML=tabs+ticketsHtmlV472();
+        return;
+      }
+    }
+    if(typeof oldShow==='function') return oldShow.apply(this,arguments);
+  };
+})();
+</script>

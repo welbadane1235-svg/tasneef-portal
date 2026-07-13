@@ -492,3 +492,45 @@ ${finalUrl}
   document.addEventListener('change',e=>{if(e.target&&e.target.id==='cpProjectV373') setTimeout(()=>{saveShort().then(renderBox).catch(()=>renderBox());},120);});
   setTimeout(()=>{saveShort().then(renderBox).catch(()=>renderBox());},1200);
 })();
+
+/* V472 - إظهار رابط مختصر بدون دومين داخل الشاشة + تنبيه الدومين المخصص */
+(function(){
+  'use strict';
+  if(window.__tasneefClientShortNoDomainV472) return;
+  window.__tasneefClientShortNoDomainV472 = true;
+  const $=(id)=>document.getElementById(id);
+  const esc=(v)=>String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const msg=(t,bad)=>{try{ if(typeof window.msg==='function') window.msg(t,bad?'err':'ok'); }catch(_){} };
+  const pid=()=>String($('cpProjectV373')?.value||'').trim();
+  function baseShort(){const href=location.href.split('#')[0].split('?')[0];return /admin\.html$/i.test(href)?href.replace(/admin\.html$/i,'c.html'):href.replace(/[^\/]*$/,'c.html');}
+  function baseLong(){const href=location.href.split('#')[0].split('?')[0];return /admin\.html$/i.test(href)?href.replace(/admin\.html$/i,'client-report.html'):href.replace(/[^\/]*$/,'client-report.html');}
+  function pathOnly(id=pid()){return id?('c.html?p='+encodeURIComponent(id)):'';}
+  function fullUrl(id=pid()){return id?(baseShort()+'?p='+encodeURIComponent(id)):'';}
+  function longUrl(id=pid()){return id?(baseLong()+'?project_id='+encodeURIComponent(id)):'';}
+  function projectRow(projectId=pid()){return (window.data?.projects||[]).find(p=>String(p.id)===String(projectId))||null;}
+  function render(){
+    const box=$('cpLinkBoxV373'), id=pid(); if(!box)return'';
+    if(!id){box.textContent='اختر مشروعًا لإنشاء الرابط.';return'';}
+    const display=pathOnly(id), url=fullUrl(id);
+    box.innerHTML=`<div style="direction:rtl;text-align:right;font-weight:900;color:#073e31;margin-bottom:6px">رابط مختصر داخلي</div>
+      <div style="direction:ltr;text-align:left;word-break:break-all"><small style="color:#60706a">المعروض بدون دومين:</small><br><b>${esc(display)}</b></div>
+      <div style="direction:rtl;text-align:right;margin-top:8px;color:#9a6b00;font-weight:800">لإرسال الرابط خارج النظام يجب نسخه كرابط كامل. لإخفاء welbadane1235-svg.github.io نهائيًا يلزم ربط دومينك الخاص من إعدادات GitHub Pages.</div>`;
+    return url;
+  }
+  async function save(id=pid()){
+    if(!id)return'';
+    const p=projectRow(id)||{};
+    const payload={client_portal_url:longUrl(id),client_portal_short_url:fullUrl(id),client_portal_updated_at:new Date().toISOString()};
+    Object.assign(p,payload);
+    if(window.sb){try{await window.sb.from('projects').update(payload).eq('id',id);}catch(e){console.warn('V472 save skipped',e);}}
+    return payload.client_portal_short_url;
+  }
+  window.copyClientPortalLinkV373=async function(){const id=pid(); if(!id){msg('اختر المشروع أولًا',true);return;} const u=await save(id); render(); try{await navigator.clipboard.writeText(u);}catch(_){} msg('تم نسخ الرابط الكامل القابل للإرسال');};
+  window.openClientPortalLinkV373=async function(){const id=pid(); if(!id){msg('اختر المشروع أولًا',true);return;} const u=await save(id); render(); window.open(u,'_blank');};
+  window.createShortClientPortalLinkV376=async function(){const id=pid(); if(!id){msg('اختر المشروع أولًا',true);return'';} const u=await save(id); render(); msg('تم تجهيز الرابط المختصر الداخلي'); return u;};
+  window.sendClientPortalWhatsappV373=async function(){const id=pid(); if(!id){msg('اختر المشروع أولًا',true);return;} const u=await save(id); render(); const txt=`السيد رئيس الجمعية المحترم،\n\nرابط بوابة مشروعكم لدى شركة تصنيف لإدارة المرافق:\n${u}\n\nوتقبلوا تحياتنا،\nشركة تصنيف لإدارة المرافق`; window.open('https://wa.me/?text='+encodeURIComponent(txt),'_blank');};
+  const oldLoad=window.loadClientPortalV373;
+  if(typeof oldLoad==='function'&&!oldLoad.__v472){window.loadClientPortalV373=async function(){const r=await oldLoad.apply(this,arguments); setTimeout(()=>{save().then(render).catch(()=>render());},180); return r;}; window.loadClientPortalV373.__v472=true;}
+  document.addEventListener('change',e=>{if(e.target&&e.target.id==='cpProjectV373')setTimeout(()=>{save().then(render).catch(()=>render());},150);});
+  setTimeout(()=>{save().then(render).catch(()=>render());},1300);
+})();
