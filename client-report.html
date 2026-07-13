@@ -41,11 +41,8 @@ function decodeToken(){const u=new URL(location.href);let t=u.searchParams.get('
 function reportTitle(r){return r?.title||r?.report_title||r?.report_no||'تقرير مشروع'}
 function serviceName(s){return s?.title||s?.service_title||s?.service_type||'خدمة منفذة'}
 function ticketNo(t){return n(t?.ticket_number||t?.ticket_no||(t?.id?('T-'+String(t.id).padStart(4,'0')):'-'))}
-function ticketStatusRawV469(s){s=String(s||'open').trim();if(['closed','مغلق','مغلقة'].includes(s))return 'closed';if(['pending','requested','request','under_request','تحت الطلب','معلقة'].includes(s))return 'pending';if(['processing','in_progress','قيد التنفيذ','تحت المعالجة','reopened','معاد فتحها'].includes(s))return 'processing';return 'open'}
-function statusLabel(s){const x=ticketStatusRawV469(s);return x==='closed'?'مغلقة':x==='pending'?'تحت الطلب':x==='processing'?'تحت المعالجة':'مفتوحة'}
-function statusClass(s){const x=ticketStatusRawV469(s);return x==='closed'?'green':(x==='pending'||x==='processing'?'amber':'red')}
-function ticketCloseDateV469(t){return t.closed_at||t.close_date||t.closed_date||t.resolved_at||''}
-function ticketDurationV469(t){const start=t.created_at||t.opened_at||t.date||'';const end=ticketCloseDateV469(t)||(t.updated_at||'');if(!start)return '-';const minutes=(a,b)=>{const x=new Date(a),y=new Date(b);const m=Math.round((y-x)/60000);return isFinite(m)&&m>0?m:0};const txt=m=>{m=Math.max(0,Math.round(Number(m)||0));const d=Math.floor(m/1440),h=Math.floor((m%1440)/60),r=m%60;if(d)return `${d} يوم ${h} س`;if(h)return `${h} س ${r} د`;return `${r} د`;};if(ticketStatusRawV469(t.status)==='closed' && end)return 'استغرق الإقفال: '+txt(minutes(start,end));return 'مفتوحة منذ: '+txt(minutes(start,new Date().toISOString()))}
+function statusLabel(s){return ({open:'مفتوحة',processing:'تحت المعالجة',in_progress:'تحت المعالجة',pending:'تحت المعالجة',reopened:'تحت المعالجة',closed:'مغلقة'}[String(s||'open')]||'مفتوحة')}
+function statusClass(s){return String(s||'open')==='closed'?'green':(['processing','in_progress','pending','reopened'].includes(String(s||''))?'amber':'red')}
 function asImages(v){if(!v)return[];if(Array.isArray(v))return v.filter(Boolean);try{const x=JSON.parse(v);return Array.isArray(x)?x.filter(Boolean):[]}catch(e){return[]}}
 function getSrc(x){return typeof x==='string'?x:(x?.url||x?.data||x?.src||'')}
 function before(s){return asImages(s.before_images||s.images_before)}function during(s){return asImages(s.during_images||s.images_during)}function after(s){return asImages(s.after_images||s.images_after||s.after)}
@@ -60,7 +57,7 @@ async function loadData(){
   const [logs,tickets,reports]=await Promise.all([logsQ,ticQ,repQ]);portal.timeLogs=logs.data||[];portal.tickets=tickets.data||[];portal.reports=reports.data||[];
   // V467: إذا منعت RLS أو اختلاف الأعمدة ظهور التسجيلات/التذاكر، نقرأها عبر RPC آمن من السيرفر.
   try{
-    const rr=await sb.rpc('tasneef_client_portal_records_v468',{p_project_id:String(portal.projectId),p_from:portal.from||null,p_to:portal.to||null});
+    const rr=await sb.rpc('tasneef_client_portal_records_v467',{p_project_id:String(portal.projectId),p_from:portal.from||null,p_to:portal.to||null});
     if(!rr.error && rr.data){
       const obj=(typeof rr.data==='string')?JSON.parse(rr.data):rr.data;
       if(Array.isArray(obj.logs) && obj.logs.length) portal.timeLogs=obj.logs;
@@ -82,7 +79,7 @@ function summaryHtml(){const st=stats();return `<section class="grid"><div class
 function logsHtml(){const rows=portal.timeLogs.map(l=>`<tr><td>${E(fmtDate(l.log_date||l.check_in))}</td><td>${E(fmt(l.check_in))}</td><td>${E(l.check_out?fmt(l.check_out):'-')}</td><td>${E(minToHr(Number(l.duration_minutes)||minutesBetween(l.check_in,l.check_out)))}</td><td>${E(l.time_status||'-')}</td><td>${E(l.notes||'-')}</td></tr>`).join('');return `<section class="card"><h2>التسجيلات اليومية</h2>${rows?`<div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>الدخول</th><th>الخروج</th><th>المدة</th><th>حالة الوقت</th><th>ملاحظات</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">لا توجد تسجيلات يومية ضمن الفترة المحددة.</div>'}</section>`}
 function worksHtml(){const annual=annualRows();const annualTable=annual.length?`<section class="card"><h2>الأعمال السنوية للمشروع</h2><div class="table-wrap"><table><thead><tr><th>الخدمة</th><th>عدد الزيارات السنوية</th><th>المنفذ</th><th>المتبقي</th><th>الحالة</th><th>ملاحظات</th></tr></thead><tbody>${annual.map(r=>`<tr><td><b>${E(r.name)}</b></td><td>${n(r.visits)}</td><td><span class="badge green">${n(r.done)}</span></td><td><span class="badge amber">${n(r.remain)}</span></td><td>${E(r.status)}</td><td>${E(r.notes||'-')}</td></tr>`).join('')}</tbody></table></div></section>`:`<section class="card"><h2>الأعمال السنوية للمشروع</h2><div class="empty">لا توجد أعمال سنوية مسجلة لهذا المشروع في بيانات العقد.</div></section>`;const cards=portal.reports.map(r=>{const ss=portal.services.filter(s=>String(s.report_id)===String(r.id));return `<div class="smart-card"><h3>${E(reportTitle(r))}</h3><p><span class="badge blue">${E(fmtDate(r.report_date||r.created_at))}</span> <span class="badge green">${n(ss.length)} أعمال مصورة</span></p><p style="color:#60706a;line-height:1.7">${E(r.executive_summary||'تم توثيق الأعمال المنفذة ضمن هذا التقرير.')}</p><button onclick="openReportDetails('${E(r.id)}')">عرض التفاصيل والصور</button></div>`}).join('');return `${annualTable}<section class="card"><h2>التقارير المصورة</h2>${cards?`<div class="service-gates">${cards}</div>`:'<div class="empty">لا توجد تقارير مصورة ضمن الفترة المحددة.</div>'}</section>`}
 function cleanTicketTitle(x){return E(x.title||x.ticket_title||x.type||'تذكرة مشروع')}
-function ticketsHtml(){const rows=portal.tickets.map(x=>{const close=ticketCloseDateV469(x);return `<tr><td><b>${E(ticketNo(x))}</b></td><td><b>${cleanTicketTitle(x)}</b><br><small>${E(x.description||'')}</small></td><td><span class="badge ${statusClass(x.status)}">${E(statusLabel(x.status))}</span></td><td>${E(ticketDurationV469(x))}</td><td>${E(fmt(x.created_at))}</td><td>${E(close?fmt(close):'-')}</td></tr>`}).join('');return `<section class="card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">التذاكر الخاصة بالمشروع</h2><button onclick="openClientTicketFormV466()">رفع تذكرة</button></div>${rows?`<div class="table-wrap"><table style="min-width:920px"><thead><tr><th>رقم التذكرة</th><th>عنوان التذكرة</th><th>حالة التذكرة</th><th>مدة التذكرة</th><th>تاريخ الفتح</th><th>تاريخ الإغلاق</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">لا توجد تذاكر ضمن الفترة المحددة.</div>'}</section>`}
+function ticketsHtml(){const rows=portal.tickets.map(x=>`<tr><td><b>${E(ticketNo(x))}</b></td><td><b>${cleanTicketTitle(x)}</b></td><td><span class="badge ${statusClass(x.status)}">${E(statusLabel(x.status))}</span></td><td>${E(fmtDate(x.created_at))}</td><td>${E(x.closed_at?fmtDate(x.closed_at):'-')}</td></tr>`).join('');return `<section class="card"><h2>التذاكر الخاصة بالمشروع</h2><p style="color:#60706a;line-height:1.8">يظهر للعميل رقم التذكرة، العنوان، الحالة، وتواريخ المتابعة بشكل مختصر ومنظم.</p>${rows?`<div class="table-wrap"><table style="min-width:620px"><thead><tr><th>رقم التذكرة</th><th>عنوان التذكرة</th><th>الحالة</th><th>تاريخ الفتح</th><th>تاريخ الإغلاق</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">لا توجد تذاكر ضمن الفترة المحددة.</div>'}</section>`}
 function ratingHtml(){return `<section class="card"><h2>تقييم الخدمة</h2><p style="color:#60706a;line-height:1.8">تقييمكم يساعدنا في تحسين مستوى التشغيل والخدمة.</p>${ratingFormHtml()}</section><section class="card"><h2>التقييمات السابقة</h2>${ratingsTable()}</section>`}
 function ratingsTable(){const rows=portal.ratings.map(r=>`<tr><td>${E(fmt(r.created_at))}</td><td>${E(r.rating||'-')}</td><td>${E(r.comment||'-')}</td><td>${r.followup_requested?'نعم':'لا'}</td></tr>`).join('');return rows?`<div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>التقييم</th><th>الملاحظة</th><th>طلب متابعة</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">لا توجد تقييمات سابقة ضمن الفترة.</div>'}
 function ratingFormHtml(){return `<label>التقييم العام</label><div class="stars">${[5,4,3,2,1].map(n=>`<button type="button" id="star${n}" onclick="setRating(${n})">★</button>`).join('')}</div><label>ملاحظات العميل</label><textarea id="ratingComment" rows="5" placeholder="اكتب ملاحظتك هنا"></textarea><label style="display:flex;align-items:center;gap:8px"><input id="ratingFollow" type="checkbox" style="width:auto"> أطلب زيارة متابعة</label><button onclick="submitRating(this)">إرسال التقييم</button>`}
@@ -138,13 +135,8 @@ function openModal(title,sub,body,detailMode=false){$('modalTitle').textContent=
     return `<section class="card"><h2>التسجيلات اليومية</h2>${rows?`<div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>الدخول</th><th>الخروج / المتوقع</th><th>الوقت المطلوب</th><th>المدة</th><th>حالة الوقت</th><th>ملاحظات</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">لا توجد تسجيلات يومية ضمن الفترة المحددة.</div>'}</section>`;
   }
   function ticketsHtmlV466(){
-    const raw=s=>{s=String(s||'open').trim();if(['closed','مغلق','مغلقة'].includes(s))return 'closed';if(['pending','requested','request','under_request','تحت الطلب','معلقة'].includes(s))return 'pending';if(['processing','in_progress','قيد التنفيذ','تحت المعالجة','reopened','معاد فتحها'].includes(s))return 'processing';return 'open'};
-    const label=s=>{const x=raw(s);return x==='closed'?'مغلقة':x==='pending'?'تحت الطلب':x==='processing'?'تحت المعالجة':'مفتوحة'};
-    const cls=s=>{const x=raw(s);return x==='closed'?'green':(x==='pending'||x==='processing'?'amber':'red')};
-    const close=x=>x.closed_at||x.close_date||x.closed_date||x.resolved_at||'';
-    const dur=x=>{const st=x.created_at||x.opened_at||x.date||'';const en=close(x)||(x.updated_at||'');if(!st)return '-';const mm=diffMinutes(st, raw(x.status)==='closed'&&en?en:new Date().toISOString());return (raw(x.status)==='closed'&&en?'استغرق الإقفال: ':'مفتوحة منذ: ')+minText(mm)};
-    const rows=(portal.tickets||[]).map(x=>`<tr><td><b>${E2((x.ticket_number||x.ticket_no||(x.id?('T-'+String(x.id).padStart(4,'0')):'-')))}</b></td><td><b>${E2(x.title||x.ticket_title||x.type||'تذكرة مشروع')}</b><br><small>${E2(x.description||'')}</small></td><td><span class="badge ${cls(x.status)}">${E2(label(x.status))}</span></td><td>${E2(dur(x))}</td><td>${E2(fmtSafe(x.created_at))}</td><td>${E2(close(x)?fmtSafe(close(x)):'-')}</td></tr>`).join('');
-    return `<section class="card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">التذاكر الخاصة بالمشروع</h2><button onclick="openClientTicketFormV466()">رفع تذكرة</button></div>${rows?`<div class="table-wrap"><table style="min-width:920px"><thead><tr><th>رقم التذكرة</th><th>عنوان التذكرة</th><th>حالة التذكرة</th><th>مدة التذكرة</th><th>تاريخ الفتح</th><th>تاريخ الإغلاق</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">لا توجد تذاكر ضمن الفترة المحددة.</div>'}</section>`;
+    const rows=(portal.tickets||[]).map(x=>`<tr><td><b>${E2((x.ticket_number||x.ticket_no||(x.id?('T-'+String(x.id).padStart(4,'0')):'-')))}</b></td><td><b>${E2(x.title||x.ticket_title||x.type||'تذكرة مشروع')}</b><br><small>${E2(x.description||'')}</small></td><td><span class="badge ${String(x.status||'open')==='closed'?'green':(String(x.status||'')==='processing'||String(x.status||'')==='in_progress'?'amber':'red')}">${E2(({open:'مفتوحة',processing:'قيد التنفيذ',in_progress:'قيد التنفيذ',closed:'مغلقة',pending:'معلقة',reopened:'معاد فتحها'}[String(x.status||'open')]||x.status||'مفتوحة'))}</span></td><td>${E2(fmtSafe(x.created_at))}</td><td>${E2(x.closed_at?fmtSafe(x.closed_at):'-')}</td></tr>`).join('');
+    return `<section class="card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">التذاكر الخاصة بالمشروع</h2><button onclick="openClientTicketFormV466()">رفع تذكرة</button></div><p style="color:#60706a;line-height:1.8">يمكنكم رفع تذكرة مرتبطة تلقائيًا بهذا المشروع، وستظهر مباشرة لدى الإدارة.</p>${rows?`<div class="table-wrap"><table style="min-width:760px"><thead><tr><th>رقم التذكرة</th><th>عنوان التذكرة</th><th>الحالة</th><th>تاريخ الفتح</th><th>تاريخ الإغلاق</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">لا توجد تذاكر ضمن الفترة المحددة.</div>'}</section>`;
   }
   function ticketFormHtml(){return `<div class="form-grid"><div><label>نوع المشكلة</label><select id="clientTicketTypeV466"><option>صيانة</option><option>نظافة</option><option>مياه</option><option>كهرباء</option><option>مصاعد</option><option>أخرى</option></select></div><div><label>رقم الوحدة / الموقع</label><input id="clientTicketLocationV466" placeholder="مثال: شقة 12 / البيسمنت / المدخل"></div></div><label>عنوان التذكرة</label><input id="clientTicketTitleV466" placeholder="اكتب عنوان مختصر للتذكرة"><label>وصف المشكلة</label><textarea id="clientTicketDescV466" rows="5" placeholder="اكتب تفاصيل المشكلة"></textarea><button onclick="submitClientTicketV466(this)">إرسال التذكرة</button>`;}
   G.openClientTicketFormV466=function(){ if(typeof G.openModal==='function') G.openModal('رفع تذكرة',portal.projectName||'المشروع',ticketFormHtml()); };
@@ -191,66 +183,5 @@ function openModal(title,sub,body,detailMode=false){$('modalTitle').textContent=
 })();
 </script>
 
-
-<script>
-/* V469 - بوابة العميل: مدة التذاكر + إقفال الخروج المفقود حسب وقت المشروع */
-(function(){
-  'use strict';
-  if(window.__tasneefClientPortalV469) return;
-  window.__tasneefClientPortalV469 = true;
-  const G=window;
-  const $=id=>document.getElementById(id);
-  const E=v=>String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const N=v=>Number(String(v??'').replace(/,/g,''))||0;
-  const fmtSafe=v=>{try{return v?new Date(v).toLocaleString('ar-SA',{year:'numeric',month:'2-digit',day:'2-digit',hour:'numeric',minute:'2-digit'}):'-';}catch(_){return v||'-';}};
-  const minText=m=>{m=Math.max(0,Math.round(N(m)));const h=Math.floor(m/60),r=m%60;return h?`${h} س ${r} د`:`${r} د`;};
-  function diff(a,b){const x=new Date(a),y=new Date(b);const m=Math.round((y-x)/60000);return isFinite(m)&&m>0?m:0;}
-  function rawStatus(s){s=String(s||'open'); if(['closed','مغلق','مغلقة'].includes(s)) return 'closed'; if(['pending','requested','request','under_request','تحت الطلب','معلقة'].includes(s)) return 'pending'; if(['processing','in_progress','قيد التنفيذ','تحت المعالجة'].includes(s)) return 'processing'; return 'open';}
-  function ticketStatusLabel(s){const x=rawStatus(s); return x==='closed'?'مغلقة':x==='pending'?'تحت الطلب':x==='processing'?'تحت المعالجة':'مفتوحة';}
-  function ticketStatusClass(s){const x=rawStatus(s); return x==='closed'?'green':x==='pending'?'amber':x==='processing'?'amber':'red';}
-  function ticketNumber(t){return t.ticket_number||t.ticket_no||(t.id?('T-'+String(t.id).padStart(4,'0')):'-');}
-  function ticketAge(t){const start=t.created_at||t.opened_at||t.date||''; const end=t.closed_at||t.close_date||t.closed_date||t.resolved_at||t.updated_at||''; if(!start)return '-'; if(rawStatus(t.status)==='closed'&&end)return 'استغرق الإقفال: '+minText(diff(start,end)); return 'مفتوحة منذ: '+minText(diff(start,new Date().toISOString()));}
-  function ticketsHtmlV469(){
-    const rows=(portal.tickets||[]).map(x=>`<tr><td><b>${E(ticketNumber(x))}</b></td><td><b>${E(x.title||x.ticket_title||x.type||'تذكرة مشروع')}</b><br><small>${E(x.description||'')}</small></td><td><span class="badge ${ticketStatusClass(x.status)}">${E(ticketStatusLabel(x.status))}</span></td><td>${E(ticketAge(x))}</td><td>${E(fmtSafe(x.created_at))}</td><td>${E((rawStatus(x.status)==='closed'&&(x.closed_at||x.close_date||x.resolved_at))?fmtSafe(x.closed_at||x.close_date||x.resolved_at):'-')}</td></tr>`).join('');
-    return `<section class="card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">التذاكر الخاصة بالمشروع</h2><button onclick="openClientTicketFormV466()">رفع تذكرة</button></div>${rows?`<div class="table-wrap"><table style="min-width:860px"><thead><tr><th>رقم التذكرة</th><th>عنوان التذكرة</th><th>حالة التذكرة</th><th>مدة التذكرة</th><th>تاريخ الفتح</th><th>تاريخ الإغلاق</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">لا توجد تذاكر ضمن الفترة المحددة.</div>'}</section>`;
-  }
-  G.ticketsHtml=ticketsHtmlV469;
-  const oldShow=G.showMain;
-  G.showMain=function(tab){
-    if(tab==='tickets'){
-      const box=$('mainContent'); if(!box) return oldShow&&oldShow(tab);
-      const tabs=`<div class="tabs"><button class="tab ${tab==='summary'?'active':''}" onclick="showMain('summary')">الملخص</button><button class="tab ${tab==='logs'?'active':''}" onclick="showMain('logs')">التسجيلات اليومية</button><button class="tab ${tab==='works'?'active':''}" onclick="showMain('works')">الأعمال المنفذة</button><button class="tab ${tab==='tickets'?'active':''}" onclick="showMain('tickets')">التذاكر</button><button class="tab ${tab==='rating'?'active':''}" onclick="showMain('rating')">التقييم</button></div>`;
-      box.innerHTML=tabs+ticketsHtmlV469(); return;
-    }
-    return oldShow&&oldShow.apply(this,arguments);
-  };
-})();
-</script>
-
-
-<script>
-/* V469 - تثبيت عرض التذاكر للعميل + مدة التذكرة */
-(function(){
-  'use strict';
-  if(window.__tasneefClientPortalV469) return;
-  window.__tasneefClientPortalV469=true;
-  const E=v=>String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]||c));
-  const fmt=v=>{try{return v?new Date(v).toLocaleString('ar-SA',{year:'numeric',month:'2-digit',day:'2-digit',hour:'numeric',minute:'2-digit'}):'-'}catch(_){return v||'-'}};
-  const raw=s=>{s=String(s||'open').trim();if(['closed','مغلق','مغلقة'].includes(s))return 'closed';if(['pending','requested','request','under_request','تحت الطلب','معلقة'].includes(s))return 'pending';if(['processing','in_progress','قيد التنفيذ','تحت المعالجة','reopened','معاد فتحها'].includes(s))return 'processing';return 'open'};
-  const label=s=>{const x=raw(s);return x==='closed'?'مغلقة':x==='pending'?'تحت الطلب':x==='processing'?'تحت المعالجة':'مفتوحة'};
-  const cls=s=>{const x=raw(s);return x==='closed'?'green':(x==='pending'||x==='processing'?'amber':'red')};
-  const no=t=>t.ticket_number||t.ticket_no||(t.id?('T-'+String(t.id).padStart(4,'0')):'-');
-  const close=t=>t.closed_at||t.close_date||t.closed_date||t.resolved_at||'';
-  function mins(a,b){const x=new Date(a),y=new Date(b);const m=Math.round((y-x)/60000);return isFinite(m)&&m>0?m:0}
-  function mt(m){m=Math.max(0,Math.round(Number(m)||0));const d=Math.floor(m/1440),h=Math.floor((m%1440)/60),r=m%60;if(d)return `${d} يوم ${h} س`;if(h)return `${h} س ${r} د`;return `${r} د`}
-  function dur(t){const st=t.created_at||t.opened_at||t.date||'';const en=close(t)||(t.updated_at||'');if(!st)return '-';if(raw(t.status)==='closed'&&en)return 'استغرق الإقفال: '+mt(mins(st,en));return 'مفتوحة منذ: '+mt(mins(st,new Date().toISOString()))}
-  function ticketsHtml469(){const arr=(window.portal&&window.portal.tickets)||[];const rows=arr.map(t=>`<tr><td><b>${E(no(t))}</b></td><td><b>${E(t.title||t.ticket_title||t.type||'تذكرة مشروع')}</b><br><small>${E(t.description||'')}</small></td><td><span class="badge ${cls(t.status)}">${E(label(t.status))}</span></td><td>${E(dur(t))}</td><td>${E(fmt(t.created_at))}</td><td>${E(close(t)?fmt(close(t)):'-')}</td></tr>`).join('');return `<section class="card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">التذاكر الخاصة بالمشروع</h2><button onclick="openClientTicketFormV466()">رفع تذكرة</button></div>${rows?`<div class="table-wrap"><table style="min-width:920px"><thead><tr><th>رقم التذكرة</th><th>عنوان التذكرة</th><th>حالة التذكرة</th><th>مدة التذكرة</th><th>تاريخ الفتح</th><th>تاريخ الإغلاق</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">لا توجد تذاكر ضمن الفترة المحددة.</div>'}</section>`}
-  const old=window.showMain;
-  window.showMain=function(tab){
-    if(tab==='tickets'){const box=document.getElementById('mainContent');if(box){const tabs=`<div class="tabs"><button class="tab ${tab==='summary'?'active':''}" onclick="showMain('summary')">الملخص</button><button class="tab ${tab==='logs'?'active':''}" onclick="showMain('logs')">التسجيلات اليومية</button><button class="tab ${tab==='works'?'active':''}" onclick="showMain('works')">الأعمال المنفذة</button><button class="tab ${tab==='tickets'?'active':''}" onclick="showMain('tickets')">التذاكر</button><button class="tab ${tab==='rating'?'active':''}" onclick="showMain('rating')">التقييم</button></div>`;box.innerHTML=tabs+ticketsHtml469();return;}}
-    return old&&old.apply(this,arguments);
-  };
-})();
-</script>
 </body>
 </html>

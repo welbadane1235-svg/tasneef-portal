@@ -204,7 +204,7 @@
   }
   function renderKpis(){ const s=stats(); const items=[['إجمالي ساعات العمل',minTxt(s.minutes)],['أيام الحضور',s.days],['المتبقي على العقد',s.contractLeft],['الأعمال السنوية المنفذة',s.annualDone],['تذاكر مفتوحة',s.open],['متوسط التقييم',s.avg]]; $('cpKpisV373').innerHTML=items.map(i=>`<div class="cp-v373-kpi"><small>${i[0]}</small><b>${i[1]}</b></div>`).join(''); }
   function renderLogs(){ const rows=state.logs.slice(0,80).map(l=>`<tr><td>${esc(dateOnly(l.log_date||l.check_in))}</td><td>${esc(supervisorName(l.supervisor_id))}</td><td>${esc(fmt(l.check_in))}</td><td>${esc(l.check_out?fmt(l.check_out):'-')}</td><td>${esc(minTxt(Number(l.duration_minutes)||minutesBetween(l.check_in,l.check_out)))}</td></tr>`).join(''); $('cpLogsBoxV373').innerHTML=rows?`<div class="table-wrap"><table class="cp-v373-table"><thead><tr><th>التاريخ</th><th>المشرف</th><th>دخول</th><th>خروج</th><th>المدة</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="cp-v373-empty">لا توجد تسجيلات ضمن الفترة.</div>'; }
-  function renderTickets(){ const raw=s=>{s=String(s||'open').trim();if(['closed','مغلق','مغلقة'].includes(s))return 'closed';if(['pending','requested','request','under_request','تحت الطلب','معلقة'].includes(s))return 'pending';if(['processing','in_progress','قيد التنفيذ','تحت المعالجة','reopened','معاد فتحها'].includes(s))return 'processing';return 'open'}; const lbl=s=>{const x=raw(s);return x==='closed'?'مغلقة':x==='pending'?'تحت الطلب':x==='processing'?'تحت المعالجة':'مفتوحة'}; const cls=s=>{const x=raw(s);return x==='closed'?'green':(x==='pending'||x==='processing'?'amber':'red')}; const close=t=>t.closed_at||t.close_date||t.closed_date||t.resolved_at||''; const age=t=>{const st=t.created_at||t.opened_at||t.date||''; const en=close(t)||(t.updated_at||''); if(!st)return '-'; const mm=minutesBetween(st,raw(t.status)==='closed'&&en?en:new Date().toISOString()); return (raw(t.status)==='closed'&&en?'استغرق الإقفال: ':'مفتوحة منذ: ')+minTxt(mm)}; const rows=state.tickets.slice(0,80).map(t=>`<tr><td><b>${esc(ticketNo(t))}</b></td><td><b>${esc(t.title||t.ticket_title||t.type||'تذكرة مشروع')}</b><br><small>${esc(t.description||'')}</small></td><td><span class="cp-v373-badge ${cls(t.status)}">${esc(lbl(t.status))}</span></td><td>${esc(age(t))}</td><td>${esc(fmt(t.created_at))}</td><td>${esc(close(t)?fmt(close(t)):'-')}</td></tr>`).join(''); $('cpTicketsBoxV373').innerHTML=rows?`<div class="table-wrap"><table class="cp-v373-table"><thead><tr><th>رقم التذكرة</th><th>عنوان التذكرة</th><th>حالة التذكرة</th><th>مدة التذكرة</th><th>تاريخ الفتح</th><th>تاريخ الإغلاق</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="cp-v373-empty">لا توجد تذاكر ضمن الفترة.</div>'; }
+  function renderTickets(){ const rows=state.tickets.slice(0,80).map(t=>`<tr><td><b>${esc(ticketNo(t))}</b></td><td>${esc(t.title||'-')}<br><small>${esc(t.description||'')}</small></td><td><span class="cp-v373-badge ${statusClass(t.status)}">${esc(statusLabel(t.status))}</span></td><td>${esc(fmt(t.created_at))}</td><td>${esc(t.closure_note||t.close_note||'-')}</td></tr>`).join(''); $('cpTicketsBoxV373').innerHTML=rows?`<div class="table-wrap"><table class="cp-v373-table"><thead><tr><th>الرقم</th><th>التذكرة</th><th>الحالة</th><th>التاريخ</th><th>الإجراء</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="cp-v373-empty">لا توجد تذاكر ضمن الفترة.</div>'; }
   function renderReports(){
     const annual=annualRows();
     const annualHtml=annual.length?`<div class="table-wrap"><table class="cp-v373-table"><thead><tr><th>الخدمة السنوية</th><th>عدد الزيارات</th><th>المنفذ</th><th>المتبقي</th><th>الحالة</th><th>ملاحظات</th></tr></thead><tbody>${annual.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td>${r.visits}</td><td><span class="cp-v373-badge green">${r.done}</span></td><td><span class="cp-v373-badge amber">${r.remain}</span></td><td>${esc(r.status)}</td><td>${esc(r.notes||'-')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="cp-v373-empty">لا توجد أعمال سنوية مسجلة لهذا المشروع في بيانات العقد.</div>';
@@ -442,41 +442,5 @@ ${finalUrl}
   if(typeof oldRender==='function' && !oldRender.__v466){
     window.renderClientPortalV373=function(){const res=oldRender.apply(this,arguments);setTimeout(()=>{try{window.__cpV466ProjectId=$('cpProjectV373')?.value||'';window.__cpV466StateLogs=(window.state&&window.state.logs)||[];renderLogsBox();}catch(_){}},250);return res;};
     window.renderClientPortalV373.__v466=true;
-  }
-})();
-
-/* V468 - بوابة العميل: مدة التذاكر + عدم اعتبار الخروج التقديري خروجًا فعليًا في العرض */
-(function(){
-  'use strict';
-  if(window.__tasneefAdminClientPortalV468) return;
-  window.__tasneefAdminClientPortalV468 = true;
-  const $=id=>document.getElementById(id);
-  const esc=v=>String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const n=v=>Number(String(v??'').replace(/,/g,''))||0;
-  const fmt=v=>{try{return v?new Date(v).toLocaleString('ar-SA',{year:'numeric',month:'2-digit',day:'2-digit',hour:'numeric',minute:'2-digit'}):'-';}catch(_){return v||'-';}};
-  const dOnly=v=>String(v||'').slice(0,10);
-  const minTxt=m=>{m=Math.max(0,Math.round(n(m)));const h=Math.floor(m/60),r=m%60;return h?`${h} س ${r} د`:`${r} د`;};
-  function diff(a,b){const x=new Date(a),y=new Date(b);const m=Math.round((y-x)/60000);return isFinite(m)&&m>0?m:0;}
-  function ticketNo(t){return t?.ticket_number || t?.ticket_no || (t?.id?('T-'+String(t.id).padStart(4,'0')):'-');}
-  function stRaw(s){s=String(s||'open'); if(['closed','مغلق','مغلقة'].includes(s)) return 'closed'; if(['pending','requested','request','under_request','تحت الطلب','معلقة'].includes(s)) return 'pending'; if(['processing','in_progress','قيد التنفيذ','تحت المعالجة'].includes(s)) return 'processing'; return 'open';}
-  function stLabel(s){const x=stRaw(s); return x==='closed'?'مغلقة':x==='pending'?'تحت الطلب':x==='processing'?'تحت المعالجة':'مفتوحة';}
-  function stClass(s){const x=stRaw(s); return x==='closed'?'green':x==='pending'?'amber':x==='processing'?'amber':'red';}
-  function ticketAge(t){const start=t.created_at||t.opened_at||t.date||''; const end=t.closed_at||t.close_date||t.closed_date||t.resolved_at||t.updated_at||''; if(!start) return '-'; if(stRaw(t.status)==='closed' && end){return 'استغرق الإقفال: '+minTxt(diff(start,end));} return 'مفتوحة منذ: '+minTxt(diff(start,new Date().toISOString()));}
-  function renderTicketsBox(){
-    const box=$('cpTicketsBoxV373');
-    const arr=(window.__cpV468Tickets||[]);
-    if(!box) return;
-    const rows=arr.slice(0,80).map(t=>`<tr><td><b>${esc(ticketNo(t))}</b></td><td><b>${esc(t.title||t.ticket_title||t.type||'تذكرة مشروع')}</b><br><small>${esc(t.description||'')}</small></td><td><span class="cp-v373-badge ${stClass(t.status)}">${esc(stLabel(t.status))}</span></td><td>${esc(ticketAge(t))}</td><td>${esc(fmt(t.created_at))}</td><td>${esc((stRaw(t.status)==='closed'&&(t.closed_at||t.close_date||t.resolved_at))?fmt(t.closed_at||t.close_date||t.resolved_at):'-')}</td></tr>`).join('');
-    box.innerHTML=rows?`<div class="table-wrap"><table class="cp-v373-table"><thead><tr><th>رقم التذكرة</th><th>عنوان التذكرة</th><th>حالة التذكرة</th><th>مدة التذكرة</th><th>تاريخ الفتح</th><th>تاريخ الإغلاق</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="cp-v373-empty">لا توجد تذاكر ضمن الفترة.</div>';
-  }
-  const oldLoad=window.loadClientPortalV373;
-  if(typeof oldLoad==='function' && !oldLoad.__v468){
-    window.loadClientPortalV373=async function(btn){const r=await oldLoad.apply(this,arguments);setTimeout(()=>{try{window.__cpV468Tickets=(window.state&&window.state.tickets)||[];renderTicketsBox();}catch(_){}},80);return r;};
-    window.loadClientPortalV373.__v468=true;
-  }
-  const oldRender=window.renderClientPortalV373;
-  if(typeof oldRender==='function' && !oldRender.__v468){
-    window.renderClientPortalV373=function(){const r=oldRender.apply(this,arguments);setTimeout(()=>{try{window.__cpV468Tickets=(window.state&&window.state.tickets)||[];renderTicketsBox();}catch(_){}},250);return r;};
-    window.renderClientPortalV373.__v468=true;
   }
 })();
