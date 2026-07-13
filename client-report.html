@@ -21,6 +21,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $=id=>document.getElementById(id);
 const E=s=>String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let portal={projectId:'',projectName:'',from:'',to:'',project:null,smart:null,reports:[],services:[],tickets:[],timeLogs:[],ratings:[],rating:0};
+window.portal=portal;
 function toast(t,err){const x=$('toast');x.textContent=t;x.style.background=err?'#b83232':'#0A4033';x.classList.add('show');setTimeout(()=>x.classList.remove('show'),3200)}
 function today(){return new Date().toISOString().slice(0,10)}
 function monthStart(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`}
@@ -102,268 +103,112 @@ function openModal(title,sub,body,detailMode=false){$('modalTitle').textContent=
 </script>
 
 <script>
-/* V467 - بوابة العميل: إظهار التسجيلات والتذاكر عبر RPC + حذف العبارة */
+/* V474 - بوابة العميل: تثبيت نسخة واحدة فقط للتذاكر + بدون وصف + تواريخ إنجليزي */
 (function(){
   'use strict';
-  if(window.__tasneefClientPortalV466) return;
-  window.__tasneefClientPortalV466 = true;
-  const G = window;
-  const $ = (id)=>document.getElementById(id);
-  const E2 = (v)=>String(v ?? '').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const N = (v)=>Number(String(v ?? '').replace(/,/g,''))||0;
-  const dateOnly2 = (v)=>String(v||'').slice(0,10);
-  const fmtSafe = (v)=>{ try{return v?new Date(v).toLocaleString('ar-SA',{year:'numeric',month:'2-digit',day:'2-digit',hour:'numeric',minute:'2-digit'}):'-';}catch(_){return v||'-';} };
-  const minText = (m)=>{m=Math.max(0,Math.round(N(m))); const h=Math.floor(m/60), r=m%60; return h?`${h} س ${r} د`:`${r} د`;};
-  function parseDate(v){ const d=new Date(v); return isNaN(d.getTime())?null:d; }
-  function addMinutesTo(v,m){ const d=parseDate(v); if(!d || !m) return ''; d.setMinutes(d.getMinutes()+N(m)); return d.toISOString(); }
-  function diffMinutes(a,b){ const x=parseDate(a), y=parseDate(b); if(!x||!y) return 0; const m=Math.round((y-x)/60000); return isFinite(m)&&m>0?m:0; }
-  function requiredMinutes(){
-    const p=portal.project||{};
-    const keys=['required_daily_minutes','required_minutes','required_time_minutes','visit_minutes','daily_minutes','expected_minutes','required_duration_minutes','duration_minutes','service_minutes'];
-    for(const k of keys){ const v=N(p[k]); if(v>0) return v; }
-    const txt=String(p.required_time||p.required_duration||p.visit_duration||'').trim();
-    const hm=txt.match(/(\d{1,2})\s*[:٫.]\s*(\d{1,2})/); if(hm) return N(hm[1])*60+N(hm[2]);
-    const nm=txt.match(/\d+/); if(nm) return N(nm[0]);
-    return 0;
+  window.__tasneefClientPortalV474 = true;
+  const html = v => String(v ?? '').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const getPortal = () => (typeof portal !== 'undefined' ? portal : (window.portal || {tickets:[]}));
+  function rawStatus(s){
+    s = String(s || 'open').trim().toLowerCase();
+    if(['closed','close','done','resolved','مغلق','مغلقة','منتهية','منفذة'].includes(s)) return 'closed';
+    if(['pending','requested','request','under_request','تحت الطلب','قيد الطلب','قيد الانتظار'].includes(s)) return 'pending';
+    if(['processing','in_progress','under_process','تحت المعالجة','قيد التنفيذ','reopened','معاد فتحها'].includes(s)) return 'processing';
+    return 'open';
   }
-  function logMeta(l){
-    const req=requiredMinutes();
-    const actual=N(l.duration_minutes)||diffMinutes(l.check_in,l.check_out)||diffMinutes(l.entry_time,l.exit_time)||diffMinutes(l.start_time,l.end_time);
-    const hasOut=!!(l.check_out||l.exit_time||l.end_time||l.out_time);
-    const checkIn=l.check_in||l.entry_time||l.start_time||l.in_time||l.created_at;
-    const rawOut=l.check_out||l.exit_time||l.end_time||l.out_time||'';
-    const expected=req&&checkIn?addMinutesTo(checkIn,req):'';
-    const effective=hasOut?actual:req;
-    let cls='green', label='ضمن الوقت', details='';
-    if(!hasOut){ cls='amber'; label='لم يسجل خروج'; details=expected?`الخروج المتوقع حسب الوقت المطلوب: ${fmtSafe(expected)}`:'لم يتم تسجيل خروج فعلي'; }
-    else if(req && actual>req+5){ cls='blue'; label='زيادة عن الوقت'; details=`زيادة ${minText(actual-req)} عن المطلوب`; }
-    else { cls='green'; label='ضمن الوقت'; details=req?`المطلوب ${minText(req)}`:'ضمن الوقت'; }
-    return {required:req, actual:effective||actual, hasOut, checkIn, out:rawOut, expected, cls, label, details};
-  }
-  function logsHtmlV466(){
-    const rows=(portal.timeLogs||[]).map(l=>{ const m=logMeta(l); const outText=m.hasOut?fmtSafe(m.out):(m.expected?`تقديري: ${fmtSafe(m.expected)}`:'-'); return `<tr><td>${E2(dateOnly2(l.log_date||m.checkIn))}</td><td>${E2(fmtSafe(m.checkIn))}</td><td>${E2(outText)}</td><td>${E2(minText(m.required))}</td><td>${E2(minText(m.actual))}</td><td><span class="badge ${m.cls}">${E2(m.label)}</span><br><small>${E2(m.details)}</small></td><td>${E2(l.notes||'-')}</td></tr>`; }).join('');
-    return `<section class="card"><h2>التسجيلات اليومية</h2>${rows?`<div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>الدخول</th><th>الخروج / المتوقع</th><th>الوقت المطلوب</th><th>المدة</th><th>حالة الوقت</th><th>ملاحظات</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">لا توجد تسجيلات يومية ضمن الفترة المحددة.</div>'}</section>`;
-  }
-  function ticketsHtmlV466(){
-    const raw=s=>{s=String(s||'open').trim();if(['closed','مغلق','مغلقة'].includes(s))return 'closed';if(['pending','requested','request','under_request','تحت الطلب','معلقة'].includes(s))return 'pending';if(['processing','in_progress','قيد التنفيذ','تحت المعالجة','reopened','معاد فتحها'].includes(s))return 'processing';return 'open'};
-    const label=s=>{const x=raw(s);return x==='closed'?'مغلقة':x==='pending'?'تحت الطلب':x==='processing'?'تحت المعالجة':'مفتوحة'};
-    const cls=s=>{const x=raw(s);return x==='closed'?'green':(x==='pending'||x==='processing'?'amber':'red')};
-    const close=x=>x.closed_at||x.close_date||x.closed_date||x.resolved_at||'';
-    const dur=x=>{const st=x.created_at||x.opened_at||x.date||'';const en=close(x)||(x.updated_at||'');if(!st)return '-';const mm=diffMinutes(st, raw(x.status)==='closed'&&en?en:new Date().toISOString());return (raw(x.status)==='closed'&&en?'استغرق الإقفال: ':'مفتوحة منذ: ')+minText(mm)};
-    const rows=(portal.tickets||[]).map(x=>`<tr><td><b>${E2((x.ticket_number||x.ticket_no||(x.id?('T-'+String(x.id).padStart(4,'0')):'-')))}</b></td><td><b>${E2(x.title||x.ticket_title||x.type||'تذكرة مشروع')}</b><br><small>${E2(x.description||'')}</small></td><td><span class="badge ${cls(x.status)}">${E2(label(x.status))}</span></td><td>${E2(dur(x))}</td><td>${E2(fmtSafe(x.created_at))}</td><td>${E2(close(x)?fmtSafe(close(x)):'-')}</td></tr>`).join('');
-    return `<section class="card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">التذاكر الخاصة بالمشروع</h2><button onclick="openClientTicketFormV466()">رفع تذكرة</button></div>${rows?`<div class="table-wrap"><table style="min-width:920px"><thead><tr><th>رقم التذكرة</th><th>عنوان التذكرة</th><th>حالة التذكرة</th><th>مدة التذكرة</th><th>تاريخ الفتح</th><th>تاريخ الإغلاق</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">لا توجد تذاكر ضمن الفترة المحددة.</div>'}</section>`;
-  }
-  function ticketFormHtml(){return `<div class="form-grid"><div><label>نوع المشكلة</label><select id="clientTicketTypeV466"><option>صيانة</option><option>نظافة</option><option>مياه</option><option>كهرباء</option><option>مصاعد</option><option>أخرى</option></select></div><div><label>رقم الوحدة / الموقع</label><input id="clientTicketLocationV466" placeholder="مثال: شقة 12 / البيسمنت / المدخل"></div></div><label>عنوان التذكرة</label><input id="clientTicketTitleV466" placeholder="اكتب عنوان مختصر للتذكرة"><label>وصف المشكلة</label><textarea id="clientTicketDescV466" rows="5" placeholder="اكتب تفاصيل المشكلة"></textarea><button onclick="submitClientTicketV466(this)">إرسال التذكرة</button>`;}
-  G.openClientTicketFormV466=function(){ if(typeof G.openModal==='function') G.openModal('رفع تذكرة',portal.projectName||'المشروع',ticketFormHtml()); };
-  G.submitClientTicketV466=async function(btn){
+  function statusLabel(s){ const x=rawStatus(s); return x==='closed'?'مغلقة':x==='pending'?'تحت الطلب':x==='processing'?'تحت المعالجة':'مفتوحة'; }
+  function statusClass(s){ const x=rawStatus(s); return x==='closed'?'green':(x==='open'?'red':'amber'); }
+  function ticketNo(t){ return t.ticket_number || t.ticket_no || (t.id ? ('T-'+String(t.id).padStart(4,'0')) : '-'); }
+  function closeAt(t){ return t.closed_at || t.close_date || t.closed_date || t.resolved_at || ''; }
+  function fmtEN(v){
+    if(!v) return '-';
     try{
-      const title=String($('clientTicketTitleV466')?.value||'').trim();
-      const desc=String($('clientTicketDescV466')?.value||'').trim();
-      const type=String($('clientTicketTypeV466')?.value||'أخرى').trim();
-      const loc=String($('clientTicketLocationV466')?.value||'').trim();
+      const d=new Date(v);
+      if(isNaN(d.getTime())) return String(v || '-');
+      return d.toLocaleString('en-US',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:true});
+    }catch(_){ return String(v || '-'); }
+  }
+  function diffMin(a,b){
+    const x=new Date(a), y=new Date(b);
+    const m=Math.round((y-x)/60000);
+    return Number.isFinite(m) && m>0 ? m : 0;
+  }
+  function durationText(m){
+    m=Math.max(0, Math.round(Number(m)||0));
+    const d=Math.floor(m/1440), h=Math.floor((m%1440)/60), r=m%60;
+    if(d) return `${d} d ${h} h`;
+    if(h) return `${h} h ${r} m`;
+    return `${r} m`;
+  }
+  function ticketDuration(t){
+    const start=t.created_at || t.opened_at || t.date || '';
+    if(!start) return '-';
+    const c=closeAt(t);
+    if(rawStatus(t.status)==='closed' && c) return 'Closed in: ' + durationText(diffMin(start,c));
+    return 'Open for: ' + durationText(diffMin(start,new Date().toISOString()));
+  }
+  function ticketTypeOnly(t){
+    const values=[t.type,t.category,t.service_type,t.issue_type,t.ticket_type,t.title,t.ticket_title]
+      .map(x=>String(x||'').trim()).filter(Boolean);
+    const joined=values.join(' ');
+    const cats=['كهرباء','سباكة','نظافة','مصاعد','صيانة','مياه','تكييف','إنارة','حدائق','مسبح','أمن','بوابات','كاميرات','أخرى'];
+    for(const c of cats){ if(joined.includes(c)) return c; }
+    return values[0] || 'تذكرة';
+  }
+  function tabs(active){
+    return `<div class="tabs"><button class="tab ${active==='summary'?'active':''}" onclick="showMain('summary')">الملخص</button><button class="tab ${active==='logs'?'active':''}" onclick="showMain('logs')">التسجيلات اليومية</button><button class="tab ${active==='works'?'active':''}" onclick="showMain('works')">الأعمال المنفذة</button><button class="tab ${active==='tickets'?'active':''}" onclick="showMain('tickets')">التذاكر</button><button class="tab ${active==='rating'?'active':''}" onclick="showMain('rating')">التقييم</button></div>`;
+  }
+  window.ticketsHtml = function(){
+    const p=getPortal();
+    const arr=Array.isArray(p.tickets)?p.tickets:[];
+    const rows=arr.map(t=>`<tr><td><b>${html(ticketNo(t))}</b></td><td><b>${html(ticketTypeOnly(t))}</b></td><td><span class="badge ${statusClass(t.status)}">${html(statusLabel(t.status))}</span></td><td>${html(ticketDuration(t))}</td><td>${html(fmtEN(t.created_at||t.opened_at||t.date))}</td><td>${html(closeAt(t)?fmtEN(closeAt(t)):'-')}</td></tr>`).join('');
+    return `<section class="card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">التذاكر الخاصة بالمشروع</h2><button onclick="openClientTicketFormV466()">رفع تذكرة</button></div>${rows?`<div class="table-wrap"><table style="min-width:860px"><thead><tr><th>رقم التذكرة</th><th>نوع التذكرة</th><th>حالة التذكرة</th><th>مدة التذكرة</th><th>تاريخ الفتح</th><th>تاريخ الإغلاق</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">لا توجد تذاكر لهذا المشروع.</div>'}</section>`;
+  };
+  const originalShowMain = window.showMain;
+  window.showMain = function(tab){
+    if(tab==='tickets'){
+      const box=document.getElementById('mainContent');
+      if(box){ box.innerHTML=tabs('tickets') + window.ticketsHtml(); return; }
+    }
+    return typeof originalShowMain==='function' ? originalShowMain.apply(this, arguments) : undefined;
+  };
+  window.openClientTicketFormV466 = function(){
+    const p=getPortal();
+    const body=`<div class="form-grid"><div><label>نوع المشكلة</label><select id="clientTicketTypeV466"><option>صيانة</option><option>نظافة</option><option>مياه</option><option>كهرباء</option><option>سباكة</option><option>مصاعد</option><option>أخرى</option></select></div><div><label>رقم الوحدة / الموقع</label><input id="clientTicketLocationV466" placeholder="مثال: شقة 12 / البيسمنت / المدخل"></div></div><label>عنوان التذكرة</label><input id="clientTicketTitleV466" placeholder="اكتب عنوان مختصر للتذكرة"><label>وصف المشكلة</label><textarea id="clientTicketDescV466" rows="5" placeholder="اكتب تفاصيل المشكلة"></textarea><button onclick="submitClientTicketV466(this)">إرسال التذكرة</button>`;
+    if(typeof openModal==='function') openModal('رفع تذكرة',p.projectName||'المشروع',body);
+  };
+  window.submitClientTicketV466 = async function(btn){
+    try{
+      const p=getPortal();
+      const title=String(document.getElementById('clientTicketTitleV466')?.value||'').trim();
+      const desc=String(document.getElementById('clientTicketDescV466')?.value||'').trim();
+      const type=String(document.getElementById('clientTicketTypeV466')?.value||'أخرى').trim();
+      const loc=String(document.getElementById('clientTicketLocationV466')?.value||'').trim();
       if(!title) throw new Error('اكتب عنوان التذكرة');
       if(btn){btn.disabled=true;btn.textContent='جاري الإرسال...';}
       let inserted=null, err=null;
-      if(G.sb){
+      try{
+        const r=await sb.rpc('tasneef_client_create_ticket_v466',{p_project_id:String(p.projectId),p_title:title,p_description:desc,p_type:type,p_location:loc,p_client_name:'عميل المشروع',p_client_contact:''});
+        if(r.error) throw r.error;
+        inserted=Array.isArray(r.data)?r.data[0]:r.data;
+      }catch(e){
+        err=e;
         try{
-          const r=await G.sb.rpc('tasneef_client_create_ticket_v466',{p_project_id:String(portal.projectId),p_title:title,p_description:desc,p_type:type,p_location:loc,p_client_name:'عميل المشروع',p_client_contact:''});
-          if(r.error) throw r.error;
-          inserted=Array.isArray(r.data)?r.data[0]:r.data;
-        }catch(e){ err=e; try{ const d=await G.sb.from('tickets').insert({project_id:Number(portal.projectId)||portal.projectId,title,description:[desc,loc?('الموقع: '+loc):'',type?('النوع: '+type):''].filter(Boolean).join('\n'),status:'open',created_at:new Date().toISOString()}).select('*').single(); if(d.error) throw d.error; inserted=d.data; err=null; }catch(e2){ err=e2; } }
+          const d=await sb.from('tickets').insert({project_id:Number(p.projectId)||p.projectId,project_name:p.projectName||'',title:title,description:[desc,loc?('الموقع: '+loc):'',type?('النوع: '+type):''].filter(Boolean).join('\n'),type:type,status:'open',created_at:new Date().toISOString()}).select('*').single();
+          if(d.error) throw d.error;
+          inserted=d.data; err=null;
+        }catch(e2){ err=e2; }
       }
       if(err) throw err;
-      if(inserted) portal.tickets=[inserted,...(portal.tickets||[])];
-      if(typeof G.toast==='function') G.toast('تم رفع التذكرة بنجاح');
-      if(typeof G.closeModal==='function') G.closeModal();
-      if(typeof G.showMain==='function') G.showMain('tickets');
-    }catch(e){ if(typeof G.toast==='function') G.toast(e.message||String(e),true); else alert(e.message||String(e)); }
-    finally{ if(btn){btn.disabled=false;btn.textContent='إرسال التذكرة';} }
-  };
-  const oldStats=G.stats;
-  G.stats=function(){ const s=oldStats?oldStats():{}; const mins=(portal.timeLogs||[]).reduce((a,l)=>a+(logMeta(l).actual||0),0); if(mins>=0) s.minutes=mins; return s; };
-  G.logsHtml=logsHtmlV466;
-  G.ticketsHtml=ticketsHtmlV466;
-  const oldShow=G.showMain;
-  G.showMain=function(tab){
-    const box=$('mainContent'); if(!box || !oldShow) return oldShow&&oldShow(tab);
-    if(tab==='logs' || tab==='tickets'){
-      const tabs=`<div class="tabs"><button class="tab ${tab==='summary'?'active':''}" onclick="showMain('summary')">الملخص</button><button class="tab ${tab==='logs'?'active':''}" onclick="showMain('logs')">التسجيلات اليومية</button><button class="tab ${tab==='works'?'active':''}" onclick="showMain('works')">الأعمال المنفذة</button><button class="tab ${tab==='tickets'?'active':''}" onclick="showMain('tickets')">التذاكر</button><button class="tab ${tab==='rating'?'active':''}" onclick="showMain('rating')">التقييم</button></div>`;
-      box.innerHTML=tabs+(tab==='logs'?logsHtmlV466():ticketsHtmlV466());
-      return;
+      if(inserted) p.tickets=[inserted,...(p.tickets||[])];
+      if(typeof toast==='function') toast('تم رفع التذكرة بنجاح');
+      if(typeof closeModal==='function') closeModal();
+      window.showMain('tickets');
+    }catch(e){
+      if(typeof toast==='function') toast(e.message||String(e),true);
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent='إرسال التذكرة';}
     }
-    return oldShow(tab);
-  };
-  const oldRender=G.renderHome;
-  if(oldRender){ G.renderHome=function(){ oldRender(); setTimeout(()=>{ try{ const hero=document.querySelector('.hero-actions'); if(hero && !document.getElementById('clientTicketHeroV466')){ const d=document.createElement('div'); d.id='clientTicketHeroV466'; d.className='hero-action'; d.onclick=()=>G.openClientTicketFormV466(); d.innerHTML='<div class="ico">📝</div><h3>رفع تذكرة</h3><p>إرسال بلاغ أو ملاحظة للإدارة مرتبطة بهذا المشروع.</p>'; hero.appendChild(d); } }catch(_){} },50); }; }
-})();
-</script>
-
-
-<script>
-/* V469 - بوابة العميل: مدة التذاكر + إقفال الخروج المفقود حسب وقت المشروع */
-(function(){
-  'use strict';
-  if(window.__tasneefClientPortalV469) return;
-  window.__tasneefClientPortalV469 = true;
-  const G=window;
-  const $=id=>document.getElementById(id);
-  const E=v=>String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const N=v=>Number(String(v??'').replace(/,/g,''))||0;
-  const fmtSafe=v=>{try{return v?new Date(v).toLocaleString('ar-SA',{year:'numeric',month:'2-digit',day:'2-digit',hour:'numeric',minute:'2-digit'}):'-';}catch(_){return v||'-';}};
-  const minText=m=>{m=Math.max(0,Math.round(N(m)));const h=Math.floor(m/60),r=m%60;return h?`${h} س ${r} د`:`${r} د`;};
-  function diff(a,b){const x=new Date(a),y=new Date(b);const m=Math.round((y-x)/60000);return isFinite(m)&&m>0?m:0;}
-  function rawStatus(s){s=String(s||'open'); if(['closed','مغلق','مغلقة'].includes(s)) return 'closed'; if(['pending','requested','request','under_request','تحت الطلب','معلقة'].includes(s)) return 'pending'; if(['processing','in_progress','قيد التنفيذ','تحت المعالجة'].includes(s)) return 'processing'; return 'open';}
-  function ticketStatusLabel(s){const x=rawStatus(s); return x==='closed'?'مغلقة':x==='pending'?'تحت الطلب':x==='processing'?'تحت المعالجة':'مفتوحة';}
-  function ticketStatusClass(s){const x=rawStatus(s); return x==='closed'?'green':x==='pending'?'amber':x==='processing'?'amber':'red';}
-  function ticketNumber(t){return t.ticket_number||t.ticket_no||(t.id?('T-'+String(t.id).padStart(4,'0')):'-');}
-  function ticketAge(t){const start=t.created_at||t.opened_at||t.date||''; const end=t.closed_at||t.close_date||t.closed_date||t.resolved_at||t.updated_at||''; if(!start)return '-'; if(rawStatus(t.status)==='closed'&&end)return 'استغرق الإقفال: '+minText(diff(start,end)); return 'مفتوحة منذ: '+minText(diff(start,new Date().toISOString()));}
-  function ticketsHtmlV469(){
-    const rows=(portal.tickets||[]).map(x=>`<tr><td><b>${E(ticketNumber(x))}</b></td><td><b>${E(x.title||x.ticket_title||x.type||'تذكرة مشروع')}</b><br><small>${E(x.description||'')}</small></td><td><span class="badge ${ticketStatusClass(x.status)}">${E(ticketStatusLabel(x.status))}</span></td><td>${E(ticketAge(x))}</td><td>${E(fmtSafe(x.created_at))}</td><td>${E((rawStatus(x.status)==='closed'&&(x.closed_at||x.close_date||x.resolved_at))?fmtSafe(x.closed_at||x.close_date||x.resolved_at):'-')}</td></tr>`).join('');
-    return `<section class="card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">التذاكر الخاصة بالمشروع</h2><button onclick="openClientTicketFormV466()">رفع تذكرة</button></div>${rows?`<div class="table-wrap"><table style="min-width:860px"><thead><tr><th>رقم التذكرة</th><th>عنوان التذكرة</th><th>حالة التذكرة</th><th>مدة التذكرة</th><th>تاريخ الفتح</th><th>تاريخ الإغلاق</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">لا توجد تذاكر ضمن الفترة المحددة.</div>'}</section>`;
-  }
-  G.ticketsHtml=ticketsHtmlV469;
-  const oldShow=G.showMain;
-  G.showMain=function(tab){
-    if(tab==='tickets'){
-      const box=$('mainContent'); if(!box) return oldShow&&oldShow(tab);
-      const tabs=`<div class="tabs"><button class="tab ${tab==='summary'?'active':''}" onclick="showMain('summary')">الملخص</button><button class="tab ${tab==='logs'?'active':''}" onclick="showMain('logs')">التسجيلات اليومية</button><button class="tab ${tab==='works'?'active':''}" onclick="showMain('works')">الأعمال المنفذة</button><button class="tab ${tab==='tickets'?'active':''}" onclick="showMain('tickets')">التذاكر</button><button class="tab ${tab==='rating'?'active':''}" onclick="showMain('rating')">التقييم</button></div>`;
-      box.innerHTML=tabs+ticketsHtmlV469(); return;
-    }
-    return oldShow&&oldShow.apply(this,arguments);
-  };
-})();
-</script>
-
-
-<script>
-/* V469 - تثبيت عرض التذاكر للعميل + مدة التذكرة */
-(function(){
-  'use strict';
-  if(window.__tasneefClientPortalV469) return;
-  window.__tasneefClientPortalV469=true;
-  const E=v=>String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]||c));
-  const fmt=v=>{try{return v?new Date(v).toLocaleString('ar-SA',{year:'numeric',month:'2-digit',day:'2-digit',hour:'numeric',minute:'2-digit'}):'-'}catch(_){return v||'-'}};
-  const raw=s=>{s=String(s||'open').trim();if(['closed','مغلق','مغلقة'].includes(s))return 'closed';if(['pending','requested','request','under_request','تحت الطلب','معلقة'].includes(s))return 'pending';if(['processing','in_progress','قيد التنفيذ','تحت المعالجة','reopened','معاد فتحها'].includes(s))return 'processing';return 'open'};
-  const label=s=>{const x=raw(s);return x==='closed'?'مغلقة':x==='pending'?'تحت الطلب':x==='processing'?'تحت المعالجة':'مفتوحة'};
-  const cls=s=>{const x=raw(s);return x==='closed'?'green':(x==='pending'||x==='processing'?'amber':'red')};
-  const no=t=>t.ticket_number||t.ticket_no||(t.id?('T-'+String(t.id).padStart(4,'0')):'-');
-  const close=t=>t.closed_at||t.close_date||t.closed_date||t.resolved_at||'';
-  function mins(a,b){const x=new Date(a),y=new Date(b);const m=Math.round((y-x)/60000);return isFinite(m)&&m>0?m:0}
-  function mt(m){m=Math.max(0,Math.round(Number(m)||0));const d=Math.floor(m/1440),h=Math.floor((m%1440)/60),r=m%60;if(d)return `${d} يوم ${h} س`;if(h)return `${h} س ${r} د`;return `${r} د`}
-  function dur(t){const st=t.created_at||t.opened_at||t.date||'';const en=close(t)||(t.updated_at||'');if(!st)return '-';if(raw(t.status)==='closed'&&en)return 'استغرق الإقفال: '+mt(mins(st,en));return 'مفتوحة منذ: '+mt(mins(st,new Date().toISOString()))}
-  function ticketsHtml469(){const arr=(window.portal&&window.portal.tickets)||[];const rows=arr.map(t=>`<tr><td><b>${E(no(t))}</b></td><td><b>${E(t.title||t.ticket_title||t.type||'تذكرة مشروع')}</b><br><small>${E(t.description||'')}</small></td><td><span class="badge ${cls(t.status)}">${E(label(t.status))}</span></td><td>${E(dur(t))}</td><td>${E(fmt(t.created_at))}</td><td>${E(close(t)?fmt(close(t)):'-')}</td></tr>`).join('');return `<section class="card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">التذاكر الخاصة بالمشروع</h2><button onclick="openClientTicketFormV466()">رفع تذكرة</button></div>${rows?`<div class="table-wrap"><table style="min-width:920px"><thead><tr><th>رقم التذكرة</th><th>عنوان التذكرة</th><th>حالة التذكرة</th><th>مدة التذكرة</th><th>تاريخ الفتح</th><th>تاريخ الإغلاق</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">لا توجد تذاكر ضمن الفترة المحددة.</div>'}</section>`}
-  const old=window.showMain;
-  window.showMain=function(tab){
-    if(tab==='tickets'){const box=document.getElementById('mainContent');if(box){const tabs=`<div class="tabs"><button class="tab ${tab==='summary'?'active':''}" onclick="showMain('summary')">الملخص</button><button class="tab ${tab==='logs'?'active':''}" onclick="showMain('logs')">التسجيلات اليومية</button><button class="tab ${tab==='works'?'active':''}" onclick="showMain('works')">الأعمال المنفذة</button><button class="tab ${tab==='tickets'?'active':''}" onclick="showMain('tickets')">التذاكر</button><button class="tab ${tab==='rating'?'active':''}" onclick="showMain('rating')">التقييم</button></div>`;box.innerHTML=tabs+ticketsHtml469();return;}}
-    return old&&old.apply(this,arguments);
-  };
-})();
-</script>
-
-<script>
-/* V470 - بوابة العميل: التذاكر مختصرة + تاريخ/وقت إنجليزي + رابط دائم داخلي */
-(function(){
-  'use strict';
-  window.__tasneefClientPortalV470 = true;
-  const E = v => String(v ?? '').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const N = v => Number(String(v ?? '').replace(/,/g,'')) || 0;
-  function fmtEN(v){
-    try{
-      if(!v) return '-';
-      const d = new Date(v);
-      if(isNaN(d.getTime())) return String(v || '-');
-      return d.toLocaleString('en-US', {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:true});
-    }catch(_){ return String(v || '-'); }
-  }
-  function raw(s){
-    s=String(s||'open').trim();
-    if(['closed','مغلق','مغلقة'].includes(s)) return 'closed';
-    if(['pending','requested','request','under_request','تحت الطلب','معلقة'].includes(s)) return 'pending';
-    if(['processing','in_progress','قيد التنفيذ','تحت المعالجة','reopened','معاد فتحها'].includes(s)) return 'processing';
-    return 'open';
-  }
-  function label(s){ const x=raw(s); return x==='closed'?'مغلقة':x==='pending'?'تحت الطلب':x==='processing'?'تحت المعالجة':'مفتوحة'; }
-  function cls(s){ const x=raw(s); return x==='closed'?'green':(x==='pending'||x==='processing'?'amber':'red'); }
-  function no(t){ return t.ticket_number || t.ticket_no || (t.id ? ('T-'+String(t.id).padStart(4,'0')) : '-'); }
-  function close(t){ return t.closed_at || t.close_date || t.closed_date || t.resolved_at || ''; }
-  function minutes(a,b){ const x=new Date(a), y=new Date(b); const m=Math.round((y-x)/60000); return isFinite(m)&&m>0?m:0; }
-  function durText(m){
-    m=Math.max(0,Math.round(N(m)));
-    const d=Math.floor(m/1440), h=Math.floor((m%1440)/60), r=m%60;
-    if(d) return `${d}d ${h}h`;
-    if(h) return `${h}h ${r}m`;
-    return `${r}m`;
-  }
-  function age(t){
-    const st=t.created_at || t.opened_at || t.date || '';
-    if(!st) return '-';
-    const end=close(t) || t.updated_at || '';
-    if(raw(t.status)==='closed' && end) return 'Closed in: ' + durText(minutes(st,end));
-    return 'Open for: ' + durText(minutes(st,new Date().toISOString()));
-  }
-  function ticketShortTitle(t){
-    const v = t.type || t.category || t.service_type || t.issue_type || t.title || t.ticket_title || 'تذكرة';
-    return String(v || '').trim() || 'تذكرة';
-  }
-  function ticketsHtmlV470(){
-    const arr=(window.portal && window.portal.tickets) || [];
-    const rows=arr.map(t=>`<tr><td><b>${E(no(t))}</b></td><td><b>${E(ticketShortTitle(t))}</b></td><td><span class="badge ${cls(t.status)}">${E(label(t.status))}</span></td><td>${E(age(t))}</td><td>${E(fmtEN(t.created_at || t.opened_at || t.date))}</td><td>${E(close(t)?fmtEN(close(t)):'-')}</td></tr>`).join('');
-    return `<section class="card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">التذاكر الخاصة بالمشروع</h2><button onclick="openClientTicketFormV466()">رفع تذكرة</button></div>${rows?`<div class="table-wrap"><table style="min-width:860px"><thead><tr><th>رقم التذكرة</th><th>نوع التذكرة</th><th>حالة التذكرة</th><th>مدة التذكرة</th><th>تاريخ الفتح</th><th>تاريخ الإغلاق</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">لا توجد تذاكر ضمن الفترة المحددة.</div>'}</section>`;
-  }
-  window.ticketsHtml = ticketsHtmlV470;
-  const previousShowMain = window.showMain;
-  window.showMain = function(tab){
-    if(tab === 'tickets'){
-      const box=document.getElementById('mainContent');
-      if(box){
-        const tabs=`<div class="tabs"><button class="tab ${tab==='summary'?'active':''}" onclick="showMain('summary')">الملخص</button><button class="tab ${tab==='logs'?'active':''}" onclick="showMain('logs')">التسجيلات اليومية</button><button class="tab ${tab==='works'?'active':''}" onclick="showMain('works')">الأعمال المنفذة</button><button class="tab ${tab==='tickets'?'active':''}" onclick="showMain('tickets')">التذاكر</button><button class="tab ${tab==='rating'?'active':''}" onclick="showMain('rating')">التقييم</button></div>`;
-        box.innerHTML=tabs+ticketsHtmlV470();
-        return;
-      }
-    }
-    return previousShowMain && previousShowMain.apply(this, arguments);
-  };
-})();
-</script>
-
-
-<script>
-/* V473 - تذاكر العميل: عرض مضمون + بدون وصف + تاريخ/وقت إنجليزي */
-(function(){
-  'use strict';
-  window.__tasneefClientTicketsV473=true;
-  const E=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  function raw(s){s=String(s||'open').trim().toLowerCase(); if(['closed','close','done','resolved','مغلق','مغلقة','منتهية'].includes(s))return 'closed'; if(['pending','requested','request','under_request','تحت الطلب','قيد الطلب'].includes(s))return 'pending'; if(['processing','in_progress','under_process','تحت المعالجة','قيد التنفيذ','reopened'].includes(s))return 'processing'; return 'open';}
-  function label(s){const x=raw(s); return x==='closed'?'مغلقة':x==='pending'?'تحت الطلب':x==='processing'?'تحت المعالجة':'مفتوحة';}
-  function cls(s){const x=raw(s); return x==='closed'?'green':(x==='open'?'red':'amber');}
-  function no(t){return t.ticket_number||t.ticket_no||(t.id?('T-'+String(t.id).padStart(4,'0')):'-');}
-  function close(t){return t.closed_at||t.close_date||t.closed_date||t.resolved_at||'';}
-  function fmtEN(v){if(!v)return '-'; try{const d=new Date(v); if(isNaN(d.getTime())) return String(v||'-'); return d.toLocaleString('en-US',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:true});}catch(_){return String(v||'-');}}
-  function diff(a,b){const x=new Date(a),y=new Date(b);const m=Math.max(0,Math.round((y-x)/60000));return isFinite(m)?m:0;}
-  function durText(m){m=Math.round(Number(m)||0);const d=Math.floor(m/1440),h=Math.floor((m%1440)/60),r=m%60; if(d)return `${d} d ${h} h`; if(h)return `${h} h ${r} m`; return `${r} m`;}
-  function age(t){const start=t.created_at||t.opened_at||t.date||''; if(!start)return '-'; const c=close(t); if(raw(t.status)==='closed'&&c)return 'Closed in: '+durText(diff(start,c)); return 'Open for: '+durText(diff(start,new Date().toISOString()));}
-  function typeOnly(t){
-    const fields=[t.type,t.category,t.service_type,t.issue_type,t.ticket_type,t.title,t.ticket_title].map(x=>String(x||'').trim()).filter(Boolean);
-    const joined=fields.join(' ');
-    const cats=['كهرباء','سباكة','نظافة','مصاعد','صيانة','مياه','تكييف','إنارة','حدائق','مسبح','أمن','بوابات','كاميرات','أخرى'];
-    for(const c of cats){ if(joined.includes(c)) return c; }
-    return fields[0]||'تذكرة';
-  }
-  window.ticketsHtml=function(){
-    const arr=(window.portal&&Array.isArray(window.portal.tickets))?window.portal.tickets:[];
-    const rows=arr.map(t=>`<tr><td><b>${E(no(t))}</b></td><td><b>${E(typeOnly(t))}</b></td><td><span class="badge ${cls(t.status)}">${E(label(t.status))}</span></td><td>${E(age(t))}</td><td>${E(fmtEN(t.created_at||t.opened_at||t.date))}</td><td>${E(close(t)?fmtEN(close(t)):'-')}</td></tr>`).join('');
-    return `<section class="card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">التذاكر الخاصة بالمشروع</h2><button onclick="openClientTicketFormV466()">رفع تذكرة</button></div>${rows?`<div class="table-wrap"><table style="min-width:860px"><thead><tr><th>رقم التذكرة</th><th>نوع التذكرة</th><th>حالة التذكرة</th><th>مدة التذكرة</th><th>تاريخ الفتح</th><th>تاريخ الإغلاق</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">لا توجد تذاكر لهذا المشروع.</div>'}</section>`;
-  };
-  const oldShowMain=window.showMain;
-  window.showMain=function(tab){
-    if(tab==='tickets'){
-      const box=document.getElementById('mainContent');
-      if(box){
-        const tabs=`<div class="tabs"><button class="tab" onclick="showMain('summary')">الملخص</button><button class="tab" onclick="showMain('logs')">التسجيلات اليومية</button><button class="tab" onclick="showMain('works')">الأعمال المنفذة</button><button class="tab active" onclick="showMain('tickets')">التذاكر</button><button class="tab" onclick="showMain('rating')">التقييم</button></div>`;
-        box.innerHTML=tabs+window.ticketsHtml(); return;
-      }
-    }
-    if(typeof oldShowMain==='function') return oldShowMain.apply(this,arguments);
   };
 })();
 </script>
