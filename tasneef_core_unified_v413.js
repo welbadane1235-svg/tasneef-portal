@@ -6,7 +6,7 @@
   if(window.__tasneefCoreUnifiedV413) return;
   window.__tasneefCoreUnifiedV413 = true;
 
-  const VERSION='446';
+  const VERSION='453';
   const S=v=>String(v??'').trim();
   const N=v=>{const n=Number(v||0);return Number.isFinite(n)?n:0};
   const $=id=>document.getElementById(id);
@@ -40,6 +40,8 @@
   function projectRequired(p){return N(p.required_daily_minutes||p.daily_required_minutes||p.required_minutes||p.monthly_required_minutes||p.required_time_minutes||p.expected_minutes||0);}
   function projectBuildings(p){return N(p.buildings_count||p.building_count||p.buildings||p.towers_count||p.towers||p.blocks_count||0);}
   function projectUnits(p){return N(p.units_count||p.apartments_count||p.flats_count||p.units||p.apartments||p.apartment_count||0);}
+  function projectStartDate(p){return S(p.project_start_date||p.contract_start_date||p.start_date||p.service_start_date||'');}
+  function projectEndDate(p){return S(p.project_end_date||p.contract_end_date||p.end_date||p.service_end_date||'');}
   function projectSupervisorCode(p){return S(p.supervisor_employee_code||p.current_supervisor_code||p.supervisor_code||p.supervisor_id||p.current_supervisor_id||'');}
   function projectSupervisorName(p){const code=projectSupervisorCode(p); const w=state.workers.find(x=>workerCode(x)===code||S(x.id)===code); return w?workerDisplay(w):S(p.supervisor_name||p.current_supervisor_name||code||'-');}
   function statusActive(x){const st=norm(x?.status||x?.state||x?.active_status||'active'); return !(x?.deleted_at||x?.is_deleted===true||x?.active===false||x?.is_active===false||['deleted','archived','inactive','stopped','ended','disabled','محذوف','موقوف','متوقف','منتهي','غير نشط','غيرنشط'].includes(st));}
@@ -118,19 +120,43 @@
     const c=client(); if(!c) return [];
     const r1=await safe('employees_master_v386', c.from('employees_master_v386').select('*').limit(10000));
     const r2=await safe('workers', c.from('workers').select('*').limit(10000));
-    const map=new Map();
+    const map=new Map(), nameIndex=new Map();
+    function mergeWorker(a,b){
+      const out=Object.assign({},a||{});
+      Object.keys(b||{}).forEach(k=>{const v=b[k]; if(v!==undefined&&v!==null&&S(v)!=='') out[k]=v;});
+      const code=normalizeWorkerCode(workerCode(out));
+      if(code) out.employee_code=code;
+      return out;
+    }
     function put(w,prio){
-      const c=normalizeWorkerCode(workerCode(w));
+      const code=normalizeWorkerCode(workerCode(w));
       const n=norm(workerName(w));
-      const key=c || ('name:'+n);
-      if(!key || key==='name:') return;
+      if(!code && !n) return;
+      let key=code || nameIndex.get(n) || ('name:'+n);
+      if(code && nameIndex.has(n) && nameIndex.get(n)!==code){
+        const oldKey=nameIndex.get(n), old=map.get(oldKey);
+        if(old){ map.delete(oldKey); key=code; w=mergeWorker(old,w); }
+      }
       const old=map.get(key);
-      if(!old || prio>=(old.__prio||0)) map.set(key,Object.assign({},old||{},w,{__prio:prio, employee_code:c||w.employee_code}));
-      else map.set(key,Object.assign({},w,old));
+      const merged = (!old || prio>=(old.__prio||0)) ? mergeWorker(old,w) : mergeWorker(w,old);
+      merged.__prio=Math.max(prio, old?.__prio||0);
+      if(code) merged.employee_code=code;
+      map.set(key,merged);
+      if(n) nameIndex.set(n,key);
+      if(code) nameIndex.set(n,code);
     }
     (r2.data||[]).forEach(w=>put(w,1));
     (r1.data||[]).forEach(w=>put(w,2));
-    state.allWorkers=[...map.values()].sort((a,b)=>workerDisplay(a).localeCompare(workerDisplay(b),'ar'));
+    // منع أي تكرار متبقٍ: الأولوية للكود، ثم الاسم، مع تجاهل الموقوف في القوائم التشغيلية.
+    const final=new Map();
+    [...map.values()].forEach(w=>{
+      const code=normalizeWorkerCode(workerCode(w));
+      const n=norm(workerName(w));
+      const key=code || ('name:'+n);
+      const old=final.get(key);
+      final.set(key, old?mergeWorker(old,w):w);
+    });
+    state.allWorkers=[...final.values()].sort((a,b)=>workerDisplay(a).localeCompare(workerDisplay(b),'ar'));
     state.workers=state.allWorkers.filter(statusActive).sort((a,b)=>workerDisplay(a).localeCompare(workerDisplay(b),'ar'));
     return state.workers;
   }
@@ -279,7 +305,7 @@
       return !q || norm(projectName(p)+' '+projectType(p)+' '+projectSupervisorName(p)+' '+d.sup.join(' ')+' '+d.workers.join(' ')).includes(q);
     });
     const supOptions=state.workers.filter(isSupervisor).map(w=>`<option value="${esc(workerCode(w))}">${esc(workerDisplay(w))}</option>`).join('');
-    box.innerHTML=`<div class="cu413-grid"><div class="cu413-card"><h3>إضافة / تعديل مشروع</h3><div class="cu413-form"><input type="hidden" id="cu413PId"><label>اسم المشروع</label><input id="cu413PName" placeholder="اسم المشروع"><label>نوع المشروع</label><select id="cu413PType"><option value="daily_visit">زيارة يومية</option><option value="full_time">دوام كامل</option></select><div class="cu413-two"><div><label>الوقت المطلوب / المستغرق بالدقائق</label><input id="cu413PReq" type="number" placeholder="مثال 480"></div><div><label>المشرف من السيرفر</label><select id="cu413PSupervisor"><option value="">بدون مشرف</option>${supOptions}</select></div></div><div class="cu413-two"><div><label>عدد العمائر</label><input id="cu413PBuildings" type="number" min="0" placeholder="0"></div><div><label>عدد الشقق</label><input id="cu413PUnits" type="number" min="0" placeholder="0"></div></div><label>الحالة</label><select id="cu413PStatus"><option value="active">نشط</option><option value="inactive">موقوف</option></select><div class="cu413-two"><button type="button" onclick="tasneefCoreUnifiedV413.saveProject()">حفظ المشروع</button><button type="button" class="light" onclick="tasneefCoreUnifiedV413.clearProjectForm()">تفريغ</button></div></div></div><div class="cu413-card"><h3>قائمة المشاريع + التوزيع</h3><div class="cu413-two"><div><label>شهر عرض التوزيع</label><input type="month" id="cu413ProjectsMonth" value="${esc(m)}"></div><div><label>بحث</label><input id="cu413ProjectSearch" placeholder="بحث باسم المشروع أو المشرف أو العامل" value="${esc($('cu413ProjectSearch')?.value||'')}"></div></div><div class="cu413-kpis"><div class="cu413-kpi"><small>الإجمالي</small><b>${state.projects.length}</b></div><div class="cu413-kpi"><small>دوام كامل</small><b>${state.projects.filter(p=>projectType(p)==='دوام كامل').length}</b></div><div class="cu413-kpi"><small>زيارة يومية</small><b>${state.projects.filter(p=>projectType(p)!=='دوام كامل').length}</b></div><div class="cu413-kpi"><small>المعروض</small><b>${rows.length}</b></div></div><div class="cu413-list">${rows.map(p=>{const d=projectDistributionSummary(p); return `<div class="cu413-row"><div style="flex:1"><b>${esc(projectName(p))}</b><small>${esc(projectType(p))} | الوقت: ${projectRequired(p).toLocaleString('en-US')} د | العمائر: ${projectBuildings(p)} | الشقق: ${projectUnits(p)}</small><small>المشرف الافتراضي في المشروع: ${esc(projectSupervisorName(p))}</small><small><b>توزيع شهر ${esc(d.month)}:</b> المشرف: ${esc(d.sup.join('، ')||'-')} | عدد العمال: ${d.workers.length}</small><div>${d.workers.slice(0,8).map(w=>`<span class="cu413-chip">${esc(w)}</span>`).join('')}${d.workers.length>8?`<span class="cu413-chip">+${d.workers.length-8}</span>`:''}</div></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end"><small>${esc(projectId(p))}</small><button type="button" class="light" onclick="tasneefCoreUnifiedV413.editProject('${esc(projectId(p))}')">تعديل المشروع</button><button type="button" class="light" onclick="tasneefCoreUnifiedV413.openProjectDistribution('${esc(projectId(p))}')">تعديل التوزيع</button></div></div>`}).join('')||'<div class="cu413-row">لا توجد مشاريع</div>'}</div></div></div>`;
+    box.innerHTML=`<div class="cu413-grid"><div class="cu413-card"><h3>إضافة / تعديل مشروع</h3><div class="cu413-form"><input type="hidden" id="cu413PId"><label>اسم المشروع</label><input id="cu413PName" placeholder="اسم المشروع"><label>نوع المشروع</label><select id="cu413PType"><option value="daily_visit">زيارة يومية</option><option value="full_time">دوام كامل</option></select><div class="cu413-two"><div><label>الوقت المطلوب / المستغرق بالدقائق</label><input id="cu413PReq" type="number" placeholder="مثال 480"></div><div><label>المشرف من السيرفر</label><select id="cu413PSupervisor"><option value="">بدون مشرف</option>${supOptions}</select></div></div><div class="cu413-two"><div><label>عدد العمائر</label><input id="cu413PBuildings" type="number" min="0" placeholder="0"></div><div><label>عدد الشقق</label><input id="cu413PUnits" type="number" min="0" placeholder="0"></div></div><div class="cu413-two"><div><label>تاريخ بداية المشروع</label><input id="cu413PStartDate" type="date"></div><div><label>تاريخ نهاية المشروع</label><input id="cu413PEndDate" type="date"></div></div><label>الحالة</label><select id="cu413PStatus"><option value="active">نشط</option><option value="inactive">موقوف</option></select><div class="cu413-two"><button type="button" onclick="tasneefCoreUnifiedV413.saveProject()">حفظ المشروع</button><button type="button" class="light" onclick="tasneefCoreUnifiedV413.clearProjectForm()">تفريغ</button></div></div></div><div class="cu413-card"><h3>قائمة المشاريع + التوزيع</h3><div class="cu413-two"><div><label>شهر عرض التوزيع</label><input type="month" id="cu413ProjectsMonth" value="${esc(m)}"></div><div><label>بحث</label><input id="cu413ProjectSearch" placeholder="بحث باسم المشروع أو المشرف أو العامل" value="${esc($('cu413ProjectSearch')?.value||'')}"></div></div><div class="cu413-kpis"><div class="cu413-kpi"><small>الإجمالي</small><b>${state.projects.length}</b></div><div class="cu413-kpi"><small>دوام كامل</small><b>${state.projects.filter(p=>projectType(p)==='دوام كامل').length}</b></div><div class="cu413-kpi"><small>زيارة يومية</small><b>${state.projects.filter(p=>projectType(p)!=='دوام كامل').length}</b></div><div class="cu413-kpi"><small>المعروض</small><b>${rows.length}</b></div></div><div class="cu413-list">${rows.map(p=>{const d=projectDistributionSummary(p); return `<div class="cu413-row"><div style="flex:1"><b>${esc(projectName(p))}</b><small>${esc(projectType(p))} | الوقت: ${projectRequired(p).toLocaleString('en-US')} د | العمائر: ${projectBuildings(p)} | الشقق: ${projectUnits(p)}</small><small>بداية المشروع: ${esc(projectStartDate(p)||'-')} | نهاية المشروع: ${esc(projectEndDate(p)||'-')}</small><small>المشرف الافتراضي في المشروع: ${esc(projectSupervisorName(p))}</small><small><b>توزيع شهر ${esc(d.month)}:</b> المشرف: ${esc(d.sup.join('، ')||'-')} | عدد العمال: ${d.workers.length}</small><div>${d.workers.slice(0,8).map(w=>`<span class="cu413-chip">${esc(w)}</span>`).join('')}${d.workers.length>8?`<span class="cu413-chip">+${d.workers.length-8}</span>`:''}</div></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end"><small>${esc(projectId(p))}</small><button type="button" class="light" onclick="tasneefCoreUnifiedV413.editProject('${esc(projectId(p))}')">تعديل المشروع</button><button type="button" class="light" onclick="tasneefCoreUnifiedV413.openProjectDistribution('${esc(projectId(p))}')">تعديل التوزيع</button></div></div>`}).join('')||'<div class="cu413-row">لا توجد مشاريع</div>'}</div></div></div>`;
     $('cu413ProjectSearch')?.addEventListener('input', renderProjectsTab);
     $('cu413ProjectsMonth')?.addEventListener('change', refreshProjectsMonthDistribution);
   }
@@ -301,7 +327,7 @@
     ['cu413FilterSup','cu413FilterProject'].forEach(id=>$(id)?.addEventListener('change', renderDistBox));
   }
   function visibleProjects(){const q=norm($('cu413ProjectSearchPick')?.value||''); return state.projects.filter(statusActive).filter(p=>!q||norm(projectName(p)+' '+projectType(p)+' '+projectSupervisorName(p)).includes(q));}
-  function visibleWorkers(){const q=norm($('cu413PickSearch')?.value||''); return state.workers.filter(w=>isWorker(w)).filter(statusActive).filter(w=>!q||norm(workerDisplay(w)+' '+workerRole(w)).includes(q));}
+  function visibleWorkers(){const q=norm($('cu413PickSearch')?.value||''); const seen=new Set(); return state.workers.filter(w=>isWorker(w)).filter(statusActive).filter(w=>{const k=workerCode(w)||('name:'+norm(workerName(w))); if(seen.has(k)) return false; seen.add(k); return true;}).filter(w=>!q||norm(workerDisplay(w)+' '+workerRole(w)).includes(q));}
   function renderPickProjects(){
     const box=$('cu413ProjectPick'); if(!box) return;
     const rows=visibleProjects();
@@ -349,13 +375,13 @@
   }
   function clearWorkerForm(){['cu413WEditMode','cu413WCode','cu413WName','cu413WIqama','cu413WStartDate','cu413WEndDate','cu413WSalary','cu413WAllowance','cu413WTotal'].forEach(id=>{const el=$(id); if(el) el.value='';}); const r=$('cu413WRole'); if(r) r.value='عامل'; const st=$('cu413WStatus'); if(st) st.value='active';}
   function editWorker(code){const w=(state.allWorkers||state.workers).find(x=>workerCode(x)===code); if(!w)return; setTab('workers'); setTimeout(()=>{if($('cu413WEditMode')) $('cu413WEditMode').value=code; if($('cu413WCode')) $('cu413WCode').value=workerCode(w); if($('cu413WName')) $('cu413WName').value=workerName(w); if($('cu413WRole')) $('cu413WRole').value=workerRole(w)||'عامل'; if($('cu413WIqama')) $('cu413WIqama').value=S(w.iqama_number||w.national_id||''); if($('cu413WStatus')) $('cu413WStatus').value=S(w.status||w.state||'active')||'active'; if($('cu413WStartDate')) $('cu413WStartDate').value=workerStartDate(w); if($('cu413WEndDate')) $('cu413WEndDate').value=workerEndDate(w); if($('cu413WSalary')) $('cu413WSalary').value=workerBasicSalary(w)||''; if($('cu413WAllowance')) $('cu413WAllowance').value=workerAllowances(w)||''; calcWorkerTotal();},60);}
-  function clearProjectForm(){['cu413PId','cu413PName','cu413PReq','cu413PBuildings','cu413PUnits'].forEach(id=>{const el=$(id); if(el) el.value='';}); const t=$('cu413PType'); if(t)t.value='daily_visit'; const s=$('cu413PStatus'); if(s)s.value='active'; const sp=$('cu413PSupervisor'); if(sp)sp.value='';}
-  function editProject(pid){const p=state.projects.find(x=>projectId(x)===S(pid)); if(!p)return; setTab('projects'); setTimeout(()=>{if($('cu413PId')) $('cu413PId').value=projectId(p); if($('cu413PName')) $('cu413PName').value=projectName(p); if($('cu413PType')) $('cu413PType').value=(projectType(p)==='دوام كامل'?'full_time':'daily_visit'); if($('cu413PReq')) $('cu413PReq').value=projectRequired(p)||''; if($('cu413PBuildings')) $('cu413PBuildings').value=projectBuildings(p)||''; if($('cu413PUnits')) $('cu413PUnits').value=projectUnits(p)||''; if($('cu413PStatus')) $('cu413PStatus').value=S(p.status||p.state||'active'); if($('cu413PSupervisor')) $('cu413PSupervisor').value=projectSupervisorCode(p);},60);}
+  function clearProjectForm(){['cu413PId','cu413PName','cu413PReq','cu413PBuildings','cu413PUnits','cu413PStartDate','cu413PEndDate'].forEach(id=>{const el=$(id); if(el) el.value='';}); const t=$('cu413PType'); if(t)t.value='daily_visit'; const s=$('cu413PStatus'); if(s)s.value='active'; const sp=$('cu413PSupervisor'); if(sp)sp.value='';}
+  function editProject(pid){const p=state.projects.find(x=>projectId(x)===S(pid)); if(!p)return; setTab('projects'); setTimeout(()=>{if($('cu413PId')) $('cu413PId').value=projectId(p); if($('cu413PName')) $('cu413PName').value=projectName(p); if($('cu413PType')) $('cu413PType').value=(projectType(p)==='دوام كامل'?'full_time':'daily_visit'); if($('cu413PReq')) $('cu413PReq').value=projectRequired(p)||''; if($('cu413PBuildings')) $('cu413PBuildings').value=projectBuildings(p)||''; if($('cu413PUnits')) $('cu413PUnits').value=projectUnits(p)||''; if($('cu413PStartDate')) $('cu413PStartDate').value=projectStartDate(p)||''; if($('cu413PEndDate')) $('cu413PEndDate').value=projectEndDate(p)||''; if($('cu413PStatus')) $('cu413PStatus').value=S(p.status||p.state||'active'); if($('cu413PSupervisor')) $('cu413PSupervisor').value=projectSupervisorCode(p);},60);}
   function editDistribution(pid){setTab('distribution'); setTimeout(()=>{state.selectedProjects.clear(); state.selectedProjects.add(S(pid)); renderPickProjects(); hydrateProjectSelection(); const m=$('cu413Month')?.value||todayMonth(); const rows=(state.dist[m]||[]).filter(r=>S(r.project_id)===S(pid)); const first=rows[0]||{}; const sup=$('cu413Sup'); if(sup) sup.value=S(first.supervisor_employee_code||''); renderSelected();},80);}
   async function saveProject(){
     const c=client(); if(!c)return; const name=S($('cu413PName')?.value); if(!name){showMsg('أدخل اسم المشروع.',true);return;}
     const pid=S($('cu413PId')?.value||'');
-    const row={name, operation_type:S($('cu413PType')?.value||'daily_visit'), required_daily_minutes:N($('cu413PReq')?.value), status:S($('cu413PStatus')?.value||'active'), supervisor_employee_code:S($('cu413PSupervisor')?.value||''), buildings_count:N($('cu413PBuildings')?.value), units_count:N($('cu413PUnits')?.value)};
+    const row={name, operation_type:S($('cu413PType')?.value||'daily_visit'), required_daily_minutes:N($('cu413PReq')?.value), status:S($('cu413PStatus')?.value||'active'), supervisor_employee_code:S($('cu413PSupervisor')?.value||''), buildings_count:N($('cu413PBuildings')?.value), units_count:N($('cu413PUnits')?.value), project_start_date:S($('cu413PStartDate')?.value||'')||null, project_end_date:S($('cu413PEndDate')?.value||'')||null};
     let r;
     if(pid) r=await c.from('projects').update(row).eq('id',pid).select(); else r=await c.from('projects').insert(row).select();
     if(r.error){showMsg('تعذر حفظ المشروع: '+r.error.message,true);return;} state.projects=[]; await reload(true); clearProjectForm(); showMsg('تم حفظ المشروع.');
@@ -369,8 +395,8 @@
     if(!m||!sup){showMsg('اختر الشهر والمشرف.',true);return;}
     if(!projects.length){showMsg('اختر مشروعًا واحدًا على الأقل.',true);return;}
     if(!chosen.length){showMsg('اختر عاملًا واحدًا على الأقل.',true);return;}
-    const rows=[];
-    projects.forEach(p=>chosen.forEach(w=>rows.push({month_key:m, supervisor_employee_code:workerCode(sup), supervisor_name:workerName(sup), project_id:projectId(p), project_name:projectName(p), worker_employee_code:workerCode(w), worker_name:workerName(w), role_type:workerRole(w)||'عامل', shift_name:'default', required_minutes:projectRequired(p), start_date:m+'-01', end_date:null, status:'active'})));
+    const rows=[], rowKeys=new Set();
+    projects.forEach(p=>chosen.forEach(w=>{const key=[m,projectId(p),workerCode(w)].join('|'); if(rowKeys.has(key)) return; rowKeys.add(key); rows.push({month_key:m, supervisor_employee_code:workerCode(sup), supervisor_name:workerName(sup), project_id:projectId(p), project_name:projectName(p), worker_employee_code:workerCode(w), worker_name:workerName(w), role_type:workerRole(w)||'عامل', shift_name:'default', required_minutes:projectRequired(p), start_date:m+'-01', end_date:null, status:'active'});}));
     const r=await c.from('monthly_distribution').upsert(rows,{onConflict:'month_key,project_id,worker_employee_code'}).select();
     if(r.error){showMsg('تعذر حفظ التوزيع: '+r.error.message,true);return;}
     delete state.dist[m]; await loadDistribution(true); await loadBorrowings($('cu413Month')?.value||todayMonth(),true); fillSelects(); renderDistBox(); showMsg('تم ربط '+chosen.length+' عامل مع '+projects.length+' مشروع بنجاح.');
