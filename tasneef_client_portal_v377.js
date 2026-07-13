@@ -204,7 +204,7 @@
   }
   function renderKpis(){ const s=stats(); const items=[['إجمالي ساعات العمل',minTxt(s.minutes)],['أيام الحضور',s.days],['المتبقي على العقد',s.contractLeft],['الأعمال السنوية المنفذة',s.annualDone],['تذاكر مفتوحة',s.open],['متوسط التقييم',s.avg]]; $('cpKpisV373').innerHTML=items.map(i=>`<div class="cp-v373-kpi"><small>${i[0]}</small><b>${i[1]}</b></div>`).join(''); }
   function renderLogs(){ const rows=state.logs.slice(0,80).map(l=>`<tr><td>${esc(dateOnly(l.log_date||l.check_in))}</td><td>${esc(supervisorName(l.supervisor_id))}</td><td>${esc(fmt(l.check_in))}</td><td>${esc(l.check_out?fmt(l.check_out):'-')}</td><td>${esc(minTxt(Number(l.duration_minutes)||minutesBetween(l.check_in,l.check_out)))}</td></tr>`).join(''); $('cpLogsBoxV373').innerHTML=rows?`<div class="table-wrap"><table class="cp-v373-table"><thead><tr><th>التاريخ</th><th>المشرف</th><th>دخول</th><th>خروج</th><th>المدة</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="cp-v373-empty">لا توجد تسجيلات ضمن الفترة.</div>'; }
-  function renderTickets(){ const rows=state.tickets.slice(0,80).map(t=>`<tr><td><b>${esc(ticketNo(t))}</b></td><td>${esc(t.title||'-')}<br><small>${esc(t.description||'')}</small></td><td><span class="cp-v373-badge ${statusClass(t.status)}">${esc(statusLabel(t.status))}</span></td><td>${esc(fmt(t.created_at))}</td><td>${esc(t.closure_note||t.close_note||'-')}</td></tr>`).join(''); $('cpTicketsBoxV373').innerHTML=rows?`<div class="table-wrap"><table class="cp-v373-table"><thead><tr><th>الرقم</th><th>التذكرة</th><th>الحالة</th><th>التاريخ</th><th>الإجراء</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="cp-v373-empty">لا توجد تذاكر ضمن الفترة.</div>'; }
+  function renderTickets(){ const raw=s=>{s=String(s||'open').trim();if(['closed','مغلق','مغلقة'].includes(s))return 'closed';if(['pending','requested','request','under_request','تحت الطلب','معلقة'].includes(s))return 'pending';if(['processing','in_progress','قيد التنفيذ','تحت المعالجة','reopened','معاد فتحها'].includes(s))return 'processing';return 'open'}; const lbl=s=>{const x=raw(s);return x==='closed'?'مغلقة':x==='pending'?'تحت الطلب':x==='processing'?'تحت المعالجة':'مفتوحة'}; const cls=s=>{const x=raw(s);return x==='closed'?'green':(x==='pending'||x==='processing'?'amber':'red')}; const close=t=>t.closed_at||t.close_date||t.closed_date||t.resolved_at||''; const age=t=>{const st=t.created_at||t.opened_at||t.date||''; const en=close(t)||(t.updated_at||''); if(!st)return '-'; const mm=minutesBetween(st,raw(t.status)==='closed'&&en?en:new Date().toISOString()); return (raw(t.status)==='closed'&&en?'استغرق الإقفال: ':'مفتوحة منذ: ')+minTxt(mm)}; const rows=state.tickets.slice(0,80).map(t=>`<tr><td><b>${esc(ticketNo(t))}</b></td><td><b>${esc(t.title||t.ticket_title||t.type||'تذكرة مشروع')}</b><br><small>${esc(t.description||'')}</small></td><td><span class="cp-v373-badge ${cls(t.status)}">${esc(lbl(t.status))}</span></td><td>${esc(age(t))}</td><td>${esc(fmt(t.created_at))}</td><td>${esc(close(t)?fmt(close(t)):'-')}</td></tr>`).join(''); $('cpTicketsBoxV373').innerHTML=rows?`<div class="table-wrap"><table class="cp-v373-table"><thead><tr><th>رقم التذكرة</th><th>عنوان التذكرة</th><th>حالة التذكرة</th><th>مدة التذكرة</th><th>تاريخ الفتح</th><th>تاريخ الإغلاق</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="cp-v373-empty">لا توجد تذاكر ضمن الفترة.</div>'; }
   function renderReports(){
     const annual=annualRows();
     const annualHtml=annual.length?`<div class="table-wrap"><table class="cp-v373-table"><thead><tr><th>الخدمة السنوية</th><th>عدد الزيارات</th><th>المنفذ</th><th>المتبقي</th><th>الحالة</th><th>ملاحظات</th></tr></thead><tbody>${annual.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td>${r.visits}</td><td><span class="cp-v373-badge green">${r.done}</span></td><td><span class="cp-v373-badge amber">${r.remain}</span></td><td>${esc(r.status)}</td><td>${esc(r.notes||'-')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="cp-v373-empty">لا توجد أعمال سنوية مسجلة لهذا المشروع في بيانات العقد.</div>';
@@ -417,120 +417,66 @@ ${finalUrl}
   setTimeout(ensureAndRender, 900);
 })();
 
-
-/* V471 - رابط داخلي مختصر دائم بدون TinyURL */
+/* V466 - تحسين تقرير العميل في الإدارة: حالة الوقت + خروج تقديري */
 (function(){
   'use strict';
-  if(window.__tasneefClientShortInternalV471) return;
-  window.__tasneefClientShortInternalV471 = true;
-  const $=(id)=>document.getElementById(id);
-  const esc=(v)=>String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const msg=(t,bad)=>{try{ if(typeof window.msg==='function') window.msg(t,bad?'err':'ok'); }catch(_){}};
-  const pid=()=>String($('cpProjectV373')?.value||'').trim();
-  function projectRow(projectId=pid()){return (window.data?.projects||[]).find(p=>String(p.id)===String(projectId))||null;}
-  function baseShort(){
-    const href=location.href.split('#')[0].split('?')[0];
-    if(/admin\.html$/i.test(href)) return href.replace(/admin\.html$/i,'c.html');
-    return href.replace(/[^\/]*$/,'c.html');
-  }
-  function baseLong(){
-    const href=location.href.split('#')[0].split('?')[0];
-    if(/admin\.html$/i.test(href)) return href.replace(/admin\.html$/i,'client-report.html');
-    return href.replace(/[^\/]*$/,'client-report.html');
-  }
-  function internalShortUrl(projectId=pid()){
-    return projectId ? (baseShort()+'?p='+encodeURIComponent(projectId)) : '';
-  }
-  function internalLongUrl(projectId=pid()){
-    return projectId ? (baseLong()+'?project_id='+encodeURIComponent(projectId)) : '';
-  }
-  function renderBox(){
-    const projectId=pid(); const box=$('cpLinkBoxV373'); if(!box) return '';
-    if(!projectId){box.textContent='اختر مشروعًا لإنشاء الرابط.'; return '';}
-    const shortUrl=internalShortUrl(projectId), longUrl=internalLongUrl(projectId);
-    box.innerHTML=`<div style="direction:rtl;text-align:right;font-weight:900;color:#073e31;margin-bottom:6px">رابط عميل مختصر داخلي ودائم</div>
-    <div style="direction:ltr;text-align:left;word-break:break-all"><small style="color:#60706a">الرابط المختصر:</small><br><b>${esc(shortUrl)}</b></div>
-    <div style="direction:ltr;text-align:left;word-break:break-all;margin-top:8px"><small style="color:#60706a">الرابط الطويل الاحتياطي:</small><br>${esc(longUrl)}</div>
-    <div style="direction:rtl;text-align:right;margin-top:8px;color:#137a4b;font-weight:800">هذا الرابط لا يعتمد على TinyURL، ويظل يعمل طالما الموقع وقاعدة البيانات شغالة.</div>`;
-    return shortUrl;
-  }
-  async function saveShort(projectId=pid()){
-    if(!projectId) return '';
-    const p=projectRow(projectId)||{};
-    const payload={
-      client_portal_url: internalLongUrl(projectId),
-      client_portal_short_url: internalShortUrl(projectId),
-      client_portal_updated_at: new Date().toISOString()
-    };
-    Object.assign(p,payload);
-    if(window.sb){try{await window.sb.from('projects').update(payload).eq('id', projectId);}catch(e){console.warn('V471 save short skipped',e);}}
-    return payload.client_portal_short_url;
-  }
-  window.createShortClientPortalLinkV376 = async function(){
-    const projectId=pid(); if(!projectId){msg('اختر المشروع أولًا',true); return '';}
-    const u=await saveShort(projectId); renderBox(); msg('تم إنشاء الرابط المختصر الداخلي'); return u;
-  };
-  window.copyClientPortalLinkV373 = async function(){
-    const projectId=pid(); if(!projectId){msg('اختر المشروع أولًا',true); return;}
-    const u=await saveShort(projectId); renderBox(); try{await navigator.clipboard.writeText(u);}catch(_){} msg('تم نسخ الرابط المختصر');
-  };
-  window.openClientPortalLinkV373 = async function(){
-    const projectId=pid(); if(!projectId){msg('اختر المشروع أولًا',true); return;}
-    const u=await saveShort(projectId); renderBox(); window.open(u,'_blank');
-  };
-  window.sendClientPortalWhatsappV373 = async function(){
-    const projectId=pid(); if(!projectId){msg('اختر المشروع أولًا',true); return;}
-    const u=await saveShort(projectId); renderBox();
-    const txt=`السيد رئيس الجمعية المحترم،\n\nرابط بوابة مشروعكم لدى شركة تصنيف لإدارة المرافق:\n${u}\n\nوتقبلوا تحياتنا،\nشركة تصنيف لإدارة المرافق`;
-    window.open('https://wa.me/?text='+encodeURIComponent(txt),'_blank');
-  };
+  if(window.__tasneefAdminClientPortalV466) return;
+  window.__tasneefAdminClientPortalV466 = true;
+  const $=id=>document.getElementById(id);
+  const esc=v=>String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const num=v=>Number(String(v??'').replace(/,/g,''))||0;
+  const minTxt=m=>{m=Math.max(0,Math.round(num(m)));const h=Math.floor(m/60),r=m%60;return h?`${h} س ${r} د`:`${r} د`;};
+  const fmt=v=>{try{return v?new Date(v).toLocaleString('ar-SA',{year:'numeric',month:'2-digit',day:'2-digit',hour:'numeric',minute:'2-digit'}):'-';}catch(_){return v||'-';}};
+  const dOnly=v=>String(v||'').slice(0,10);
+  function diff(a,b){const x=new Date(a),y=new Date(b);const m=Math.round((y-x)/60000);return isFinite(m)&&m>0?m:0;}
+  function add(v,m){const d=new Date(v);if(isNaN(d.getTime())||!m)return '';d.setMinutes(d.getMinutes()+num(m));return d.toISOString();}
+  function req(){const p=(window.data?.projects||[]).find(x=>String(x.id)===String((window.__cpV466ProjectId)||($('cpProjectV373')?.value||'')))||{};for(const k of ['required_daily_minutes','required_minutes','required_time_minutes','visit_minutes','daily_minutes','expected_minutes','duration_minutes']){const v=num(p[k]);if(v>0)return v;}return 0;}
+  function meta(l){const r=req();const actual=num(l.duration_minutes)||diff(l.check_in,l.check_out);const has=!!l.check_out;const exp=r&&l.check_in?add(l.check_in,r):'';if(!has)return {req:r,dur:r,status:'لم يسجل خروج',cls:'amber',out:exp?`تقديري: ${fmt(exp)}`:'-',note:exp?'خروج تقديري حسب الوقت المطلوب':'لم يسجل خروج'};if(r&&actual>r+5)return{req:r,dur:actual,status:'زيادة عن الوقت',cls:'blue',out:fmt(l.check_out),note:`زيادة ${minTxt(actual-r)}`};return{req:r,dur:actual,status:'ضمن الوقت',cls:'green',out:fmt(l.check_out),note:r?`المطلوب ${minTxt(r)}`:'ضمن الوقت'};}
+  function renderLogsBox(){const box=$('cpLogsBoxV373');if(!box||!window.__cpV466StateLogs)return;const rows=(window.__cpV466StateLogs||[]).slice(0,80).map(l=>{const m=meta(l);return `<tr><td>${esc(dOnly(l.log_date||l.check_in))}</td><td>${esc(window.supervisorName?window.supervisorName(l.supervisor_id):'')}</td><td>${esc(fmt(l.check_in))}</td><td>${esc(m.out)}</td><td>${esc(minTxt(m.req))}</td><td>${esc(minTxt(m.dur))}</td><td><span class="cp-v373-badge ${m.cls}">${esc(m.status)}</span><br><small>${esc(m.note)}</small></td></tr>`}).join('');box.innerHTML=rows?`<div class="table-wrap"><table class="cp-v373-table"><thead><tr><th>التاريخ</th><th>المشرف</th><th>الدخول</th><th>الخروج / المتوقع</th><th>الوقت المطلوب</th><th>المدة</th><th>حالة الوقت</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="cp-v373-empty">لا توجد تسجيلات ضمن الفترة.</div>';}
   const oldLoad=window.loadClientPortalV373;
-  if(typeof oldLoad==='function' && !oldLoad.__v471){
-    window.loadClientPortalV373=async function(){const r=await oldLoad.apply(this,arguments); setTimeout(()=>{saveShort().then(renderBox).catch(()=>renderBox());},150); return r;};
-    window.loadClientPortalV373.__v471=true;
+  if(typeof oldLoad==='function' && !oldLoad.__v466){
+    window.loadClientPortalV373=async function(btn){const res=await oldLoad.apply(this,arguments);try{window.__cpV466ProjectId=$('cpProjectV373')?.value||'';window.__cpV466StateLogs=(window.state&&window.state.logs)||[];renderLogsBox();}catch(_){}return res;};
+    window.loadClientPortalV373.__v466=true;
   }
-  document.addEventListener('change',e=>{if(e.target&&e.target.id==='cpProjectV373') setTimeout(()=>{saveShort().then(renderBox).catch(()=>renderBox());},120);});
-  setTimeout(()=>{saveShort().then(renderBox).catch(()=>renderBox());},1200);
+  const oldRender=window.renderClientPortalV373;
+  if(typeof oldRender==='function' && !oldRender.__v466){
+    window.renderClientPortalV373=function(){const res=oldRender.apply(this,arguments);setTimeout(()=>{try{window.__cpV466ProjectId=$('cpProjectV373')?.value||'';window.__cpV466StateLogs=(window.state&&window.state.logs)||[];renderLogsBox();}catch(_){}},250);return res;};
+    window.renderClientPortalV373.__v466=true;
+  }
 })();
 
-/* V472 - إظهار رابط مختصر بدون دومين داخل الشاشة + تنبيه الدومين المخصص */
+/* V468 - بوابة العميل: مدة التذاكر + عدم اعتبار الخروج التقديري خروجًا فعليًا في العرض */
 (function(){
   'use strict';
-  if(window.__tasneefClientShortNoDomainV472) return;
-  window.__tasneefClientShortNoDomainV472 = true;
-  const $=(id)=>document.getElementById(id);
-  const esc=(v)=>String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const msg=(t,bad)=>{try{ if(typeof window.msg==='function') window.msg(t,bad?'err':'ok'); }catch(_){} };
-  const pid=()=>String($('cpProjectV373')?.value||'').trim();
-  function baseShort(){const href=location.href.split('#')[0].split('?')[0];return /admin\.html$/i.test(href)?href.replace(/admin\.html$/i,'c.html'):href.replace(/[^\/]*$/,'c.html');}
-  function baseLong(){const href=location.href.split('#')[0].split('?')[0];return /admin\.html$/i.test(href)?href.replace(/admin\.html$/i,'client-report.html'):href.replace(/[^\/]*$/,'client-report.html');}
-  function pathOnly(id=pid()){return id?('c.html?p='+encodeURIComponent(id)):'';}
-  function fullUrl(id=pid()){return id?(baseShort()+'?p='+encodeURIComponent(id)):'';}
-  function longUrl(id=pid()){return id?(baseLong()+'?project_id='+encodeURIComponent(id)):'';}
-  function projectRow(projectId=pid()){return (window.data?.projects||[]).find(p=>String(p.id)===String(projectId))||null;}
-  function render(){
-    const box=$('cpLinkBoxV373'), id=pid(); if(!box)return'';
-    if(!id){box.textContent='اختر مشروعًا لإنشاء الرابط.';return'';}
-    const display=pathOnly(id), url=fullUrl(id);
-    box.innerHTML=`<div style="direction:rtl;text-align:right;font-weight:900;color:#073e31;margin-bottom:6px">رابط مختصر داخلي</div>
-      <div style="direction:ltr;text-align:left;word-break:break-all"><small style="color:#60706a">المعروض بدون دومين:</small><br><b>${esc(display)}</b></div>
-      <div style="direction:rtl;text-align:right;margin-top:8px;color:#9a6b00;font-weight:800">لإرسال الرابط خارج النظام يجب نسخه كرابط كامل. لإخفاء welbadane1235-svg.github.io نهائيًا يلزم ربط دومينك الخاص من إعدادات GitHub Pages.</div>`;
-    return url;
+  if(window.__tasneefAdminClientPortalV468) return;
+  window.__tasneefAdminClientPortalV468 = true;
+  const $=id=>document.getElementById(id);
+  const esc=v=>String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const n=v=>Number(String(v??'').replace(/,/g,''))||0;
+  const fmt=v=>{try{return v?new Date(v).toLocaleString('ar-SA',{year:'numeric',month:'2-digit',day:'2-digit',hour:'numeric',minute:'2-digit'}):'-';}catch(_){return v||'-';}};
+  const dOnly=v=>String(v||'').slice(0,10);
+  const minTxt=m=>{m=Math.max(0,Math.round(n(m)));const h=Math.floor(m/60),r=m%60;return h?`${h} س ${r} د`:`${r} د`;};
+  function diff(a,b){const x=new Date(a),y=new Date(b);const m=Math.round((y-x)/60000);return isFinite(m)&&m>0?m:0;}
+  function ticketNo(t){return t?.ticket_number || t?.ticket_no || (t?.id?('T-'+String(t.id).padStart(4,'0')):'-');}
+  function stRaw(s){s=String(s||'open'); if(['closed','مغلق','مغلقة'].includes(s)) return 'closed'; if(['pending','requested','request','under_request','تحت الطلب','معلقة'].includes(s)) return 'pending'; if(['processing','in_progress','قيد التنفيذ','تحت المعالجة'].includes(s)) return 'processing'; return 'open';}
+  function stLabel(s){const x=stRaw(s); return x==='closed'?'مغلقة':x==='pending'?'تحت الطلب':x==='processing'?'تحت المعالجة':'مفتوحة';}
+  function stClass(s){const x=stRaw(s); return x==='closed'?'green':x==='pending'?'amber':x==='processing'?'amber':'red';}
+  function ticketAge(t){const start=t.created_at||t.opened_at||t.date||''; const end=t.closed_at||t.close_date||t.closed_date||t.resolved_at||t.updated_at||''; if(!start) return '-'; if(stRaw(t.status)==='closed' && end){return 'استغرق الإقفال: '+minTxt(diff(start,end));} return 'مفتوحة منذ: '+minTxt(diff(start,new Date().toISOString()));}
+  function renderTicketsBox(){
+    const box=$('cpTicketsBoxV373');
+    const arr=(window.__cpV468Tickets||[]);
+    if(!box) return;
+    const rows=arr.slice(0,80).map(t=>`<tr><td><b>${esc(ticketNo(t))}</b></td><td><b>${esc(t.title||t.ticket_title||t.type||'تذكرة مشروع')}</b><br><small>${esc(t.description||'')}</small></td><td><span class="cp-v373-badge ${stClass(t.status)}">${esc(stLabel(t.status))}</span></td><td>${esc(ticketAge(t))}</td><td>${esc(fmt(t.created_at))}</td><td>${esc((stRaw(t.status)==='closed'&&(t.closed_at||t.close_date||t.resolved_at))?fmt(t.closed_at||t.close_date||t.resolved_at):'-')}</td></tr>`).join('');
+    box.innerHTML=rows?`<div class="table-wrap"><table class="cp-v373-table"><thead><tr><th>رقم التذكرة</th><th>عنوان التذكرة</th><th>حالة التذكرة</th><th>مدة التذكرة</th><th>تاريخ الفتح</th><th>تاريخ الإغلاق</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="cp-v373-empty">لا توجد تذاكر ضمن الفترة.</div>';
   }
-  async function save(id=pid()){
-    if(!id)return'';
-    const p=projectRow(id)||{};
-    const payload={client_portal_url:longUrl(id),client_portal_short_url:fullUrl(id),client_portal_updated_at:new Date().toISOString()};
-    Object.assign(p,payload);
-    if(window.sb){try{await window.sb.from('projects').update(payload).eq('id',id);}catch(e){console.warn('V472 save skipped',e);}}
-    return payload.client_portal_short_url;
-  }
-  window.copyClientPortalLinkV373=async function(){const id=pid(); if(!id){msg('اختر المشروع أولًا',true);return;} const u=await save(id); render(); try{await navigator.clipboard.writeText(u);}catch(_){} msg('تم نسخ الرابط الكامل القابل للإرسال');};
-  window.openClientPortalLinkV373=async function(){const id=pid(); if(!id){msg('اختر المشروع أولًا',true);return;} const u=await save(id); render(); window.open(u,'_blank');};
-  window.createShortClientPortalLinkV376=async function(){const id=pid(); if(!id){msg('اختر المشروع أولًا',true);return'';} const u=await save(id); render(); msg('تم تجهيز الرابط المختصر الداخلي'); return u;};
-  window.sendClientPortalWhatsappV373=async function(){const id=pid(); if(!id){msg('اختر المشروع أولًا',true);return;} const u=await save(id); render(); const txt=`السيد رئيس الجمعية المحترم،\n\nرابط بوابة مشروعكم لدى شركة تصنيف لإدارة المرافق:\n${u}\n\nوتقبلوا تحياتنا،\nشركة تصنيف لإدارة المرافق`; window.open('https://wa.me/?text='+encodeURIComponent(txt),'_blank');};
   const oldLoad=window.loadClientPortalV373;
-  if(typeof oldLoad==='function'&&!oldLoad.__v472){window.loadClientPortalV373=async function(){const r=await oldLoad.apply(this,arguments); setTimeout(()=>{save().then(render).catch(()=>render());},180); return r;}; window.loadClientPortalV373.__v472=true;}
-  document.addEventListener('change',e=>{if(e.target&&e.target.id==='cpProjectV373')setTimeout(()=>{save().then(render).catch(()=>render());},150);});
-  setTimeout(()=>{save().then(render).catch(()=>render());},1300);
+  if(typeof oldLoad==='function' && !oldLoad.__v468){
+    window.loadClientPortalV373=async function(btn){const r=await oldLoad.apply(this,arguments);setTimeout(()=>{try{window.__cpV468Tickets=(window.state&&window.state.tickets)||[];renderTicketsBox();}catch(_){}},80);return r;};
+    window.loadClientPortalV373.__v468=true;
+  }
+  const oldRender=window.renderClientPortalV373;
+  if(typeof oldRender==='function' && !oldRender.__v468){
+    window.renderClientPortalV373=function(){const r=oldRender.apply(this,arguments);setTimeout(()=>{try{window.__cpV468Tickets=(window.state&&window.state.tickets)||[];renderTicketsBox();}catch(_){}},250);return r;};
+    window.renderClientPortalV373.__v468=true;
+  }
 })();
