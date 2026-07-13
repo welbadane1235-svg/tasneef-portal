@@ -6,7 +6,7 @@
   if(window.__tasneefCoreUnifiedV413) return;
   window.__tasneefCoreUnifiedV413 = true;
 
-  const VERSION='453';
+  const VERSION='454';
   const S=v=>String(v??'').trim();
   const N=v=>{const n=Number(v||0);return Number.isFinite(n)?n:0};
   const $=id=>document.getElementById(id);
@@ -40,8 +40,8 @@
   function projectRequired(p){return N(p.required_daily_minutes||p.daily_required_minutes||p.required_minutes||p.monthly_required_minutes||p.required_time_minutes||p.expected_minutes||0);}
   function projectBuildings(p){return N(p.buildings_count||p.building_count||p.buildings||p.towers_count||p.towers||p.blocks_count||0);}
   function projectUnits(p){return N(p.units_count||p.apartments_count||p.flats_count||p.units||p.apartments||p.apartment_count||0);}
-  function projectStartDate(p){return S(p.project_start_date||p.contract_start_date||p.start_date||p.service_start_date||'');}
-  function projectEndDate(p){return S(p.project_end_date||p.contract_end_date||p.end_date||p.service_end_date||'');}
+  function projectStartDate(p){return S(p.project_start_date||p.contract_start_date||p.contract_start||p.start_date||p.service_start_date||'');}
+  function projectEndDate(p){return S(p.project_end_date||p.contract_end_date||p.contract_end||p.end_date||p.service_end_date||'');}
   function projectSupervisorCode(p){return S(p.supervisor_employee_code||p.current_supervisor_code||p.supervisor_code||p.supervisor_id||p.current_supervisor_id||'');}
   function projectSupervisorName(p){const code=projectSupervisorCode(p); const w=state.workers.find(x=>workerCode(x)===code||S(x.id)===code); return w?workerDisplay(w):S(p.supervisor_name||p.current_supervisor_name||code||'-');}
   function statusActive(x){const st=norm(x?.status||x?.state||x?.active_status||'active'); return !(x?.deleted_at||x?.is_deleted===true||x?.active===false||x?.is_active===false||['deleted','archived','inactive','stopped','ended','disabled','محذوف','موقوف','متوقف','منتهي','غير نشط','غيرنشط'].includes(st));}
@@ -381,7 +381,8 @@
   async function saveProject(){
     const c=client(); if(!c)return; const name=S($('cu413PName')?.value); if(!name){showMsg('أدخل اسم المشروع.',true);return;}
     const pid=S($('cu413PId')?.value||'');
-    const row={name, operation_type:S($('cu413PType')?.value||'daily_visit'), required_daily_minutes:N($('cu413PReq')?.value), status:S($('cu413PStatus')?.value||'active'), supervisor_employee_code:S($('cu413PSupervisor')?.value||''), buildings_count:N($('cu413PBuildings')?.value), units_count:N($('cu413PUnits')?.value), project_start_date:S($('cu413PStartDate')?.value||'')||null, project_end_date:S($('cu413PEndDate')?.value||'')||null};
+    const pStart=S($('cu413PStartDate')?.value||'')||null, pEnd=S($('cu413PEndDate')?.value||'')||null;
+    const row={name, operation_type:S($('cu413PType')?.value||'daily_visit'), required_daily_minutes:N($('cu413PReq')?.value), status:S($('cu413PStatus')?.value||'active'), supervisor_employee_code:S($('cu413PSupervisor')?.value||''), buildings_count:N($('cu413PBuildings')?.value), units_count:N($('cu413PUnits')?.value), project_start_date:pStart, project_end_date:pEnd, contract_start:pStart, contract_end:pEnd, start_date:pStart, end_date:pEnd};
     let r;
     if(pid) r=await c.from('projects').update(row).eq('id',pid).select(); else r=await c.from('projects').insert(row).select();
     if(r.error){showMsg('تعذر حفظ المشروع: '+r.error.message,true);return;} state.projects=[]; await reload(true); clearProjectForm(); showMsg('تم حفظ المشروع.');

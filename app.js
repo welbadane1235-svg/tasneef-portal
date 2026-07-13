@@ -987,8 +987,11 @@ window.showSupervisorWindow = function(id, btn){
   function isoDate(d){ if(!d) return ''; return String(d).slice(0,10); }
   function parseDateOnly(s){ if(!s) return null; const parts=String(s).slice(0,10).split('-').map(Number); if(parts.length!==3||!parts[0]) return null; return new Date(parts[0], parts[1]-1, parts[2]); }
   function daysLeft(end){ const e=parseDateOnly(end); if(!e) return null; const t=new Date(); const today=new Date(t.getFullYear(),t.getMonth(),t.getDate()); return Math.ceil((e-today)/86400000); }
+  function contractStartValue(p){ return isoDate(p?.project_start_date || p?.contract_start_date || p?.contract_start || p?.start_date || p?.service_start_date || ''); }
+  function contractEndValue(p){ return isoDate(p?.project_end_date || p?.contract_end_date || p?.contract_end || p?.end_date || p?.service_end_date || ''); }
+  function projectActiveInContracts(p){ const st=String(p?.status||p?.state||'active').trim().toLowerCase(); return !(p?.deleted_at || p?.is_deleted===true || ['deleted','archived','محذوف'].includes(st)); }
   function contractInfo(p){
-    const d=daysLeft(p.contract_end);
+    const d=daysLeft(contractEndValue(p));
     if(d===null) return {key:'missing', text:'بيانات ناقصة', cls:'amber', days:'-'};
     if(d < 0) return {key:'expired', text:'منتهي', cls:'red', days:'منتهي'};
     if(d <= 30) return {key:'soon', text:'قريب الانتهاء', cls:'amber', days:d + ' يوم'};
@@ -1034,6 +1037,10 @@ window.showSupervisorWindow = function(id, btn){
       units_count:Number($safe('projectUnitsCount')?.value)||0,
       contract_start:$safe('projectContractStart')?.value||null,
       contract_end:$safe('projectContractEnd')?.value||null,
+      project_start_date:$safe('projectContractStart')?.value||null,
+      project_end_date:$safe('projectContractEnd')?.value||null,
+      start_date:$safe('projectContractStart')?.value||null,
+      end_date:$safe('projectContractEnd')?.value||null,
       required_daily_minutes:Number($safe('projectRequiredDaily')?.value||180),
       friday_minutes:Number($safe('projectFridayMinutes')?.value||90),
       operation_type:$safe('projectOperationType')?.value||'daily_visit',
@@ -1061,8 +1068,8 @@ window.showSupervisorWindow = function(id, btn){
     if(typeof oldEditProject==='function') oldEditProject(id);
     if($safe('projectBuildingsCount')) $safe('projectBuildingsCount').value=p.buildings_count||0;
     if($safe('projectUnitsCount')) $safe('projectUnitsCount').value=p.units_count||0;
-    if($safe('projectContractStart')) $safe('projectContractStart').value=isoDate(p.contract_start);
-    if($safe('projectContractEnd')) $safe('projectContractEnd').value=isoDate(p.contract_end);
+    if($safe('projectContractStart')) $safe('projectContractStart').value=contractStartValue(p);
+    if($safe('projectContractEnd')) $safe('projectContractEnd').value=contractEndValue(p);
   };
 
   const oldClearProjectForm = window.clearProjectForm;
@@ -1078,9 +1085,9 @@ window.showSupervisorWindow = function(id, btn){
     const projects=data.projects||[];
     const relevant=projects.map(p=>({p,c:contractInfo(p)})).filter(x=>['soon','expired','missing'].includes(x.c.key));
     const html = relevant.sort((a,b)=>{
-      const da=daysLeft(a.p.contract_end); const db=daysLeft(b.p.contract_end);
+      const da=daysLeft(contractEndValue(a.p)); const db=daysLeft(contractEndValue(b.p));
       return (da??99999)-(db??99999);
-    }).map(x=>`<div class="alert-item ${x.c.key==='expired'?'danger':'warn'}"><b>${esc2(x.p.name)}</b><br>نهاية العقد: ${esc2(isoDate(x.p.contract_end)||'-')}<br>المتبقي: ${x.c.days} - ${x.c.text}</div>`).join('') || '<div class="alert-item">لا توجد عقود قريبة الانتهاء خلال 30 يوم</div>';
+    }).map(x=>`<div class="alert-item ${x.c.key==='expired'?'danger':'warn'}"><b>${esc2(x.p.name)}</b><br>نهاية العقد: ${esc2(contractEndValue(x.p)||'-')}<br>المتبقي: ${x.c.days} - ${x.c.text}</div>`).join('') || '<div class="alert-item">لا توجد عقود قريبة الانتهاء خلال 30 يوم</div>';
     if($safe('contractDashboardAlerts')) $safe('contractDashboardAlerts').innerHTML=html;
     if($safe('contractsAlertsList')) $safe('contractsAlertsList').innerHTML=html;
   };
@@ -1093,8 +1100,8 @@ window.showSupervisorWindow = function(id, btn){
     let rows=[...(data.projects||[])];
     if(q) rows=rows.filter(p=>String(p.name||'').includes(q));
     if(st) rows=rows.filter(p=>contractInfo(p).key===st);
-    rows.sort((a,b)=>{ const da=daysLeft(a.contract_end); const db=daysLeft(b.contract_end); return (da??999999)-(db??999999); });
-    body.innerHTML=rows.map(p=>{ const c=contractInfo(p); return `<tr><td><b>${esc2(p.name)}</b></td><td>${p.buildings_count||0}</td><td>${p.units_count||0}</td><td>${esc2(isoDate(p.contract_start)||'-')}</td><td>${esc2(isoDate(p.contract_end)||'-')}</td><td>${c.days}</td><td><span class="badge ${c.cls}">${c.text}</span></td><td><button onclick="showPage('projects', document.querySelector(\`.nav[onclick*=projects]\`)); setTimeout(()=>editProject(${p.id}),50)">تعديل</button></td></tr>`; }).join('') || '<tr><td colspan="8">لا توجد بيانات</td></tr>';
+    rows=rows.filter(projectActiveInContracts); rows.sort((a,b)=>{ const da=daysLeft(contractEndValue(a)); const db=daysLeft(contractEndValue(b)); return (da??999999)-(db??999999); });
+    body.innerHTML=rows.map(p=>{ const c=contractInfo(p); return `<tr><td><b>${esc2(p.name)}</b></td><td>${p.buildings_count||0}</td><td>${p.units_count||0}</td><td>${esc2(contractStartValue(p)||'-')}</td><td>${esc2(contractEndValue(p)||'-')}</td><td>${c.days}</td><td><span class="badge ${c.cls}">${c.text}</span></td><td><button onclick="showPage('projects', document.querySelector(\`.nav[onclick*=projects]\`)); setTimeout(()=>editProject(${p.id}),50)">تعديل</button></td></tr>`; }).join('') || '<tr><td colspan="8">لا توجد بيانات</td></tr>';
     if($safe('contractsActiveCount')) $safe('contractsActiveCount').textContent=(data.projects||[]).filter(p=>contractInfo(p).key==='active').length;
     if($safe('contractsSoonCount')) $safe('contractsSoonCount').textContent=(data.projects||[]).filter(p=>contractInfo(p).key==='soon').length;
     if($safe('contractsExpiredCount')) $safe('contractsExpiredCount').textContent=(data.projects||[]).filter(p=>contractInfo(p).key==='expired').length;
@@ -1108,7 +1115,7 @@ window.showSupervisorWindow = function(id, btn){
     if(q) rows=rows.filter(p=>[p.name,p.location,supervisorName(p.supervisor_id),p.notes].join(' ').includes(q));
     if(sid) rows=rows.filter(p=>String(p.supervisor_id)===String(sid));
     if(st) rows=rows.filter(p=>(p.status||'active')===st);
-    b.innerHTML=rows.map(p=>{ const c=contractInfo(p); return `<tr><td><b>${esc2(p.name)}</b><br><small>${esc2(p.location||'')}</small></td><td>${esc2(supervisorName(p.supervisor_id))}</td><td>${p.buildings_count||0}</td><td>${p.units_count||0}</td><td>${esc2(isoDate(p.contract_end)||'-')}</td><td>${c.days}</td><td><span class="badge ${c.cls}">${c.text}</span></td><td>${minsToText(p.required_daily_minutes??180)}</td><td><span class="badge ${p.status==='inactive'?'red':'green'}">${p.status==='inactive'?'متوقف':'نشط'}</span></td><td class="row-actions"><button onclick="editProject(${p.id})">تعديل</button><button class="light" onclick="openProjectManager(${p.id})">إدارة المشروع</button><button class="light" onclick="toggleProjectStatus(${p.id})">${p.status==='inactive'?'تفعيل':'إيقاف'}</button><button class="danger" onclick="deleteRow('projects',${p.id})">حذف</button></td></tr>`; }).join('')||'<tr><td colspan="10">لا توجد بيانات</td></tr>';
+    b.innerHTML=rows.map(p=>{ const c=contractInfo(p); return `<tr><td><b>${esc2(p.name)}</b><br><small>${esc2(p.location||'')}</small></td><td>${esc2(supervisorName(p.supervisor_id))}</td><td>${p.buildings_count||0}</td><td>${p.units_count||0}</td><td>${esc2(contractEndValue(p)||'-')}</td><td>${c.days}</td><td><span class="badge ${c.cls}">${c.text}</span></td><td>${minsToText(p.required_daily_minutes??180)}</td><td><span class="badge ${p.status==='inactive'?'red':'green'}">${p.status==='inactive'?'متوقف':'نشط'}</span></td><td class="row-actions"><button onclick="editProject(${p.id})">تعديل</button><button class="light" onclick="openProjectManager(${p.id})">إدارة المشروع</button><button class="light" onclick="toggleProjectStatus(${p.id})">${p.status==='inactive'?'تفعيل':'إيقاف'}</button><button class="danger" onclick="deleteRow('projects',${p.id})">حذف</button></td></tr>`; }).join('')||'<tr><td colspan="10">لا توجد بيانات</td></tr>';
     if(typeof renderProjectManager==='function') renderProjectManager();
     renderContracts(); renderContractAlerts();
   };
@@ -18008,7 +18015,7 @@ function financePrintReport(kind){
     let rows=[...(data.projects||[])];
     if(q) rows=rows.filter(p=>String(p.name||'').includes(q));
     if(st) rows=rows.filter(p=>contractInfo(p).key===st);
-    rows.sort((a,b)=>{ const da=daysLeft(a.contract_end); const db=daysLeft(b.contract_end); return (da??999999)-(db??999999); });
+    rows=rows.filter(projectActiveInContracts); rows.sort((a,b)=>{ const da=daysLeft(contractEndValue(a)); const db=daysLeft(contractEndValue(b)); return (da??999999)-(db??999999); });
     body.innerHTML=rows.map(p=>{ const c=contractInfo(p); return `<tr><td><b>${h(p.name)}</b></td><td>${p.buildings_count||0}</td><td>${p.units_count||0}</td><td>${h(isoDate(p.contract_start)||'-')}</td><td>${h(isoDate(p.contract_end)||'-')}</td><td>${c.days}</td><td><span class="badge ${c.cls}">${c.text}</span></td><td class="row-actions"><button class="light" onclick="openContractSmartModal(${p.id},'view')">عرض</button><button onclick="openContractSmartModal(${p.id},'edit')">تعديل</button></td></tr>`; }).join('') || '<tr><td colspan="8">لا توجد بيانات</td></tr>';
     if(el('contractsActiveCount')) el('contractsActiveCount').textContent=(data.projects||[]).filter(p=>contractInfo(p).key==='active').length;
     if(el('contractsSoonCount')) el('contractsSoonCount').textContent=(data.projects||[]).filter(p=>contractInfo(p).key==='soon').length;
