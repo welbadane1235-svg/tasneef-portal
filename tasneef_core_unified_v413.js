@@ -618,7 +618,7 @@
 /* ===================== V458 Smart stop + visible status + no duplicates ===================== */
 (function(){
   'use strict';
-  const VERSION='V463';
+  const VERSION='V464';
   const S=v=>String(v??'').trim();
   const N=v=>Number(v)||0;
   const $=id=>document.getElementById(id);
@@ -705,10 +705,10 @@
     const fromDate=new Date().toISOString().slice(0,10);
     let result={dist:0,projects:0,logs:0,attendance:0,users:newUser?1:0};
 
-    // V462 الحل الجذري الفعلي: نقل واحد كامل من قاعدة البيانات نفسها.
+    // V464 الحل الجذري العام: نقل واحد كامل من قاعدة البيانات نفسها.
     // ينقل المشاريع وحساب المشرف والتوزيع الحالي/المستقبلي والسجلات اليومية الحالية/المستقبلية.
     try{
-      const rpc=await c.rpc('tasneef_transfer_supervisor_all_history_v463',{
+      const rpc=await c.rpc('tasneef_transfer_supervisor_any_v464',{
         p_old_code:S(oldCode),
         p_new_code:S(newCode),
         p_old_name:S(oldName),
@@ -843,5 +843,5 @@
   document.addEventListener('DOMContentLoaded',()=>setTimeout(install,1500));
   window.addEventListener('load',()=>setTimeout(install,1800));
   setInterval(()=>{hookSaveWorker(); enhanceWorkerCards(); installEndDateAutoFill();},2000);
-  console.log('Tasneef core smart stop '+VERSION+' loaded');
+  console.log('Tasneef core smart stop '+VERSION+' loaded - generic supervisor transfer');
 })();
