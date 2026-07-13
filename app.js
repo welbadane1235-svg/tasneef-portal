@@ -24086,3 +24086,16 @@ try{ exportSupervisorDailyPDFV10310 = window.exportSupervisorDailyPDFV10310; }ca
   const oldShow=window.showContractsSubTab; if(typeof oldShow==='function') window.showContractsSubTab=function(){const r=oldShow.apply(this,arguments); setTimeout(refresh,80); return r;};
   console.log('Contracts stronger status '+VERSION+' loaded');
 })();
+
+/* V470 - روابط العميل الدائمة بدون TinyURL */
+(function(){
+  try{
+    window.clientReportUrl = function(token){
+      var base = location.href.replace(/admin\.html.*$/,'').replace(/index\.html.*$/,'').replace(/supervisor\.html.*$/,'');
+      return base + 'client.html?token=' + encodeURIComponent(token || '');
+    };
+    window.openClientReport = function(token){
+      window.open(window.clientReportUrl(token), '_blank');
+    };
+  }catch(e){ console.warn('V470 client permanent link patch failed', e); }
+})();
