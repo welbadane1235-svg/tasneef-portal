@@ -4,7 +4,7 @@
   // التوزيع الموحد يحدد المشرف والعمال، العمال الموحدون يحددون بيانات العامل والراتب، الحضور يحدد الغياب فقط.
   window.__tasneefSalariesUnifiedV440 = true;
   window.__tasneefSalariesUnifiedV451 = true;
-  const VERSION='V451 رواتب ثابتة وخفيفة';
+  const VERSION='V452 رواتب حسب التوزيع النشط فقط';
   const $=id=>document.getElementById(id);
   const S=v=>String(v??'').trim();
   const N=v=>Number(String(v??'').replace(/,/g,''))||0;
@@ -36,7 +36,7 @@
   function startOf(w){return S(w.start_date||w.work_start_date||w.joining_date||w.date_start||w.default_start_date)}
   function endOf(w){return S(w.end_date||w.work_end_date||w.termination_date||w.date_end||w.default_end_date)}
   function catOf(job){const j=norm(job); if(j.includes('مشرف'))return'supervisors'; if(j.includes('فني')||j.includes('صيانة'))return'technicians'; if(j.includes('حارس'))return'guards'; return'workers';}
-  function workerActive(w){return active(w.status||w.state||'active')}
+  function workerActive(w){return !(w?.deleted_at||w?.is_deleted===true||w?.active===false||w?.is_active===false) && active(w.status||w.state||w.active_status||'active')}
   function mergeWorkers(empRows,workerRows){
     const m=new Map();
     function put(w,priority){const c=codeOf(w); if(!c||/^\d+$/.test(c))return; const old=m.get(c); if(!old || priority>=(old.__priority||0)) m.set(c,Object.assign({},old||{},w,{__priority:priority})); else m.set(c,Object.assign({},w,old));}
@@ -47,7 +47,7 @@
   function workerByCode(code){const c=codeNorm(code); return st.workers.find(w=>codeOf(w)===c)||null;}
   function projectById(pid){return st.projects.find(p=>S(p.id)===S(pid)||S(p.project_id)===S(pid))||{};}
   function projectName(pid,d){const p=projectById(pid); return S(d?.project_name||p.name||p.project_name||p.title||pid||'');}
-  function projectActive(pid){const p=projectById(pid); return !S(pid)||!p.id||active(p.status||p.state||p.active_status||'active');}
+  function projectActive(pid){const p=projectById(pid); return !!S(pid) && !!(p.id||p.project_id) && !(p.deleted_at||p.is_deleted===true||p.active===false||p.is_active===false) && active(p.status||p.state||p.active_status||'active');}
   function pType(pid,d){const p=projectById(pid); return norm(p.operation_type||p.project_type||p.type||p.work_type||p.service_type||d?.operation_type||d?.project_type||d?.type||'');}
   function isDaily(pid,d){const t=pType(pid,d); return t.includes('زياره')||t.includes('زيارة')||t.includes('daily')||t.includes('visit')||t.includes('3 ساعات')||t.includes('جزئي');}
   function isFull(pid,d){const t=pType(pid,d); return t.includes('دوام كامل')||t.includes('كامل')||t.includes('full')||t.includes('9 ساعات')||t.includes('full time');}
@@ -57,18 +57,21 @@
   function dPid(d){return S(d.project_id||d.project_code||d.project||'')}
   function dPname(d){return projectName(dPid(d),d)}
   function dSupName(d){const sw=workerByCode(dSup(d)); return S(d.supervisor_name||nameOf(sw)||dSup(d)||'بدون مشرف')}
-  function distRows(month){return st.dist.filter(d=>dMonth(d)===month && active(d.status||'active') && projectActive(dPid(d)) && dWorker(d));}
+  function supervisorActive(code){const c=codeNorm(code); if(!c) return false; const w=workerByCode(c); return !!w && workerActive(w) && catOf(jobOf(w))==='supervisors';}
+  function distRows(month){return st.dist.filter(d=>{const wc=dWorker(d), sc=dSup(d), pid=dPid(d); if(dMonth(d)!==month) return false; if(!active(d.status||'active')) return false; if(!wc || !workerByCode(wc) || !workerActive(workerByCode(wc))) return false; if(!sc || !supervisorActive(sc)) return false; if(!projectActive(pid)) return false; return true;});}
 
   function cleanDistribution(month){
-    // المصدر الوحيد للرواتب هو التوزيع. كل عامل يظهر مرة واحدة فقط تحت أول مشرف موجود له في التوزيع.
+    // المصدر الوحيد للرواتب هو التوزيع النشط. العامل يظهر مرة واحدة تحت مشرفه الموجود في أول توزيع نشط للشهر.
+    const rows=distRows(month);
     const groups=[]; const groupMap=new Map(); const usedWorker=new Set();
-    distRows(month).forEach((d,idx)=>{
-      const wc=dWorker(d), sc=dSup(d)||norm(dSupName(d));
+    rows.forEach((d,idx)=>{
+      const wc=dWorker(d), sc=dSup(d);
+      const w=workerByCode(wc);
       if(!wc || usedWorker.has(wc)) return;
-      const allForWorker=distRows(month).filter(x=>dWorker(x)===wc && (dSup(x)||norm(dSupName(x)))===sc);
-      // إذا العامل موزع بنفس المشرف على أكثر من مشروع نجمع مشاريع نفس المشرف فقط.
+      if(catOf(jobOf(w))==='supervisors') return; // لا نضيف المشرف كعامل داخل نفس المجموعة
+      const allForWorker=rows.filter(x=>dWorker(x)===wc && dSup(x)===sc);
       usedWorker.add(wc);
-      if(!groupMap.has(sc)){groupMap.set(sc,{code:dSup(d),name:dSupName(d),workers:[],_order:idx}); groups.push(groupMap.get(sc));}
+      if(!groupMap.has(sc)){groupMap.set(sc,{code:sc,name:dSupName(d),workers:[],_order:idx}); groups.push(groupMap.get(sc));}
       groupMap.get(sc).workers.push({code:wc,distRows:allForWorker,_order:idx});
     });
     groups.sort((a,b)=>a._order-b._order);
