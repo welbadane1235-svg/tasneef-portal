@@ -50,22 +50,34 @@ function imgCount(s){return before(s).length+during(s).length+after(s).length}
 function serviceIcon(t){t=String(t||'');if(t.includes('حشر'))return'🛡️';if(t.includes('خزان'))return'💧';if(t.includes('كهرب'))return'💡';if(t.includes('سباك'))return'🔧';if(t.includes('نظاف'))return'🧹';if(t.includes('مصعد'))return'🛗';return'✅'}
 async function loadPortal(){try{const payload=decodeToken();portal.projectId=payload.project_id||payload.projectId;portal.from=payload.from||monthStart();portal.to=payload.to||today();if(!portal.projectId)throw new Error('رابط العميل غير مكتمل. لا يوجد مشروع مرتبط بالرابط.');await loadData();renderHome()}catch(e){$('app').className='container loading';$('app').innerHTML=`<div class="loading-card"><img src="tasneef_logo_print.png"><h2>تعذر فتح بوابة العميل</h2><p>${E(e.message||String(e))}</p></div>`}}
 async function loadData(){
-  const pr=await sb.from('projects').select('*').eq('id',portal.projectId).maybeSingle();portal.project=pr.data||{};portal.projectName=portal.project.name||'مشروع العميل';try{const sm=await sb.from('project_contract_smart').select('*').eq('project_id',portal.projectId).maybeSingle();portal.smart=smartPayload(sm.data)}catch(e){portal.smart={annual:[]}}
-  let logsQ=sb.from('time_logs').select('*').eq('project_id',portal.projectId).order('check_in',{ascending:false}).limit(5000);if(portal.from)logsQ=logsQ.gte('log_date',portal.from);if(portal.to)logsQ=logsQ.lte('log_date',portal.to);
-  let ticQ=sb.from('tickets').select('*').eq('project_id',portal.projectId).order('created_at',{ascending:false}).limit(1000);if(portal.from)ticQ=ticQ.gte('created_at',portal.from+'T00:00:00');if(portal.to)ticQ=ticQ.lte('created_at',portal.to+'T23:59:59');
-  let repQ=sb.from('client_reports').select('*').eq('project_id',portal.projectId).eq('status','published').order('report_date',{ascending:false}).limit(500);if(portal.from)repQ=repQ.gte('report_date',portal.from);if(portal.to)repQ=repQ.lte('report_date',portal.to);
-  const [logs,tickets,reports]=await Promise.all([logsQ,ticQ,repQ]);portal.timeLogs=logs.data||[];portal.tickets=tickets.data||[];portal.reports=reports.data||[];
-  // V467: إذا منعت RLS أو اختلاف الأعمدة ظهور التسجيلات/التذاكر، نقرأها عبر RPC آمن من السيرفر.
-  try{
-    const rr=await sb.rpc('tasneef_client_portal_records_v467',{p_project_id:String(portal.projectId),p_from:portal.from||null,p_to:portal.to||null});
-    if(!rr.error && rr.data){
-      const obj=(typeof rr.data==='string')?JSON.parse(rr.data):rr.data;
-      if(Array.isArray(obj.logs) && obj.logs.length) portal.timeLogs=obj.logs;
-      if(Array.isArray(obj.tickets) && obj.tickets.length) portal.tickets=obj.tickets;
-    }
-  }catch(_){ }
-  const ids=portal.reports.map(r=>r.id).filter(Boolean);portal.services=[];if(ids.length){try{const sr=await sb.from('client_report_services').select('*').in('report_id',ids).order('id',{ascending:true});portal.services=sr.data||[]}catch(e){}}
-  try{let rt=sb.from('client_service_ratings').select('*').eq('project_id',portal.projectId).order('created_at',{ascending:false}).limit(100);if(portal.from)rt=rt.gte('created_at',portal.from+'T00:00:00');if(portal.to)rt=rt.lte('created_at',portal.to+'T23:59:59');const rr=await rt;portal.ratings=rr.data||[]}catch(e){portal.ratings=[]}
+  let logsQ=sb.from('time_logs').select('*').eq('project_id',portal.projectId).order('check_in',{ascending:false}).limit(1500);
+  if(portal.from)logsQ=logsQ.gte('log_date',portal.from);if(portal.to)logsQ=logsQ.lte('log_date',portal.to);
+  let ticQ=sb.from('tickets').select('*').eq('project_id',portal.projectId).order('created_at',{ascending:false}).limit(500);
+  if(portal.from)ticQ=ticQ.gte('created_at',portal.from+'T00:00:00');if(portal.to)ticQ=ticQ.lte('created_at',portal.to+'T23:59:59');
+  let repQ=sb.from('client_reports').select('*').eq('project_id',portal.projectId).eq('status','published').order('report_date',{ascending:false}).limit(150);
+  if(portal.from)repQ=repQ.gte('report_date',portal.from);if(portal.to)repQ=repQ.lte('report_date',portal.to);
+  let rtQ=sb.from('client_service_ratings').select('*').eq('project_id',portal.projectId).order('created_at',{ascending:false}).limit(50);
+  if(portal.from)rtQ=rtQ.gte('created_at',portal.from+'T00:00:00');if(portal.to)rtQ=rtQ.lte('created_at',portal.to+'T23:59:59');
+  const [pr,sm,logs,tickets,reports,ratings]=await Promise.all([
+    sb.from('projects').select('*').eq('id',portal.projectId).maybeSingle(),
+    sb.from('project_contract_smart').select('*').eq('project_id',portal.projectId).maybeSingle(),
+    logsQ,ticQ,repQ,rtQ
+  ]);
+  portal.project=pr.data||{};portal.projectName=portal.project.name||'مشروع العميل';
+  portal.smart=smartPayload(sm.data)||{annual:[]};
+  portal.timeLogs=logs.data||[];portal.tickets=tickets.data||[];portal.reports=reports.data||[];portal.ratings=ratings.data||[];
+  if(!portal.timeLogs.length && !portal.tickets.length){
+    try{
+      const rr=await sb.rpc('tasneef_client_portal_records_v467',{p_project_id:String(portal.projectId),p_from:portal.from||null,p_to:portal.to||null});
+      if(!rr.error && rr.data){
+        const obj=(typeof rr.data==='string')?JSON.parse(rr.data):rr.data;
+        if(Array.isArray(obj.logs)) portal.timeLogs=obj.logs;
+        if(Array.isArray(obj.tickets)) portal.tickets=obj.tickets;
+      }
+    }catch(_){ }
+  }
+  const ids=portal.reports.map(r=>r.id).filter(Boolean);portal.services=[];
+  if(ids.length){try{const sr=await sb.from('client_report_services').select('*').in('report_id',ids).order('id',{ascending:true});portal.services=sr.data||[]}catch(_){portal.services=[]}}
 }
 function stats(){const minutes=portal.timeLogs.reduce((a,l)=>a+(Number(l.duration_minutes)||minutesBetween(l.check_in,l.check_out)),0);const days=new Set(portal.timeLogs.map(l=>dateOnly(l.log_date||l.check_in)).filter(Boolean)).size;const open=portal.tickets.filter(t=>String(t.status||'open')!=='closed').length;const nums=portal.ratings.map(r=>Number(r.score||({'ممتاز':5,'جيد جدًا':4,'جيد':3,'يحتاج تحسين':2}[r.rating]||0))).filter(Boolean);const avg=nums.length?(nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(1):'-';return{minutes,days,open,closed:portal.tickets.length-open,avg,annualDone:annualDoneCount(),annualRemain:annualRemainCount(),contractLeft:daysLeft(portal.project.contract_end||portal.project.end_date)}}
 function renderHome(){const st=stats();$('app').className='container';document.title=`بوابة ${portal.projectName} - شركة تصنيف`; $('app').innerHTML=`

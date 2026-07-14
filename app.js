@@ -2570,7 +2570,16 @@ function reportStatusClass(s){ return s==='published'?'green':(s==='draft'?'ambe
 function ratingClass(v){ return v==='يحتاج تحسين'?'red':(v?'green':'amber'); }
 function genReportToken(){ return 'r_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,10); }
 function genReportNo(){ const d=new Date(); return `TR-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}-${String(Date.now()).slice(-5)}`; }
-function clientReportUrl(token){ return `https://tasneef-fm.github.io/client-report.html?token=${encodeURIComponent(token||'')}`; }
+function tasneefPublicBaseUrl(){
+  try{
+    const loc=window.location;
+    const path=String(loc.pathname||'/');
+    const dir=path.endsWith('/')?path:path.slice(0,path.lastIndexOf('/')+1);
+    return String(loc.origin||'').replace(/\/$/,'') + dir.replace(/\/$/,'');
+  }catch(_){ return 'https://tasneef-fm.github.io'; }
+}
+window.tasneefPublicBaseUrl=tasneefPublicBaseUrl;
+function clientReportUrl(token){ return `${tasneefPublicBaseUrl()}/client-report.html?token=${encodeURIComponent(token||'')}`; }
 function normalizePhoneForWa(p){ p=String(p||'').replace(/[^0-9]/g,''); if(!p) return ''; if(p.startsWith('05')) p='966'+p.slice(1); if(p.startsWith('5')) p='966'+p; return p; }
 function defaultReportSummary(){ return 'تم تنفيذ الأعمال الموضحة أدناه ضمن خطة التشغيل المعتمدة للمشروع، مع توثيق مراحل التنفيذ بالصور قبل وأثناء وبعد، بهدف رفع جودة المرافق المشتركة والمحافظة على بيئة آمنة ونظيفة للسكان.'; }
 
@@ -24156,7 +24165,7 @@ try{ exportSupervisorDailyPDFV10310 = window.exportSupervisorDailyPDFV10310; }ca
   const E=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const isAdminPage=()=>/admin\.html|\/tasneef-fm\.github\.io\/?$/i.test(location.pathname)||!!document.getElementById('clientReports');
   const newToken=()=> 'cr_'+Date.now().toString(36)+'_'+(crypto?.randomUUID?.()||Math.random().toString(36).slice(2)).replace(/-/g,'');
-  const reportUrl=token=>`https://tasneef-fm.github.io/client-report.html?token=${encodeURIComponent(token||'')}`;
+  const reportUrl=token=>`${tasneefPublicBaseUrl()}/client-report.html?token=${encodeURIComponent(token||'')}`;
   window.clientReportUrl=reportUrl;
   let pending=[];
   let pollTimer=null;

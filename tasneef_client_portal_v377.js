@@ -90,7 +90,7 @@
 
   function getFilters(){ return { projectId:$('cpProjectV373')?.value||'', from:$('cpFromV373')?.value||monthStart(), to:$('cpToV373')?.value||today() }; }
   function makeToken(){ const f=getFilters(); if(!f.projectId) return ''; const payload={project_id:String(f.projectId), from:f.from, to:f.to, v:376, ts:Date.now()}; return btoa(unescape(encodeURIComponent(JSON.stringify(payload)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
-  function link(){ const token=makeToken(); if(!token) return ''; const base='https://tasneef-fm.github.io/client-report.html'; return base+'?token='+encodeURIComponent(token); }
+  function link(){ const token=makeToken(); if(!token) return ''; const base=(window.tasneefPublicBaseUrl?window.tasneefPublicBaseUrl():(location.origin+location.pathname.replace(/[^/]*$/,'').replace(/\/$/,'')))+'/client-report.html'; return base+'?token='+encodeURIComponent(token); }
 
   function simpleHash(str){
     let h=2166136261;
@@ -289,7 +289,7 @@ ${finalUrl}
   const pid = ()=>String($('cpProjectV373')?.value || '').trim();
   const baseUrl = ()=>{
     const href = location.href.split('#')[0].split('?')[0];
-    return 'https://tasneef-fm.github.io/client-report.html';
+    return (window.tasneefPublicBaseUrl?window.tasneefPublicBaseUrl():(location.origin+location.pathname.replace(/[^/]*$/,'').replace(/\/$/,'')))+'/client-report.html';
   };
   const stableUrl = (projectId=pid())=> projectId ? (baseUrl()+'?project_id='+encodeURIComponent(projectId)) : '';
   function projectRow(projectId=pid()){
