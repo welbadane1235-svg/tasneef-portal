@@ -287,10 +287,9 @@ ${finalUrl}
   const esc = (v)=>String(v ?? '').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const msg = (t,bad)=>{ try{ if(typeof window.msg==='function') window.msg(t,bad?'err':'ok'); }catch(_){} };
   const pid = ()=>String($('cpProjectV373')?.value || '').trim();
-  const baseUrl = ()=>{
-    const href = location.href.split('#')[0].split('?')[0];
-    return (window.tasneefPublicBaseUrl?window.tasneefPublicBaseUrl():(location.origin+location.pathname.replace(/[^/]*$/,'').replace(/\/$/,'')))+'/client-report.html';
-  };
+  const CURRENT_PORTAL_ROOT = 'https://tasneef-fm.github.io';
+  const baseUrl = ()=> CURRENT_PORTAL_ROOT + '/client-report.html';
+  const isLegacyPortalUrl = (u)=> /welbadane1235-svg\.github\.io|\/tasneef-portal\//i.test(String(u||''));
   const stableUrl = (projectId=pid())=> projectId ? (baseUrl()+'?project_id='+encodeURIComponent(projectId)) : '';
   function projectRow(projectId=pid()){
     return (window.data?.projects||[]).find(p=>String(p.id)===String(projectId)) || null;
@@ -313,14 +312,18 @@ ${finalUrl}
   async function saveProjectLink(projectId=pid(), extra={}){
     if(!projectId) return '';
     const p=projectRow(projectId) || {};
-    const longUrl = p.client_portal_url || stableUrl(projectId);
+    const canonicalUrl = stableUrl(projectId);
+    const oldUrl = String(p.client_portal_url||'');
+    const urlChanged = !oldUrl || oldUrl !== canonicalUrl || isLegacyPortalUrl(oldUrl);
     const payload = {
       client_portal_token: p.client_portal_token || tokenFor(projectId),
-      client_portal_url: longUrl,
+      client_portal_url: canonicalUrl,
       client_portal_updated_at: new Date().toISOString(),
       ...extra
     };
-    if(!payload.client_portal_short_url && p.client_portal_short_url) payload.client_portal_short_url = p.client_portal_short_url;
+    // أي رابط مختصر قديم يوجّه إلى الدومين السابق؛ يُلغى تلقائياً عند تغيير الرابط الأصلي.
+    if(urlChanged && !Object.prototype.hasOwnProperty.call(extra,'client_portal_short_url')) payload.client_portal_short_url = null;
+    else if(!Object.prototype.hasOwnProperty.call(payload,'client_portal_short_url') && p.client_portal_short_url) payload.client_portal_short_url = p.client_portal_short_url;
     setProjectRowFields(projectId, payload);
     if(window.sb){
       const r=await window.sb.from('projects').update(payload).eq('id', projectId);
@@ -332,14 +335,17 @@ ${finalUrl}
     const projectId=pid();
     if(!projectId){ renderPersistentLink('', '', false); return ''; }
     const p=projectRow(projectId) || {};
-    const longUrl = p.client_portal_url || stableUrl(projectId);
-    const shortUrl = p.client_portal_short_url || '';
-    let saved=!!p.client_portal_url;
+    const canonicalUrl = stableUrl(projectId);
+    const needsMigration = !p.client_portal_url || p.client_portal_url !== canonicalUrl || isLegacyPortalUrl(p.client_portal_url);
+    let longUrl = needsMigration ? canonicalUrl : p.client_portal_url;
+    let shortUrl = needsMigration ? '' : (p.client_portal_short_url || '');
+    let saved=!needsMigration;
     renderPersistentLink(longUrl, shortUrl, saved);
-    if(!saved){
+    if(needsMigration){
       try{ await saveProjectLink(projectId); saved=true; }catch(e){ console.warn(e); }
       const pp=projectRow(projectId)||{};
-      renderPersistentLink(pp.client_portal_url||longUrl, pp.client_portal_short_url||shortUrl, saved);
+      longUrl=pp.client_portal_url||canonicalUrl; shortUrl=pp.client_portal_short_url||'';
+      renderPersistentLink(longUrl, shortUrl, saved);
     }
     return (projectRow(projectId)?.client_portal_short_url || projectRow(projectId)?.client_portal_url || longUrl);
   }
