@@ -1,12 +1,12 @@
 (function(){
   'use strict';
-  const BUILD='V434 supervisor unified distribution stable';
+  const BUILD='V435 supervisor attendance stable verified';
   const $=id=>document.getElementById(id);
   const S=v=>String(v??'').trim();
   const N=v=>Number(v)||0;
   const esc=s=>S(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const norm=s=>S(s).toLowerCase().replace(/[إأآا]/g,'ا').replace(/[ىي]/g,'ي').replace(/ة/g,'ه').replace(/[\u064B-\u0652]/g,'').replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim();
-  const today=()=>{const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+  const today=()=>{try{return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}catch(_){const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}};
   const monthOf=d=>S(d||today()).slice(0,7);
   const statusCode=v=>{const x=norm(v); if(['absent','غائب','غياب','غ','a'].includes(x))return 'absent'; if(['present','حاضر','حضور','ح','p'].includes(x))return 'present'; return x||'present';};
   const isOff=v=>['deleted','inactive','stopped','ended','محذوف','موقوف','منتهي'].includes(norm(v));
@@ -63,16 +63,18 @@
     });
     return [...map.values()].sort((a,b)=>S(a.worker_employee_code).localeCompare(S(b.worker_employee_code),'en') || S(a.worker_name).localeCompare(S(b.worker_name),'ar'));
   }
+  function recStamp(a){const raw=S(a?.updated_at||a?.created_at||a?.attendance_date||'');const ms=Date.parse(raw);return Number.isFinite(ms)?ms:0;}
   function buildRecMap(att){
     const m=new Map();
+    const put=(key,val)=>{const old=m.get(key);if(!old||recStamp(val.raw)>recStamp(old.raw)||(recStamp(val.raw)===recStamp(old.raw)&&N(val.raw?.id)>N(old.raw?.id)))m.set(key,val);};
     (att||[]).forEach(a=>{
       const d=S(a.attendance_date||a.date||a.created_at).slice(0,10); if(!d)return;
       const code=S(a.worker_employee_code||a.worker_code||a.employee_code||'');
       const name=S(a.worker_name||a.worker_identity||a.name||'');
       const st=statusCode(a.status||a.attendance_status||a.state);
       const val={status:st,notes:S(a.notes||''),raw:a};
-      if(code) m.set('code:'+code+'|'+d,val);
-      if(name) m.set('name:'+norm(name)+'|'+d,val);
+      if(code) put('code:'+code+'|'+d,val);
+      if(name) put('name:'+norm(name)+'|'+d,val);
     });
     return m;
   }
@@ -96,7 +98,9 @@
     `; document.head.appendChild(st);
   }
   let state={};
+  let loadSeqV435=0;
   async function load(date){
+    const mySeq=++loadSeqV435;
     if(!window.sb) throw new Error('Supabase غير جاهز');
     const month=monthOf(date);
     let dist=[];
@@ -105,6 +109,7 @@
       if(r.error) throw r.error; dist=r.data||[];
     }catch(e){throw new Error('تعذر قراءة توزيع النظام الموحد: '+(e.message||e));}
     const [att]=await Promise.all([qAttendanceMonth(month)]);
+    if(mySeq!==loadSeqV435) return null;
     return {month,dist,att};
   }
   function currentFilters(){return {date:($('supUniDate')?.value||$('attendanceDate')?.value||today()), project:S($('supUniProject')?.value), search:norm($('supUniSearch')?.value)};}
@@ -163,7 +168,7 @@
       const date=($('attendanceDate')?.value||$('supUniDate')?.value||today());
       if(!state.loaded || force || state.month!==monthOf(date)){
         list.classList.add('sup-uni-v433'); list.innerHTML='<div class="sup-uni-msg">جار تحميل العمال من النظام الموحد...</div>';
-        const u=getUser(); const data=await load(date);
+        const u=getUser(); const data=await load(date); if(!data) return;
         const supervisorRows=(data.dist||[]).filter(r=>matchSupervisor(r,u));
         state={loaded:true,month:data.month,dist:supervisorRows,att:data.att,workers:dedupeDistribution(supervisorRows)};
       }
@@ -173,10 +178,12 @@
     }catch(e){ if(list) list.innerHTML='<div class="sup-uni-msg">تعذر التحميل: '+esc(e.message||e)+'</div>'; }
   }
   async function saveSupervisorUnified(){
+    const btn=$('supUniSave'); if(btn?.disabled) return;
     try{
       const date=($('supUniDate')?.value||$('attendanceDate')?.value||today());
       const cards=[...document.querySelectorAll('#supUniWorkers .sup-uni-worker[data-name]')];
       if(!cards.length) return toast('لا يوجد عمال للحفظ',true);
+      if(btn){btn.disabled=true;btn.textContent='جاري الحفظ...';}
       const byKey=new Map((state.workers||[]).map(w=>[(w.worker_employee_code?('code:'+w.worker_employee_code):('name:'+norm(w.worker_name))),w]));
       const payload=cards.map(c=>{
         const code=S(c.dataset.code), name=S(c.dataset.name);
@@ -196,9 +203,13 @@
       });
       const r=await window.sb.rpc('tasneef_save_attendance_unified_v430',{p_date:date,p_records:payload});
       if(r.error) throw r.error;
-      toast('تم حفظ '+(N(r.data?.saved)||payload.length)+' سجل فعليًا');
       state.loaded=false; await renderSupervisorUnified(true);
+      const rec=buildRecMap(state.att||[]); let verified=0;
+      (state.workers||[]).forEach(w=>{if(getRecord(rec,w,date))verified++;});
+      if(verified<cards.length) throw new Error('تم الحفظ لكن لم تظهر كل السجلات بعد التحقق ('+verified+' من '+cards.length+').');
+      toast('تم حفظ والتحقق من '+verified+' سجل بتاريخ '+date+'.');
     }catch(e){ toast('فشل الحفظ: '+(e.message||e),true); }
+    finally{if(btn){btn.disabled=false;btn.textContent='حفظ تحضير اليوم';}}
   }
   function bind(){
     window.renderSupervisorAttendanceList=()=>renderSupervisorUnified(true);

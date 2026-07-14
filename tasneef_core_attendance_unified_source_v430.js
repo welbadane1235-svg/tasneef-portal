@@ -1,12 +1,12 @@
 (function(){
   'use strict';
-  const BUILD='V443 ثابت - الحضور من التوزيع الموحد فقط';
+  const BUILD='V444 ثابت - حفظ وتحميل الحضور بدون اختفاء';
   const S=v=>String(v??'').trim();
   const N=v=>Number(v)||0;
   const $=id=>document.getElementById(id);
   const esc=s=>S(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const norm=s=>S(s).toLowerCase().replace(/[إأآا]/g,'ا').replace(/[ىي]/g,'ي').replace(/ة/g,'ه').replace(/[\u064B-\u0652]/g,'').replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim();
-  const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+  const today=()=>{try{return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}catch(_){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}};
   const monthNow=()=>today().slice(0,7);
   const daysOfMonth=m=>{const y=N(m.slice(0,4)),mo=N(m.slice(5,7));return Array.from({length:new Date(y,mo,0).getDate()||31},(_,i)=>String(i+1).padStart(2,'0'));};
   const dateKey=v=>{const x=S(v); if(/^\d{4}-\d{2}-\d{2}/.test(x)) return x.slice(0,10); return x.slice(0,10);};
@@ -130,9 +130,14 @@
     // أسماء العامل في التوزيع قد تكون "TS-01 - الاسم" أو فيها اسم بديل بين أقواس.
     return [...new Set(out.filter(x=>!x.endsWith(':')))].filter(x=>x!==':');
   }
+  function recStamp(a){
+    const raw=S(a?.updated_at||a?.created_at||a?.attendance_date||a?.date||'');
+    const ms=Date.parse(raw); return Number.isFinite(ms)?ms:0;
+  }
   function putBest(m,k,a){
-    const old=m.get(k); const st=statusCode(a.status||a.state||a.attendance_status);
-    if(!old || st==='absent' || (statusCode(old.status)!=='absent' && S(a.updated_at||a.created_at)>S(old.updated_at||old.created_at))) m.set(k,a);
+    const old=m.get(k);
+    // آخر تعديل هو المصدر الصحيح دائمًا؛ لا نعطي الغياب أولوية دائمة حتى لا يختفي تصحيح الحضور.
+    if(!old || recStamp(a)>recStamp(old) || (recStamp(a)===recStamp(old) && N(a?.id)>N(old?.id))) m.set(k,a);
   }
   function buildAttMap(){
     const m=new Map();
@@ -149,22 +154,37 @@
   function rowAttKey(r,date){return rowAliases(r)[0]+'|'+date;}
   const numericId=v=>/^\d+$/.test(S(v))?S(v):null;
   function filters(){return {date:$('cu427Date')?.value||today(), month:($('cu427Month')?.value||monthNow()).slice(0,7), sup:$('cu427Sup')?.value||'', project:$('cu427Project')?.value||'', search:norm($('cu427Search')?.value||'')};}
+  let loadSeqV444=0;
+  async function fetchAttendanceMonthV444(c,month){
+    const from=month+'-01'; const [y,mo]=month.split('-').map(Number);
+    const next=new Date(y,mo,1); const to=next.getFullYear()+'-'+String(next.getMonth()+1).padStart(2,'0')+'-'+String(next.getDate()).padStart(2,'0');
+    const all=[]; let start=0; const size=1000;
+    while(start<100000){
+      const r=await c.from('attendance').select('*').gte('attendance_date',from).lt('attendance_date',to).order('attendance_date',{ascending:true}).range(start,start+size-1);
+      if(r.error) throw r.error;
+      const rows=r.data||[]; all.push(...rows); if(rows.length<size) break; start+=size;
+    }
+    return all;
+  }
   async function load(month,force){
-    const c=client(); if(!c){msg('Supabase غير جاهز',true);return;}
-    if(!force && state.month===month)return;
+    const c=client(); if(!c){msg('Supabase غير جاهز',true);return false;}
+    if(!force && state.month===month)return true;
+    const mySeq=++loadSeqV444;
     const [dr,ar,wr,er,pr,ur]=await Promise.all([
       safe('monthly_distribution unified', c.from('monthly_distribution').select('*').eq('month_key',month).limit(50000)),
-      // نجلب الحضور القديم والجديد بدون فلتر attendance_date لأن بعض السجلات القديمة محفوظة في date أو created_at.
-      safe('attendance all legacy', c.from('attendance').select('*').limit(50000)),
+      (async()=>{try{return {data:await fetchAttendanceMonthV444(c,month),error:null};}catch(e){return {data:[],error:e};}})(),
       safe('workers legacy', c.from('workers').select('*').limit(50000)),
       safe('employees master', c.from('employees_master_v386').select('*').limit(50000)),
       safe('projects active filter', c.from('projects').select('*').limit(50000)),
       safe('app users active filter', c.from('app_users').select('*').limit(50000))
     ]);
+    if(mySeq!==loadSeqV444) return false; // تجاهل أي طلب قديم وصل بعد طلب أحدث.
+    if(ar.error) throw ar.error;
     const emps=(er.data||[]).map(x=>Object.assign({},x,{name:S(x.app_name||x.name||x.full_name||x.employee_name),employee_code:S(x.employee_code||x.worker_employee_code||x.code)}));
     const allWorkers=[...(wr.data||[]),...emps];
     const activeDist=(dr.data||[]).filter(r=>distributionRowActive(r, allWorkers, pr.data||[], ur.data||[]));
-    state={dist:mergeDistribution(activeDist),att:ar.data||[],workers:allWorkers,month};
+    state={dist:mergeDistribution(activeDist),att:ar.data||[],workers:allWorkers,month,loadedAt:Date.now()};
+    return true;
   }
   function nextMonth(m){const y=N(m.slice(0,4)),mo=N(m.slice(5,7));const d=new Date(y,mo,1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
   function currentRows(){const f=filters(); return state.dist.filter(r=>(!f.sup||distSupCode(r)===f.sup||distSupName(r)===f.sup)&&(!f.project||((r.__projectIds||[]).includes(f.project)||distProjectId(r)===f.project))&&(!f.search||norm(distName(r)).includes(f.search)||norm(distCode(r)).includes(f.search)||norm((r.__projects||[]).join(' ')).includes(f.search)));}
@@ -209,14 +229,21 @@
   }
   async function refresh(force){shell(); const f=filters(); msg('جاري تحميل التوزيع والحضور...'); await load(f.month,force); render(); msg('تم التحميل: '+state.dist.length+' عامل بدون تكرار من التوزيع الحالي.');}
   async function save(){
+    const btn=$('cu427Save'); if(btn?.disabled) return;
     try{const c=client(); if(!c)return msg('Supabase غير جاهز',true); const f=filters(); const rows=currentRows(); if(!rows.length)return msg('لا يوجد عمال للحفظ.',true);
+      if(btn){btn.disabled=true;btn.textContent='جاري الحفظ...';}
       const card=new Map([...document.querySelectorAll('#cu427Workers .cu427-worker[data-wkey]')].map(el=>[el.dataset.wkey,el]));
       const payload=rows.map(r=>{const el=card.get(workerUniqKey(r)); if(!el)return null; return {worker_identity:distName(r),worker_name:distName(r),worker_employee_code:distCode(r),worker_code:distCode(r),project_key:distProjectId(r)||((r.__projectIds||[])[0]||''),project_name:(r.__projects||[])[0]||distProject(r),supervisor_employee_code:distSupCode(r),supervisor_name:distSupName(r),status:S(el.querySelector('select')?.value||'present'),notes:S(el.querySelector('input')?.value||'')};}).filter(Boolean);
-      let saved=0; const rpc=await safe('attendance unified rpc v430', c.rpc('tasneef_save_attendance_unified_v430',{p_date:f.date,p_records:payload}));
+      const rpc=await c.rpc('tasneef_save_attendance_unified_v430',{p_date:f.date,p_records:payload});
       if(rpc.error) throw rpc.error;
-      saved=N(rpc.data?.saved)||payload.length;
-      msg('تم حفظ '+saved+' سجل بدون تكرار.'); await load(f.month,true); render();
+      await load(f.month,true);
+      const amap=buildAttMap(); let verified=0;
+      rows.forEach(r=>{ if(getRowRec(amap,r,f.date)) verified++; });
+      render();
+      if(verified<payload.length) throw new Error('تم الحفظ لكن لم تُقرأ كل السجلات بعد التحقق ('+verified+' من '+payload.length+'). اضغط تحديث مباشر مرة واحدة.');
+      msg('تم حفظ والتحقق من '+verified+' سجل بتاريخ '+f.date+'.');
     }catch(e){msg('فشل الحفظ: '+(e.message||e),true);}
+    finally{if(btn){btn.disabled=false;btn.textContent='حفظ التحضير';}}
   }
   function exportCsv(){const rows=[];document.querySelectorAll('#cu427Body tr').forEach(tr=>rows.push([...tr.children].map(td=>td.textContent.trim())));const csv=rows.map(r=>r.map(x=>'"'+S(x).replace(/"/g,'""')+'"').join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='attendance_old_style_'+(filters().month||monthNow())+'.csv';a.click();}
   function visible(){const tab=$('cu413AttendanceTab');return !!tab&&!tab.classList.contains('hidden')&&getComputedStyle(tab).display!=='none';}
