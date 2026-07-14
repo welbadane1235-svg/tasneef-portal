@@ -31,6 +31,15 @@
     return 'زيارة يومية';
   }
   function isFull(r){return S(r.projectType).includes('دوام')}
+
+  function activeDistributionRow(r,m){
+    const st=norm(r?.status||'active');
+    if(st.includes('منتهي')||st.includes('ملغي')||st.includes('inactive')||st.includes('ended')||st.includes('cancel')) return false;
+    const end=S(r?.end_date||'').slice(0,10);
+    if(end && end < (m+'-01')) return false;
+    return true;
+  }
+
   function actualMinutes(l){
     const saved=N(l.duration_minutes||l.actual_minutes||l.minutes||l.total_minutes||l.work_minutes||0); if(saved>0) return saved;
     const ci=l.check_in||l.checkin_at||l.in_time||l.start_time||l.created_at, co=l.check_out||l.checkout_at||l.out_time||l.end_time;
@@ -53,6 +62,7 @@
     usersCache=await safe(c.from('app_users').select('*').limit(3000),'app_users');
     let dist=await safe(c.from('monthly_distribution').select('*').eq('month_key',m).limit(20000),'monthly_distribution');
     if(!dist.length) dist=await safe(c.from('monthly_distribution_view').select('*').eq('month_key',m).limit(20000),'monthly_distribution_view');
+    dist=dist.filter(r=>activeDistributionRow(r,m));
     let logs=await safe(c.from('time_logs').select('*').gte('log_date',r.from).lt('log_date',r.to).limit(20000),'time_logs log_date');
     if(!logs.length) logs=await safe(c.from('time_logs').select('*').gte('check_in',r.fromIso).lt('check_in',r.toIso).limit(20000),'time_logs check_in');
     return {projects,dist,logs};

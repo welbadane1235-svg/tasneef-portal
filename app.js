@@ -64,7 +64,7 @@ const session = () => JSON.parse(localStorage.getItem('tasneef_user') || 'null')
 const setSession = u => localStorage.setItem('tasneef_user', JSON.stringify(u));
 const clearSession = () => localStorage.removeItem('tasneef_user');
 const fmt = d => d ? new Date(d).toLocaleString('ar-SA') : '-';
-const timeOnly = d => d ? new Date(d).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}) : '-';
+const timeOnly = d => d ? new Date(d).toLocaleTimeString('ar-SA-u-nu-latn',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Riyadh'}) : '-';
 const minsToText = m => { m=Number(m||0); const h=Math.floor(m/60), mm=m%60; return `${h}:${String(mm).padStart(2,'0')}`; };
 function num(v){ const n = Number(String(v ?? 0).replace(/,/g,'').trim()); return Number.isFinite(n) ? n : 0; }
 function safeQtyEn(v){ return num(v).toLocaleString('en-US',{maximumFractionDigits:2}); }

@@ -385,10 +385,27 @@
     const c=client(); if(!c)return; const name=S($('cu413PName')?.value); if(!name){showMsg('أدخل اسم المشروع.',true);return;}
     const pid=S($('cu413PId')?.value||'');
     const pStart=S($('cu413PStartDate')?.value||'')||null, pEnd=S($('cu413PEndDate')?.value||'')||null;
-    const row={name, operation_type:S($('cu413PType')?.value||'daily_visit'), required_daily_minutes:N($('cu413PReq')?.value), status:S($('cu413PStatus')?.value||'active'), state:S($('cu413PStatus')?.value||'active'), is_active:S($('cu413PStatus')?.value||'active')==='active', active:S($('cu413PStatus')?.value||'active')==='active', supervisor_employee_code:S($('cu413PSupervisor')?.value||''), buildings_count:N($('cu413PBuildings')?.value), units_count:N($('cu413PUnits')?.value), project_start_date:pStart, project_end_date:pEnd, contract_start:pStart, contract_end:pEnd, start_date:pStart, end_date:pEnd};
+    const supCode=S($('cu413PSupervisor')?.value||'');
+    const supWorker=(state.workers||[]).find(x=>workerCode(x)===supCode)||null;
+    const supName=supWorker?workerName(supWorker):'';
+    let supUserId=null;
+    try{
+      const ur=await c.from('app_users').select('id,full_name,username,employee_code,role').limit(5000);
+      const users=ur.data||[];
+      const hit=users.find(u=>S(u.employee_code)===supCode || (supName && norm(u.full_name||u.username)===norm(supName)));
+      if(hit) supUserId=hit.id;
+    }catch(_){ }
+    const row={name, operation_type:S($('cu413PType')?.value||'daily_visit'), required_daily_minutes:N($('cu413PReq')?.value), status:S($('cu413PStatus')?.value||'active'), state:S($('cu413PStatus')?.value||'active'), is_active:S($('cu413PStatus')?.value||'active')==='active', active:S($('cu413PStatus')?.value||'active')==='active', supervisor_employee_code:supCode||null, supervisor_name:supName||null, supervisor_id:supUserId, current_supervisor_id:supUserId, app_supervisor_id:supUserId, buildings_count:N($('cu413PBuildings')?.value), units_count:N($('cu413PUnits')?.value), project_start_date:pStart, project_end_date:pEnd, contract_start:pStart, contract_end:pEnd, start_date:pStart, end_date:pEnd, updated_at:new Date().toISOString()};
     let r;
     if(pid) r=await c.from('projects').update(row).eq('id',pid).select(); else r=await c.from('projects').insert(row).select();
-    if(r.error){showMsg('تعذر حفظ المشروع: '+r.error.message,true);return;} state.projects=[]; await reload(true); clearProjectForm(); showMsg('تم حفظ المشروع.');
+    if(r.error){showMsg('تعذر حفظ المشروع: '+r.error.message,true);return;}
+    const savedPid=pid||S((r.data||[])[0]?.id||'');
+    if(savedPid){
+      const m=todayMonth();
+      await safe('sync monthly distribution supervisor',c.from('monthly_distribution').update({supervisor_employee_code:supCode||null,supervisor_name:supName||null,supervisor_id:supUserId,updated_at:new Date().toISOString()}).eq('month_key',m).eq('project_id',savedPid).neq('status','ended'));
+      await safe('sync project monthly settings supervisor',c.from('project_monthly_settings_v387').update({supervisor_id:supUserId||supCode||null,supervisor_name:supName||null,updated_at:new Date().toISOString()}).eq('month_key',m).eq('project_id',savedPid));
+    }
+    state.projects=[]; state.dist={}; await reload(true); clearProjectForm(); showMsg('تم حفظ المشروع ونقله للمشرف الجديد وتحديث التوزيع الحالي.');
   }
   async function saveQuickDistribution(){
     const c=client(); if(!c)return;
@@ -398,12 +415,24 @@
     const chosen=[...state.selected.values()];
     if(!m||!sup){showMsg('اختر الشهر والمشرف.',true);return;}
     if(!projects.length){showMsg('اختر مشروعًا واحدًا على الأقل.',true);return;}
-    if(!chosen.length){showMsg('اختر عاملًا واحدًا على الأقل.',true);return;}
+    const now=new Date().toISOString(), endDate=new Date().toISOString().slice(0,10);
+    for(const p of projects){
+      const pid=projectId(p);
+      const existing=await safe('existing distribution',c.from('monthly_distribution').select('id,worker_employee_code,status').eq('month_key',m).eq('project_id',pid).limit(10000));
+      const chosenCodes=new Set(chosen.map(workerCode));
+      const removed=(existing.data||[]).filter(x=>!chosenCodes.has(S(x.worker_employee_code)) && !['ended','inactive','cancelled','منتهي','ملغي'].includes(S(x.status).toLowerCase()));
+      if(removed.length){
+        const ids=removed.map(x=>x.id).filter(Boolean);
+        if(ids.length) await safe('end removed workers',c.from('monthly_distribution').update({status:'ended',end_date:endDate,updated_at:now}).in('id',ids));
+      }
+    }
     const rows=[], rowKeys=new Set();
-    projects.forEach(p=>chosen.forEach(w=>{const key=[m,projectId(p),workerCode(w)].join('|'); if(rowKeys.has(key)) return; rowKeys.add(key); rows.push({month_key:m, supervisor_employee_code:workerCode(sup), supervisor_name:workerName(sup), project_id:projectId(p), project_name:projectName(p), worker_employee_code:workerCode(w), worker_name:workerName(w), role_type:workerRole(w)||'عامل', shift_name:'default', required_minutes:projectRequired(p), start_date:m+'-01', end_date:null, status:'active'});}));
-    const r=await c.from('monthly_distribution').upsert(rows,{onConflict:'month_key,project_id,worker_employee_code'}).select();
-    if(r.error){showMsg('تعذر حفظ التوزيع: '+r.error.message,true);return;}
-    delete state.dist[m]; await loadDistribution(true); await loadBorrowings($('cu413Month')?.value||todayMonth(),true); fillSelects(); renderDistBox(); showMsg('تم ربط '+chosen.length+' عامل مع '+projects.length+' مشروع بنجاح.');
+    projects.forEach(p=>chosen.forEach(w=>{const key=[m,projectId(p),workerCode(w)].join('|'); if(rowKeys.has(key)) return; rowKeys.add(key); rows.push({month_key:m, supervisor_employee_code:workerCode(sup), supervisor_name:workerName(sup), project_id:projectId(p), project_name:projectName(p), worker_employee_code:workerCode(w), worker_name:workerName(w), role_type:workerRole(w)||'عامل', shift_name:'default', required_minutes:projectRequired(p), start_date:m+'-01', end_date:null, status:'active',updated_at:now});}));
+    if(rows.length){
+      const r=await c.from('monthly_distribution').upsert(rows,{onConflict:'month_key,project_id,worker_employee_code'}).select();
+      if(r.error){showMsg('تعذر حفظ التوزيع: '+r.error.message,true);return;}
+    }
+    delete state.dist[m]; await loadDistribution(true); await loadBorrowings($('cu413Month')?.value||todayMonth(),true); fillSelects(); renderDistBox(); showMsg(chosen.length?'تم تحديث الربط وإلغاء العمال غير المحددين من السجلات الجديدة.':'تم إلغاء ربط جميع العمال من المشروع لهذا الشهر.');
   }
   async function saveDistribution(){ return saveQuickDistribution(); }
   async function copyPreviousMonth(){
