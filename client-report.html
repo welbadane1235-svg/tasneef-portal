@@ -53,7 +53,7 @@ async function loadData(){
   const pr=await sb.from('projects').select('*').eq('id',portal.projectId).maybeSingle();portal.project=pr.data||{};portal.projectName=portal.project.name||'مشروع العميل';try{const sm=await sb.from('project_contract_smart').select('*').eq('project_id',portal.projectId).maybeSingle();portal.smart=smartPayload(sm.data)}catch(e){portal.smart={annual:[]}}
   let logsQ=sb.from('time_logs').select('*').eq('project_id',portal.projectId).order('check_in',{ascending:false}).limit(5000);if(portal.from)logsQ=logsQ.gte('log_date',portal.from);if(portal.to)logsQ=logsQ.lte('log_date',portal.to);
   let ticQ=sb.from('tickets').select('*').eq('project_id',portal.projectId).order('created_at',{ascending:false}).limit(1000);if(portal.from)ticQ=ticQ.gte('created_at',portal.from+'T00:00:00');if(portal.to)ticQ=ticQ.lte('created_at',portal.to+'T23:59:59');
-  let repQ=sb.from('client_reports').select('*').eq('project_id',portal.projectId).order('report_date',{ascending:false}).limit(500);if(portal.from)repQ=repQ.gte('report_date',portal.from);if(portal.to)repQ=repQ.lte('report_date',portal.to);
+  let repQ=sb.from('client_reports').select('*').eq('project_id',portal.projectId).eq('status','published').order('report_date',{ascending:false}).limit(500);if(portal.from)repQ=repQ.gte('report_date',portal.from);if(portal.to)repQ=repQ.lte('report_date',portal.to);
   const [logs,tickets,reports]=await Promise.all([logsQ,ticQ,repQ]);portal.timeLogs=logs.data||[];portal.tickets=tickets.data||[];portal.reports=reports.data||[];
   // V467: إذا منعت RLS أو اختلاف الأعمدة ظهور التسجيلات/التذاكر، نقرأها عبر RPC آمن من السيرفر.
   try{

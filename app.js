@@ -14040,7 +14040,7 @@ function financePrintReport(kind){
       let reportId='';
       if(existing?.id){
         reportId=existing.id;
-        await sb.from('client_reports').update({title:`تقرير شهري - ${p}`,report_type:'تقرير شهري من المشرف',report_date:reportDate,executive_summary:$id('supClientReportSummary')?.value||'',updated_at:new Date().toISOString()}).eq('id',reportId);
+        await sb.from('client_reports').update({title:`تقرير شهري - ${p}`,report_type:'تقرير شهري من المشرف',report_date:reportDate,executive_summary:$id('supClientReportSummary')?.value||'',status:'draft',public_token:null,published_at:null,updated_at:new Date().toISOString()}).eq('id',reportId);
       }else{
         const reportRow={report_no:genReportNo(),project_id:Number(pid),project_name:p,chairman_name:'',chairman_phone:'',title:`تقرير شهري - ${p}`,report_type:'تقرير شهري من المشرف',report_date:reportDate,executive_summary:$id('supClientReportSummary')?.value||'',status:'draft',public_token:null};
         const {data:rep,error}=await sb.from('client_reports').insert(reportRow).select('id').single(); if(error) throw error; reportId=rep.id;
@@ -14048,7 +14048,7 @@ function financePrintReport(kind){
       let currentCount=0; try{ currentCount=(getReportServices(reportId)||[]).length; }catch(_){}
       const rows=valid.map((s,i)=>({report_id:reportId,sort_order:currentCount+i+1,service_type:s.service_type,title:s.title||s.service_type,service_description:'',scope_work:'',notes:`رفع بواسطة: ${u.full_name||u.username||''}`,before_images:s.before_images||[],during_images:s.during_images||[],after_images:s.after_images||[]}));
       const {error:se}=await sb.from('client_report_services').insert(rows); if(se) throw se;
-      if(typeof v133Msg==='function') v133Msg('تم إرسال التقرير وتحديث تقرير الشهر نفسه'); else msg('تم تحديث تقرير الشهر');
+      if(typeof v133Msg==='function') v133Msg('تم إرسال التقرير للإدارة وهو بانتظار الاعتماد'); else msg('تم إرسال التقرير للإدارة وهو بانتظار الاعتماد');
       if(typeof supClientReportReset==='function') supClientReportReset(); await loadPremiumReportsOnly(false); if(typeof supClientRenderMyReports==='function') supClientRenderMyReports();
     }catch(e){ if(typeof v133Msg==='function') v133Msg(e.message||String(e),'err'); else msg(e.message||String(e),'err'); }
     finally{ if(btn) btn.disabled=false; }

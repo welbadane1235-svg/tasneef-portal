@@ -90,7 +90,7 @@
 
   function getFilters(){ return { projectId:$('cpProjectV373')?.value||'', from:$('cpFromV373')?.value||monthStart(), to:$('cpToV373')?.value||today() }; }
   function makeToken(){ const f=getFilters(); if(!f.projectId) return ''; const payload={project_id:String(f.projectId), from:f.from, to:f.to, v:376, ts:Date.now()}; return btoa(unescape(encodeURIComponent(JSON.stringify(payload)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
-  function link(){ const token=makeToken(); if(!token) return ''; const base=location.href.replace(/admin\.html.*$/,'client-report.html').replace(/#.*$/,''); return base+'?token='+encodeURIComponent(token); }
+  function link(){ const token=makeToken(); if(!token) return ''; const base=location.origin+'/client-report.html'; return base+'?token='+encodeURIComponent(token); }
 
   function simpleHash(str){
     let h=2166136261;
