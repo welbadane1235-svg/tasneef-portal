@@ -553,11 +553,11 @@ body .tasneef-version-badge, body .version-badge, body .build-badge, body #versi
           <h2>قسم الأوردرات</h2>
           <p>إدارة أوردرات الصيانة الخارجية بنفس آلية ملف الإكسل، مع رقم نظام تلقائي ورقم مستقل للأوردر في القروب.</p>
         </div>
-        <div class="actions ou-orders-toolbar" id="ouOrdersToolbar">
-          <button type="button" id="ouNewOrderBtn">+ أوردر جديد</button>
-          <button type="button" class="light" id="ouExportOrdersBtn">تصدير CSV</button>
-          <button type="button" class="light" id="ouQuotesBtn">عروض الأسعار</button>
-          <button type="button" class="light" id="ouPrintFilteredBtn">طباعة حسب الفلتر</button>
+        <div class="actions orders-section-actions-v10408">
+          <button onclick="clearOrderFormV233()">+ أوردر جديد</button>
+          <button class="light" onclick="tasneefOrders10400.exportExcel()">تصدير Excel</button>
+          <button class="light" onclick="tasneefOrders10400.openQuoteBuilder()">عروض الأسعار</button>
+          <button class="light" onclick="tasneefOrders10400.printFiltered()">طباعة حسب الفلتر</button>
         </div>
       </div>
 
@@ -819,14 +819,13 @@ window.__tasneefOrdersRootCleanV10189=true;
 window.__tasneefSupervisorOrdersV10061=true;
 </script>
 <script src="app.js?v=477-root-fast" defer></script>
-<script src="tasneef_orders_unified_v10400.js?v=10406" defer></script>
+<script src="tasneef_orders_unified_v10400.js?v=10408" defer></script>
 <script src="tasneef_contracts_core_v10107.js?v=10107" defer></script>
 <script src="tasneef_finance_inventory_pro_v15.js?v=10089" defer></script>
 <script src="tasneef_worker_distribution_unified_v51.js?v=51" defer></script>
 <script src="tasneef_permissions_unified_v43.js?v=10061" defer></script>
 <script src="tasneef_sidebar_permissions_lock_v44.js?v=10059" defer></script>
 <script src="tasneef_inventory_audit_root_v10059.js?v=10059" defer></script>
-<script src="tasneef_quotes_exact_pdf_v10041.js?v=10041" defer></script>
 <script src="tasneef_audit_history_v10059.js?v=10059" defer></script>
 
 <script src="tasneef_contracts_filters_orders_print_v10108.js?v=10108" defer></script>
