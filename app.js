@@ -2576,7 +2576,7 @@ function tasneefPublicBaseUrl(){
     const path=String(loc.pathname||'/');
     const dir=path.endsWith('/')?path:path.slice(0,path.lastIndexOf('/')+1);
     return String(loc.origin||'').replace(/\/$/,'') + dir.replace(/\/$/,'');
-  }catch(_){ return 'https://tasneef-fm.github.io'; }
+  }catch(_){ return (location.origin + location.pathname.replace(/[^/]*$/,'').replace(/\/$/,'')); }
 }
 window.tasneefPublicBaseUrl=tasneefPublicBaseUrl;
 function clientReportUrl(token){ return `${tasneefPublicBaseUrl()}/client-report.html?token=${encodeURIComponent(token||'')}`; }
@@ -24539,8 +24539,8 @@ ${finalUrl}
   const esc = (v)=>String(v ?? '').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const msg = (t,bad)=>{ try{ if(typeof window.msg==='function') window.msg(t,bad?'err':'ok'); }catch(_){} };
   const pid = ()=>String($('cpProjectV373')?.value || '').trim();
-  const CURRENT_PORTAL_ROOT = 'https://tasneef-fm.github.io';
-  const baseUrl = ()=> CURRENT_PORTAL_ROOT + '/client-report.html';
+  const CURRENT_PORTAL_ROOT = (typeof window.tasneefPublicBaseUrl==='function' ? window.tasneefPublicBaseUrl() : (location.origin + location.pathname.replace(/[^/]*$/,'' ).replace(/\/$/,'')));
+  const baseUrl = ()=> CURRENT_PORTAL_ROOT.replace(/\/$/,'') + '/client-report.html';
   const isLegacyPortalUrl = (u)=> /welbadane1235-svg\.github\.io|\/tasneef-portal\//i.test(String(u||''));
   const stableUrl = (projectId=pid())=> projectId ? (baseUrl()+'?project_id='+encodeURIComponent(projectId)) : '';
   function projectRow(projectId=pid()){
@@ -24703,3 +24703,23 @@ ${finalUrl}
 })();
 
 /* ===== END V481 CLIENT PORTAL INTEGRATED ROOT ===== */
+
+/* ===== V482 CLIENT PORTAL SINGLE SOURCE / LEGACY STOP ===== */
+(function(){
+  'use strict';
+  if(window.__tasneefClientPortalSingleSourceV482) return;
+  window.__tasneefClientPortalSingleSourceV482=true;
+  function deploymentBase(){
+    const origin=String(location.origin||'').replace(/\/$/,'');
+    const dir=String(location.pathname||'/').replace(/[^/]*$/,'').replace(/\/$/,'');
+    return origin+dir;
+  }
+  window.tasneefPublicBaseUrl=deploymentBase;
+  window.clientReportUrl=function(token){
+    return deploymentBase()+'/client-report.html?token='+encodeURIComponent(token||'');
+  };
+  window.__tasneefLegacyClientPortalDisabled=true;
+  console.info('V482 client portal: single integrated source active; legacy external scripts disabled.');
+})();
+/* ===== END V482 CLIENT PORTAL SINGLE SOURCE ===== */
+
