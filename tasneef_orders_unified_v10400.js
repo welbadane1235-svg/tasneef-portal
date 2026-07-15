@@ -1,4 +1,4 @@
-/* Tasneef Orders Unified v10414
+/* Tasneef Orders Unified v10416
    المصدر الوحيد لقسم الأوردرات.
    - يحافظ على كل بيانات orders_shared القديمة دون حذف أو إعادة كتابة جماعية.
    - يمنع تشغيل سكربتات الأوردرات القديمة.
@@ -9,8 +9,8 @@
 */
 (function(){
   'use strict';
-  if(window.__tasneefOrdersUnifiedV10414) return;
-  window.__tasneefOrdersUnifiedV10414=true;
+  if(window.__tasneefOrdersUnifiedV10416) return;
+  window.__tasneefOrdersUnifiedV10416=true;
 
   const URL='https://zmjdqiswytxlbfgnfjfv.supabase.co';
   const KEY='sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb';
@@ -81,6 +81,41 @@
     if(!res.ok) throw new Error((await res.text().catch(()=>''))||('HTTP '+res.status));
     const text=await res.text(); return text?JSON.parse(text):null;
   }
+
+
+  if(!document.getElementById('ouSupervisorRestrictionStyle')){const st=document.createElement('style');st.id='ouSupervisorRestrictionStyle';st.textContent='.ou-supervisor-locked{background:#f3f5f4!important;color:#667!important;cursor:not-allowed!important;opacity:.82}.ou-supervisor-locked:disabled{opacity:.82}';document.head.appendChild(st);}
+
+  const SUPERVISOR_EDIT_ALLOWED_IDS=new Set(['ouStatus','ouPayment']);
+  function applySupervisorEditRestrictions(active){
+    if(!isSupervisorPage())return;
+    const form=$('supOrderFormV10061')||$('orderFormV233')||document.querySelector('#supOrdersSectionV10061 form, #ordersSectionV233 form');
+    const root=form||document;
+    root.querySelectorAll('input,select,textarea').forEach(el=>{
+      const allowed=SUPERVISOR_EDIT_ALLOWED_IDS.has(el.id);
+      if(active&&!allowed){
+        el.dataset.ouSupervisorLocked='1';
+        if(el.tagName==='SELECT'||el.type==='file'||el.type==='date'||el.type==='number')el.disabled=true;
+        else el.readOnly=true;
+        el.setAttribute('aria-disabled','true');
+        el.classList.add('ou-supervisor-locked');
+      }else if(el.dataset.ouSupervisorLocked==='1'){
+        el.disabled=false;el.readOnly=false;el.removeAttribute('aria-disabled');el.classList.remove('ou-supervisor-locked');delete el.dataset.ouSupervisorLocked;
+      }
+    });
+    const delBtn=document.querySelector('[onclick*="deleteCurrentOrderV233"], [onclick*="deleteCurrent"], #supOrderDeleteV10061');
+    if(delBtn)delBtn.style.display=active?'none':'';
+    const title=$('supOrderFormTitleV10061');
+    if(title&&active)title.textContent='تعديل حالة التنفيذ والسداد فقط';
+    let note=$('ouSupervisorEditNotice');
+    if(active){
+      if(!note){
+        note=document.createElement('div');note.id='ouSupervisorEditNotice';note.className='ou-note';
+        note.textContent='صلاحية المشرف: يمكن تعديل حالة التنفيذ وحالة السداد فقط. بقية بيانات الأوردر للعرض.';
+        const anchor=title||form?.firstElementChild;anchor?.insertAdjacentElement('afterend',note);
+      }
+    }else note?.remove();
+  }
+
   function projects(){
     const list=allProjects();
     if(!isSupervisorPage())return list;
@@ -361,15 +396,26 @@
   async function save(ev){
     ev?.preventDefault?.(); if(saving)return; const v=values(); if(!validate(v))return; saving=true;
     try{
-      const current=editNo?rows.find(r=>orderNo(r)===editNo):null; const no=editNo||makeNo(); const oldD=current?dataOf(current):{}; const d=toData(v,oldD);
-      const picked=$('ouReceiptFile')?.files?.[0]; if(picked){const rec=await fileToDataURL(picked);d.__tasneef_order_receipt_v10140=rec;d['بيانات الإيصال']=rec;d['الإيصال']=rec;}
+      const current=editNo?rows.find(r=>orderNo(r)===editNo):null; const no=editNo||makeNo(); const oldD=current?dataOf(current):{};
+      let d;
+      if(current&&isSupervisorPage()){
+        const u=user();
+        d={...oldD,
+          status:v.status,'حالة التنفيذ':v.status,
+          payment_status:v.payment,'حالة السداد':v.payment,
+          updated_by_id:S(u.id||u.user_id||u.email),updated_by_name:userName(u),updated_by_role:userRole(u),updated_at:now(),'آخر تعديل بواسطة':userName(u)
+        };
+      }else{
+        d=toData(v,oldD);
+        const picked=$('ouReceiptFile')?.files?.[0]; if(picked){const rec=await fileToDataURL(picked);d.__tasneef_order_receipt_v10140=rec;d['بيانات الإيصال']=rec;d['الإيصال']=rec;}
+      }
       d['رقم الطلب']=no; d.order_no=no; if(!oldD['تاريخ الطلب'])d['تاريخ الطلب']=today(); if(!oldD['وقت الطلب'])d['وقت الطلب']=timeNow(); d['مرسل الطلب']=d['منشئ الطلب']||d.created_by_name;
       await api('/rest/v1/'+TABLE+'?on_conflict=order_no',{method:'POST',body:JSON.stringify([{order_no:no,data:d,flow:current?.flow||{},updated_at:now()}])});
       await audit(no,current?'update':'create',current?diff(oldD,d):[]); notify(current?'تم تعديل الأوردر وتسجيل التغييرات':'تم إنشاء الأوردر وتسجيل المنشئ تلقائياً','ok'); clear(); await load();
     }catch(e){notify('فشل حفظ الأوردر: '+e.message,'err');}finally{saving=false;}
   }
-  function clear(){editNo='';['ouType','ouProject','ouCustomer','ouPhone','ouUnit','ouExecutor','ouPayment','ouBilling','ouInvoiceNo','ouInvoiceDate','ouInclusive','ouBefore','ouVat','ouCost','ouProfit','ouDetails','ouNotes','ouReceiptFile'].forEach(id=>{if($(id))$(id).value='';});if($('ouStatus'))$('ouStatus').value='لم ينفذ';if($('ouBilling'))$('ouBilling').value='لم تتم';if($('orderNoV233'))$('orderNoV233').value='';if($('orderFormTitleV233'))$('orderFormTitleV233').textContent='إضافة أوردر';if($('supOrderFormTitleV10061'))$('supOrderFormTitleV10061').textContent='رفع أوردر';if($('ouReceiptCurrent'))$('ouReceiptCurrent').textContent='';document.querySelectorAll('.ou-invalid').forEach(x=>x.classList.remove('ou-invalid'));recalcFinance();}
-  function edit(idx){const r=rows[idx];if(!r)return;const d=dataOf(r);editNo=orderNo(r);const set=(id,v)=>{if($(id))$(id).value=S(v)};set('ouType',d.order_type||(/جمعية/.test(S(d['نوع الطلب']||d['تخص']))?'association':/خارجي/.test(S(d['نوع الطلب']))?'external':'internal'));set('ouProject',projectName(r));set('ouCustomer',field(r,'customer_name','اسم العميل'));set('ouPhone',field(r,'customer_phone','رقم العميل'));set('ouUnit',field(r,'unit_number','رقم الشقة'));set('ouExecutor',field(r,'executor_name','المنفذ'));set('ouStatus',field(r,'status','حالة التنفيذ'));set('ouPayment',field(r,'payment_status','حالة السداد'));set('ouBilling',field(r,'billing_status','حالة الفوترة')||'لم تتم');set('ouInvoiceNo',field(r,'invoice_number','رقم الفاتورة'));set('ouInvoiceDate',field(r,'invoice_date','تاريخ الفوترة'));$('ouBilling')?.dispatchEvent(new Event('change',{bubbles:true}));set('ouInvoiceNo',field(r,'invoice_number','رقم الفاتورة'));set('ouInvoiceDate',field(r,'invoice_date','تاريخ الفوترة'));set('ouInclusive',field(r,'السعر (شامل الضريبة)','inclusive_total','total_with_vat'));set('ouBefore',field(r,'السعر قبل الضريبة','before_vat'));set('ouVat',field(r,'الضريبة 15%','vat_amount'));set('ouCost',field(r,'التكلفة','cost'));set('ouProfit',field(r,'الربح','net_profit'));recalcFinance();set('ouDetails',field(r,'description','التفاصيل'));set('ouNotes',field(r,'ملاحظات'));const rec=receiptFromRow(r);if($('ouReceiptCurrent'))$('ouReceiptCurrent').textContent=rec?('الإيصال الحالي: '+rec.name):'لا يوجد إيصال محفوظ';if($('orderNoV233'))$('orderNoV233').value=editNo;if($('orderFormTitleV233'))$('orderFormTitleV233').textContent='تعديل أوردر '+editNo;if($('supOrderFormTitleV10061'))$('supOrderFormTitleV10061').textContent='تعديل أوردر '+editNo;window.scrollTo({top:0,behavior:'smooth'});}
+  function clear(){applySupervisorEditRestrictions(false);editNo='';['ouType','ouProject','ouCustomer','ouPhone','ouUnit','ouExecutor','ouPayment','ouBilling','ouInvoiceNo','ouInvoiceDate','ouInclusive','ouBefore','ouVat','ouCost','ouProfit','ouDetails','ouNotes','ouReceiptFile'].forEach(id=>{if($(id))$(id).value='';});if($('ouStatus'))$('ouStatus').value='لم ينفذ';if($('ouBilling'))$('ouBilling').value='لم تتم';if($('orderNoV233'))$('orderNoV233').value='';if($('orderFormTitleV233'))$('orderFormTitleV233').textContent='إضافة أوردر';if($('supOrderFormTitleV10061'))$('supOrderFormTitleV10061').textContent='رفع أوردر';if($('ouReceiptCurrent'))$('ouReceiptCurrent').textContent='';document.querySelectorAll('.ou-invalid').forEach(x=>x.classList.remove('ou-invalid'));recalcFinance();}
+  function edit(idx){const r=rows[idx];if(!r)return;const d=dataOf(r);editNo=orderNo(r);const set=(id,v)=>{if($(id))$(id).value=S(v)};set('ouType',d.order_type||(/جمعية/.test(S(d['نوع الطلب']||d['تخص']))?'association':/خارجي/.test(S(d['نوع الطلب']))?'external':'internal'));set('ouProject',projectName(r));set('ouCustomer',field(r,'customer_name','اسم العميل'));set('ouPhone',field(r,'customer_phone','رقم العميل'));set('ouUnit',field(r,'unit_number','رقم الشقة'));set('ouExecutor',field(r,'executor_name','المنفذ'));set('ouStatus',field(r,'status','حالة التنفيذ'));set('ouPayment',field(r,'payment_status','حالة السداد'));set('ouBilling',field(r,'billing_status','حالة الفوترة')||'لم تتم');set('ouInvoiceNo',field(r,'invoice_number','رقم الفاتورة'));set('ouInvoiceDate',field(r,'invoice_date','تاريخ الفوترة'));$('ouBilling')?.dispatchEvent(new Event('change',{bubbles:true}));set('ouInvoiceNo',field(r,'invoice_number','رقم الفاتورة'));set('ouInvoiceDate',field(r,'invoice_date','تاريخ الفوترة'));set('ouInclusive',field(r,'السعر (شامل الضريبة)','inclusive_total','total_with_vat'));set('ouBefore',field(r,'السعر قبل الضريبة','before_vat'));set('ouVat',field(r,'الضريبة 15%','vat_amount'));set('ouCost',field(r,'التكلفة','cost'));set('ouProfit',field(r,'الربح','net_profit'));recalcFinance();set('ouDetails',field(r,'description','التفاصيل'));set('ouNotes',field(r,'ملاحظات'));const rec=receiptFromRow(r);if($('ouReceiptCurrent'))$('ouReceiptCurrent').textContent=rec?('الإيصال الحالي: '+rec.name):'لا يوجد إيصال محفوظ';if($('orderNoV233'))$('orderNoV233').value=editNo;if($('orderFormTitleV233'))$('orderFormTitleV233').textContent='تعديل أوردر '+editNo;if($('supOrderFormTitleV10061'))$('supOrderFormTitleV10061').textContent='تعديل أوردر '+editNo;applySupervisorEditRestrictions(true);window.scrollTo({top:0,behavior:'smooth'});}
   async function del(idx){const r=rows[idx];if(!r||!confirm('حذف الأوردر '+orderNo(r)+'؟'))return;try{await api('/rest/v1/'+TABLE+'?order_no=eq.'+encodeURIComponent(orderNo(r)),{method:'DELETE'});await audit(orderNo(r),'delete');notify('تم حذف الأوردر','ok');clear();await load();}catch(e){notify('تعذر الحذف: '+e.message,'err');}}
   function deleteCurrent(){const idx=rows.findIndex(r=>orderNo(r)===editNo);if(idx>=0)del(idx);else notify('اختر أوردر للتعديل أولاً','err');}
   function createdByCurrentUser(r){
