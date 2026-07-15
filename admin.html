@@ -1,11 +1,12 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+
+<html dir="rtl" lang="ar">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="no-store, no-cache, must-revalidate, max-age=0" http-equiv="Cache-Control"/>
+<meta content="no-cache" http-equiv="Pragma"/>
+<meta content="0" http-equiv="Expires"/>
 <title>لوحة الإدارة - تصنيف</title>
 <style>
 :root{--brand:#0A4033;--brand2:#0f5a47;--bg:#f3f6f5;--card:#fff;--line:#dce6e2;--text:#10231d;--muted:#60706a;--red:#b83232;--green:#137a4b;--amber:#9a6b00}*{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}button{font-family:inherit;border:0;background:var(--brand);color:#fff;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer}button.light{background:#eef6f3;color:var(--brand);border:1px solid var(--line)}button.danger,.danger{background:var(--red)!important}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px;background:#fff;font-family:inherit;font-size:14px}textarea{min-height:82px;resize:vertical}label{display:block;margin:10px 0 6px;color:var(--brand);font-weight:700;font-size:13px}.hidden{display:none!important}.login-body{min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at 15% 15%,#e8f3ef,transparent 35%),linear-gradient(180deg,#eef6f3,#f8fbfa)}.login-card{width:min(440px,92vw);background:#fff;border:1px solid var(--line);border-radius:24px;padding:28px;box-shadow:0 18px 44px rgba(10,64,51,.12);text-align:center}.login-card h1{margin:10px 0;color:#071b33}.login-card p{color:var(--muted)}.logo-mark,.brand span{width:64px;height:64px;border-radius:20px;background:var(--brand);display:grid;place-items:center;color:#fff;font-size:28px;font-weight:900;margin:auto}.login-card button{width:100%;margin-top:14px}.login-card small{display:block;margin-top:18px;color:var(--muted)}.app-shell{display:grid;grid-template-columns:240px 1fr;min-height:100vh}.side{background:#101b2f;color:#fff;padding:18px;position:sticky;top:0;height:100vh;overflow:auto}.brand{display:flex;align-items:center;gap:12px;margin-bottom:22px}.brand span{width:46px;height:46px;border-radius:14px;margin:0}.brand small{display:block;color:#b7c2d6;margin-top:4px}.nav{display:block;width:100%;text-align:right;background:transparent;color:#fff;margin:6px 0;border:1px solid transparent}.nav:hover,.nav.active{background:#1d2b46;border-color:#354560}.content{padding:22px;overflow:auto}.hero{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;border-radius:24px;padding:24px;display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px;box-shadow:0 12px 34px rgba(10,64,51,.12)}.hero h1{margin:0 0 8px}.hero p{margin:0;color:#e9f5f1;line-height:1.7}.compact{border-radius:0 0 22px 22px}.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:18px;box-shadow:0 8px 24px rgba(10,64,51,.05);margin-bottom:16px}.card h2{margin:0 0 14px;color:var(--brand)}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}.kpis.small{grid-template-columns:repeat(3,1fr)}.kpi{background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px}.kpi small{color:var(--muted)}.kpi b{display:block;font-size:32px;color:var(--brand);margin-top:8px}.grid.two{display:grid;grid-template-columns:390px 1fr;gap:16px}.split{display:grid;grid-template-columns:1fr 1fr;gap:10px}.actions,.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin:12px 0}.filters>*{min-width:160px;flex:1}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:16px;max-height:66vh;background:#fff}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px;border-bottom:1px solid #edf1ef;text-align:right;white-space:nowrap;vertical-align:top}th{position:sticky;top:0;background:#f8fbfa;color:#4c635c;z-index:1}.badge{display:inline-block;padding:5px 9px;border-radius:999px;background:#eef6f3;color:var(--brand);font-size:12px;font-weight:700}.badge.red{background:#fde8e8;color:#9d2222}.badge.green{background:#e8f4ee;color:#137a4b}.badge.amber{background:#fff5da;color:#8a6700}.row-actions{display:flex;gap:6px}.row-actions button{padding:7px 9px;border-radius:9px;font-size:12px}.msg{padding:11px 13px;border-radius:12px;margin:10px 0;background:#eef6f3;color:var(--brand);border:1px solid var(--line)}.msg.err{background:#fde8e8;color:#9d2222}.summary-grid,.alerts{display:grid;gap:10px}.summary-grid{grid-template-columns:repeat(3,1fr)}.summary-item,.alert-item{background:#fbfdfc;border:1px solid var(--line);border-radius:14px;padding:12px;line-height:1.7}.alert-item.warn{background:#fff8e8;border-color:#f0d48d}.alert-item.danger{background:#fde8e8;border-color:#efc3c3}.quick-list{display:grid;gap:8px;margin:12px 0}.quick-item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fbfdfc;border:1px solid var(--line);border-radius:12px;padding:10px}.quick-item select{max-width:140px}.mobile-shell{max-width:760px;margin:0 auto;padding-bottom:24px}.mobile-shell .card{margin:14px}.mobile-shell .hero{margin-bottom:14px}@media(max-width:1000px){.app-shell{grid-template-columns:1fr}.side{position:static;height:auto;display:grid;grid-template-columns:repeat(2,1fr);gap:6px}.brand{grid-column:1/-1}.content{padding:12px}.grid.two,.kpis,.summary-grid{grid-template-columns:1fr}.hero{border-radius:0 0 22px 22px;margin:-12px -12px 14px}.split{grid-template-columns:1fr}.side .nav{text-align:center}}
@@ -80,7 +81,6 @@ body .tasneef-version-badge, body .version-badge, body .build-badge, body #versi
 @media(max-width:760px){.orders-receipt-row-v10138{grid-template-columns:1fr}}
 .orders-card-receipt-main-v10144{display:block;width:100%;margin-top:10px;background:#0A4B3C;color:#fff;border:0;border-radius:10px;padding:10px 12px;font-weight:900;cursor:pointer}
 </style>
-
 <style id="smart-ui-framework-v129">
 /* V130 Smart UI Framework Fix */
 .smart-shell-v129{display:grid;gap:16px}
@@ -100,8 +100,6 @@ body .tasneef-version-badge, body .version-badge, body .build-badge, body #versi
 /* V10055 hide old build/version floating badge */
 body .tasneef-version-badge, body .version-badge, body .build-badge, body #versionBadge, body #buildBadge{display:none!important}
 </style>
-
-
 <style id="smart-ui-framework-v130-fix">
 /* V130: إصلاح عرض الكروت وحذف شريط الواجهة الذكية */
 .smart-hero-v129{display:none!important;}
@@ -145,16 +143,11 @@ body .tasneef-version-badge, body .version-badge, body .build-badge, body #versi
 /* V10055 hide old build/version floating badge */
 body .tasneef-version-badge, body .version-badge, body .build-badge, body #versionBadge, body #buildBadge{display:none!important}
 </style>
-
-
-
-
 <style id="monthlyCleanV403Css">
 .monthly-clean-v401{direction:rtl}.mc401-hero{background:linear-gradient(135deg,#0A4033,#0f5a47);color:#fff;border-radius:24px;padding:22px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:12px}.mc401-hero h1{margin:0 0 8px}.mc401-hero p{margin:0;color:#eaf7f2}.mc401-badge{background:#fff;color:#0A4033;border-radius:999px;padding:10px 16px;font-weight:900}.mc401-toolbar{display:grid;grid-template-columns:1fr 1fr 1fr auto auto auto;gap:10px;align-items:end}.mc401-summary{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:14px 0}.mc401-kpi{background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px;text-align:center}.mc401-kpi small{color:var(--muted);display:block;margin-bottom:6px}.mc401-kpi b{display:block;font-size:28px;color:#0A4033}.mc401-title{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}.mc401-title h2{margin:0;color:#0A4033}.mc401-title small{color:var(--muted)}.mc401-supervisor-title{font-size:18px;font-weight:900;color:#0A4033;margin:12px 0 8px;padding:8px 12px;border-right:6px solid #0A4033;background:#eef8f5;border-radius:12px}.mc401-grid{display:grid;grid-template-columns:repeat(3,minmax(270px,1fr));gap:12px;margin:12px 0}.mc401-card{background:#fff;border:2px solid #111;border-radius:16px;padding:14px;min-height:245px;break-inside:avoid;page-break-inside:avoid}.mc401-card.full{border-color:#0A4033;background:linear-gradient(180deg,#fff,#fbfffd)}.mc401-card h3{margin:0 0 10px;text-align:center;color:#061f18;font-size:20px}.mc401-row{display:grid;grid-template-columns:1fr 1.2fr;gap:8px;border-top:1px solid #e7efec;padding:7px 0;align-items:center}.mc401-row span{color:#65746f}.mc401-row b{color:#061f18}.mc401-workers{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:10px}.mc401-pill{background:#eef8f5;border:1px solid #d5e9e2;border-radius:999px;padding:5px 9px;font-weight:800;color:#0A4033}.mc401-bar{height:10px;background:#edf3f1;border-radius:999px;overflow:hidden;margin:8px 0}.mc401-bar i{display:block;height:100%;background:#0A4033}.mc401-empty{padding:22px;border:1px dashed #b9dfcb;border-radius:16px;text-align:center;color:#60706a;background:#fbfffd}.mc401-section{overflow:visible}
 .mc402-daily-card{background:#fff;border:2px solid #0A4033;border-radius:18px;padding:14px;margin:14px 0;break-inside:avoid;page-break-inside:avoid}.mc402-daily-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #dce6e2;padding-bottom:10px;margin-bottom:10px}.mc402-daily-head h3{margin:0;color:#0A4033;font-size:21px}.mc402-mini-kpis{display:flex;gap:8px;flex-wrap:wrap}.mc402-mini-kpi{background:#eef8f5;border:1px solid #cfe2dc;border-radius:12px;padding:7px 10px;font-weight:900;color:#0A4033}.mc402-project-table{width:100%;border-collapse:separate;border-spacing:0 7px}.mc402-project-table th{background:#f5faf8;color:#0A4033}.mc402-project-table td,.mc402-project-table th{padding:9px;border-bottom:1px solid #edf1ef;text-align:right;white-space:normal}.mc402-workers-line{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.mc402-progress{height:8px;background:#edf3f1;border-radius:999px;overflow:hidden;min-width:90px}.mc402-progress i{display:block;height:100%;background:#0A4033}
 @media(max-width:1200px){.mc401-toolbar,.mc401-summary,.mc401-grid{grid-template-columns:1fr 1fr}}@media(max-width:760px){.mc401-toolbar,.mc401-summary,.mc401-grid{grid-template-columns:1fr}.mc401-hero{display:block}}@media print{body *{visibility:hidden!important}#monthly,#monthly *{visibility:visible!important}#monthly{position:absolute!important;inset:0!important;background:#fff!important}.side,.nav,.mc401-toolbar,.content>.hero{display:none!important}.card{box-shadow:none!important}.mc401-card{break-inside:avoid!important;page-break-inside:avoid!important}.mc401-grid{grid-template-columns:repeat(2,1fr)!important}}
 </style>
-
 <style id="ticket-sla-permanent-root-fix-v10373">
 /* V10373: شريط SLA ثابت من جذر بطاقة التكت ولا يتأثر بإعادة الرسم */
 .smart-ticket-card.ticket-sla-card{
@@ -174,636 +167,590 @@ body .tasneef-version-badge, body .version-badge, body .build-badge, body #versi
 .smart-ticket-card.ticket-sla-card.near{border-top-color:#f0b429!important}
 .smart-ticket-card.ticket-sla-card.late{border-top-color:#d92d20!important}
 </style>
-
-</head>
+<meta content="client-portal-root-v480-old-scripts-disabled" name="tasneef-clean-build"/></head>
 <body onload="initAdmin()">
 <div class="app-shell">
-  <aside class="side">
-    <div class="brand"><span>ت</span><div><b>شركة تصنيف</b><small>إدارة المرافق</small></div></div>
-    <button class="nav active" onclick="showPage('dashboard',this)">لوحة التحكم</button>
-    <button class="nav" onclick="showPage('daily',this)">التسجيلات اليومية</button>
-    <button class="nav" onclick="showPage('users',this)">إدارة المستخدمين</button>
-    <button class="nav" onclick="showPage('projects',this)">المشاريع</button>
-    <button class="nav" data-page="distribution" onclick="showPage('distribution',this); setTimeout(function(){window.tasneefDistributionV404&&tasneefDistributionV404.init&&tasneefDistributionV404.init();},120);">التوزيع</button>
-    <button class="nav" onclick="showPage('contracts',this)">العقود والخدمات</button>
-    <button class="nav" onclick="showPage('workers',this)">العمال</button>
-    <button class="nav" onclick="showPage('attendance',this)">الحضور والغياب</button>
-    <button class="nav" onclick="showPage('monthly',this)">الأوقات الشهرية</button>
-    <button class="nav" onclick="showPage('tickets',this)">تذاكر</button>
-    <button class="nav" onclick="showPage('orders',this)">الأوردرات</button>
-    <button class="nav" data-page="inventoryAudit" onclick="showPage('inventoryAudit',this); setTimeout(function(){ window.tasneefInventoryAuditV10059 && tasneefInventoryAuditV10059.load && tasneefInventoryAuditV10059.load(); },80);">الجرد</button>
-    <button class="nav" onclick="showPage('alerts',this)">التنبيهات</button>
-    <button class="nav" onclick="showPage('assistant',this)">مساعد تصنيف</button>
-    <button class="nav" onclick="showPage('export',this)">التصدير والاستيراد</button>
-    <button class="nav" id="at10124StaticNav" data-page="adminTasks" data-section="adminTasks" onclick="if(window.tasneefAdminTasksV10121&&window.tasneefAdminTasksV10121.openPage){window.tasneefAdminTasksV10121.openPage();}else if(window.showPage){showPage('adminTasks',this);} return false;">مهام إدارية</button>
-    <button class="nav danger" onclick="logout()">تسجيل خروج</button>
-  </aside>
-  <main class="content">
-    <header class="hero">
-      <div class="hero-brand-v155">
-        <div class="hero-logo-card-v155"><img src="tasneef_logo_print.png" alt="شركة تصنيف لإدارة المرافق"></div>
-        <div class="hero-title-v155"><h1>لوحة تشغيل يومية احترافية</h1><p>إدارة المستخدمين، المشاريع، العمال، الحضور، التسجيلات اليومية والتقارير.</p><span class="hero-app-name-v155">شركة تصنيف لإدارة المرافق</span></div>
-      </div>
-      <div class="hero-action-v155"><span class="status-pill-v155">النظام محدث</span><button onclick="refreshAll()">تحديث البيانات</button></div>
-    </header>
-    <div id="globalMsg" class="msg hidden"></div>
-
-    <section id="dashboard" class="page">
-      <div class="kpis">
-        <div class="kpi"><small>المستخدمون</small><b id="kpiUsers">0</b></div>
-        <div class="kpi"><small>المشاريع</small><b id="kpiProjects">0</b></div>
-        <div class="kpi"><small>العمال</small><b id="kpiWorkers">0</b></div>
-        <div class="kpi"><small>تسجيلات اليوم</small><b id="kpiTodayLogs">0</b></div>
-      </div>
-      <div class="card"><h2>ملخص اليوم</h2><div id="todaySummary" class="summary-grid"></div></div>
-      <div class="card"><h2>تنبيهات العقود</h2><div id="contractDashboardAlerts" class="alerts"></div></div>
-    </section>
-
-    <section id="daily" class="page hidden">
-      <div class="grid two">
-        <div class="card">
-          <h2 id="logFormTitle">تسجيل دخول / خروج</h2>
-          <input type="hidden" id="logId">
-          <label>التاريخ</label><input type="date" id="logDate">
-          <label>المشرف</label><select id="logSupervisor"></select>
-          <label>المشروع</label><select id="logProject" onchange="onLogProjectChange()"></select>
-          <label>نوع الزيارة</label><select id="logVisitType"><option value="surface">نظافة سطحية</option><option value="deep">نظافة عميقة</option></select>
-          <div class="split"><div><label>وقت الدخول</label><input type="time" id="logIn"></div><div><label>وقت الخروج</label><input type="time" id="logOut"></div></div>
-          <label>وقت الانتقال / الضائع بالدقائق</label><input type="number" id="logTravel" min="0" value="0">
-          <label>ملاحظات</label><textarea id="logNotes"></textarea>
-          <div class="actions"><button onclick="setNow('logIn')">الدخول الآن</button><button onclick="setNow('logOut')">الخروج الآن</button><button onclick="saveTimeLog()">حفظ</button><button class="light" onclick="clearLogForm()">جديد</button></div>
-        </div>
-        <div class="card">
-          <h2>التسجيلات اليومية</h2>
-          <div class="filters"><input type="date" id="dailyDate" onchange="renderTimeLogs()"><select id="dailySupervisor" onchange="renderTimeLogs()"></select><select id="dailyProject" onchange="renderTimeLogs()"></select><input id="dailySearch" oninput="renderTimeLogs()" placeholder="بحث"><button type="button" class="light" onclick="exportDailyManagerPDF()">طباعة التقرير / PDF</button><button type="button" class="light" onclick="sendDailyManagerWhatsapp()">إرسال واتساب</button></div>
-          <div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المشرف</th><th>المشروع</th><th>نوع الزيارة</th><th>الدخول</th><th>الخروج</th><th>الوقت المطلوب</th><th>المدة الفعلية</th><th>الفرق</th><th>حالة الوقت</th><th>انتقال</th><th>ملاحظات</th><th>واتساب</th><th>إجراء</th></tr></thead><tbody id="logsBody"></tbody></table></div>
-        </div>
-      </div>
-    </section>
-
-    <section id="users" class="page hidden">
-      <div class="grid two"><div class="card"><h2 id="userFormTitle">إضافة مستخدم</h2><input type="hidden" id="userId"><label>الاسم الكامل</label><input id="userFullName"><label>اسم المستخدم</label><input id="userUsername"><label>كلمة المرور</label><input id="userPassword"><label>رقم المشرف</label><input id="userSupervisorPhone" placeholder="05xxxxxxxx أو 9665xxxxxxxx"><label>الدور</label><select id="userRole"><option value="admin">مدير عام</option><option value="financial_manager">مدير مالي</option><option value="operations_manager">مدير تشغيلي</option><option value="warehouse_manager">مدير مخازن</option><option value="technician">فني</option><option value="supervisor">مشرف</option></select><label>الحالة</label><select id="userActive"><option value="true">نشط</option><option value="false">موقوف</option></select><div id="userPermissionsBoxV72" class="perm-box-v72"><label>الصلاحيات</label><div class="perm-grid-v72"><label class="perm-item-v72"><input type="checkbox" id="perm_can_time_logs" data-perm="can_time_logs"> <span>تسجيل دخول / خروج</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_journey" data-perm="can_journey"> <span>رحلة التشغيل اليومية</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_attendance" data-perm="can_attendance"> <span>تسجيل الحضور</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_tickets" data-perm="can_tickets"> <span>تذاكر</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_reports" data-perm="can_reports"> <span>الملخص والتقارير</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_monthly" data-perm="can_monthly"> <span>الأوقات الشهرية</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_edit_time_logs" data-perm="can_edit_time_logs"> <span>تعديل السجلات اليومية</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_manage_users" data-perm="can_manage_users"> <span>إدارة المستخدمين</span></label><label class="perm-item-v72"><input type="checkbox" id="perm_can_manage_workers" data-perm="can_manage_workers"> <span>إدارة العمال</span></label></div><div class="footer-note">تحدد هذه الصلاحيات ما يظهر للمستخدم داخل التطبيق. مدير عام يحصل على كل الصلاحيات افتراضيًا.</div></div><div class="actions"><button onclick="saveUser()">حفظ</button><button class="light" onclick="clearUserForm()">جديد</button></div></div><div class="card"><h2>المستخدمون</h2><div class="table-wrap"><table><thead><tr><th>الاسم</th><th>المستخدم</th><th>الدور</th><th>الحالة</th><th data-user-phone-col="1">رقم المشرف</th><th>إجراء</th></tr></thead><tbody id="usersBody"></tbody></table></div></div></div>
-    </section>
-
-    <section id="projects" class="page hidden">
-      <div class="card section-head">
-        <div><h2>إدارة المشاريع</h2><p>إضافة وتعديل المشاريع، تحديد الوقت المطلوب، وربط المشرف والعمال من داخل المشروع.</p></div>
-        <button class="light" onclick="clearProjectForm()">مشروع جديد</button>
-      </div>
-      <div class="grid two">
-        <div class="card">
-          <h2 id="projectFormTitle">إضافة مشروع</h2>
-          <input type="hidden" id="projectId">
-          <label>اسم المشروع</label><input id="projectName" placeholder="مثال: تعمير 17">
-          <label>الموقع</label><input id="projectLocation" placeholder="اختياري">
-          <div class="split"><div><label>عدد العمائر</label><input type="number" id="projectBuildingsCount" min="0" value="0"></div><div><label>عدد الشقق</label><input type="number" id="projectUnitsCount" min="0" value="0"></div></div>
-          <div class="split"><div><label>تاريخ بداية العقد</label><input type="date" id="projectContractStart"></div><div><label>تاريخ نهاية العقد</label><input type="date" id="projectContractEnd"></div></div>
-          <label>المشرف المرتبط</label><select id="projectSupervisor"></select>
-          <div class="split">
-            <div><label>الوقت المطلوب يوميًا (بالدقائق)</label><input type="number" id="projectRequiredDaily" min="0" value="180"></div>
-            <div><label>وقت الجمعة (بالدقائق)</label><input type="number" id="projectFridayMinutes" min="0" value="90"></div>
-          </div>
-          <div class="split">
-            <div><label>نوع التشغيل</label><select id="projectOperationType"><option value="daily_visit">زيارة يومية</option><option value="full_time">دوام كامل</option><option value="as_needed">حسب الحاجة</option></select></div>
-            <div><label>نوع الزيارة الافتراضي</label><select id="projectVisitDefault"><option value="surface">نظافة سطحية</option><option value="deep">نظافة عميقة</option></select></div>
-          </div>
-          <label>الحالة</label><select id="projectStatus"><option value="active">نشط</option><option value="inactive">متوقف</option></select>
-          <label>ملاحظات</label><textarea id="projectNotes"></textarea>
-          <div class="actions"><button onclick="saveProject()" id="projectSaveBtn">حفظ المشروع</button><button class="light" onclick="clearProjectForm()">إلغاء / جديد</button></div>
-        </div>
-        <div class="card">
-          <div class="table-head"><h2>المشاريع</h2><button class="light" onclick="exportTable('projects')">تصدير CSV</button></div>
-          <div class="filters"><input id="projectSearch" oninput="renderProjects()" placeholder="بحث باسم المشروع أو المشرف"><select id="projectFilterSupervisor" onchange="renderProjects()"></select><select id="projectFilterStatus" onchange="renderProjects()"><option value="">كل الحالات</option><option value="active">نشط</option><option value="inactive">متوقف</option></select></div>
-          <div class="table-wrap"><table><thead><tr><th>المشروع</th><th>المشرف</th><th>العمائر</th><th>الشقق</th><th>نهاية العقد</th><th>المتبقي</th><th>حالة العقد</th><th>الوقت اليومي</th><th>الحالة</th><th data-user-phone-col="1">رقم المشرف</th><th>إجراء</th></tr></thead><tbody id="projectsBody"></tbody></table></div>
-        </div>
-      </div>
-      <div id="projectManagerCard" class="card hidden">
-        <div class="table-head"><h2 id="projectManagerTitle">إدارة المشروع</h2><button class="light" onclick="closeProjectManager()">إغلاق</button></div>
-        <input type="hidden" id="manageProjectId">
-        <div class="grid two">
-          <div>
-            <h3>ربط المشرف</h3><label>المشرف المسؤول</label><select id="projectManageSupervisor"></select><div class="actions"><button onclick="saveProjectManagerSupervisor()">حفظ المشرف</button></div><hr>
-            <h3>إضافة عامل موجود للمشروع</h3><label>العامل</label><select id="manageWorkerSelect"></select><label>نوع العامل داخل المشروع</label><select id="manageWorkerType"><option value="primary">أساسي</option><option value="support">بديل / مساند</option></select><div class="actions"><button onclick="addExistingWorkerToProject()">ربط العامل</button></div><hr>
-            <h3>إضافة عامل جديد وربطه بالمشروع</h3><label>اسم العامل</label><input id="manageNewWorkerName"><label>الجوال</label><input id="manageNewWorkerPhone"><label>الراتب</label><input type="number" id="manageNewWorkerSalary" value="1500"><label>نوع العامل</label><select id="manageNewWorkerType"><option value="primary">أساسي</option><option value="support">بديل / مساند</option></select><div class="actions"><button onclick="addWorkerInsideProject()">إضافة وربط</button></div>
-          </div>
-          <div><h3>العمال المرتبطون بالمشروع</h3><div class="table-wrap"><table><thead><tr><th>العامل</th><th>المشرف</th><th>النوع</th><th>الحالة</th><th data-user-phone-col="1">رقم المشرف</th><th>إجراء</th></tr></thead><tbody id="projectWorkersBody"></tbody></table></div></div>
-        </div>
-      </div>
-    </section>
-
-
-
-    <section id="contracts" class="page hidden">
-      <div class="card section-head">
-        <div><h2>العقود والخدمات السنوية</h2><p>متابعة تواريخ العقود، الأيام المتبقية، والتنبيه قبل شهر من نهاية العقد.</p></div>
-        <button class="light" onclick="showPage('projects', document.querySelector(`[onclick*=projects]`))">تعديل بيانات مشروع</button>
-      </div>
-      <div class="kpis">
-        <div class="kpi"><small>عقود نشطة</small><b id="contractsActiveCount">0</b></div>
-        <div class="kpi"><small>قريبة الانتهاء</small><b id="contractsSoonCount">0</b></div>
-        <div class="kpi"><small>منتهية</small><b id="contractsExpiredCount">0</b></div>
-        <div class="kpi"><small>بيانات ناقصة</small><b id="contractsMissingCount">0</b></div>
-      </div>
-      <div class="card"><h2>العقود القريبة والمنتهية</h2><div id="contractsAlertsList" class="alerts"></div></div>
-      <div class="card">
-        <div class="table-head"><h2>كل العقود</h2><button class="light" onclick="exportTable('projects')">تصدير CSV</button></div>
-        <div class="filters"><input id="contractSearch" oninput="renderContracts()" placeholder="بحث باسم المشروع"><select id="contractFilterStatus" onchange="renderContracts()"><option value="">كل الحالات</option><option value="active">نشط</option><option value="soon">قريب الانتهاء</option><option value="expired">منتهي</option><option value="missing">بيانات ناقصة</option></select></div>
-        <div class="table-wrap"><table><thead><tr><th>المشروع</th><th>العمائر</th><th>الشقق</th><th>بداية العقد</th><th>نهاية العقد</th><th>الأيام المتبقية</th><th>حالة العقد</th><th>إجراء</th></tr></thead><tbody id="contractsBody"></tbody></table></div>
-      </div>
-
-      <div class="card" id="servicesSubTab">
-        <div class="table-head">
-          <h2>الخدمات التعاقدية</h2>
-          <div class="row-actions">
-            <button class="light" onclick="openNewContractService()">إضافة خدمة</button>
-            <button class="light" onclick="exportContractServicesCSV()">تصدير CSV</button>
-            <button class="light" onclick="tasneefPrintContractsServicesV10097()">طباعة</button>
-          </div>
-        </div>
-        <div class="kpis small">
-          <div class="kpi"><small>إجمالي الخدمات</small><b id="servicesTotalCount">0</b></div>
-          <div class="kpi"><small>مستحقة</small><b id="servicesDueCount">0</b></div>
-          <div class="kpi"><small>قريبة</small><b id="servicesSoonCount">0</b></div>
-          <div class="kpi"><small>متأخرة</small><b id="servicesLateCount">0</b></div>
-          <div class="kpi"><small>منجزة</small><b id="servicesDoneCount">0</b></div>
-          <div class="kpi"><small>مراجعة</small><b id="servicesReviewCount">0</b></div>
-        </div>
-        <div class="filters">
-          <input id="serviceSearch" oninput="renderContractServices()" placeholder="بحث بالخدمة أو المشروع">
-          <select id="serviceFilterProject" onchange="renderContractServices()"></select>
-          <select id="serviceFilterSupervisor" onchange="renderContractServices()"></select>
-          <select id="serviceFilterStatus" onchange="renderContractServices()"><option value="">كل الحالات</option><option value="due">مستحقة</option><option value="soon">قريبة</option><option value="late">متأخرة</option><option value="done">منجزة</option><option value="review">مراجعة</option></select>
-          <select id="serviceFilterType" onchange="renderContractServices()"></select>
-          <input type="date" id="serviceFilterDate" onchange="renderContractServices()">
-          <button class="light" onclick="resetServiceFilters()">مسح الفلاتر</button>
-        </div>
-        <div class="table-wrap"><table><thead><tr><th>المشروع</th><th>المشرف</th><th>الخدمة</th><th>النوع</th><th>التكرار</th><th>عدد الزيارات</th><th>المنفذ</th><th>تم</th><th>المتبقي</th><th>آخر تنفيذ</th><th>الاستحقاق</th><th>الحالة</th><th>ملاحظات</th><th>إجراء</th></tr></thead><tbody id="contractServicesBody"></tbody></table></div>
-        <div id="supervisorServicesPreview" class="quick-list"></div>
-        <div id="smartServicesList" class="quick-list"></div>
-      </div>
-    </section>
-
-    <section id="workers" class="page hidden">
-      <div class="card section-head">
-        <div>
-          <h2>إدارة العمال</h2>
-          <p>إضافة وتعديل وربط العمال بالمشرفين والمشاريع، مع تمييز العامل الأساسي والبديل.</p>
-        </div>
-        <button class="light" onclick="clearWorkerForm()">عامل جديد</button>
-      </div>
-      <div class="grid two">
-        <div class="card">
-          <h2 id="workerFormTitle">إضافة عامل</h2>
-          <input type="hidden" id="workerId">
-          <label>اسم العامل</label><input id="workerName" placeholder="مثال: ياسر">
-          <label>الجوال</label><input id="workerPhone" placeholder="اختياري">
-          <label>الراتب</label><input type="number" id="workerSalary" value="1500">
-          <label>المشرف</label><select id="workerSupervisor" onchange="onWorkerSupervisorChange()"></select>
-          <label>المشروع المرتبط</label><select id="workerProject"></select>
-          <label>نوع العامل</label><select id="workerType"><option value="primary">أساسي</option><option value="support">بديل / مساند</option></select>
-          <label>الحالة</label><select id="workerStatus"><option value="active">نشط</option><option value="inactive">موقوف</option></select>
-          <label>ملاحظات</label><textarea id="workerNotes" placeholder="أي ملاحظة تخص العامل أو توزيعه"></textarea>
-          <div class="actions">
-            <button id="workerSaveBtn" onclick="saveWorker()">حفظ العامل</button>
-            <button id="workerCancelBtn" class="light hidden" onclick="clearWorkerForm()">إلغاء التعديل</button>
-          </div>
-        </div>
-        <div class="card">
-          <div class="table-head">
-            <h2>قائمة العمال</h2>
-            <button class="light" onclick="exportTable('workers')">تصدير CSV</button>
-          </div>
-          <div class="filters">
-            <input id="workerSearch" oninput="renderWorkers()" placeholder="بحث باسم العامل أو المشرف أو المشروع">
-            <select id="workerFilterSupervisor" onchange="renderWorkers()"></select>
-            <select id="workerFilterProject" onchange="renderWorkers()"></select>
-            <select id="workerFilterStatus" onchange="renderWorkers()"><option value="">كل الحالات</option><option value="active">نشط</option><option value="inactive">موقوف</option></select>
-            <select id="workerFilterType" onchange="renderWorkers()"><option value="">كل الأنواع</option><option value="primary">أساسي</option><option value="support">بديل / مساند</option></select>
-          </div>
-          <div class="table-wrap"><table><thead><tr><th>العامل</th><th>المشرف</th><th>المشروع</th><th>النوع</th><th>الجوال</th><th>الراتب</th><th>الحالة</th><th>ملاحظات</th><th>واتساب</th><th>إجراء</th></tr></thead><tbody id="workersBody"></tbody></table></div>
-        </div>
-      </div>
-    </section>
-
-
-
-    <section id="distribution" class="page hidden">
-      <div class="card section-head">
-        <div>
-          <h2>التوزيع الشهري</h2>
-          <p>ربط المشرف + المشروع + العمال حسب الشهر. هذا القسم يقرأ البيانات من السيرفر بشكل منظم وبدون ضغط.</p>
-        </div>
-        <div class="actions">
-          <button class="light" type="button" onclick="tasneefDistributionV404&&tasneefDistributionV404.reload(true)">تحديث من السيرفر</button>
-          <button type="button" onclick="tasneefDistributionV404&&tasneefDistributionV404.copyPreviousMonth()">نسخ الشهر السابق</button>
-        </div>
-      </div>
-      <div id="td404Msg" class="msg hidden"></div>
-      <div class="grid two">
-        <div class="card">
-          <h2>إضافة توزيع مشروع</h2>
-          <div class="split">
-            <div><label>الشهر</label><input type="month" id="td404Month"></div>
-            <div><label>الحالة</label><select id="td404Status"><option value="active">نشط</option><option value="inactive">موقوف</option></select></div>
-          </div>
-          <label>المشرف</label><select id="td404Supervisor"></select>
-          <label>المشروع</label><select id="td404Project"></select>
-          <label>بحث عن عامل</label><input id="td404WorkerSearch" placeholder="ابحث باسم العامل أو الكود" oninput="tasneefDistributionV404&&tasneefDistributionV404.renderWorkers()">
-          <div class="td404-worker-box" id="td404WorkersBox"></div>
-          <label>العمال المختارون</label>
-          <div class="td404-selected" id="td404SelectedWorkers">لا يوجد عمال مختارون</div>
-          <label>ملاحظات</label><textarea id="td404Notes" placeholder="اختياري"></textarea>
-          <div class="actions"><button type="button" onclick="tasneefDistributionV404&&tasneefDistributionV404.saveProjectDistribution()">حفظ توزيع المشروع</button><button class="light" type="button" onclick="tasneefDistributionV404&&tasneefDistributionV404.clearSelection()">مسح الاختيار</button></div>
-        </div>
-        <div class="card">
-          <div class="table-head"><h2>توزيع الشهر</h2><button class="light" type="button" onclick="tasneefDistributionV404&&tasneefDistributionV404.print()">طباعة التوزيع</button></div>
-          <div class="filters"><input id="td404Search" placeholder="بحث في التوزيع" oninput="tasneefDistributionV404&&tasneefDistributionV404.renderDistribution()"><select id="td404FilterSupervisor" onchange="tasneefDistributionV404&&tasneefDistributionV404.renderDistribution()"><option value="">كل المشرفين</option></select><select id="td404FilterProject" onchange="tasneefDistributionV404&&tasneefDistributionV404.renderDistribution()"><option value="">كل المشاريع</option></select></div>
-          <div id="td404DistributionBox" class="td404-distribution-box"></div>
-        </div>
-      </div>
-    </section>
-
-    <section id="attendance" class="page hidden">
-      <div class="grid two">
-        <div class="card">
-          <h2 id="attendanceFormTitle">تسجيل حضور / غياب</h2>
-          <input type="hidden" id="attendanceId">
-          <label>التاريخ</label><input type="date" id="attendanceDate">
-          <label>المشرف</label><select id="attendanceSupervisor" onchange="renderAttendanceWorkersQuick()"></select>
-          <input type="hidden" id="attendanceProject" value="">
-          <label>العامل</label><select id="attendanceWorker"></select>
-          <label>الحالة</label><select id="attendanceStatus"><option value="present">حاضر</option><option value="absent">غائب</option></select>
-          <label>ملاحظات</label><textarea id="attendanceNotes"></textarea>
-          <div class="actions"><button onclick="saveAttendance()">حفظ</button><button class="light" onclick="clearAttendanceForm()">جديد</button></div>
-          <div class="quick-list" id="attendanceQuick"></div>
-        </div>
-        <div class="card">
-          <h2>سجلات الحضور</h2>
-          <div class="filters"><input type="date" id="attendanceFilterDate" onchange="renderAttendance()"><select id="attendanceFilterSupervisor" onchange="renderAttendance()"></select><input id="attendanceSearch" oninput="renderAttendance()" placeholder="بحث"></div>
-          <div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>العامل</th><th>المشرف</th><th>الحالة</th><th>ملاحظات</th><th>إجراء</th></tr></thead><tbody id="attendanceBody"></tbody></table></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>جدول الحضور والغياب الشهري</h2>
-        <div class="filters">
-          <div><label>الشهر</label><input type="month" id="attendanceMatrixMonth" onchange="renderAttendanceMonthly()"></div>
-          <div><label>المشرف</label><select id="attendanceMatrixSupervisor" onchange="renderAttendanceMonthly()"></select></div>
-          <input type="hidden" id="attendanceMatrixProject" value="">
-          <div><label>بحث العامل</label><input id="attendanceMatrixSearch" oninput="renderAttendanceMonthly()" placeholder="اسم العامل"></div>
-        </div>
-        <div id="attendanceMatrixSummary" class="kpis small"></div>
-        <div class="actions"><button class="light" onclick="exportAttendanceMatrixCSV()">تصدير جدول الحضور CSV</button></div>
-        <div class="table-wrap attendance-matrix-wrap"><table class="attendance-matrix"><thead id="attendanceMatrixHead"></thead><tbody id="attendanceMatrixBody"></tbody></table></div>
-        <div class="footer-note">الرموز: <span class="badge green">حاضر</span> <span class="badge red">غائب</span> <span class="badge">لم يسجل</span></div>
-      </div>
-    </section>
-
-    <section id="monthly" class="page hidden">
-  <div class="monthly-clean-v401" id="monthlyCleanV403">
-    <div class="mc401-hero">
-      <div>
-        <h1>الأوقات الشهرية - نسخة نظيفة V403</h1>
-        <p>تم إعادة بناء القسم من الصفر. القراءة من بيانات شهر 6 فقط، أسماء المشرفين والعمال من ملف الموظفين، والمعادلة من مدة الأوقات الشهرية.</p>
-      </div>
-      <span class="mc401-badge">V406</span>
-    </div>
-
-    <div class="card mc401-toolbar">
-      <div>
-        <label>الشهر</label>
-        <input type="month" id="mc401Month" value="2026-06">
-      </div>
-      <div>
-        <label>المشرف</label>
-        <select id="mc401Supervisor"><option value="">كل المشرفين</option></select>
-      </div>
-      <div>
-        <label>نوع المشروع</label>
-        <select id="mc401Type"><option value="">كل الأنواع</option><option value="daily">زيارة يومية</option><option value="full">دوام كامل</option></select>
-      </div>
-      <button type="button" id="mc401Show">عرض الشهر</button>
-      <button type="button" class="light" id="mc401Print">طباعة التقرير</button>
-      <button type="button" class="light" id="mc401Export">تصدير CSV</button>
-    </div>
-
-    <div id="mc401Message" class="msg">جاهز لعرض بيانات شهر 2026-06.</div>
-    <div id="mc401Summary" class="mc401-summary"></div>
-
-    <div class="card mc401-section">
-      <div class="mc401-title"><h2>مشاريع الزيارة اليومية</h2><small>مشاريع الزيارة اليومية تظهر في مربع واحد لكل مشرف، وداخل المربع كل مشاريعه مع الوقت والنسبة.</small></div>
-      <div id="mc401Daily"></div>
-    </div>
-
-    <div class="card mc401-section">
-      <div class="mc401-title"><h2>مشاريع الدوام الكامل</h2><small>كل مشروع دوام كامل مربع مستقل وحسابه لحاله حسب المدة المستغرقة.</small></div>
-      <div id="mc401Full" class="mc401-grid"></div>
-    </div>
-
-    <div class="card mc401-section">
-      <div class="mc401-title"><h2>جدول التفاصيل</h2><small>نفس البيانات التي تظهر في المربعات.</small></div>
-      <div class="table-wrap"><table><thead><tr><th>الشهر</th><th>المشرف</th><th>المشروع</th><th>النوع</th><th>العمال</th><th>الدقائق</th><th>المدة</th><th>النسبة</th><th>المعادلة</th></tr></thead><tbody id="mc401Body"></tbody></table></div>
-    </div>
-  </div>
+<aside class="side">
+<div class="brand"><span>ت</span><div><b>شركة تصنيف</b><small>إدارة المرافق</small></div></div>
+<button class="nav active" onclick="showPage('dashboard',this)">لوحة التحكم</button>
+<button class="nav" onclick="showPage('daily',this)">التسجيلات اليومية</button>
+<button class="nav" onclick="showPage('users',this)">إدارة المستخدمين</button>
+<button class="nav" onclick="showPage('projects',this)">المشاريع</button>
+<button class="nav" data-page="distribution" onclick="showPage('distribution',this); setTimeout(function(){window.tasneefDistributionV404&amp;&amp;tasneefDistributionV404.init&amp;&amp;tasneefDistributionV404.init();},120);">التوزيع</button>
+<button class="nav" onclick="showPage('contracts',this)">العقود والخدمات</button>
+<button class="nav" onclick="showPage('workers',this)">العمال</button>
+<button class="nav" onclick="showPage('attendance',this)">الحضور والغياب</button>
+<button class="nav" onclick="showPage('monthly',this)">الأوقات الشهرية</button>
+<button class="nav" onclick="showPage('tickets',this)">تذاكر</button>
+<button class="nav" onclick="showPage('orders',this)">الأوردرات</button>
+<button class="nav" data-page="inventoryAudit" onclick="showPage('inventoryAudit',this); setTimeout(function(){ window.tasneefInventoryAuditV10059 &amp;&amp; tasneefInventoryAuditV10059.load &amp;&amp; tasneefInventoryAuditV10059.load(); },80);">الجرد</button>
+<button class="nav" onclick="showPage('alerts',this)">التنبيهات</button>
+<button class="nav" onclick="showPage('assistant',this)">مساعد تصنيف</button>
+<button class="nav" onclick="showPage('export',this)">التصدير والاستيراد</button>
+<button class="nav" data-page="adminTasks" data-section="adminTasks" id="at10124StaticNav" onclick="if(window.tasneefAdminTasksV10121&amp;&amp;window.tasneefAdminTasksV10121.openPage){window.tasneefAdminTasksV10121.openPage();}else if(window.showPage){showPage('adminTasks',this);} return false;">مهام إدارية</button>
+<button class="nav danger" onclick="logout()">تسجيل خروج</button>
+</aside>
+<main class="content">
+<header class="hero">
+<div class="hero-brand-v155">
+<div class="hero-logo-card-v155"><img alt="شركة تصنيف لإدارة المرافق" src="tasneef_logo_print.png"/></div>
+<div class="hero-title-v155"><h1>لوحة تشغيل يومية احترافية</h1><p>إدارة المستخدمين، المشاريع، العمال، الحضور، التسجيلات اليومية والتقارير.</p><span class="hero-app-name-v155">شركة تصنيف لإدارة المرافق</span></div>
+</div>
+<div class="hero-action-v155"><span class="status-pill-v155">النظام محدث</span><button onclick="refreshAll()">تحديث البيانات</button></div>
+</header>
+<div class="msg hidden" id="globalMsg"></div>
+<section class="page" id="dashboard">
+<div class="kpis">
+<div class="kpi"><small>المستخدمون</small><b id="kpiUsers">0</b></div>
+<div class="kpi"><small>المشاريع</small><b id="kpiProjects">0</b></div>
+<div class="kpi"><small>العمال</small><b id="kpiWorkers">0</b></div>
+<div class="kpi"><small>تسجيلات اليوم</small><b id="kpiTodayLogs">0</b></div>
+</div>
+<div class="card"><h2>ملخص اليوم</h2><div class="summary-grid" id="todaySummary"></div></div>
+<div class="card"><h2>تنبيهات العقود</h2><div class="alerts" id="contractDashboardAlerts"></div></div>
 </section>
-<section id="tickets" class="page hidden">
-      <div class="grid two">
-        <div class="card">
-          <h2 id="ticketFormTitle">إضافة تذكرة</h2>
-          <input type="hidden" id="ticketId">
-          <label>المشروع</label><select id="ticketProject"></select>
-          <label>المشرف</label><select id="ticketSupervisor"></select>
-          <label>العنوان</label><select id="ticketTitle"><option value="">اختر نوع المشكلة</option><option value="صيانة">صيانة</option><option value="سباكة">سباكة</option><option value="تعطير">تعطير</option><option value="تشجير">تشجير</option><option value="كهرباء">كهرباء</option><option value="نظافة">نظافة</option><option value="دفاع مدني">دفاع مدني</option><option value="مصاعد">مصاعد</option><option value="مشكلة نظافة">مشكلة نظافة</option><option value="صهاريج">صهاريج</option></select>
-          <label>الأولوية</label>
-          <select id="ticketPriority"><option value="normal">عادي</option><option value="high">مهم</option><option value="urgent">عاجل</option><option value="low">منخفض</option></select>
-          <label>الحالة</label>
-          <select id="ticketStatus" onchange="toggleTicketClosureBox()"><option value="open">مفتوحة</option><option value="processing">تحت المعالجة</option><option value="closed">مغلقة</option></select>
-          <label>الوصف</label><textarea id="ticketDescription" placeholder="اكتب وصف التذكرة بشكل واضح"></textarea>
-          <div id="ticketClosureBox" class="closure-box hidden">
-            <label>أغلق بواسطة / الفني أو المشرف</label>
-            <input id="ticketClosedByName" list="ticketTechniciansList" placeholder="اختر أو اكتب اسم من أغلق التذكرة">
-            <datalist id="ticketTechniciansList">
-              <option value="مازن الخطيب"><option value="جمال"><option value="شريف"><option value="أسعد"><option value="حسين">
-            </datalist>
-            <label>كيف تم الإغلاق؟</label>
-            <textarea id="ticketClosureNote" placeholder="اكتب طريقة الحل أو الإجراء المنفذ"></textarea>
-            <div class="footer-note">لن يتم إغلاق التذكرة إلا بعد كتابة طريقة الإغلاق واسم من أغلقه.</div>
-          </div>
-          <div class="actions"><button onclick="saveTicket()">حفظ التذكرة</button><button class="light" onclick="clearTicketForm()">جديد</button></div>
-        </div>
-        <div class="card">
-          <h2>تذاكر</h2>
-          <div class="filters">
-            <select id="ticketFilterStatus" onchange="renderTickets()"><option value="">كل الحالات</option><option value="open">مفتوحة</option><option value="processing">تحت المعالجة</option><option value="closed">مغلقة</option></select><select id="ticketSortOrder" onchange="renderTickets()"><option value="newest">الأحدث أولاً</option><option value="oldest">الأقدم أولاً</option></select>
-            <input id="ticketSearch" oninput="renderTickets()" placeholder="بحث برقم التذكرة، المشروع، العنوان أو الوصف">
-          </div>
-          <div id="ticketsSmartSummary" class="smart-ticket-summary"></div><div id="ticketsBody" class="smart-ticket-grid"></div>
-        </div>
-      </div>
-    </section>
-
-
-
-
-
-    
-<section id="orders" class="page hidden">
-      <div class="card section-head">
-        <div>
-          <h2>قسم الأوردرات</h2>
-          <p>إدارة أوردرات الصيانة الخارجية بنفس آلية ملف الإكسل، مع رقم نظام تلقائي ورقم مستقل للأوردر في القروب.</p>
-        </div>
-        <div class="actions orders-section-actions-v10408">
-          <button onclick="clearOrderFormV233()">+ أوردر جديد</button>
-          <button class="light" onclick="tasneefOrders10400.exportExcel()">تصدير Excel</button>
-          <button class="light" onclick="tasneefOrders10400.openQuoteBuilder()">عروض الأسعار</button>
-          <button class="light" onclick="tasneefOrders10400.printFiltered()">طباعة حسب الفلتر</button>
-        </div>
-      </div>
-
-      <div class="kpis orders-kpis-v233">
-        <div class="kpi"><small>إجمالي الأوردرات</small><b id="ordersTotalKpiV233">0</b></div>
-        <div class="kpi"><small>تم التنفيذ</small><b id="ordersDoneKpiV233">0</b></div>
-        <div class="kpi"><small>آجل / غير مسدد</small><b id="ordersDueKpiV233">0</b></div>
-        <div class="kpi"><small>صافي الربح</small><b id="ordersProfitKpiV233">0</b></div>
-      </div>
-
-      <div class="card orders-summary-v233">
-        <h2>ملخص مالي وتنفيذي</h2>
-        <div id="ordersSummaryV233" class="summary-grid"></div>
-      </div>
-
-      <div class="grid two orders-layout-v233">
-        <div class="card orders-form-card-v233">
-          <h2 id="orderFormTitleV233">إضافة أوردر</h2>
-          <input type="hidden" id="orderEditIndexV233">
-          <div class="split"><div><label>رقم الطلب / النظام</label><input id="orderNoV233" readonly placeholder="تلقائي عند الحفظ"></div><div><label>رقم الطلب بالجروب</label><input id="orderGroupNoV233"></div></div>
-          <div id="orderFormFieldsV233" class="orders-form-grid-v233"></div>
-          <div class="orders-receipt-base-v10138" id="ordersReceiptBoxV10138">
-            <label>الإيصال</label>
-            <div class="orders-receipt-row-v10138">
-              <input id="orderReceiptFileV233" type="file" accept="image/*,application/pdf">
-              <button type="button" class="light" id="orderReceiptViewV233">عرض الإيصال</button>
-            </div>
-            <small id="orderReceiptNameV233" class="orders-receipt-name-v10138">اختياري</small>
-          </div>
-          <div class="actions">
-            <button onclick="saveOrderV233()">حفظ الأوردر</button>
-            <button class="light" onclick="clearOrderFormV233()">جديد</button>
-            <button class="danger" onclick="deleteCurrentOrderV233()">حذف المحدد</button>
-          </div>
-          <div class="footer-note">رقم النظام يتم توليده تلقائيًا ولا يتكرر. رقم القروب يكتب يدويًا من قروب الأوردرات.</div>
-        </div>
-
-        <div class="card orders-list-card-v233">
-          <div class="table-head"><h2>سجل الأوردرات من الإكسل</h2><button class="light" onclick="renderOrdersV233()">تحديث</button></div>
-          <div class="filters orders-filters-v233">
-            <input id="orderSearchV233" oninput="renderOrdersV233()" placeholder="بحث برقم النظام، رقم القروب، المشروع، العميل، الجوال، التفاصيل">
-            <select id="orderProjectFilterV233" onchange="renderOrdersV233()"><option value="">كل المشاريع</option></select>
-            <select id="orderExecutorFilterV233" onchange="renderOrdersV233()"><option value="">كل المنفذين</option></select>
-            <select id="orderSenderFilterV233" onchange="renderOrdersV233()"><option value="">كل مرسلي الطلب</option></select>
-            <select id="orderStatusFilterV233" onchange="renderOrdersV233()"><option value="">كل حالات التنفيذ</option></select>
-            <select id="orderPaymentFilterV233" onchange="renderOrdersV233()"><option value="">كل حالات السداد</option></select>
-            <select id="orderBillingFilterV233" onchange="renderOrdersV233()"><option value="">كل حالات الفوترة</option></select>
-            <input id="orderFromDateV233" type="date" onchange="renderOrdersV233()" title="من تاريخ الطلب">
-            <input id="orderToDateV233" type="date" onchange="renderOrdersV233()" title="إلى تاريخ الطلب">
-            <button class="light" onclick="resetOrdersFiltersV233()">إعادة تعيين</button>
-          </div>
-          <div id="ordersCardsV360" class="orders-cards-v360"></div>
-          <div id="ordersPagerV360" class="orders-pager-v360"></div>
-        </div>
-      </div>
-    </section>
-
-    <section id="inventoryAudit" class="page hidden inventory-audit-page-v10046">
-      <div class="card section-head audit-head-v10046">
-        <div>
-          <h2>قسم الجرد</h2>
-          <p>جرد مستقل مرتبط بالمالية والمخزون. عند فتح عملية جرد يتم قفل المالية والمخزون حتى إغلاق العملية.</p>
-        </div>
-        <div class="actions">
-          <button onclick="tasneefInventoryAuditV10059.newAudit()">+ عملية جرد جديدة</button>
-          <button class="light" onclick="tasneefInventoryAuditV10059.load()">تحديث</button>
-        </div>
-      </div>
-      <div id="auditLockMsgV10054" class="msg hidden"></div>
-      <div class="card">
-        <div class="table-head">
-          <h2>عمليات الجرد</h2>
-          <div class="row-actions">
-            <button class="light" onclick="tasneefInventoryAuditV10059.load()">تحديث</button>
-            <button class="light" onclick="tasneefInventoryAuditV10059.print()">طباعة</button>
-            <button class="light" onclick="tasneefInventoryAuditV10059.exportCsv()">تصدير CSV</button>
-          </div>
-        </div>
-        <div id="auditSessionsV10054" class="quick-list"></div>
-      </div>
-      <div class="card">
-        <div class="table-head">
-          <h2 id="auditTitleV10054">تفاصيل الجرد</h2>
-          <div class="row-actions"><button class="light" onclick="tasneefInventoryAuditV10059.closeAudit(false)">إغلاق بدون تعديل المخزون</button></div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>المنتج</th><th>كود المنتج</th><th>كود الموزع</th><th>الوحدة</th><th>كمية النظام</th><th>الكمية الفعلية</th><th>الفرق</th><th>الحالة</th><th>ملاحظات</th></tr></thead>
-            <tbody id="auditItemsBodyV10054"></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <section id="alerts" class="page hidden"><div class="card"><h2>التنبيهات وأخطاء التوزيع</h2><div id="alertsList" class="alerts"></div></div></section>
-
-
-    <section id="assistant" class="page hidden">
-      <div class="card tasneef-assistant-card">
-        <h2>مساعد تصنيف</h2>
-        <p style="color:var(--muted);line-height:1.8;margin-top:-6px">مساعد داخلي مجاني للتقارير والرسائل والتحليل السريع. يعمل بالقوالب وبيانات التطبيق بدون API.</p>
-        <div class="actions">
-          <button class="light" onclick="assistantQuick('اكتب تقرير مكافحة حشرات لمشروع صفاء 50')">تقرير مكافحة حشرات</button>
-          <button class="light" onclick="assistantQuick('اكتب تقرير تنظيف خزانات لمشروع صفاء 65')">تقرير خزانات</button>
-          <button class="light" onclick="assistantQuick('اكتب رسالة واتساب لرئيس الجمعية عن غسيل الخزانات غداً الساعة 8 صباحاً')">رسالة واتساب</button>
-          <button class="light" onclick="assistantQuick('ما السجلات المفتوحة اليوم؟')">السجلات المفتوحة</button>
-          <button class="light" onclick="assistantQuick('ما المشاريع الناقصة وقت هذا الشهر؟')">ناقص وقت</button>
-        </div>
-        <div id="assistantChat" class="assistant-chat"></div>
-        <div class="split" style="align-items:end;margin-top:12px">
-          <div>
-            <label>اكتب طلبك</label>
-            <textarea id="assistantInput" placeholder="مثال: اكتب تقرير تنظيف بيسمنت لمشروع اتحاد العاصمة"></textarea>
-          </div>
-          <div class="actions" style="margin:0">
-            <button onclick="assistantSend()">إرسال</button>
-            <button class="light" onclick="assistantCopyLast()">نسخ آخر رد</button>
-            <button class="light" onclick="assistantWhatsappLast()">واتساب</button>
-            <button class="light" onclick="assistantPrintLast()">طباعة</button>
-            <button class="danger" onclick="assistantClear()">مسح</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="export" class="page hidden">
-      <div class="export-smart-v222">
-        <div class="export-hero-v222">
-          <div>
-            <span class="export-kicker-v222">مركز ذكي</span>
-            <h2>التصدير والاستيراد</h2>
-            <p>ملف اجتماع Excel واحد، منظم على شكل تبويبات واضحة وجاهز للعرض على الإدارة، مع نموذج استيراد منظم للبيانات.</p>
-          </div>
-          <div class="export-hero-badge-v222">V224</div>
-        </div>
-
-        <div class="export-nav-v223">
-          <button class="active" onclick="showExportSlideV223(0,this)">01 الفلتر</button>
-          <button onclick="showExportSlideV223(1,this)">02 ملف الاجتماع</button>
-          <button onclick="showExportSlideV223(2,this)">03 نموذج الاستيراد</button>
-        </div>
-
-        <div class="export-slides-v222">
-          <article class="export-slide-v222 active">
-            <div class="slide-no-v222">01</div>
-            <h3>فلتر ملف الاجتماع</h3>
-            <p>اختر الشهر أو المشرف أو المشروع قبل التصدير. إذا تركت الفلاتر فارغة يتم تصدير البيانات حسب الشهر الحالي.</p>
-            <div class="export-filter-grid-v222">
-              <div><label>الشهر</label><input type="month" id="meetingExportMonth"></div>
-              <div><label>المشرف</label><select id="meetingExportSupervisor"></select></div>
-              <div><label>المشروع</label><select id="meetingExportProject"></select></div>
-            </div>
-          </article>
-
-          <article class="export-slide-v222">
-            <div class="slide-no-v222">02</div>
-            <h3>تصدير ملف اجتماع شامل</h3>
-            <p>ينزل ملف Excel واحد يحتوي على الملخص التنفيذي، المشاريع، المشرفين، العمال، السجلات اليومية، الحضور والغياب، الأوقات الشهرية، تذاكر والتنبيهات.</p>
-            <div class="actions export-actions-v222">
-              <button onclick="exportMeetingExcelV229(this)">تنزيل ملف الاجتماع Excel</button>
-              <button class="light" onclick="previewMeetingExportV223()">معاينة قبل التنزيل</button>
-            </div>
-          </article>
-
-          <article class="export-slide-v222 import-slide-v222">
-            <div class="slide-no-v222">03</div>
-            <h3>نموذج استيراد شامل</h3>
-            <p>ملف Excel واحد فارغ بتبويبات منظمة لتجهيز بيانات المشاريع، المشرفين، العمال، المستخدمين، تذاكر، السجلات اليومية.</p>
-            <div class="actions export-actions-v222">
-              <button class="light" onclick="downloadImportTemplateV223()">تنزيل نموذج الاستيراد</button>
-            </div>
-            <div class="mini-note-v222">الاستيراد الفعلي لا يعتمد إلا بعد المعاينة وفحص الأخطاء في مرحلة لاحقة.</div>
-          </article>
-        </div>
-
-        <div id="meetingExportPreview" class="export-preview-v222"></div>
-      </div>
-
-      <div class="card export-quick-v222">
-        <h3>تصدير CSV سريع</h3>
-        <p class="muted">للاستخدام السريع فقط. ملف الاجتماع Excel هو الأفضل للعرض الرسمي.</p>
-        <div class="actions"><button onclick="exportTable('app_users')">المستخدمين</button><button onclick="exportTable('projects')">المشاريع</button><button onclick="exportTable('workers')">العمال</button><button onclick="exportTable('attendance')">الحضور</button><button onclick="exportTable('time_logs')">التسجيلات اليومية</button><button onclick="exportTable('tickets')">تذاكر</button></div>
-      </div>
-    </section>
-  </main>
+<section class="page hidden" id="daily">
+<div class="grid two">
+<div class="card">
+<h2 id="logFormTitle">تسجيل دخول / خروج</h2>
+<input id="logId" type="hidden"/>
+<label>التاريخ</label><input id="logDate" type="date"/>
+<label>المشرف</label><select id="logSupervisor"></select>
+<label>المشروع</label><select id="logProject" onchange="onLogProjectChange()"></select>
+<label>نوع الزيارة</label><select id="logVisitType"><option value="surface">نظافة سطحية</option><option value="deep">نظافة عميقة</option></select>
+<div class="split"><div><label>وقت الدخول</label><input id="logIn" type="time"/></div><div><label>وقت الخروج</label><input id="logOut" type="time"/></div></div>
+<label>وقت الانتقال / الضائع بالدقائق</label><input id="logTravel" min="0" type="number" value="0"/>
+<label>ملاحظات</label><textarea id="logNotes"></textarea>
+<div class="actions"><button onclick="setNow('logIn')">الدخول الآن</button><button onclick="setNow('logOut')">الخروج الآن</button><button onclick="saveTimeLog()">حفظ</button><button class="light" onclick="clearLogForm()">جديد</button></div>
+</div>
+<div class="card">
+<h2>التسجيلات اليومية</h2>
+<div class="filters"><input id="dailyDate" onchange="renderTimeLogs()" type="date"/><select id="dailySupervisor" onchange="renderTimeLogs()"></select><select id="dailyProject" onchange="renderTimeLogs()"></select><input id="dailySearch" oninput="renderTimeLogs()" placeholder="بحث"/><button class="light" onclick="exportDailyManagerPDF()" type="button">طباعة التقرير / PDF</button><button class="light" onclick="sendDailyManagerWhatsapp()" type="button">إرسال واتساب</button></div>
+<div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المشرف</th><th>المشروع</th><th>نوع الزيارة</th><th>الدخول</th><th>الخروج</th><th>الوقت المطلوب</th><th>المدة الفعلية</th><th>الفرق</th><th>حالة الوقت</th><th>انتقال</th><th>ملاحظات</th><th>واتساب</th><th>إجراء</th></tr></thead><tbody id="logsBody"></tbody></table></div>
+</div>
+</div>
+</section>
+<section class="page hidden" id="users">
+<div class="grid two"><div class="card"><h2 id="userFormTitle">إضافة مستخدم</h2><input id="userId" type="hidden"/><label>الاسم الكامل</label><input id="userFullName"/><label>اسم المستخدم</label><input id="userUsername"/><label>كلمة المرور</label><input id="userPassword"/><label>رقم المشرف</label><input id="userSupervisorPhone" placeholder="05xxxxxxxx أو 9665xxxxxxxx"/><label>الدور</label><select id="userRole"><option value="admin">مدير عام</option><option value="financial_manager">مدير مالي</option><option value="operations_manager">مدير تشغيلي</option><option value="warehouse_manager">مدير مخازن</option><option value="technician">فني</option><option value="supervisor">مشرف</option></select><label>الحالة</label><select id="userActive"><option value="true">نشط</option><option value="false">موقوف</option></select><div class="perm-box-v72" id="userPermissionsBoxV72"><label>الصلاحيات</label><div class="perm-grid-v72"><label class="perm-item-v72"><input data-perm="can_time_logs" id="perm_can_time_logs" type="checkbox"/> <span>تسجيل دخول / خروج</span></label><label class="perm-item-v72"><input data-perm="can_journey" id="perm_can_journey" type="checkbox"/> <span>رحلة التشغيل اليومية</span></label><label class="perm-item-v72"><input data-perm="can_attendance" id="perm_can_attendance" type="checkbox"/> <span>تسجيل الحضور</span></label><label class="perm-item-v72"><input data-perm="can_tickets" id="perm_can_tickets" type="checkbox"/> <span>تذاكر</span></label><label class="perm-item-v72"><input data-perm="can_reports" id="perm_can_reports" type="checkbox"/> <span>الملخص والتقارير</span></label><label class="perm-item-v72"><input data-perm="can_monthly" id="perm_can_monthly" type="checkbox"/> <span>الأوقات الشهرية</span></label><label class="perm-item-v72"><input data-perm="can_edit_time_logs" id="perm_can_edit_time_logs" type="checkbox"/> <span>تعديل السجلات اليومية</span></label><label class="perm-item-v72"><input data-perm="can_manage_users" id="perm_can_manage_users" type="checkbox"/> <span>إدارة المستخدمين</span></label><label class="perm-item-v72"><input data-perm="can_manage_workers" id="perm_can_manage_workers" type="checkbox"/> <span>إدارة العمال</span></label></div><div class="footer-note">تحدد هذه الصلاحيات ما يظهر للمستخدم داخل التطبيق. مدير عام يحصل على كل الصلاحيات افتراضيًا.</div></div><div class="actions"><button onclick="saveUser()">حفظ</button><button class="light" onclick="clearUserForm()">جديد</button></div></div><div class="card"><h2>المستخدمون</h2><div class="table-wrap"><table><thead><tr><th>الاسم</th><th>المستخدم</th><th>الدور</th><th>الحالة</th><th data-user-phone-col="1">رقم المشرف</th><th>إجراء</th></tr></thead><tbody id="usersBody"></tbody></table></div></div></div>
+</section>
+<section class="page hidden" id="projects">
+<div class="card section-head">
+<div><h2>إدارة المشاريع</h2><p>إضافة وتعديل المشاريع، تحديد الوقت المطلوب، وربط المشرف والعمال من داخل المشروع.</p></div>
+<button class="light" onclick="clearProjectForm()">مشروع جديد</button>
+</div>
+<div class="grid two">
+<div class="card">
+<h2 id="projectFormTitle">إضافة مشروع</h2>
+<input id="projectId" type="hidden"/>
+<label>اسم المشروع</label><input id="projectName" placeholder="مثال: تعمير 17"/>
+<label>الموقع</label><input id="projectLocation" placeholder="اختياري"/>
+<div class="split"><div><label>عدد العمائر</label><input id="projectBuildingsCount" min="0" type="number" value="0"/></div><div><label>عدد الشقق</label><input id="projectUnitsCount" min="0" type="number" value="0"/></div></div>
+<div class="split"><div><label>تاريخ بداية العقد</label><input id="projectContractStart" type="date"/></div><div><label>تاريخ نهاية العقد</label><input id="projectContractEnd" type="date"/></div></div>
+<label>المشرف المرتبط</label><select id="projectSupervisor"></select>
+<div class="split">
+<div><label>الوقت المطلوب يوميًا (بالدقائق)</label><input id="projectRequiredDaily" min="0" type="number" value="180"/></div>
+<div><label>وقت الجمعة (بالدقائق)</label><input id="projectFridayMinutes" min="0" type="number" value="90"/></div>
+</div>
+<div class="split">
+<div><label>نوع التشغيل</label><select id="projectOperationType"><option value="daily_visit">زيارة يومية</option><option value="full_time">دوام كامل</option><option value="as_needed">حسب الحاجة</option></select></div>
+<div><label>نوع الزيارة الافتراضي</label><select id="projectVisitDefault"><option value="surface">نظافة سطحية</option><option value="deep">نظافة عميقة</option></select></div>
+</div>
+<label>الحالة</label><select id="projectStatus"><option value="active">نشط</option><option value="inactive">متوقف</option></select>
+<label>ملاحظات</label><textarea id="projectNotes"></textarea>
+<div class="actions"><button id="projectSaveBtn" onclick="saveProject()">حفظ المشروع</button><button class="light" onclick="clearProjectForm()">إلغاء / جديد</button></div>
+</div>
+<div class="card">
+<div class="table-head"><h2>المشاريع</h2><button class="light" onclick="exportTable('projects')">تصدير CSV</button></div>
+<div class="filters"><input id="projectSearch" oninput="renderProjects()" placeholder="بحث باسم المشروع أو المشرف"/><select id="projectFilterSupervisor" onchange="renderProjects()"></select><select id="projectFilterStatus" onchange="renderProjects()"><option value="">كل الحالات</option><option value="active">نشط</option><option value="inactive">متوقف</option></select></div>
+<div class="table-wrap"><table><thead><tr><th>المشروع</th><th>المشرف</th><th>العمائر</th><th>الشقق</th><th>نهاية العقد</th><th>المتبقي</th><th>حالة العقد</th><th>الوقت اليومي</th><th>الحالة</th><th data-user-phone-col="1">رقم المشرف</th><th>إجراء</th></tr></thead><tbody id="projectsBody"></tbody></table></div>
+</div>
+</div>
+<div class="card hidden" id="projectManagerCard">
+<div class="table-head"><h2 id="projectManagerTitle">إدارة المشروع</h2><button class="light" onclick="closeProjectManager()">إغلاق</button></div>
+<input id="manageProjectId" type="hidden"/>
+<div class="grid two">
+<div>
+<h3>ربط المشرف</h3><label>المشرف المسؤول</label><select id="projectManageSupervisor"></select><div class="actions"><button onclick="saveProjectManagerSupervisor()">حفظ المشرف</button></div><hr/>
+<h3>إضافة عامل موجود للمشروع</h3><label>العامل</label><select id="manageWorkerSelect"></select><label>نوع العامل داخل المشروع</label><select id="manageWorkerType"><option value="primary">أساسي</option><option value="support">بديل / مساند</option></select><div class="actions"><button onclick="addExistingWorkerToProject()">ربط العامل</button></div><hr/>
+<h3>إضافة عامل جديد وربطه بالمشروع</h3><label>اسم العامل</label><input id="manageNewWorkerName"/><label>الجوال</label><input id="manageNewWorkerPhone"/><label>الراتب</label><input id="manageNewWorkerSalary" type="number" value="1500"/><label>نوع العامل</label><select id="manageNewWorkerType"><option value="primary">أساسي</option><option value="support">بديل / مساند</option></select><div class="actions"><button onclick="addWorkerInsideProject()">إضافة وربط</button></div>
+</div>
+<div><h3>العمال المرتبطون بالمشروع</h3><div class="table-wrap"><table><thead><tr><th>العامل</th><th>المشرف</th><th>النوع</th><th>الحالة</th><th data-user-phone-col="1">رقم المشرف</th><th>إجراء</th></tr></thead><tbody id="projectWorkersBody"></tbody></table></div></div>
+</div>
+</div>
+</section>
+<section class="page hidden" id="contracts">
+<div class="card section-head">
+<div><h2>العقود والخدمات السنوية</h2><p>متابعة تواريخ العقود، الأيام المتبقية، والتنبيه قبل شهر من نهاية العقد.</p></div>
+<button class="light" onclick="showPage('projects', document.querySelector(`[onclick*=projects]`))">تعديل بيانات مشروع</button>
+</div>
+<div class="kpis">
+<div class="kpi"><small>عقود نشطة</small><b id="contractsActiveCount">0</b></div>
+<div class="kpi"><small>قريبة الانتهاء</small><b id="contractsSoonCount">0</b></div>
+<div class="kpi"><small>منتهية</small><b id="contractsExpiredCount">0</b></div>
+<div class="kpi"><small>بيانات ناقصة</small><b id="contractsMissingCount">0</b></div>
+</div>
+<div class="card"><h2>العقود القريبة والمنتهية</h2><div class="alerts" id="contractsAlertsList"></div></div>
+<div class="card">
+<div class="table-head"><h2>كل العقود</h2><button class="light" onclick="exportTable('projects')">تصدير CSV</button></div>
+<div class="filters"><input id="contractSearch" oninput="renderContracts()" placeholder="بحث باسم المشروع"/><select id="contractFilterStatus" onchange="renderContracts()"><option value="">كل الحالات</option><option value="active">نشط</option><option value="soon">قريب الانتهاء</option><option value="expired">منتهي</option><option value="missing">بيانات ناقصة</option></select></div>
+<div class="table-wrap"><table><thead><tr><th>المشروع</th><th>العمائر</th><th>الشقق</th><th>بداية العقد</th><th>نهاية العقد</th><th>الأيام المتبقية</th><th>حالة العقد</th><th>إجراء</th></tr></thead><tbody id="contractsBody"></tbody></table></div>
+</div>
+<div class="card" id="servicesSubTab">
+<div class="table-head">
+<h2>الخدمات التعاقدية</h2>
+<div class="row-actions">
+<button class="light" onclick="openNewContractService()">إضافة خدمة</button>
+<button class="light" onclick="exportContractServicesCSV()">تصدير CSV</button>
+<button class="light" onclick="tasneefPrintContractsServicesV10097()">طباعة</button>
+</div>
+</div>
+<div class="kpis small">
+<div class="kpi"><small>إجمالي الخدمات</small><b id="servicesTotalCount">0</b></div>
+<div class="kpi"><small>مستحقة</small><b id="servicesDueCount">0</b></div>
+<div class="kpi"><small>قريبة</small><b id="servicesSoonCount">0</b></div>
+<div class="kpi"><small>متأخرة</small><b id="servicesLateCount">0</b></div>
+<div class="kpi"><small>منجزة</small><b id="servicesDoneCount">0</b></div>
+<div class="kpi"><small>مراجعة</small><b id="servicesReviewCount">0</b></div>
+</div>
+<div class="filters">
+<input id="serviceSearch" oninput="renderContractServices()" placeholder="بحث بالخدمة أو المشروع"/>
+<select id="serviceFilterProject" onchange="renderContractServices()"></select>
+<select id="serviceFilterSupervisor" onchange="renderContractServices()"></select>
+<select id="serviceFilterStatus" onchange="renderContractServices()"><option value="">كل الحالات</option><option value="due">مستحقة</option><option value="soon">قريبة</option><option value="late">متأخرة</option><option value="done">منجزة</option><option value="review">مراجعة</option></select>
+<select id="serviceFilterType" onchange="renderContractServices()"></select>
+<input id="serviceFilterDate" onchange="renderContractServices()" type="date"/>
+<button class="light" onclick="resetServiceFilters()">مسح الفلاتر</button>
+</div>
+<div class="table-wrap"><table><thead><tr><th>المشروع</th><th>المشرف</th><th>الخدمة</th><th>النوع</th><th>التكرار</th><th>عدد الزيارات</th><th>المنفذ</th><th>تم</th><th>المتبقي</th><th>آخر تنفيذ</th><th>الاستحقاق</th><th>الحالة</th><th>ملاحظات</th><th>إجراء</th></tr></thead><tbody id="contractServicesBody"></tbody></table></div>
+<div class="quick-list" id="supervisorServicesPreview"></div>
+<div class="quick-list" id="smartServicesList"></div>
+</div>
+</section>
+<section class="page hidden" id="workers">
+<div class="card section-head">
+<div>
+<h2>إدارة العمال</h2>
+<p>إضافة وتعديل وربط العمال بالمشرفين والمشاريع، مع تمييز العامل الأساسي والبديل.</p>
+</div>
+<button class="light" onclick="clearWorkerForm()">عامل جديد</button>
+</div>
+<div class="grid two">
+<div class="card">
+<h2 id="workerFormTitle">إضافة عامل</h2>
+<input id="workerId" type="hidden"/>
+<label>اسم العامل</label><input id="workerName" placeholder="مثال: ياسر"/>
+<label>الجوال</label><input id="workerPhone" placeholder="اختياري"/>
+<label>الراتب</label><input id="workerSalary" type="number" value="1500"/>
+<label>المشرف</label><select id="workerSupervisor" onchange="onWorkerSupervisorChange()"></select>
+<label>المشروع المرتبط</label><select id="workerProject"></select>
+<label>نوع العامل</label><select id="workerType"><option value="primary">أساسي</option><option value="support">بديل / مساند</option></select>
+<label>الحالة</label><select id="workerStatus"><option value="active">نشط</option><option value="inactive">موقوف</option></select>
+<label>ملاحظات</label><textarea id="workerNotes" placeholder="أي ملاحظة تخص العامل أو توزيعه"></textarea>
+<div class="actions">
+<button id="workerSaveBtn" onclick="saveWorker()">حفظ العامل</button>
+<button class="light hidden" id="workerCancelBtn" onclick="clearWorkerForm()">إلغاء التعديل</button>
+</div>
+</div>
+<div class="card">
+<div class="table-head">
+<h2>قائمة العمال</h2>
+<button class="light" onclick="exportTable('workers')">تصدير CSV</button>
+</div>
+<div class="filters">
+<input id="workerSearch" oninput="renderWorkers()" placeholder="بحث باسم العامل أو المشرف أو المشروع"/>
+<select id="workerFilterSupervisor" onchange="renderWorkers()"></select>
+<select id="workerFilterProject" onchange="renderWorkers()"></select>
+<select id="workerFilterStatus" onchange="renderWorkers()"><option value="">كل الحالات</option><option value="active">نشط</option><option value="inactive">موقوف</option></select>
+<select id="workerFilterType" onchange="renderWorkers()"><option value="">كل الأنواع</option><option value="primary">أساسي</option><option value="support">بديل / مساند</option></select>
+</div>
+<div class="table-wrap"><table><thead><tr><th>العامل</th><th>المشرف</th><th>المشروع</th><th>النوع</th><th>الجوال</th><th>الراتب</th><th>الحالة</th><th>ملاحظات</th><th>واتساب</th><th>إجراء</th></tr></thead><tbody id="workersBody"></tbody></table></div>
+</div>
+</div>
+</section>
+<section class="page hidden" id="distribution">
+<div class="card section-head">
+<div>
+<h2>التوزيع الشهري</h2>
+<p>ربط المشرف + المشروع + العمال حسب الشهر. هذا القسم يقرأ البيانات من السيرفر بشكل منظم وبدون ضغط.</p>
+</div>
+<div class="actions">
+<button class="light" onclick="tasneefDistributionV404&amp;&amp;tasneefDistributionV404.reload(true)" type="button">تحديث من السيرفر</button>
+<button onclick="tasneefDistributionV404&amp;&amp;tasneefDistributionV404.copyPreviousMonth()" type="button">نسخ الشهر السابق</button>
+</div>
+</div>
+<div class="msg hidden" id="td404Msg"></div>
+<div class="grid two">
+<div class="card">
+<h2>إضافة توزيع مشروع</h2>
+<div class="split">
+<div><label>الشهر</label><input id="td404Month" type="month"/></div>
+<div><label>الحالة</label><select id="td404Status"><option value="active">نشط</option><option value="inactive">موقوف</option></select></div>
+</div>
+<label>المشرف</label><select id="td404Supervisor"></select>
+<label>المشروع</label><select id="td404Project"></select>
+<label>بحث عن عامل</label><input id="td404WorkerSearch" oninput="tasneefDistributionV404&amp;&amp;tasneefDistributionV404.renderWorkers()" placeholder="ابحث باسم العامل أو الكود"/>
+<div class="td404-worker-box" id="td404WorkersBox"></div>
+<label>العمال المختارون</label>
+<div class="td404-selected" id="td404SelectedWorkers">لا يوجد عمال مختارون</div>
+<label>ملاحظات</label><textarea id="td404Notes" placeholder="اختياري"></textarea>
+<div class="actions"><button onclick="tasneefDistributionV404&amp;&amp;tasneefDistributionV404.saveProjectDistribution()" type="button">حفظ توزيع المشروع</button><button class="light" onclick="tasneefDistributionV404&amp;&amp;tasneefDistributionV404.clearSelection()" type="button">مسح الاختيار</button></div>
+</div>
+<div class="card">
+<div class="table-head"><h2>توزيع الشهر</h2><button class="light" onclick="tasneefDistributionV404&amp;&amp;tasneefDistributionV404.print()" type="button">طباعة التوزيع</button></div>
+<div class="filters"><input id="td404Search" oninput="tasneefDistributionV404&amp;&amp;tasneefDistributionV404.renderDistribution()" placeholder="بحث في التوزيع"/><select id="td404FilterSupervisor" onchange="tasneefDistributionV404&amp;&amp;tasneefDistributionV404.renderDistribution()"><option value="">كل المشرفين</option></select><select id="td404FilterProject" onchange="tasneefDistributionV404&amp;&amp;tasneefDistributionV404.renderDistribution()"><option value="">كل المشاريع</option></select></div>
+<div class="td404-distribution-box" id="td404DistributionBox"></div>
+</div>
+</div>
+</section>
+<section class="page hidden" id="attendance">
+<div class="grid two">
+<div class="card">
+<h2 id="attendanceFormTitle">تسجيل حضور / غياب</h2>
+<input id="attendanceId" type="hidden"/>
+<label>التاريخ</label><input id="attendanceDate" type="date"/>
+<label>المشرف</label><select id="attendanceSupervisor" onchange="renderAttendanceWorkersQuick()"></select>
+<input id="attendanceProject" type="hidden" value=""/>
+<label>العامل</label><select id="attendanceWorker"></select>
+<label>الحالة</label><select id="attendanceStatus"><option value="present">حاضر</option><option value="absent">غائب</option></select>
+<label>ملاحظات</label><textarea id="attendanceNotes"></textarea>
+<div class="actions"><button onclick="saveAttendance()">حفظ</button><button class="light" onclick="clearAttendanceForm()">جديد</button></div>
+<div class="quick-list" id="attendanceQuick"></div>
+</div>
+<div class="card">
+<h2>سجلات الحضور</h2>
+<div class="filters"><input id="attendanceFilterDate" onchange="renderAttendance()" type="date"/><select id="attendanceFilterSupervisor" onchange="renderAttendance()"></select><input id="attendanceSearch" oninput="renderAttendance()" placeholder="بحث"/></div>
+<div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>العامل</th><th>المشرف</th><th>الحالة</th><th>ملاحظات</th><th>إجراء</th></tr></thead><tbody id="attendanceBody"></tbody></table></div>
+</div>
+</div>
+<div class="card">
+<h2>جدول الحضور والغياب الشهري</h2>
+<div class="filters">
+<div><label>الشهر</label><input id="attendanceMatrixMonth" onchange="renderAttendanceMonthly()" type="month"/></div>
+<div><label>المشرف</label><select id="attendanceMatrixSupervisor" onchange="renderAttendanceMonthly()"></select></div>
+<input id="attendanceMatrixProject" type="hidden" value=""/>
+<div><label>بحث العامل</label><input id="attendanceMatrixSearch" oninput="renderAttendanceMonthly()" placeholder="اسم العامل"/></div>
+</div>
+<div class="kpis small" id="attendanceMatrixSummary"></div>
+<div class="actions"><button class="light" onclick="exportAttendanceMatrixCSV()">تصدير جدول الحضور CSV</button></div>
+<div class="table-wrap attendance-matrix-wrap"><table class="attendance-matrix"><thead id="attendanceMatrixHead"></thead><tbody id="attendanceMatrixBody"></tbody></table></div>
+<div class="footer-note">الرموز: <span class="badge green">حاضر</span> <span class="badge red">غائب</span> <span class="badge">لم يسجل</span></div>
+</div>
+</section>
+<section class="page hidden" id="monthly">
+<div class="monthly-clean-v401" id="monthlyCleanV403">
+<div class="mc401-hero">
+<div>
+<h1>الأوقات الشهرية - نسخة نظيفة V403</h1>
+<p>تم إعادة بناء القسم من الصفر. القراءة من بيانات شهر 6 فقط، أسماء المشرفين والعمال من ملف الموظفين، والمعادلة من مدة الأوقات الشهرية.</p>
+</div>
+<span class="mc401-badge">V406</span>
+</div>
+<div class="card mc401-toolbar">
+<div>
+<label>الشهر</label>
+<input id="mc401Month" type="month" value="2026-06"/>
+</div>
+<div>
+<label>المشرف</label>
+<select id="mc401Supervisor"><option value="">كل المشرفين</option></select>
+</div>
+<div>
+<label>نوع المشروع</label>
+<select id="mc401Type"><option value="">كل الأنواع</option><option value="daily">زيارة يومية</option><option value="full">دوام كامل</option></select>
+</div>
+<button id="mc401Show" type="button">عرض الشهر</button>
+<button class="light" id="mc401Print" type="button">طباعة التقرير</button>
+<button class="light" id="mc401Export" type="button">تصدير CSV</button>
+</div>
+<div class="msg" id="mc401Message">جاهز لعرض بيانات شهر 2026-06.</div>
+<div class="mc401-summary" id="mc401Summary"></div>
+<div class="card mc401-section">
+<div class="mc401-title"><h2>مشاريع الزيارة اليومية</h2><small>مشاريع الزيارة اليومية تظهر في مربع واحد لكل مشرف، وداخل المربع كل مشاريعه مع الوقت والنسبة.</small></div>
+<div id="mc401Daily"></div>
+</div>
+<div class="card mc401-section">
+<div class="mc401-title"><h2>مشاريع الدوام الكامل</h2><small>كل مشروع دوام كامل مربع مستقل وحسابه لحاله حسب المدة المستغرقة.</small></div>
+<div class="mc401-grid" id="mc401Full"></div>
+</div>
+<div class="card mc401-section">
+<div class="mc401-title"><h2>جدول التفاصيل</h2><small>نفس البيانات التي تظهر في المربعات.</small></div>
+<div class="table-wrap"><table><thead><tr><th>الشهر</th><th>المشرف</th><th>المشروع</th><th>النوع</th><th>العمال</th><th>الدقائق</th><th>المدة</th><th>النسبة</th><th>المعادلة</th></tr></thead><tbody id="mc401Body"></tbody></table></div>
+</div>
+</div>
+</section>
+<section class="page hidden" id="tickets">
+<div class="grid two">
+<div class="card">
+<h2 id="ticketFormTitle">إضافة تذكرة</h2>
+<input id="ticketId" type="hidden"/>
+<label>المشروع</label><select id="ticketProject"></select>
+<label>المشرف</label><select id="ticketSupervisor"></select>
+<label>العنوان</label><select id="ticketTitle"><option value="">اختر نوع المشكلة</option><option value="صيانة">صيانة</option><option value="سباكة">سباكة</option><option value="تعطير">تعطير</option><option value="تشجير">تشجير</option><option value="كهرباء">كهرباء</option><option value="نظافة">نظافة</option><option value="دفاع مدني">دفاع مدني</option><option value="مصاعد">مصاعد</option><option value="مشكلة نظافة">مشكلة نظافة</option><option value="صهاريج">صهاريج</option></select>
+<label>الأولوية</label>
+<select id="ticketPriority"><option value="normal">عادي</option><option value="high">مهم</option><option value="urgent">عاجل</option><option value="low">منخفض</option></select>
+<label>الحالة</label>
+<select id="ticketStatus" onchange="toggleTicketClosureBox()"><option value="open">مفتوحة</option><option value="processing">تحت المعالجة</option><option value="closed">مغلقة</option></select>
+<label>الوصف</label><textarea id="ticketDescription" placeholder="اكتب وصف التذكرة بشكل واضح"></textarea>
+<div class="closure-box hidden" id="ticketClosureBox">
+<label>أغلق بواسطة / الفني أو المشرف</label>
+<input id="ticketClosedByName" list="ticketTechniciansList" placeholder="اختر أو اكتب اسم من أغلق التذكرة"/>
+<datalist id="ticketTechniciansList">
+<option value="مازن الخطيب"><option value="جمال"><option value="شريف"><option value="أسعد"><option value="حسين">
+</option></option></option></option></option></datalist>
+<label>كيف تم الإغلاق؟</label>
+<textarea id="ticketClosureNote" placeholder="اكتب طريقة الحل أو الإجراء المنفذ"></textarea>
+<div class="footer-note">لن يتم إغلاق التذكرة إلا بعد كتابة طريقة الإغلاق واسم من أغلقه.</div>
+</div>
+<div class="actions"><button onclick="saveTicket()">حفظ التذكرة</button><button class="light" onclick="clearTicketForm()">جديد</button></div>
+</div>
+<div class="card">
+<h2>تذاكر</h2>
+<div class="filters">
+<select id="ticketFilterStatus" onchange="renderTickets()"><option value="">كل الحالات</option><option value="open">مفتوحة</option><option value="processing">تحت المعالجة</option><option value="closed">مغلقة</option></select><select id="ticketSortOrder" onchange="renderTickets()"><option value="newest">الأحدث أولاً</option><option value="oldest">الأقدم أولاً</option></select>
+<input id="ticketSearch" oninput="renderTickets()" placeholder="بحث برقم التذكرة، المشروع، العنوان أو الوصف"/>
+</div>
+<div class="smart-ticket-summary" id="ticketsSmartSummary"></div><div class="smart-ticket-grid" id="ticketsBody"></div>
+</div>
+</div>
+</section>
+<section class="page hidden" id="orders">
+<div class="card section-head">
+<div>
+<h2>قسم الأوردرات</h2>
+<p>إدارة أوردرات الصيانة الخارجية بنفس آلية ملف الإكسل، مع رقم نظام تلقائي ورقم مستقل للأوردر في القروب.</p>
+</div>
+<div class="actions orders-section-actions-v10408">
+<button onclick="clearOrderFormV233()">+ أوردر جديد</button>
+<button class="light" onclick="tasneefOrders10400.exportExcel()">تصدير Excel</button>
+<button class="light" onclick="tasneefOrders10400.openQuoteBuilder()">عروض الأسعار</button>
+<button class="light" onclick="tasneefOrders10400.printFiltered()">طباعة حسب الفلتر</button>
+</div>
+</div>
+<div class="kpis orders-kpis-v233">
+<div class="kpi"><small>إجمالي الأوردرات</small><b id="ordersTotalKpiV233">0</b></div>
+<div class="kpi"><small>تم التنفيذ</small><b id="ordersDoneKpiV233">0</b></div>
+<div class="kpi"><small>آجل / غير مسدد</small><b id="ordersDueKpiV233">0</b></div>
+<div class="kpi"><small>صافي الربح</small><b id="ordersProfitKpiV233">0</b></div>
+</div>
+<div class="card orders-summary-v233">
+<h2>ملخص مالي وتنفيذي</h2>
+<div class="summary-grid" id="ordersSummaryV233"></div>
+</div>
+<div class="grid two orders-layout-v233">
+<div class="card orders-form-card-v233">
+<h2 id="orderFormTitleV233">إضافة أوردر</h2>
+<input id="orderEditIndexV233" type="hidden"/>
+<div class="split"><div><label>رقم الطلب / النظام</label><input id="orderNoV233" placeholder="تلقائي عند الحفظ" readonly=""/></div><div><label>رقم الطلب بالجروب</label><input id="orderGroupNoV233"/></div></div>
+<div class="orders-form-grid-v233" id="orderFormFieldsV233"></div>
+<div class="orders-receipt-base-v10138" id="ordersReceiptBoxV10138">
+<label>الإيصال</label>
+<div class="orders-receipt-row-v10138">
+<input accept="image/*,application/pdf" id="orderReceiptFileV233" type="file"/>
+<button class="light" id="orderReceiptViewV233" type="button">عرض الإيصال</button>
+</div>
+<small class="orders-receipt-name-v10138" id="orderReceiptNameV233">اختياري</small>
+</div>
+<div class="actions">
+<button onclick="saveOrderV233()">حفظ الأوردر</button>
+<button class="light" onclick="clearOrderFormV233()">جديد</button>
+<button class="danger" onclick="deleteCurrentOrderV233()">حذف المحدد</button>
+</div>
+<div class="footer-note">رقم النظام يتم توليده تلقائيًا ولا يتكرر. رقم القروب يكتب يدويًا من قروب الأوردرات.</div>
+</div>
+<div class="card orders-list-card-v233">
+<div class="table-head"><h2>سجل الأوردرات من الإكسل</h2><button class="light" onclick="renderOrdersV233()">تحديث</button></div>
+<div class="filters orders-filters-v233">
+<input id="orderSearchV233" oninput="renderOrdersV233()" placeholder="بحث برقم النظام، رقم القروب، المشروع، العميل، الجوال، التفاصيل"/>
+<select id="orderProjectFilterV233" onchange="renderOrdersV233()"><option value="">كل المشاريع</option></select>
+<select id="orderExecutorFilterV233" onchange="renderOrdersV233()"><option value="">كل المنفذين</option></select>
+<select id="orderSenderFilterV233" onchange="renderOrdersV233()"><option value="">كل مرسلي الطلب</option></select>
+<select id="orderStatusFilterV233" onchange="renderOrdersV233()"><option value="">كل حالات التنفيذ</option></select>
+<select id="orderPaymentFilterV233" onchange="renderOrdersV233()"><option value="">كل حالات السداد</option></select>
+<select id="orderBillingFilterV233" onchange="renderOrdersV233()"><option value="">كل حالات الفوترة</option></select>
+<input id="orderFromDateV233" onchange="renderOrdersV233()" title="من تاريخ الطلب" type="date"/>
+<input id="orderToDateV233" onchange="renderOrdersV233()" title="إلى تاريخ الطلب" type="date"/>
+<button class="light" onclick="resetOrdersFiltersV233()">إعادة تعيين</button>
+</div>
+<div class="orders-cards-v360" id="ordersCardsV360"></div>
+<div class="orders-pager-v360" id="ordersPagerV360"></div>
+</div>
+</div>
+</section>
+<section class="page hidden inventory-audit-page-v10046" id="inventoryAudit">
+<div class="card section-head audit-head-v10046">
+<div>
+<h2>قسم الجرد</h2>
+<p>جرد مستقل مرتبط بالمالية والمخزون. عند فتح عملية جرد يتم قفل المالية والمخزون حتى إغلاق العملية.</p>
+</div>
+<div class="actions">
+<button onclick="tasneefInventoryAuditV10059.newAudit()">+ عملية جرد جديدة</button>
+<button class="light" onclick="tasneefInventoryAuditV10059.load()">تحديث</button>
+</div>
+</div>
+<div class="msg hidden" id="auditLockMsgV10054"></div>
+<div class="card">
+<div class="table-head">
+<h2>عمليات الجرد</h2>
+<div class="row-actions">
+<button class="light" onclick="tasneefInventoryAuditV10059.load()">تحديث</button>
+<button class="light" onclick="tasneefInventoryAuditV10059.print()">طباعة</button>
+<button class="light" onclick="tasneefInventoryAuditV10059.exportCsv()">تصدير CSV</button>
+</div>
+</div>
+<div class="quick-list" id="auditSessionsV10054"></div>
+</div>
+<div class="card">
+<div class="table-head">
+<h2 id="auditTitleV10054">تفاصيل الجرد</h2>
+<div class="row-actions"><button class="light" onclick="tasneefInventoryAuditV10059.closeAudit(false)">إغلاق بدون تعديل المخزون</button></div>
+</div>
+<div class="table-wrap">
+<table>
+<thead><tr><th>المنتج</th><th>كود المنتج</th><th>كود الموزع</th><th>الوحدة</th><th>كمية النظام</th><th>الكمية الفعلية</th><th>الفرق</th><th>الحالة</th><th>ملاحظات</th></tr></thead>
+<tbody id="auditItemsBodyV10054"></tbody>
+</table>
+</div>
+</div>
+</section>
+<section class="page hidden" id="alerts"><div class="card"><h2>التنبيهات وأخطاء التوزيع</h2><div class="alerts" id="alertsList"></div></div></section>
+<section class="page hidden" id="assistant">
+<div class="card tasneef-assistant-card">
+<h2>مساعد تصنيف</h2>
+<p style="color:var(--muted);line-height:1.8;margin-top:-6px">مساعد داخلي مجاني للتقارير والرسائل والتحليل السريع. يعمل بالقوالب وبيانات التطبيق بدون API.</p>
+<div class="actions">
+<button class="light" onclick="assistantQuick('اكتب تقرير مكافحة حشرات لمشروع صفاء 50')">تقرير مكافحة حشرات</button>
+<button class="light" onclick="assistantQuick('اكتب تقرير تنظيف خزانات لمشروع صفاء 65')">تقرير خزانات</button>
+<button class="light" onclick="assistantQuick('اكتب رسالة واتساب لرئيس الجمعية عن غسيل الخزانات غداً الساعة 8 صباحاً')">رسالة واتساب</button>
+<button class="light" onclick="assistantQuick('ما السجلات المفتوحة اليوم؟')">السجلات المفتوحة</button>
+<button class="light" onclick="assistantQuick('ما المشاريع الناقصة وقت هذا الشهر؟')">ناقص وقت</button>
+</div>
+<div class="assistant-chat" id="assistantChat"></div>
+<div class="split" style="align-items:end;margin-top:12px">
+<div>
+<label>اكتب طلبك</label>
+<textarea id="assistantInput" placeholder="مثال: اكتب تقرير تنظيف بيسمنت لمشروع اتحاد العاصمة"></textarea>
+</div>
+<div class="actions" style="margin:0">
+<button onclick="assistantSend()">إرسال</button>
+<button class="light" onclick="assistantCopyLast()">نسخ آخر رد</button>
+<button class="light" onclick="assistantWhatsappLast()">واتساب</button>
+<button class="light" onclick="assistantPrintLast()">طباعة</button>
+<button class="danger" onclick="assistantClear()">مسح</button>
+</div>
+</div>
+</div>
+</section>
+<section class="page hidden" id="export">
+<div class="export-smart-v222">
+<div class="export-hero-v222">
+<div>
+<span class="export-kicker-v222">مركز ذكي</span>
+<h2>التصدير والاستيراد</h2>
+<p>ملف اجتماع Excel واحد، منظم على شكل تبويبات واضحة وجاهز للعرض على الإدارة، مع نموذج استيراد منظم للبيانات.</p>
+</div>
+<div class="export-hero-badge-v222">V224</div>
+</div>
+<div class="export-nav-v223">
+<button class="active" onclick="showExportSlideV223(0,this)">01 الفلتر</button>
+<button onclick="showExportSlideV223(1,this)">02 ملف الاجتماع</button>
+<button onclick="showExportSlideV223(2,this)">03 نموذج الاستيراد</button>
+</div>
+<div class="export-slides-v222">
+<article class="export-slide-v222 active">
+<div class="slide-no-v222">01</div>
+<h3>فلتر ملف الاجتماع</h3>
+<p>اختر الشهر أو المشرف أو المشروع قبل التصدير. إذا تركت الفلاتر فارغة يتم تصدير البيانات حسب الشهر الحالي.</p>
+<div class="export-filter-grid-v222">
+<div><label>الشهر</label><input id="meetingExportMonth" type="month"/></div>
+<div><label>المشرف</label><select id="meetingExportSupervisor"></select></div>
+<div><label>المشروع</label><select id="meetingExportProject"></select></div>
+</div>
+</article>
+<article class="export-slide-v222">
+<div class="slide-no-v222">02</div>
+<h3>تصدير ملف اجتماع شامل</h3>
+<p>ينزل ملف Excel واحد يحتوي على الملخص التنفيذي، المشاريع، المشرفين، العمال، السجلات اليومية، الحضور والغياب، الأوقات الشهرية، تذاكر والتنبيهات.</p>
+<div class="actions export-actions-v222">
+<button onclick="exportMeetingExcelV229(this)">تنزيل ملف الاجتماع Excel</button>
+<button class="light" onclick="previewMeetingExportV223()">معاينة قبل التنزيل</button>
+</div>
+</article>
+<article class="export-slide-v222 import-slide-v222">
+<div class="slide-no-v222">03</div>
+<h3>نموذج استيراد شامل</h3>
+<p>ملف Excel واحد فارغ بتبويبات منظمة لتجهيز بيانات المشاريع، المشرفين، العمال، المستخدمين، تذاكر، السجلات اليومية.</p>
+<div class="actions export-actions-v222">
+<button class="light" onclick="downloadImportTemplateV223()">تنزيل نموذج الاستيراد</button>
+</div>
+<div class="mini-note-v222">الاستيراد الفعلي لا يعتمد إلا بعد المعاينة وفحص الأخطاء في مرحلة لاحقة.</div>
+</article>
+</div>
+<div class="export-preview-v222" id="meetingExportPreview"></div>
+</div>
+<div class="card export-quick-v222">
+<h3>تصدير CSV سريع</h3>
+<p class="muted">للاستخدام السريع فقط. ملف الاجتماع Excel هو الأفضل للعرض الرسمي.</p>
+<div class="actions"><button onclick="exportTable('app_users')">المستخدمين</button><button onclick="exportTable('projects')">المشاريع</button><button onclick="exportTable('workers')">العمال</button><button onclick="exportTable('attendance')">الحضور</button><button onclick="exportTable('time_logs')">التسجيلات اليومية</button><button onclick="exportTable('tickets')">تذاكر</button></div>
+</div>
+</section>
+</main>
 </div>
 <!-- V299 Contract Smart Modal -->
-<div id="contractSmartModal" class="contract-smart-modal hidden" onclick="contractSmartBackdrop(event)">
-  <div class="contract-smart-panel" onclick="event.stopPropagation()">
-    <div class="contract-smart-head">
-      <div>
-        <h2 id="contractSmartTitle">تفاصيل العقد</h2>
-        <small id="contractSmartSub">متابعة الخدمات والعقود والزيارات</small>
-      </div>
-      <div class="contract-smart-actions">
-        <button class="light" onclick="printContractClientTable()">طباعة تقرير العميل</button>
-        <button class="light" onclick="copyContractClientTable()">نسخ جدول العميل</button>
-        <button id="contractSmartSaveBtn" onclick="saveContractSmartModal()">حفظ</button>
-        <button class="danger" onclick="closeContractSmartModal()">إغلاق</button>
-      </div>
-    </div>
-    <input type="hidden" id="contractSmartProjectId">
-    <div class="contract-smart-tabs">
-      <button class="active" onclick="contractSmartTab('main',this)">الخدمات والعقود</button>
-      <button onclick="contractSmartTab('annual',this)">الخدمات السنوية</button>
-      <button onclick="contractSmartTab('report',this)">تقرير العميل</button>
-    </div>
-
-    <div id="contractSmartMainTab" class="contract-smart-tab-body">
-      <div class="smart-grid three" id="contractCoreServices"></div>
-    </div>
-
-    <div id="contractSmartAnnualTab" class="contract-smart-tab-body hidden">
-      <div class="smart-box">
-        <h3>بيانات الجمعية</h3>
-        <div class="smart-grid three">
-          <div><label>اسم الجمعية</label><input id="csAssocName" placeholder="مثال: جمعية مشروع ..."></div>
-          <div><label>اسم مدير الجمعية</label><input id="csAssocManager" placeholder="اسم المدير"></div>
-          <div><label>رقم هاتف المدير</label><input id="csAssocPhone" placeholder="05xxxxxxxx"></div>
-        </div>
-      </div>
-      <div class="smart-box">
-        <h3>إضافة خدمة سنوية</h3>
-        <div class="smart-grid four">
-          <div><label>الخدمة</label><select id="csAnnualSelect" onchange="onAnnualServiceSelect()"></select></div>
-          <div><label>خدمة أخرى</label><input id="csAnnualCustom" placeholder="اكتب اسم الخدمة"></div>
-          <div><label>عدد الزيارات السنوية</label><input id="csAnnualVisits" type="number" min="1" value="1"></div>
-          <div class="smart-end"><button onclick="addContractAnnualService()">إضافة الخدمة</button></div>
-        </div>
-      </div>
-      <div class="smart-box">
-        <div class="table-head"><h3>جدول الخدمات السنوية</h3><small>اضغط على مربعات الزيارة لتسجيل التنفيذ</small></div>
-        <div class="table-wrap"><table><thead><tr><th>الخدمة</th><th>عدد الزيارات</th><th>الزيارات</th><th>المنفذ</th><th>المتبقي</th><th>إجراء</th></tr></thead><tbody id="csAnnualBody"></tbody></table></div>
-      </div>
-    </div>
-
-    <div id="contractSmartReportTab" class="contract-smart-tab-body hidden">
-      <div class="smart-box">
-        <h3>جدول تقرير العميل</h3>
-        <p class="muted">هذا الجدول يوضح للعميل اسم الخدمة، عدد الزيارات السنوية، وكم نفذ منها.</p>
-        <div id="csClientReportBox"></div>
-      </div>
-    </div>
-  </div>
+<div class="contract-smart-modal hidden" id="contractSmartModal" onclick="contractSmartBackdrop(event)">
+<div class="contract-smart-panel" onclick="event.stopPropagation()">
+<div class="contract-smart-head">
+<div>
+<h2 id="contractSmartTitle">تفاصيل العقد</h2>
+<small id="contractSmartSub">متابعة الخدمات والعقود والزيارات</small>
 </div>
-
+<div class="contract-smart-actions">
+<button class="light" onclick="printContractClientTable()">طباعة تقرير العميل</button>
+<button class="light" onclick="copyContractClientTable()">نسخ جدول العميل</button>
+<button id="contractSmartSaveBtn" onclick="saveContractSmartModal()">حفظ</button>
+<button class="danger" onclick="closeContractSmartModal()">إغلاق</button>
+</div>
+</div>
+<input id="contractSmartProjectId" type="hidden"/>
+<div class="contract-smart-tabs">
+<button class="active" onclick="contractSmartTab('main',this)">الخدمات والعقود</button>
+<button onclick="contractSmartTab('annual',this)">الخدمات السنوية</button>
+<button onclick="contractSmartTab('report',this)">تقرير العميل</button>
+</div>
+<div class="contract-smart-tab-body" id="contractSmartMainTab">
+<div class="smart-grid three" id="contractCoreServices"></div>
+</div>
+<div class="contract-smart-tab-body hidden" id="contractSmartAnnualTab">
+<div class="smart-box">
+<h3>بيانات الجمعية</h3>
+<div class="smart-grid three">
+<div><label>اسم الجمعية</label><input id="csAssocName" placeholder="مثال: جمعية مشروع ..."/></div>
+<div><label>اسم مدير الجمعية</label><input id="csAssocManager" placeholder="اسم المدير"/></div>
+<div><label>رقم هاتف المدير</label><input id="csAssocPhone" placeholder="05xxxxxxxx"/></div>
+</div>
+</div>
+<div class="smart-box">
+<h3>إضافة خدمة سنوية</h3>
+<div class="smart-grid four">
+<div><label>الخدمة</label><select id="csAnnualSelect" onchange="onAnnualServiceSelect()"></select></div>
+<div><label>خدمة أخرى</label><input id="csAnnualCustom" placeholder="اكتب اسم الخدمة"/></div>
+<div><label>عدد الزيارات السنوية</label><input id="csAnnualVisits" min="1" type="number" value="1"/></div>
+<div class="smart-end"><button onclick="addContractAnnualService()">إضافة الخدمة</button></div>
+</div>
+</div>
+<div class="smart-box">
+<div class="table-head"><h3>جدول الخدمات السنوية</h3><small>اضغط على مربعات الزيارة لتسجيل التنفيذ</small></div>
+<div class="table-wrap"><table><thead><tr><th>الخدمة</th><th>عدد الزيارات</th><th>الزيارات</th><th>المنفذ</th><th>المتبقي</th><th>إجراء</th></tr></thead><tbody id="csAnnualBody"></tbody></table></div>
+</div>
+</div>
+<div class="contract-smart-tab-body hidden" id="contractSmartReportTab">
+<div class="smart-box">
+<h3>جدول تقرير العميل</h3>
+<p class="muted">هذا الجدول يوضح للعميل اسم الخدمة، عدد الزيارات السنوية، وكم نفذ منها.</p>
+<div id="csClientReportBox"></div>
+</div>
+</div>
+</div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
@@ -818,48 +765,40 @@ window.__tasneefOrdersSharedSyncDisabled=true;
 window.__tasneefOrdersRootCleanV10189=true;
 window.__tasneefSupervisorOrdersV10061=true;
 </script>
-<script src="app.js?v=477-root-fast" defer></script>
-<script src="tasneef_orders_unified_v10400.js?v=10414" defer></script>
-<script src="tasneef_contracts_core_v10107.js?v=10107" defer></script>
-<script src="tasneef_finance_inventory_pro_v15.js?v=10089" defer></script>
-<script src="tasneef_worker_distribution_unified_v51.js?v=51" defer></script>
-<script src="tasneef_permissions_unified_v43.js?v=10061" defer></script>
-<script src="tasneef_sidebar_permissions_lock_v44.js?v=10059" defer></script>
-<script src="tasneef_inventory_audit_root_v10059.js?v=10059" defer></script>
-<script src="tasneef_audit_history_v10059.js?v=10059" defer></script>
-
-<script src="tasneef_contracts_filters_orders_print_v10108.js?v=10108" defer></script>
-
-<script src="tasneef_finance_cleanup_image_zoom_v10112.js?v=10112" defer></script>
-<script src="tasneef_finance_product_edit_report_filter_v10113.js?v=10113" defer></script>
-<script src="tasneef_finance_movement_print_v10167.js?v=10149" defer></script>
-<script src="tasneef_finance_product_report_v10170.js?v=10170" defer></script>
-<script src="tasneef_finance_cost_consumption_report_v10171.js?v=10171" defer></script>
-<script src="tasneef_finance_core_speed_multi_v10177.js?v=10183" defer></script>
-<script src="tasneef_finance_reports_class_filter_v10174.js?v=10174" defer></script>
-<script src="tasneef_project_command_center_v10180.js?v=10148" defer></script>
-  <script src="tasneef_admin_tasks_v10126.js?v=10145" defer></script>
-  <script src="tasneef_admin_tasks_dashboard_card_v10127.js?v=10127" defer></script>
-  
-<script src="tasneef_language_switcher_safe_v10134.js?v=10134" defer></script>
-<script src="tasneef_daily_logs_app_camera_v10165.js?v=10203" defer></script>
-<script src="tasneef_daily_deleted_workers_cleanup_v10167.js?v=10167" defer></script>
-<script src="tasneef_dashboard_today_logs_fix_v10174.js?v=10182" defer></script>
-<script src="tasneef_finance_reports_excel_export_v10173.js?v=10173" defer></script>
-<script src="tasneef_projects_clean_v390.js?v=474-root" defer></script>
-<script src="tasneef_workers_clean_v386.js?v=417-status-sync-root" defer></script>
-
-<script src="tasneef_tickets_root_v10246.js?v=10373" defer></script>
-<script src="tasneef_client_portal_v377.js?v=466" defer></script>
-
-<script src="tasneef_monthly_clean_v403.js?v=474-root" defer></script>
+<script defer="" src="app.js?v=480-client-root"></script>
+<script defer="" src="tasneef_orders_unified_v10400.js?v=10414"></script>
 
 
-<script src="tasneef_core_unified_v413.js?v=480-unified-workers-salary-print" defer></script>
-<script src="tasneef_core_attendance_unified_source_v430.js?v=444" defer></script>
 
-<script src="tasneef_salaries_unified_source_v440.js?v=465" defer></script>
-<script src="tasneef_core_salaries_tab_v440.js?v=465" defer></script>
-<script src="tasneef_daily_distribution_workers_print_v441.js?v=474-root" defer></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script defer="" src="tasneef_projects_clean_v390.js?v=474-root"></script>
+<script defer="" src="tasneef_workers_clean_v386.js?v=417-status-sync-root"></script>
+<script defer="" src="tasneef_tickets_root_v10246.js?v=10373"></script>
+
+<script defer="" src="tasneef_monthly_clean_v403.js?v=474-root"></script>
+<script defer="" src="tasneef_core_unified_v413.js?v=480-unified-workers-salary-print"></script>
+<script defer="" src="tasneef_core_attendance_unified_source_v430.js?v=444"></script>
+<script defer="" src="tasneef_salaries_unified_source_v440.js?v=465"></script>
+<script defer="" src="tasneef_core_salaries_tab_v440.js?v=465"></script>
+<script defer="" src="tasneef_daily_distribution_workers_print_v441.js?v=474-root"></script>
 </body>
 </html>

@@ -48,24 +48,27 @@ function getSrc(x){return typeof x==='string'?x:(x?.url||x?.data||x?.src||'')}
 function before(s){return asImages(s.before_images||s.images_before)}function during(s){return asImages(s.during_images||s.images_during)}function after(s){return asImages(s.after_images||s.images_after||s.after)}
 function imgCount(s){return before(s).length+during(s).length+after(s).length}
 function serviceIcon(t){t=String(t||'');if(t.includes('حشر'))return'🛡️';if(t.includes('خزان'))return'💧';if(t.includes('كهرب'))return'💡';if(t.includes('سباك'))return'🔧';if(t.includes('نظاف'))return'🧹';if(t.includes('مصعد'))return'🛗';return'✅'}
-async function loadPortal(){try{const payload=decodeToken();portal.projectId=payload.project_id||payload.projectId;portal.from=payload.from||monthStart();portal.to=payload.to||today();if(!portal.projectId)throw new Error('رابط العميل غير مكتمل. لا يوجد مشروع مرتبط بالرابط.');await loadData();renderHome()}catch(e){$('app').className='container loading';$('app').innerHTML=`<div class="loading-card"><img src="tasneef_logo_print.png"><h2>تعذر فتح بوابة العميل</h2><p>${E(e.message||String(e))}</p></div>`}}
+async function loadPortal(){try{const payload=decodeToken();portal.projectId=payload.project_id||payload.projectId;portal.from=payload.from||monthStart();portal.to=payload.to||today();if(!portal.projectId)throw new Error('رابط العميل غير مكتمل. لا يوجد مشروع مرتبط بالرابط.');await loadData();renderHome();if(portal.loadErrors?.length)console.warn('Client portal partial load:',portal.loadErrors)}catch(e){$('app').className='container loading';$('app').innerHTML=`<div class="loading-card"><img src="tasneef_logo_print.png"><h2>تعذر فتح بوابة العميل</h2><p>${E(e.message||String(e))}</p></div>`}}
 async function loadData(){
-  let logsQ=sb.from('time_logs').select('*').eq('project_id',portal.projectId).order('check_in',{ascending:false}).limit(1500);
+  let logsQ=sb.from('time_logs').select('*').eq('project_id',portal.projectId).order('check_in',{ascending:false}).limit(250);
   if(portal.from)logsQ=logsQ.gte('log_date',portal.from);if(portal.to)logsQ=logsQ.lte('log_date',portal.to);
   let ticQ=sb.from('tickets').select('*').eq('project_id',portal.projectId).order('created_at',{ascending:false}).limit(500);
   if(portal.from)ticQ=ticQ.gte('created_at',portal.from+'T00:00:00');if(portal.to)ticQ=ticQ.lte('created_at',portal.to+'T23:59:59');
-  let repQ=sb.from('client_reports').select('*').eq('project_id',portal.projectId).eq('status','published').order('report_date',{ascending:false}).limit(150);
+  let repQ=sb.from('client_reports').select('*').eq('project_id',portal.projectId).eq('status','published').order('report_date',{ascending:false}).limit(100);
   if(portal.from)repQ=repQ.gte('report_date',portal.from);if(portal.to)repQ=repQ.lte('report_date',portal.to);
-  let rtQ=sb.from('client_service_ratings').select('*').eq('project_id',portal.projectId).order('created_at',{ascending:false}).limit(50);
+  let rtQ=sb.from('client_service_ratings').select('*').eq('project_id',portal.projectId).order('created_at',{ascending:false}).limit(30);
   if(portal.from)rtQ=rtQ.gte('created_at',portal.from+'T00:00:00');if(portal.to)rtQ=rtQ.lte('created_at',portal.to+'T23:59:59');
-  const [pr,sm,logs,tickets,reports,ratings]=await Promise.all([
+  const settled=await Promise.allSettled([
     sb.from('projects').select('*').eq('id',portal.projectId).maybeSingle(),
     sb.from('project_contract_smart').select('*').eq('project_id',portal.projectId).maybeSingle(),
     logsQ,ticQ,repQ,rtQ
   ]);
+  const val=i=>settled[i]?.status==='fulfilled'?(settled[i].value||{}):({data:null,error:settled[i]?.reason});
+  const pr=val(0),sm=val(1),logs=val(2),tickets=val(3),reports=val(4),ratings=val(5);
   portal.project=pr.data||{};portal.projectName=portal.project.name||'مشروع العميل';
   portal.smart=smartPayload(sm.data)||{annual:[]};
-  portal.timeLogs=logs.data||[];portal.tickets=tickets.data||[];portal.reports=reports.data||[];portal.ratings=ratings.data||[];
+  portal.timeLogs=Array.isArray(logs.data)?logs.data:[];portal.tickets=Array.isArray(tickets.data)?tickets.data:[];portal.reports=Array.isArray(reports.data)?reports.data:[];portal.ratings=Array.isArray(ratings.data)?ratings.data:[];
+  portal.loadErrors=[pr,sm,logs,tickets,reports,ratings].map(x=>x?.error?.message||'').filter(Boolean);
   if(!portal.timeLogs.length && !portal.tickets.length){
     try{
       const rr=await sb.rpc('tasneef_client_portal_records_v467',{p_project_id:String(portal.projectId),p_from:portal.from||null,p_to:portal.to||null});
@@ -77,7 +80,7 @@ async function loadData(){
     }catch(_){ }
   }
   const ids=portal.reports.map(r=>r.id).filter(Boolean);portal.services=[];
-  if(ids.length){try{const sr=await sb.from('client_report_services').select('*').in('report_id',ids).order('id',{ascending:true});portal.services=sr.data||[]}catch(_){portal.services=[]}}
+  if(ids.length){try{const sr=await sb.from('client_report_services').select('id,report_id,sort_order,service_type,title,service_description,scope_work,notes,before_images,during_images,after_images,status,service_status').in('report_id',ids).order('id',{ascending:true}).limit(500);portal.services=sr.data||[]}catch(_){portal.services=[]}}
 }
 function stats(){const minutes=portal.timeLogs.reduce((a,l)=>a+(Number(l.duration_minutes)||minutesBetween(l.check_in,l.check_out)),0);const days=new Set(portal.timeLogs.map(l=>dateOnly(l.log_date||l.check_in)).filter(Boolean)).size;const open=portal.tickets.filter(t=>String(t.status||'open')!=='closed').length;const nums=portal.ratings.map(r=>Number(r.score||({'ممتاز':5,'جيد جدًا':4,'جيد':3,'يحتاج تحسين':2}[r.rating]||0))).filter(Boolean);const avg=nums.length?(nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(1):'-';return{minutes,days,open,closed:portal.tickets.length-open,avg,annualDone:annualDoneCount(),annualRemain:annualRemainCount(),contractLeft:daysLeft(portal.project.contract_end||portal.project.end_date)}}
 function renderHome(){const st=stats();$('app').className='container';document.title=`بوابة ${portal.projectName} - شركة تصنيف`; $('app').innerHTML=`
@@ -85,7 +88,7 @@ function renderHome(){const st=stats();$('app').className='container';document.t
 <section class="card"><h2>فلترة التقرير</h2><div class="filters"><div><label>من تاريخ</label><input type="date" id="fromDate" value="${E(portal.from)}"></div><div><label>إلى تاريخ</label><input type="date" id="toDate" value="${E(portal.to)}"></div><button onclick="applyFilter(this)">تطبيق الفلتر</button></div></section>
 <section class="stats"><div class="stat"><small>ساعات العمل</small><b>${E(minToHr(st.minutes))}</b></div><div class="stat"><small>أيام الحضور</small><b>${n(st.days)}</b></div><div class="stat"><small>المتبقي على العقد</small><b>${E(st.contractLeft)}</b></div><div class="stat"><small>الأعمال السنوية المنفذة</small><b>${n(st.annualDone)}</b></div><div class="stat"><small>التذاكر المفتوحة</small><b>${n(st.open)}</b></div><div class="stat"><small>متوسط التقييم</small><b>${n(st.avg)}</b></div></section>
 <div id="mainContent"></div><div class="footer">شركة تصنيف لإدارة المرافق<br>تم إنشاء هذا التقرير من نظام شركة تصنيف لإدارة المرافق ويعتبر معتمدًا ما لم يرد خلاف ذلك.</div>`;showMain('summary')}
-async function applyFilter(btn){portal.from=$('fromDate').value||monthStart();portal.to=$('toDate').value||today();if(btn){btn.disabled=true;btn.textContent='جاري التحديث...'}await loadData();renderHome();toast('تم تحديث الفترة')}
+async function applyFilter(btn){portal.from=$('fromDate').value||monthStart();portal.to=$('toDate').value||today();if(btn){btn.disabled=true;btn.textContent='جاري التحديث...'}await loadData();renderHome();if(portal.loadErrors?.length)console.warn('Client portal partial load:',portal.loadErrors);toast('تم تحديث الفترة')}
 function showMain(tab){const box=$('mainContent');if(!box)return;const tabs=`<div class="tabs"><button class="tab ${tab==='summary'?'active':''}" onclick="showMain('summary')">الملخص</button><button class="tab ${tab==='logs'?'active':''}" onclick="showMain('logs')">التسجيلات اليومية</button><button class="tab ${tab==='works'?'active':''}" onclick="showMain('works')">الأعمال المنفذة</button><button class="tab ${tab==='tickets'?'active':''}" onclick="showMain('tickets')">التذاكر</button><button class="tab ${tab==='rating'?'active':''}" onclick="showMain('rating')">التقييم</button></div>`;box.innerHTML=tabs+(tab==='logs'?logsHtml():tab==='works'?worksHtml():tab==='tickets'?ticketsHtml():tab==='rating'?ratingHtml():summaryHtml())}
 function summaryHtml(){const st=stats();return `<section class="grid"><div class="smart-card"><h3>ساعات العمل</h3><p>إجمالي الفترة: <b>${minToHr(st.minutes)}</b></p><button onclick="showMain('logs')">عرض التسجيلات</button></div><div class="smart-card"><h3>الأعمال السنوية</h3><p>منفذ: <b>${n(st.annualDone)}</b> / متبقي: <b>${n(st.annualRemain)}</b></p><button onclick="showMain('works')">عرض الأعمال</button></div><div class="smart-card"><h3>التذاكر</h3><p>مفتوحة: <b>${n(st.open)}</b> / مسكرة: <b>${n(st.closed)}</b></p><button onclick="showMain('tickets')">عرض التذاكر</button></div></section><section class="card"><h2>ملخص تنفيذي</h2><p style="line-height:1.9;color:#31443d">يعرض هذا التقرير بيانات مشروع ${E(portal.projectName)} للفترة من ${E(fmtDate(portal.from))} إلى ${E(fmtDate(portal.to))}، متضمنًا ساعات العمل المسجلة، الأعمال السنوية المنفذة والمتبقية، والتذاكر التشغيلية الخاصة بالمشروع. المتبقي على العقد: <b>${E(st.contractLeft)}</b>.</p></section>`}
 function logsHtml(){const rows=portal.timeLogs.map(l=>`<tr><td>${E(fmtDate(l.log_date||l.check_in))}</td><td>${E(fmt(l.check_in))}</td><td>${E(l.check_out?fmt(l.check_out):'-')}</td><td>${E(minToHr(Number(l.duration_minutes)||minutesBetween(l.check_in,l.check_out)))}</td><td>${E(l.time_status||'-')}</td><td>${E(l.notes||'-')}</td></tr>`).join('');return `<section class="card"><h2>التسجيلات اليومية</h2>${rows?`<div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>الدخول</th><th>الخروج</th><th>المدة</th><th>حالة الوقت</th><th>ملاحظات</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">لا توجد تسجيلات يومية ضمن الفترة المحددة.</div>'}</section>`}
