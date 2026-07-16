@@ -77,6 +77,7 @@
 <div class="msg hidden" id="globalMsg"></div>
 <nav class="sup-tabs">
 <button class="sup-tab active" onclick="showSupervisorWindow('supLogs',this)">دخول / خروج</button>
+<button class="sup-tab" onclick="showSupervisorWindow('supAttendance',this); if(window.renderSupervisorAttendanceList) window.renderSupervisorAttendanceList()">الحضور والغياب</button>
 
 <button class="sup-tab" onclick="showSupervisorWindow('supTickets',this)">تذاكر</button>
 <button class="sup-tab" onclick="showSupervisorWindow('supAdminTasks',this); if(window.TasneefFieldAdminTasksV10130) window.TasneefFieldAdminTasksV10130.open('supervisor')">مهام إدارية</button>
@@ -98,6 +99,14 @@
 </div>
 <div class="actions"><button id="supCheckInBtn" onclick="supervisorCheckIn(this)">دخول الآن</button><button id="supCheckOutBtn" onclick="supervisorCheckOut(this)">خروج الجميع</button><button class="light" onclick="saveTimeLog()">حفظ يدوي</button></div></section>
 <section class="card"><h2>سجلاتي اليوم</h2><div class="table-wrap"><table><thead><tr><th>المشروع</th><th>النوع</th><th>الدخول</th><th>الخروج</th><th>المطلوب</th><th>المدة</th><th>الحالة</th><th>واتساب</th></tr></thead><tbody id="logsBody"></tbody></table></div></section>
+</section>
+<section class="sup-page" id="supAttendance">
+<section class="card">
+<h2>الحضور والغياب</h2>
+<div class="sup-help">يتم تحميل العمال من النظام الموحد حسب ربط المشرف والتوزيع الحالي، بدون تكرار.</div>
+<label>تاريخ التحضير</label><input id="attendanceDate" type="date"/>
+<div id="supervisorAttendanceList"></div>
+</section>
 </section>
 <section class="sup-page" id="supTickets">
 <section class="card"><h2 id="ticketFormTitle">رفع / تعديل تذكرة</h2><input id="ticketId" type="hidden"/><label>المشروع</label><select id="ticketProject"></select><label>العنوان</label><select id="ticketTitle"><option value="">اختر نوع المشكلة</option><option value="صيانة">صيانة</option><option value="سباكة">سباكة</option><option value="تعطير">تعطير</option><option value="تشجير">تشجير</option><option value="كهرباء">كهرباء</option><option value="نظافة">نظافة</option><option value="دفاع مدني">دفاع مدني</option><option value="مصاعد">مصاعد</option></select><label>الأولوية</label><select id="ticketPriority"><option value="normal">عادي</option><option value="high">مهم</option><option value="urgent">عاجل</option><option value="low">منخفض</option></select><label>الحالة</label><select id="ticketStatus" onchange="toggleTicketClosureBox()"><option value="open">مفتوحة</option><option value="processing">تحت المعالجة</option><option value="closed">مغلقة</option></select><label>الوصف</label><textarea id="ticketDescription" placeholder="اكتب وصف التذكرة"></textarea>
@@ -169,7 +178,7 @@ window.__tasneefOrdersSharedSyncDisabled=true;
 window.__tasneefOrdersRootCleanV10189=true;
 window.__tasneefSupervisorOrdersV10061=true;
 </script>
-<script defer="" src="app.js?v=10500-worker-visits"></script>
+<script defer="" src="app.js?v=10501-unified-workers-attendance"></script>
 
 
 
@@ -181,6 +190,7 @@ window.__tasneefSupervisorOrdersV10061=true;
 
 
 
+<script defer src="tasneef_supervisor_attendance_from_unified_v434.js?v=10501-unified-dedupe"></script>
 <script id="supervisor-orders-lazy-loader-v10417">
 (function(){
   let loadingPromise = null;
