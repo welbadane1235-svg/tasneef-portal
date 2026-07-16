@@ -24,6 +24,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $=id=>document.getElementById(id);
 const E=s=>String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let portal={projectId:'',projectName:'',from:'',to:'',project:null,smart:null,reports:[],services:[],tickets:[],timeLogs:[],ratings:[],rating:0};
+window.portal=portal; // V10520: expose the resolved client project to the single canonical tickets script
 function toast(t,err){const x=$('toast');x.textContent=t;x.style.background=err?'#b83232':'#0A4033';x.classList.add('show');setTimeout(()=>x.classList.remove('show'),3200)}
 function today(){return new Date().toISOString().slice(0,10)}
 function monthStart(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`}
@@ -104,7 +105,7 @@ async function loadData(){
   let logsQ=sb.from('time_logs').select('*').eq('project_id',portal.projectId).order('check_in',{ascending:false}).limit(250);
   if(portal.from)logsQ=logsQ.gte('log_date',portal.from);if(portal.to)logsQ=logsQ.lte('log_date',portal.to);
   const ticQ=(async()=>{
-    const r=await sb.rpc('tasneef_client_project_tickets_v10518',{p_project_id:String(portal.projectId),p_from:null,p_to:null});
+    const r=await sb.rpc('tasneef_client_tickets_v10519',{p_project_id:String(portal.projectId)});
     if(!r.error)return r;
     let q=sb.from('tickets').select('*').eq('project_id',portal.projectId).order('created_at',{ascending:false}).limit(500);
     if(portal.from)q=q.gte('created_at',portal.from+'T00:00:00');if(portal.to)q=q.lte('created_at',portal.to+'T23:59:59');
@@ -128,7 +129,7 @@ async function loadData(){
   portal.loadErrors=[pr,sm,logs,tickets,reports,ratings].map(x=>x?.error?.message||'').filter(Boolean);
   if(!portal.timeLogs.length && !portal.tickets.length){
     try{
-      const rr=await sb.rpc('tasneef_client_portal_records_v467',{p_project_id:String(portal.projectId),p_from:null,p_to:null});
+      const rr=await sb.rpc('tasneef_client_portal_records_v467',{p_project_id:String(portal.projectId)});
       if(!rr.error && rr.data){
         const obj=(typeof rr.data==='string')?JSON.parse(rr.data):rr.data;
         if(Array.isArray(obj.logs)) portal.timeLogs=obj.logs;
@@ -288,16 +289,16 @@ function openModal(title,sub,body,detailMode=false){$('modalTitle').textContent=
       let inserted=null, err=null;
       if(G.sb){
         try{
-          const r=await G.sb.rpc('tasneef_client_create_ticket_v10518',{p_project_id:String(portal.projectId),p_title:title,p_description:desc,p_type:type,p_location:loc,p_client_name:'عميل المشروع',p_client_contact:''});
+          const r=await G.sb.rpc('tasneef_client_create_ticket_v10519',{p_project_id:String(portal.projectId),p_title:title,p_description:desc,p_type:type,p_location:loc,p_client_name:'عميل المشروع',p_client_contact:''});
           if(r.error) throw r.error;
           inserted=Array.isArray(r.data)?r.data[0]:r.data;
         }catch(e){ err=e; try{ const d=await G.sb.from('tickets').insert({project_id:Number(portal.projectId)||portal.projectId,title,description:[desc,loc?('الموقع: '+loc):'',type?('النوع: '+type):''].filter(Boolean).join('\n'),status:'open',created_at:new Date().toISOString()}).select('*').single(); if(d.error) throw d.error; inserted=d.data; err=null; }catch(e2){ err=e2; } }
       }
       if(err) throw err;
       if(inserted) portal.tickets=[inserted,...(portal.tickets||[]).filter(x=>String(x.id)!==String(inserted.id))];
-      try{localStorage.setItem('tasneef_client_ticket_changed_v10518',String(Date.now()))}catch(_){}
+      try{localStorage.setItem('tasneef_client_ticket_changed_v10520',String(Date.now()))}catch(_){}
       try{
-        const rr=await G.sb.rpc('tasneef_client_project_tickets_v10518',{p_project_id:String(portal.projectId),p_from:null,p_to:null});
+        const rr=await G.sb.rpc('tasneef_client_tickets_v10519',{p_project_id:String(portal.projectId)});
         if(!rr.error&&Array.isArray(rr.data)) portal.tickets=rr.data;
       }catch(_){}
       if(typeof G.toast==='function') G.toast('تم رفع التذكرة بنجاح');
@@ -325,7 +326,7 @@ function openModal(title,sub,body,detailMode=false){$('modalTitle').textContent=
 })();
 </script>
 
-<script src="tasneef_client_tickets_canonical_v10519.js?v=10519-canonical-only"></script>
+<script src="tasneef_client_tickets_canonical_v10520.js?v=10520-project-link-fix"></script>
 
 </body>
 </html>
