@@ -9,7 +9,7 @@
   const A=v=>Array.isArray(v)?v:[];
   const byId=id=>document.getElementById(id);
   const esc=v=>S(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  let rows=[], requestId=0, built=false, reloadTimer=null, lastLoadedAt=0;
+  let rows=[], requestId=0, built=false, reloadTimer=null, lastLoadedAt=0, loadPromise=null, reloadQueued=false;
 
   function sessionSafe(){try{return typeof session==='function'?(session()||{}):{}}catch(_){return{}}}
   function supervisorPage(){return location.pathname.toLowerCase().includes('supervisor') || sessionSafe().role==='supervisor'}
@@ -86,21 +86,26 @@
     if(pf){const current=S(pf.value),m=new Map();A(window.data?.projects).forEach(p=>m.set(S(p.id),S(p.name||p.id)));rows.forEach(r=>m.set(S(r.project_id),projectNameSafe(r.project_id)));pf.innerHTML='<option value="">الكل</option>'+[...m.entries()].filter(x=>x[0]).sort((a,b)=>a[1].localeCompare(b[1],'ar')).map(([id,n])=>`<option value="${esc(id)}">${esc(n)}</option>`).join('');pf.value=current;}
   }
   function bind(){
-    ['dailyRootFrom','dailyRootTo'].forEach(id=>byId(id)?.addEventListener('change',load));
+    ['dailyRootFrom','dailyRootTo'].forEach(id=>byId(id)?.addEventListener('change',()=>load({allowEmpty:true})));
     ['dailyRootSupervisor','dailyRootProject'].forEach(id=>byId(id)?.addEventListener('change',render));
     let timer;byId('dailyRootSearch')?.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(render,250)});
-    byId('dailyRootRefresh')?.addEventListener('click',load);
+    byId('dailyRootRefresh')?.addEventListener('click',()=>load({allowEmpty:true}));
     byId('dailyRootPrint')?.addEventListener('click',printCurrent);
     byId('dailyRootWhatsapp')?.addEventListener('click',sendWhatsapp);
   }
   function bounds(){let from=S(byId('dailyRootFrom')?.value||today()),to=S(byId('dailyRootTo')?.value||from);if(from>to)[from,to]=[to,from];return{from,to}}
   function merge(a,b){const m=new Map();[...A(a),...A(b)].forEach(x=>m.set(S(x.id)||[x.supervisor_id,x.project_id,x.check_in].join('|'),x));return [...m.values()].sort((x,y)=>new Date(y.check_in||y.created_at)-new Date(x.check_in||x.created_at))}
-  async function load(){
-    if(!window.sb)return;
+  async function load(options){
+    if(!window.sb)return rows;
+    options=options||{};
+    if(loadPromise){reloadQueued=true;return loadPromise;}
     const rid=++requestId,{from,to}=bounds(),end=nextDay(to),msg=byId('dailyRootMessage'),body=byId('logsBody');
-    if(msg)msg.textContent='جاري تحميل التسجيلات...';if(body)body.innerHTML='<tr><td colspan="12">جاري التحميل...</td></tr>';
+    const hadRows=rows.length>0;
+    if(msg)msg.textContent=hadRows?'يتم تحديث البيانات في الخلفية...':'جاري تحميل التسجيلات...';
+    if(body&&!hadRows)body.innerHTML='<tr><td colspan="12">جاري التحميل...</td></tr>';
+    body?.closest('.table-wrap')?.classList.add('daily-root-refreshing-v10513');
     const cols='id,user_id,supervisor_id,project_id,check_in,check_out,log_date,duration_minutes,travel_minutes,visit_type,required_minutes,time_difference_minutes,time_status,notes,created_at,updated_at';
-    try{
+    loadPromise=(async()=>{try{
       let q1=sb.from('time_logs').select(cols).gte('log_date',from).lte('log_date',to).order('check_in',{ascending:false}).limit(2000);
       let q2=sb.from('time_logs').select(cols).gte('check_in',from+'T00:00:00').lt('check_in',end+'T00:00:00').order('check_in',{ascending:false}).limit(2000);
       const sup=supervisorPage()?S(sessionSafe().id):S(byId('dailyRootSupervisor')?.value||'');const proj=S(byId('dailyRootProject')?.value||'');
@@ -109,9 +114,11 @@
       if(sup)vq=vq.eq('supervisor_id',sup);if(proj)vq=vq.eq('project_id',proj);
       let rpcPromise=Promise.resolve({data:[],error:null});
       try{rpcPromise=sb.rpc('tasneef_admin_daily_logs_v10512',{p_from:from,p_to:to,p_supervisor_id:sup?Number(sup):null,p_project_id:proj?Number(proj):null})}catch(_){ }
-      const [r1,r2,vr,rpc]=await Promise.all([q1,q2,vq,rpcPromise]);if(rid!==requestId)return;
-      if(r1.error&&r2.error&&rpc?.error)throw r1.error;
-      rows=merge(merge(r1.error?[]:r1.data,r2.error?[]:r2.data),rpc?.error?[]:rpc?.data);
+      const [r1,r2,vr,rpc]=await Promise.all([q1,q2,vq,rpcPromise]);if(rid!==requestId)return rows;
+      if(r1.error&&r2.error&&rpc?.error)throw (rpc.error||r1.error||r2.error);
+      const fresh=merge(merge(r1.error?[]:r1.data,r2.error?[]:r2.data),rpc?.error?[]:rpc?.data);
+      // لا نمسح البيانات الظاهرة بسبب استجابة مؤقتة فارغة أثناء التحديث التلقائي.
+      if(fresh.length || !hadRows || options.allowEmpty===true) rows=fresh;
       const visits=vr.error?[]:A(vr.data);
       rows.forEach(l=>{
         const t=new Date(l.check_in||l.created_at).getTime();
@@ -122,7 +129,18 @@
       refreshFilterOptionsFromRows();
       lastLoadedAt=Date.now();if(msg)msg.textContent=`تم تحميل ${rows.length} سجل للفترة ${from} إلى ${to}.`;
       render();
-    }catch(e){console.error('Daily root V10511',e);if(msg)msg.textContent='تعذر تحميل التسجيلات: '+(e.message||e);if(body)body.innerHTML='<tr><td colspan="12">تعذر تحميل التسجيلات</td></tr>'}
+      return rows;
+    }catch(e){
+      console.error('Daily root V10513',e);
+      if(msg)msg.textContent=rows.length?'تعذر التحديث الآن، والبيانات السابقة ما زالت ظاهرة.':'تعذر تحميل التسجيلات: '+(e.message||e);
+      if(!rows.length&&body)body.innerHTML='<tr><td colspan="12">تعذر تحميل التسجيلات</td></tr>';
+      return rows;
+    }finally{
+      body?.closest('.table-wrap')?.classList.remove('daily-root-refreshing-v10513');
+      loadPromise=null;
+      if(reloadQueued){reloadQueued=false;setTimeout(()=>load(),120)}
+    }})();
+    return loadPromise;
   }
   function filtered(){
     const q=S(byId('dailyRootSearch')?.value).toLowerCase(),sup=S(byId('dailyRootSupervisor')?.value),proj=S(byId('dailyRootProject')?.value),b=bounds();
@@ -148,7 +166,7 @@
   }
   function sendWhatsapp(){const list=filtered();if(!list.length)return alert('لا توجد سجلات');const b=bounds();const lines=['التسجيلات اليومية','الفترة: '+b.from+' إلى '+b.to,'عدد السجلات: '+list.length,''];list.slice(0,50).forEach((l,i)=>lines.push(`${i+1}- ${projectNameSafe(l.project_id)} | ${supName(l.supervisor_id)} | ${timeText(l.check_in)} - ${timeText(l.check_out)} | ${workers(l)}`));window.open('https://wa.me/?text='+encodeURIComponent(lines.join('\n')),'_blank')}
 
-  function css(){if(byId('dailyRootCssV10511'))return;const st=document.createElement('style');st.id='dailyRootCssV10511';st.textContent=`.daily-root-filters-v10510{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:10px;margin-bottom:10px}.daily-root-filters-v10510 label{font-weight:700}.daily-root-filters-v10510 input,.daily-root-filters-v10510 select{width:100%;margin-top:4px}.daily-root-message-v10510{padding:10px;background:#eef7f4;border-radius:10px;margin:8px 0}.daily-root-status-v10510{padding:4px 8px;border-radius:999px;font-weight:800}.daily-root-status-v10510.open{background:#fff3cd;color:#795500}.daily-root-status-v10510.ok{background:#e4f6ea;color:#075d31}.daily-root-status-v10510.over{background:#e5efff;color:#174b91}.daily-root-status-v10510.under{background:#fde8e8;color:#9b1c1c}.daily-root-supervisor-v10510{display:flex;gap:8px;margin:8px 0}@media(max-width:800px){.daily-root-filters-v10510{grid-template-columns:1fr 1fr}}`;document.head.appendChild(st)}
+  function css(){if(byId('dailyRootCssV10511'))return;const st=document.createElement('style');st.id='dailyRootCssV10511';st.textContent=`.daily-root-filters-v10510{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:10px;margin-bottom:10px}.daily-root-filters-v10510 label{font-weight:700}.daily-root-filters-v10510 input,.daily-root-filters-v10510 select{width:100%;margin-top:4px}.daily-root-message-v10510{padding:10px;background:#eef7f4;border-radius:10px;margin:8px 0}.daily-root-status-v10510{padding:4px 8px;border-radius:999px;font-weight:800}.daily-root-status-v10510.open{background:#fff3cd;color:#795500}.daily-root-status-v10510.ok{background:#e4f6ea;color:#075d31}.daily-root-status-v10510.over{background:#e5efff;color:#174b91}.daily-root-status-v10510.under{background:#fde8e8;color:#9b1c1c}.daily-root-supervisor-v10510{display:flex;gap:8px;margin:8px 0}.daily-root-refreshing-v10513{opacity:.82;transition:opacity .15s}.daily-root-refreshing-v10513 table{pointer-events:auto}@media(max-width:800px){.daily-root-filters-v10510{grid-template-columns:1fr 1fr}}`;document.head.appendChild(st)}
 
   function dailyVisible(){const page=byId('daily');if(!page)return false;const st=getComputedStyle(page);return st.display!=='none'&&st.visibility!=='hidden'}
   function scheduleReload(delay){clearTimeout(reloadTimer);reloadTimer=setTimeout(()=>{if(dailyVisible()||supervisorPage())load()},Math.max(100,delay||250))}
@@ -161,8 +179,8 @@
         window.__tasneefDailyRootChannelV10511=ch;
       }
     }catch(e){console.warn('daily realtime unavailable',e)}
-    setInterval(()=>{if(dailyVisible()&&Date.now()-lastLoadedAt>5000)load()},5000);
+    setInterval(()=>{if(dailyVisible()&&Date.now()-lastLoadedAt>20000)load()},5000);
   }
-  function init(){removeLegacyScript();css();if(supervisorPage())buildSupervisor();else buildAdmin();built=true;window.renderTimeLogs=load;try{renderTimeLogs=load}catch(_){ }window.refreshDailyRangeLogsV10353=load;window.refreshDailyRangeLogsV10363=load;window.tasneefRefreshDailyFastV10506=load;window.tasneefRefreshDailyV10508=load;bindExternalRefresh();setTimeout(load,50);console.info('V10511 daily root loaded last; filters, selected workers, and live refresh enabled.');}
+  function init(){removeLegacyScript();css();if(supervisorPage())buildSupervisor();else buildAdmin();built=true;window.renderTimeLogs=load;try{renderTimeLogs=load}catch(_){ }window.refreshDailyRangeLogsV10353=load;window.refreshDailyRangeLogsV10363=load;window.tasneefRefreshDailyFastV10506=load;window.tasneefRefreshDailyV10508=load;bindExternalRefresh();setTimeout(load,50);console.info('V10513 daily root loaded last; stable background refresh and historical records enabled.');}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,0));else setTimeout(init,0);
 })();

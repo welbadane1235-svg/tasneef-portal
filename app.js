@@ -25346,6 +25346,6 @@ ${finalUrl}
   // تحديث فوري عند فتح قسم التسجيلات، مع تحديث احتياطي ثابت كل 5 ثوانٍ.
   function dailyVisible(){const p=byId('daily');if(!p)return false;const cs=getComputedStyle(p);return cs.display!=='none'&&cs.visibility!=='hidden'&&!p.classList.contains('hidden')}
   document.addEventListener('click',e=>{const el=e.target?.closest?.('button,a,.nav');if(el&&S(el.textContent).includes('التسجيلات اليومية'))setTimeout(()=>window.renderTimeLogs?.(),80)});
-  setInterval(()=>{if(dailyVisible()&&typeof window.renderTimeLogs==='function')window.renderTimeLogs()},5000);
+  setInterval(()=>{if(dailyVisible()&&typeof window.renderTimeLogs==='function'&&!window.__tasneefDailyRootV10511)window.renderTimeLogs()},30000);
 })();
 /* ===== END V10512 ===== */
