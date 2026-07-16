@@ -25040,16 +25040,46 @@ ${finalUrl}
     } finally { URL.revokeObjectURL(url); }
   }
   async function shareWhatsappWithImage(text,file){
-    if(file && navigator.share && navigator.canShare){
-      try{ if(navigator.canShare({files:[file]})){ await navigator.share({files:[file],text,title:'واتساب'}); return true; } }catch(e){ console.warn('share with file failed',e); }
-    }
-    try{ if(navigator.clipboard&&navigator.clipboard.writeText) await navigator.clipboard.writeText(text); }catch(_){ }
-    openWhatsapp(text);
-    if(file){
-      const url=URL.createObjectURL(file); window.open(url,'_blank','noopener'); setTimeout(()=>URL.revokeObjectURL(url),60000);
-      notify('تم فتح واتساب بالنص وفتح الصورة بشكل منفصل لأن جهازك لا يدعم الإرسال المباشر للملفات من المتصفح','warn');
-    }
-    return false;
+    return new Promise(resolve=>{
+      const old=document.getElementById('tasneefWhatsappShareV10505'); if(old) old.remove();
+      const modal=document.createElement('div'); modal.id='tasneefWhatsappShareV10505';
+      const previewUrl=file?URL.createObjectURL(file):'';
+      modal.innerHTML=`<div class="tasneef-wa-share-card" dir="rtl">
+        <div class="tasneef-wa-share-head"><b>إرسال التسجيل عبر واتساب</b><button type="button" data-close>إغلاق</button></div>
+        ${previewUrl?`<img src="${previewUrl}" alt="صورة التسجيل">`:''}
+        <textarea readonly>${esc2(text)}</textarea>
+        <button type="button" class="tasneef-wa-send" data-send>إرسال الصورة والرسالة</button>
+        <small>اضغط الزر الأخضر ثم اختر واتساب من نافذة المشاركة.</small>
+      </div>`;
+      if(!document.getElementById('tasneefWhatsappShareStyleV10505')){
+        const st=document.createElement('style');st.id='tasneefWhatsappShareStyleV10505';st.textContent=`
+        #tasneefWhatsappShareV10505{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:14px}
+        .tasneef-wa-share-card{width:min(520px,100%);max-height:94vh;overflow:auto;background:#fff;border-radius:18px;padding:14px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+        .tasneef-wa-share-head{display:flex;justify-content:space-between;align-items:center;color:#075542;margin-bottom:10px;font-size:18px}
+        .tasneef-wa-share-head button{border:0;background:#c93636;color:#fff;border-radius:9px;padding:8px 14px}
+        .tasneef-wa-share-card img{display:block;width:100%;max-height:48vh;object-fit:contain;border-radius:12px;background:#eee}
+        .tasneef-wa-share-card textarea{width:100%;min-height:140px;margin:10px 0;border:1px solid #cfded8;border-radius:10px;padding:10px;font-family:Tahoma,Arial;direction:rtl}
+        .tasneef-wa-send{display:block;width:100%;border:0;background:#128c7e;color:#fff;border-radius:12px;padding:14px;font-size:17px;font-weight:800}
+        .tasneef-wa-share-card small{display:block;text-align:center;color:#667;margin-top:8px}`;document.head.appendChild(st);
+      }
+      document.body.appendChild(modal);
+      const cleanup=()=>{try{if(previewUrl)URL.revokeObjectURL(previewUrl)}catch(_){} modal.remove();resolve(false)};
+      modal.querySelector('[data-close]').onclick=cleanup;
+      modal.querySelector('[data-send]').onclick=async()=>{
+        const btn=modal.querySelector('[data-send]');btn.disabled=true;btn.textContent='جارٍ فتح المشاركة...';
+        try{
+          if(file && navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))){
+            await navigator.share({files:[file],text,title:'تسجيل دخول وخروج المشروع'});
+            try{if(previewUrl)URL.revokeObjectURL(previewUrl)}catch(_){} modal.remove();resolve(true);return;
+          }
+          try{if(navigator.clipboard&&navigator.clipboard.writeText)await navigator.clipboard.writeText(text)}catch(_){}
+          const wa=window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank');
+          if(file){const a=document.createElement('a');a.href=previewUrl;a.download=file.name||'attendance-whatsapp.jpg';document.body.appendChild(a);a.click();a.remove();}
+          notify(wa?'تم فتح واتساب وتنزيل الصورة لإرفاقها':'اسمح بالنوافذ المنبثقة ثم اضغط إرسال مرة أخرى','warn');
+          btn.disabled=false;btn.textContent='إرسال الصورة والرسالة';
+        }catch(e){console.warn('share failed',e);btn.disabled=false;btn.textContent='إرسال الصورة والرسالة';notify('تعذر فتح المشاركة. حاول مرة أخرى واختر واتساب.','err')}
+      };
+    });
   }
   async function captureAndShareCheckout(title,pid,workers){
     const text=waMessage(title,pid,workers);
@@ -25060,7 +25090,22 @@ ${finalUrl}
       await shareWhatsappWithImage(text,composed);
     }catch(e){ console.warn('capture/share checkout failed',e); openWhatsapp(text); }
   }
-  async function ensureSupervisorCheckIn(pid){const u=currentUser();const open=(window.data?.logs||[]).find(l=>S(l.supervisor_id)===S(u.id)&&S(l.project_id)===S(pid)&&!l.check_out);if(open)return open;const row={user_id:u.id,supervisor_id:N(u.id),project_id:N(pid),check_in:nowIso(),check_out:null,log_date:(typeof today==='function'?today():new Date().toISOString().slice(0,10)),duration_minutes:0,travel_minutes:N($id('logTravel')?.value),visit_type:$id('logVisitType')?.value||'surface',required_minutes:0,time_difference_minutes:0,time_status:'open',notes:$id('logNotes')?.value||''};const r=await sb.from('time_logs').insert(row).select('*').single();if(r.error)throw r.error;(window.data.logs||[]).push(r.data);return r.data}
+  function riyadhDate(){try{return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())}catch(_){return new Date().toISOString().slice(0,10)}}
+  async function ensureSupervisorCheckIn(pid){
+    const u=currentUser(),sid=N(u.id),project=N(pid);
+    let q=await sb.from('time_logs').select('*').eq('supervisor_id',sid).eq('project_id',project).is('check_out',null).order('check_in',{ascending:false}).limit(1);
+    if(!q.error && q.data && q.data[0]){
+      const existing=q.data[0];window.data=window.data||{};window.data.logs=window.data.logs||[];
+      if(!window.data.logs.some(x=>S(x.id)===S(existing.id)))window.data.logs.push(existing);
+      return existing;
+    }
+    const checkIn=nowIso(),date=riyadhDate();
+    let required=0;try{required=typeof requiredMinutesForLog==='function'?N(requiredMinutesForLog(project,date)):0}catch(_){}
+    const row={user_id:sid||null,supervisor_id:sid||null,project_id:project,check_in:checkIn,check_out:null,log_date:date,duration_minutes:0,travel_minutes:N($id('logTravel')?.value),visit_type:$id('logVisitType')?.value||'surface',required_minutes:required,time_difference_minutes:-required,time_status:'open',notes:$id('logNotes')?.value||'تسجيل دخول المشروع من صفحة المشرف'};
+    const r=await sb.from('time_logs').insert(row).select('*').single();if(r.error)throw r.error;
+    window.data=window.data||{};window.data.logs=window.data.logs||[];window.data.logs.push(r.data);return r.data;
+  }
+
   window.supervisorCheckIn=async function(btn){
     const pid=currentPid();if(!pid)return notify('اختر المشروع','err');
     const ids=selectedIds('.sup-enter-worker');if(!ids.length)return notify('حدد عاملًا واحدًا على الأقل للدخول','err');
@@ -25112,8 +25157,17 @@ ${finalUrl}
       await fetchVisits();
       const rows=state.visits.filter(v=>S(v.project_id)===pid&&!v.check_out),out=nowIso();
       if(rows.length){const r=await sb.from(TABLE).update({check_out:out,updated_by:N(supervisorId()),updated_at:out}).in('id',rows.map(v=>v.id)).is('check_out',null);if(r.error)throw r.error}
-      const u=currentUser(),openLogs=(window.data?.logs||[]).filter(l=>S(l.supervisor_id)===S(u.id)&&S(l.project_id)===pid&&!l.check_out);
-      for(const l of openLogs){await sb.from('time_logs').update({check_out:out,duration_minutes:Math.max(0,Math.round((new Date(out)-new Date(l.check_in))/60000))}).eq('id',l.id).is('check_out',null);l.check_out=out}
+      const u=currentUser(),sid=N(u.id);
+      const openRes=await sb.from('time_logs').select('*').eq('supervisor_id',sid).eq('project_id',N(pid)).is('check_out',null).order('check_in',{ascending:false});
+      if(openRes.error)throw openRes.error;
+      const openLogs=openRes.data||[];
+      for(const l of openLogs){
+        const duration=Math.max(0,Math.round((new Date(out)-new Date(l.check_in))/60000));
+        let required=N(l.required_minutes);let diff=duration-required;let status=required?(diff<-5?'under':diff>5?'over':'within'):'closed';
+        const ur=await sb.from('time_logs').update({check_out:out,duration_minutes:duration,time_difference_minutes:diff,time_status:status,updated_at:out}).eq('id',l.id).is('check_out',null).select('*').maybeSingle();
+        if(ur.error)throw ur.error;
+        const local=(window.data?.logs||[]).find(x=>S(x.id)===S(l.id));if(local)Object.assign(local,ur.data||{check_out:out,duration_minutes:duration,time_difference_minutes:diff,time_status:status});
+      }
       const workers=uniqueWorkers([...selectedWorkers,...workersFromVisits(rows)]);
       await fetchVisits();if(typeof renderTimeLogs==='function')renderTimeLogs();notify('تم تسجيل خروج المشرف وجميع العمال');
       await finalizeCameraShare(rawPhoto,'تم تسجيل خروج المشروع',pid,workers);
@@ -25123,3 +25177,44 @@ ${finalUrl}
   const oldInit=window.initSupervisor;window.initSupervisor=async function(){await oldInit.apply(this,arguments);await fetchVisits();render()};
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)fetchVisits()});
 })();;
+
+/* ===== V10505 DAILY LOGS / WHATSAPP RELIABLE BRIDGE ===== */
+(function(){
+  'use strict';
+  if(window.__tasneefDailyLogsBridgeV10505)return;window.__tasneefDailyLogsBridgeV10505=true;
+  const S=v=>String(v??'').trim(),N=v=>Number(v)||0,A=v=>Array.isArray(v)?v:[];
+  const dateRiyadh=v=>{try{return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(v))}catch(_){return S(v).slice(0,10)}};
+  async function syncWorkerVisitsToDailyLogs(){
+    if(!window.sb||!document.getElementById('daily'))return;
+    const since=new Date(Date.now()-120*86400000).toISOString();
+    const [vr,lr]=await Promise.all([
+      sb.from('project_worker_visits').select('*').gte('check_in',since).order('check_in',{ascending:false}).limit(5000),
+      sb.from('time_logs').select('id,supervisor_id,project_id,check_in,check_out,notes,log_date').gte('check_in',since).order('check_in',{ascending:false}).limit(5000)
+    ]);
+    if(vr.error){console.warn('daily bridge visits',vr.error.message);return}
+    const existing=A(lr.data),groups=new Map();
+    A(vr.data).forEach(v=>{
+      const token=S(v.operation_token).replace(/-\d+$/,'');
+      const minute=S(v.check_in).slice(0,16);
+      const key=token||[v.supervisor_id,v.project_id,minute].join('|');
+      let g=groups.get(key);if(!g){g={key,supervisor_id:N(v.supervisor_id),project_id:N(v.project_id),check_in:v.check_in,check_out:v.check_out||null,workers:[]};groups.set(key,g)}
+      if(new Date(v.check_in)<new Date(g.check_in))g.check_in=v.check_in;
+      if(!v.check_out)g.check_out=null;else if(g.check_out&&new Date(v.check_out)>new Date(g.check_out))g.check_out=v.check_out;
+      const w=A(window.data?.workers).find(x=>S(x.id)===S(v.worker_id));const name=S(w?.name||w?.full_name||v.worker_name||('عامل '+v.worker_id));if(name&&!g.workers.includes(name))g.workers.push(name);
+    });
+    const inserts=[];
+    groups.forEach(g=>{
+      const marker='PWV:'+g.key;
+      const exists=existing.some(l=>S(l.notes).includes(marker)||(S(l.supervisor_id)===S(g.supervisor_id)&&S(l.project_id)===S(g.project_id)&&Math.abs(new Date(l.check_in)-new Date(g.check_in))<60000));
+      if(exists)return;
+      const duration=g.check_out?Math.max(0,Math.round((new Date(g.check_out)-new Date(g.check_in))/60000)):0;
+      inserts.push({user_id:g.supervisor_id||null,supervisor_id:g.supervisor_id||null,project_id:g.project_id,check_in:g.check_in,check_out:g.check_out,log_date:dateRiyadh(g.check_in),duration_minutes:duration,travel_minutes:0,visit_type:'surface',required_minutes:0,time_difference_minutes:duration,time_status:g.check_out?'closed':'open',notes:marker+' | العمال: '+g.workers.join('، ')});
+    });
+    if(inserts.length){const ir=await sb.from('time_logs').insert(inserts).select('*');if(ir.error)console.warn('daily bridge insert',ir.error.message);else{window.data=window.data||{};window.data.logs=A(window.data.logs).concat(A(ir.data));}}
+  }
+  const oldRefresh=window.refreshAll;
+  if(typeof oldRefresh==='function')window.refreshAll=async function(){const r=await oldRefresh.apply(this,arguments);try{await syncWorkerVisitsToDailyLogs();if(typeof window.renderTimeLogs==='function')await window.renderTimeLogs()}catch(e){console.warn('daily bridge render',e)}return r};
+  const oldInit=window.initAdmin;
+  if(typeof oldInit==='function')window.initAdmin=async function(){const r=await oldInit.apply(this,arguments);try{await syncWorkerVisitsToDailyLogs();window.renderTimeLogs&&await window.renderTimeLogs()}catch(e){console.warn('daily bridge init',e)}return r};
+  document.addEventListener('visibilitychange',function(){if(!document.hidden&&document.getElementById('daily')){syncWorkerVisitsToDailyLogs().then(()=>window.renderTimeLogs&&window.renderTimeLogs()).catch(()=>{})}});
+})();
