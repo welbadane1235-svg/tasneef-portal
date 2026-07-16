@@ -25120,10 +25120,17 @@ ${finalUrl}
       const allowedIds=new Set(selectedWorkers.map(w=>N(w.id)));
       const workers=selectedWorkers.filter(w=>allowedIds.has(N(w.id))&&!openVisitForWorker(w.id));
       if(!workers.length){notify('تم تسجيل هؤلاء العمال مسبقًا أو أصبحوا داخل مشروع آخر','warn');return}
-      await ensureSupervisorCheckIn(pid);
+      const supervisorLog=await ensureSupervisorCheckIn(pid);
       const t=nowIso();
       const rows=workers.map(w=>({operation_token:tok.token+'-'+w.id,worker_id:N(w.id),supervisor_id:N(supervisorId()),project_id:N(pid),check_in:t,check_out:null,created_by:N(supervisorId()),notes:$id('logNotes')?.value||''}));
       const r=await sb.from(TABLE).upsert(rows,{onConflict:'operation_token'}).select('*');if(r.error)throw r.error;
+      const workerNames=workers.map(workerName).filter(Boolean).join('، ');
+      if(supervisorLog&&supervisorLog.id){
+        const noteBase=S($id('logNotes')?.value||'تسجيل دخول المشروع من صفحة المشرف');
+        const note=noteBase+' | العمال: '+workerNames;
+        const ur=await sb.from('time_logs').update({notes:note,updated_at:t}).eq('id',supervisorLog.id).select('*').maybeSingle();
+        if(!ur.error&&ur.data){Object.assign(supervisorLog,ur.data);const local=(window.data?.logs||[]).find(x=>S(x.id)===S(supervisorLog.id));if(local)Object.assign(local,ur.data)}
+      }
       clearToken(tok.key);await fetchVisits();notify('تم تسجيل دخول '+workers.length+' عامل');
       await finalizeCameraShare(rawPhoto,'تم تسجيل دخول المشروع',pid,workers);
     }catch(e){console.error(e);notify('تعذر الحفظ: '+(e.message||e),'err')}finally{setBusy(btn,false)}
@@ -25178,43 +25185,42 @@ ${finalUrl}
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)fetchVisits()});
 })();;
 
-/* ===== V10505 DAILY LOGS / WHATSAPP RELIABLE BRIDGE ===== */
+/* ===== V10506 FAST DAILY LOGS BRIDGE ===== */
 (function(){
   'use strict';
-  if(window.__tasneefDailyLogsBridgeV10505)return;window.__tasneefDailyLogsBridgeV10505=true;
-  const S=v=>String(v??'').trim(),N=v=>Number(v)||0,A=v=>Array.isArray(v)?v:[];
-  const dateRiyadh=v=>{try{return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(v))}catch(_){return S(v).slice(0,10)}};
-  async function syncWorkerVisitsToDailyLogs(){
-    if(!window.sb||!document.getElementById('daily'))return;
-    const since=new Date(Date.now()-120*86400000).toISOString();
-    const [vr,lr]=await Promise.all([
-      sb.from('project_worker_visits').select('*').gte('check_in',since).order('check_in',{ascending:false}).limit(5000),
-      sb.from('time_logs').select('id,supervisor_id,project_id,check_in,check_out,notes,log_date').gte('check_in',since).order('check_in',{ascending:false}).limit(5000)
-    ]);
-    if(vr.error){console.warn('daily bridge visits',vr.error.message);return}
-    const existing=A(lr.data),groups=new Map();
-    A(vr.data).forEach(v=>{
-      const token=S(v.operation_token).replace(/-\d+$/,'');
-      const minute=S(v.check_in).slice(0,16);
-      const key=token||[v.supervisor_id,v.project_id,minute].join('|');
-      let g=groups.get(key);if(!g){g={key,supervisor_id:N(v.supervisor_id),project_id:N(v.project_id),check_in:v.check_in,check_out:v.check_out||null,workers:[]};groups.set(key,g)}
-      if(new Date(v.check_in)<new Date(g.check_in))g.check_in=v.check_in;
-      if(!v.check_out)g.check_out=null;else if(g.check_out&&new Date(v.check_out)>new Date(g.check_out))g.check_out=v.check_out;
-      const w=A(window.data?.workers).find(x=>S(x.id)===S(v.worker_id));const name=S(w?.name||w?.full_name||v.worker_name||('عامل '+v.worker_id));if(name&&!g.workers.includes(name))g.workers.push(name);
-    });
-    const inserts=[];
-    groups.forEach(g=>{
-      const marker='PWV:'+g.key;
-      const exists=existing.some(l=>S(l.notes).includes(marker)||(S(l.supervisor_id)===S(g.supervisor_id)&&S(l.project_id)===S(g.project_id)&&Math.abs(new Date(l.check_in)-new Date(g.check_in))<60000));
-      if(exists)return;
-      const duration=g.check_out?Math.max(0,Math.round((new Date(g.check_out)-new Date(g.check_in))/60000)):0;
-      inserts.push({user_id:g.supervisor_id||null,supervisor_id:g.supervisor_id||null,project_id:g.project_id,check_in:g.check_in,check_out:g.check_out,log_date:dateRiyadh(g.check_in),duration_minutes:duration,travel_minutes:0,visit_type:'surface',required_minutes:0,time_difference_minutes:duration,time_status:g.check_out?'closed':'open',notes:marker+' | العمال: '+g.workers.join('، ')});
-    });
-    if(inserts.length){const ir=await sb.from('time_logs').insert(inserts).select('*');if(ir.error)console.warn('daily bridge insert',ir.error.message);else{window.data=window.data||{};window.data.logs=A(window.data.logs).concat(A(ir.data));}}
+  if(window.__tasneefFastDailyLogsV10506)return;window.__tasneefFastDailyLogsV10506=true;
+  const S=v=>String(v??'').trim(), A=v=>Array.isArray(v)?v:[];
+  let busy=false,lastKey='',lastAt=0,timer=null;
+  function dateValue(id,fallback){const el=document.getElementById(id);return S(el&&el.value)||fallback}
+  function todayRiyadh(){try{return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())}catch(_){return new Date().toISOString().slice(0,10)}}
+  function nextDay(d){const x=new Date(d+'T00:00:00');x.setDate(x.getDate()+1);return x.toISOString().slice(0,10)}
+  function dailyVisible(){const el=document.getElementById('daily');if(!el)return false;const st=getComputedStyle(el);return st.display!=='none'&&!el.hidden&&el.offsetParent!==null}
+  function range(){const t=todayRiyadh();const from=dateValue('dailyDateFromV10310',dateValue('dailyFrom',t));const to=dateValue('dailyDateToV10310',dateValue('dailyTo',from));return{from,to}}
+  function mergeLogs(rows){window.data=window.data||{};const map=new Map(A(window.data.logs).map(x=>[S(x.id),x]));A(rows).forEach(x=>map.set(S(x.id),x));window.data.logs=[...map.values()]}
+  async function refreshFast(force){
+    if(!window.sb||busy||!dailyVisible())return;
+    const r=range(),key=r.from+'|'+r.to;
+    if(!force&&key===lastKey&&Date.now()-lastAt<15000)return;
+    busy=true;
+    try{
+      const res=await sb.from('time_logs')
+        .select('id,user_id,supervisor_id,project_id,check_in,check_out,log_date,duration_minutes,travel_minutes,visit_type,required_minutes,time_difference_minutes,time_status,notes,created_at,updated_at')
+        .gte('log_date',r.from).lte('log_date',r.to)
+        .order('check_in',{ascending:false}).limit(800);
+      if(res.error)throw res.error;
+      mergeLogs(res.data||[]);lastKey=key;lastAt=Date.now();
+      if(typeof window.renderTimeLogs==='function')await window.renderTimeLogs();
+    }catch(e){console.warn('V10506 daily fast refresh',e&&e.message||e)}finally{busy=false}
   }
-  const oldRefresh=window.refreshAll;
-  if(typeof oldRefresh==='function')window.refreshAll=async function(){const r=await oldRefresh.apply(this,arguments);try{await syncWorkerVisitsToDailyLogs();if(typeof window.renderTimeLogs==='function')await window.renderTimeLogs()}catch(e){console.warn('daily bridge render',e)}return r};
-  const oldInit=window.initAdmin;
-  if(typeof oldInit==='function')window.initAdmin=async function(){const r=await oldInit.apply(this,arguments);try{await syncWorkerVisitsToDailyLogs();window.renderTimeLogs&&await window.renderTimeLogs()}catch(e){console.warn('daily bridge init',e)}return r};
-  document.addEventListener('visibilitychange',function(){if(!document.hidden&&document.getElementById('daily')){syncWorkerVisitsToDailyLogs().then(()=>window.renderTimeLogs&&window.renderTimeLogs()).catch(()=>{})}});
+  window.tasneefRefreshDailyFastV10506=refreshFast;
+  document.addEventListener('click',e=>{
+    const target=e.target&&e.target.closest?e.target.closest('[data-tab="daily"],button,a'):null;
+    const txt=S(target&&target.textContent);
+    if(target&&(target.dataset?.tab==='daily'||txt.includes('التسجيلات اليومية')))setTimeout(()=>refreshFast(true),120);
+  });
+  ['dailyDateFromV10310','dailyDateToV10310','dailyFrom','dailyTo','dailySupervisor','dailyProject'].forEach(id=>document.addEventListener('change',e=>{if(e.target&&e.target.id===id)setTimeout(()=>refreshFast(true),80)}));
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&dailyVisible())refreshFast(true)});
+  timer=setInterval(()=>{if(dailyVisible())refreshFast(false)},30000);
+  window.addEventListener('beforeunload',()=>{if(timer)clearInterval(timer)});
 })();
+/* ===== END V10506 FAST DAILY LOGS BRIDGE ===== */
