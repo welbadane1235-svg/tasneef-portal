@@ -24884,18 +24884,39 @@ ${finalUrl}
     }finally{state.loading=false;render()}
   }
   function workerProjectLabel(w){return (w.projects||[]).map(p=>p.name||projectNameLocal(p.id)).filter(Boolean).join('، ')||'غير مرتبط بمشروع'}
-  function isForCurrentProject(w,pid){return !pid||(w.projects||[]).some(p=>S(p.id)===S(pid)||norm(p.name)===norm(projectNameLocal(pid)))}
+  function projectIdentity(value){
+    const raw=S(value); if(!raw)return {id:'',name:''};
+    const p=(window.data?.projects||[]).find(x=>S(x.id)===raw||norm(x.name)===norm(raw));
+    return {id:S(p?.id||(/^\d+$/.test(raw)?raw:'')),name:norm(p?.name||(!/^\d+$/.test(raw)?raw:''))};
+  }
+  function sameProject(a,b){
+    const x=projectIdentity(a),y=projectIdentity(b);
+    return !!((x.id&&y.id&&x.id===y.id)||(x.name&&y.name&&x.name===y.name));
+  }
+  function isForCurrentProject(w,pid){
+    if(!pid)return false;
+    return (w.projects||[]).some(p=>sameProject(p.id||p.name,pid));
+  }
   function render(){
     const workers=assignedWorkers(),pid=currentPid();
-    const insideRaw=state.visits.filter(v=>!v.check_out&&(!pid||S(v.project_id)===pid));
+    const insideRaw=pid?state.visits.filter(v=>!v.check_out&&sameProject(v.project_id||v.project_name,pid)):[];
     const insideMap=new Map();insideRaw.forEach(v=>insideMap.set(S(v.worker_id),v));const inside=[...insideMap.values()];
-    const available=workers.filter(w=>!openVisitForWorker(w.id));
-    if($id('supWorkersTotalCount'))$id('supWorkersTotalCount').textContent=workers.length;
+    const projectWorkers=pid?workers.filter(w=>isForCurrentProject(w,pid)):[];
+    const available=projectWorkers.filter(w=>!openVisitForWorker(w.id));
+    const busyElsewhere=projectWorkers.filter(w=>{const ov=openVisitForWorker(w.id);return ov&&!sameProject(ov.project_id||ov.project_name,pid)});
+    if($id('supWorkersTotalCount'))$id('supWorkersTotalCount').textContent=pid?projectWorkers.length:workers.length;
     if($id('supWorkersInsideCount'))$id('supWorkersInsideCount').textContent=inside.length;
     if($id('supWorkersAvailableCount'))$id('supWorkersAvailableCount').textContent=available.length;
     const assigned=$id('supAssignedWorkers');if(assigned)assigned.innerHTML=workers.map(w=>{const ov=openVisitForWorker(w.id);return`<div class="sup-worker-row"><span><b>${esc2(workerName(w))}</b><br><small>${ov?'داخل '+esc2(projectNameLocal(ov.project_id)):esc2(workerProjectLabel(w))}</small></span></div>`}).join('')||'<div class="sup-worker-empty">لا يوجد عمال مرتبطون بالمشرف في النظام الموحد</div>';
-    const inn=$id('supInsideWorkers');if(inn)inn.innerHTML=inside.map(v=>{const w=workers.find(x=>S(x.id)===S(v.worker_id));return`<label class="sup-worker-row"><input type="checkbox" class="sup-exit-worker" value="${N(v.worker_id)}"><span><b>${esc2(workerName(w||{id:v.worker_id}))}</b><br><small>دخول ${esc2(new Date(v.check_in).toLocaleTimeString('ar-SA',{hour:'numeric',minute:'2-digit'}))}</small></span></label>`}).join('')||'<div class="sup-worker-empty">لا يوجد عمال داخل المشروع الآن</div>';
-    const av=$id('supAvailableWorkers');if(av)av.innerHTML=available.map(w=>`<label class="sup-worker-row"><input type="checkbox" class="sup-enter-worker" value="${N(w.id)}"><span><b>${esc2(workerName(w))}</b><br><small>${isForCurrentProject(w,pid)?'مخصص لهذا المشروع':'متاح للنقل — '+esc2(workerProjectLabel(w))}</small></span></label>`).join('')||'<div class="sup-worker-empty">لا يوجد عمال متاحون</div>';
+    const inn=$id('supInsideWorkers');if(inn)inn.innerHTML=!pid?'<div class="sup-worker-empty">اختر المشروع لعرض العمال الموجودين داخله</div>':(inside.map(v=>{const w=workers.find(x=>S(x.id)===S(v.worker_id));return`<label class="sup-worker-row"><input type="checkbox" class="sup-exit-worker" value="${N(v.worker_id)}"><span><b>${esc2(workerName(w||{id:v.worker_id}))}</b><br><small>دخول ${esc2(new Date(v.check_in).toLocaleTimeString('ar-SA',{hour:'numeric',minute:'2-digit'}))}</small></span></label>`}).join('')||'<div class="sup-worker-empty">لا يوجد عمال داخل هذا المشروع الآن</div>');
+    const av=$id('supAvailableWorkers');if(av){
+      if(!pid) av.innerHTML='<div class="sup-worker-empty">اختر المشروع أولًا لعرض العمال المتاحين</div>';
+      else {
+        const ready=available.map(w=>`<label class="sup-worker-row"><input type="checkbox" class="sup-enter-worker" value="${N(w.id)}"><span><b>${esc2(workerName(w))}</b><br><small>متاح للدخول</small></span></label>`).join('');
+        const blocked=busyElsewhere.map(w=>{const ov=openVisitForWorker(w.id);return`<div class="sup-worker-row sup-worker-blocked"><span><b>${esc2(workerName(w))}</b><br><small>يعمل الآن في ${esc2(projectNameLocal(ov.project_id))} — سجّل خروجه أولًا</small></span></div>`}).join('');
+        av.innerHTML=ready+blocked||'<div class="sup-worker-empty">لا يوجد عمال مرتبطون بهذا المشروع</div>';
+      }
+    }
   }
   function uniqueWorkers(workers){return [...new Map((workers||[]).map(w=>[S(w.id||workerNumericId(w)||workerCode(w)||norm(workerName(w))),w])).values()].filter(Boolean)}
   function workersFromVisits(rows){
