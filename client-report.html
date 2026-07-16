@@ -285,20 +285,27 @@ function openModal(title,sub,body,detailMode=false){$('modalTitle').textContent=
       const type=String($('clientTicketTypeV466')?.value||'أخرى').trim();
       const loc=String($('clientTicketLocationV466')?.value||'').trim();
       if(!title) throw new Error('اكتب عنوان التذكرة');
+      let resolvedProjectId=portal.projectId||portal.project_id||'';
+      if(!resolvedProjectId){
+        const payload=await resolvePortalPayload();
+        resolvedProjectId=payload?.project_id||payload?.projectId||'';
+        if(resolvedProjectId){portal.projectId=resolvedProjectId;window.portal=portal;}
+      }
+      if(!resolvedProjectId) throw new Error('تعذر تحديد المشروع المرتبط ببوابة العميل. افتح رابط البوابة من زر العرض في لوحة الإدارة.');
       if(btn){btn.disabled=true;btn.textContent='جاري الإرسال...';}
       let inserted=null, err=null;
       if(G.sb){
         try{
-          const r=await G.sb.rpc('tasneef_client_create_ticket_v10519',{p_project_id:String(portal.projectId),p_title:title,p_description:desc,p_type:type,p_location:loc,p_client_name:'عميل المشروع',p_client_contact:''});
+          const r=await G.sb.rpc('tasneef_client_create_ticket_v10519',{p_project_id:String(resolvedProjectId),p_title:title,p_description:desc,p_type:type,p_location:loc,p_client_name:'عميل المشروع',p_client_contact:''});
           if(r.error) throw r.error;
           inserted=Array.isArray(r.data)?r.data[0]:r.data;
-        }catch(e){ err=e; try{ const d=await G.sb.from('tickets').insert({project_id:Number(portal.projectId)||portal.projectId,title,description:[desc,loc?('الموقع: '+loc):'',type?('النوع: '+type):''].filter(Boolean).join('\n'),status:'open',created_at:new Date().toISOString()}).select('*').single(); if(d.error) throw d.error; inserted=d.data; err=null; }catch(e2){ err=e2; } }
+        }catch(e){ err=e; try{ const d=await G.sb.from('tickets').insert({project_id:Number(resolvedProjectId)||resolvedProjectId,title,description:[desc,loc?('الموقع: '+loc):'',type?('النوع: '+type):''].filter(Boolean).join('\n'),status:'open',created_at:new Date().toISOString()}).select('*').single(); if(d.error) throw d.error; inserted=d.data; err=null; }catch(e2){ err=e2; } }
       }
       if(err) throw err;
       if(inserted) portal.tickets=[inserted,...(portal.tickets||[]).filter(x=>String(x.id)!==String(inserted.id))];
       try{localStorage.setItem('tasneef_client_ticket_changed_v10520',String(Date.now()))}catch(_){}
       try{
-        const rr=await G.sb.rpc('tasneef_client_tickets_v10519',{p_project_id:String(portal.projectId)});
+        const rr=await G.sb.rpc('tasneef_client_tickets_v10519',{p_project_id:String(resolvedProjectId)});
         if(!rr.error&&Array.isArray(rr.data)) portal.tickets=rr.data;
       }catch(_){}
       if(typeof G.toast==='function') G.toast('تم رفع التذكرة بنجاح');
@@ -326,7 +333,6 @@ function openModal(title,sub,body,detailMode=false){$('modalTitle').textContent=
 })();
 </script>
 
-<script src="tasneef_client_tickets_canonical_v10520.js?v=10520-project-link-fix"></script>
 
 </body>
 </html>
