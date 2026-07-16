@@ -25110,8 +25110,20 @@ ${finalUrl}
       if(!rpc.error)saved=Array.isArray(rpc.data)?rpc.data[0]:rpc.data;
       else console.warn('checkin RPC fallback:',rpc.error.message);
     }catch(e){console.warn('checkin RPC unavailable:',e&&e.message||e)}
-    if(!saved){const r=await sb.from('time_logs').insert(row).select('*').single();if(r.error)throw r.error;saved=r.data}
-    window.data=window.data||{};window.data.logs=window.data.logs||[];if(!window.data.logs.some(x=>S(x.id)===S(saved.id)))window.data.logs.push(saved);return saved;
+    if(!saved){
+      const r=await sb.from('time_logs').insert(row).select('*');
+      if(r.error){
+        // إذا سبق إنشاء السجل بسبب ضغطة مكررة أو بطء الشبكة، نقرأ السجل المفتوح بدل إظهار خطأ single.
+        const retry=await sb.from('time_logs').select('*').eq('supervisor_id',sid).eq('project_id',project).is('check_out',null).order('check_in',{ascending:false}).limit(5);
+        if(retry.error||!retry.data||!retry.data.length)throw r.error;
+        saved=retry.data[0];
+      }else saved=Array.isArray(r.data)?r.data[0]:r.data;
+    }
+    if(!saved||!saved.id)throw new Error('تم إرسال عملية الدخول لكن لم يرجع سجل صالح من قاعدة البيانات');
+    window.data=window.data||{};window.data.logs=window.data.logs||[];if(!window.data.logs.some(x=>S(x.id)===S(saved.id)))window.data.logs.push(saved);
+    try{localStorage.setItem('tasneef_time_logs_changed',JSON.stringify({id:saved.id,at:Date.now(),type:'checkin'}));}catch(_){}
+    try{window.dispatchEvent(new CustomEvent('tasneef:time-log-changed',{detail:saved}));}catch(_){}
+    return saved;
   }
 
   window.supervisorCheckIn=async function(btn){
