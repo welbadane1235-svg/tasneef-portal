@@ -107,9 +107,11 @@
       if(sup){q1=q1.eq('supervisor_id',sup);q2=q2.eq('supervisor_id',sup)}if(proj){q1=q1.eq('project_id',proj);q2=q2.eq('project_id',proj)}
       let vq=sb.from('project_worker_visits').select('id,worker_id,supervisor_id,project_id,check_in,check_out').gte('check_in',from+'T00:00:00').lt('check_in',end+'T00:00:00').order('check_in',{ascending:false}).limit(5000);
       if(sup)vq=vq.eq('supervisor_id',sup);if(proj)vq=vq.eq('project_id',proj);
-      const [r1,r2,vr]=await Promise.all([q1,q2,vq]);if(rid!==requestId)return;
-      if(r1.error&&r2.error)throw r1.error;
-      rows=merge(r1.error?[]:r1.data,r2.error?[]:r2.data);
+      let rpcPromise=Promise.resolve({data:[],error:null});
+      try{rpcPromise=sb.rpc('tasneef_admin_daily_logs_v10512',{p_from:from,p_to:to,p_supervisor_id:sup?Number(sup):null,p_project_id:proj?Number(proj):null})}catch(_){ }
+      const [r1,r2,vr,rpc]=await Promise.all([q1,q2,vq,rpcPromise]);if(rid!==requestId)return;
+      if(r1.error&&r2.error&&rpc?.error)throw r1.error;
+      rows=merge(merge(r1.error?[]:r1.data,r2.error?[]:r2.data),rpc?.error?[]:rpc?.data);
       const visits=vr.error?[]:A(vr.data);
       rows.forEach(l=>{
         const t=new Date(l.check_in||l.created_at).getTime();
@@ -159,7 +161,7 @@
         window.__tasneefDailyRootChannelV10511=ch;
       }
     }catch(e){console.warn('daily realtime unavailable',e)}
-    setInterval(()=>{if(dailyVisible()&&Date.now()-lastLoadedAt>20000)load()},20000);
+    setInterval(()=>{if(dailyVisible()&&Date.now()-lastLoadedAt>5000)load()},5000);
   }
   function init(){removeLegacyScript();css();if(supervisorPage())buildSupervisor();else buildAdmin();built=true;window.renderTimeLogs=load;try{renderTimeLogs=load}catch(_){ }window.refreshDailyRangeLogsV10353=load;window.refreshDailyRangeLogsV10363=load;window.tasneefRefreshDailyFastV10506=load;window.tasneefRefreshDailyV10508=load;bindExternalRefresh();setTimeout(load,50);console.info('V10511 daily root loaded last; filters, selected workers, and live refresh enabled.');}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,0));else setTimeout(init,0);
