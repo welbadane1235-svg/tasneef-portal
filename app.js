@@ -25090,7 +25090,7 @@ ${finalUrl}
       await shareWhatsappWithImage(text,composed);
     }catch(e){ console.warn('capture/share checkout failed',e); openWhatsapp(text); }
   }
-  function riyadhDate(){try{return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())}catch(_){return new Date().toISOString().slice(0,10)}}
+  function riyadhDate(){try{const ps=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const g=t=>ps.find(x=>x.type===t)?.value||'';return g('year')+'-'+g('month')+'-'+g('day')}catch(_){return new Date().toISOString().slice(0,10)}}
   async function ensureSupervisorCheckIn(pid){
     const u=currentUser(),sid=N(u.id),project=N(pid);
     let q=await sb.from('time_logs').select('*').eq('supervisor_id',sid).eq('project_id',project).is('check_out',null).order('check_in',{ascending:false}).limit(1);
@@ -25102,8 +25102,14 @@ ${finalUrl}
     const checkIn=nowIso(),date=riyadhDate();
     let required=0;try{required=typeof requiredMinutesForLog==='function'?N(requiredMinutesForLog(project,date)):0}catch(_){}
     const row={user_id:sid||null,supervisor_id:sid||null,project_id:project,check_in:checkIn,check_out:null,log_date:date,duration_minutes:0,travel_minutes:N($id('logTravel')?.value),visit_type:$id('logVisitType')?.value||'surface',required_minutes:required,time_difference_minutes:-required,time_status:'open',notes:$id('logNotes')?.value||'تسجيل دخول المشروع من صفحة المشرف'};
-    const r=await sb.from('time_logs').insert(row).select('*').single();if(r.error)throw r.error;
-    window.data=window.data||{};window.data.logs=window.data.logs||[];window.data.logs.push(r.data);return r.data;
+    let saved=null;
+    try{
+      const rpc=await sb.rpc('tasneef_supervisor_project_checkin_v10507',{p_supervisor_id:sid,p_project_id:project,p_check_in:checkIn,p_log_date:date,p_visit_type:row.visit_type,p_travel_minutes:row.travel_minutes,p_required_minutes:required,p_notes:row.notes});
+      if(!rpc.error)saved=Array.isArray(rpc.data)?rpc.data[0]:rpc.data;
+      else console.warn('checkin RPC fallback:',rpc.error.message);
+    }catch(e){console.warn('checkin RPC unavailable:',e&&e.message||e)}
+    if(!saved){const r=await sb.from('time_logs').insert(row).select('*').single();if(r.error)throw r.error;saved=r.data}
+    window.data=window.data||{};window.data.logs=window.data.logs||[];if(!window.data.logs.some(x=>S(x.id)===S(saved.id)))window.data.logs.push(saved);return saved;
   }
 
   window.supervisorCheckIn=async function(btn){
@@ -25203,12 +25209,15 @@ ${finalUrl}
     if(!force&&key===lastKey&&Date.now()-lastAt<15000)return;
     busy=true;
     try{
-      const res=await sb.from('time_logs')
-        .select('id,user_id,supervisor_id,project_id,check_in,check_out,log_date,duration_minutes,travel_minutes,visit_type,required_minutes,time_difference_minutes,time_status,notes,created_at,updated_at')
-        .gte('log_date',r.from).lte('log_date',r.to)
-        .order('check_in',{ascending:false}).limit(800);
-      if(res.error)throw res.error;
-      mergeLogs(res.data||[]);lastKey=key;lastAt=Date.now();
+      const cols='id,user_id,supervisor_id,project_id,check_in,check_out,log_date,duration_minutes,travel_minutes,visit_type,required_minutes,time_difference_minutes,time_status,notes,created_at,updated_at';
+      const next=nextDay(r.to);
+      const [byDate,byTime]=await Promise.all([
+        sb.from('time_logs').select(cols).gte('log_date',r.from).lte('log_date',r.to).order('check_in',{ascending:false}).limit(800),
+        sb.from('time_logs').select(cols).gte('check_in',r.from+'T00:00:00').lt('check_in',next+'T00:00:00').order('check_in',{ascending:false}).limit(800)
+      ]);
+      if(byDate.error&&byTime.error)throw byDate.error||byTime.error;
+      const map=new Map();[...(byDate.data||[]),...(byTime.data||[])].forEach(x=>map.set(S(x.id),x));
+      mergeLogs([...map.values()]);lastKey=key;lastAt=Date.now();
       if(typeof window.renderTimeLogs==='function')await window.renderTimeLogs();
     }catch(e){console.warn('V10506 daily fast refresh',e&&e.message||e)}finally{busy=false}
   }
