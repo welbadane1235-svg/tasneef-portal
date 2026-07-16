@@ -24233,21 +24233,50 @@ try{ exportSupervisorDailyPDFV10310 = window.exportSupervisorDailyPDFV10310; }ca
     renderList();
   }
   window.tasneefCloseReportReviewV475=()=>$('reportReviewBackdropV475')?.classList.add('hidden');
+  async function ensureReportServicesBeforePublish(id){
+    const direct=await sb.from('client_report_services').select('*').eq('report_id',id).order('sort_order',{ascending:true});
+    if(direct.error) throw direct.error;
+    if((direct.data||[]).length) return direct.data||[];
+    const rr=await sb.from('client_reports').select('*').eq('id',id).maybeSingle();
+    if(rr.error) throw rr.error;
+    const r=rr.data||{};
+    let q=sb.from('client_reports').select('id,project_id,project_name,report_date,created_at,status,report_type').neq('id',id).order('created_at',{ascending:false}).limit(20);
+    if(r.project_id!=null) q=q.eq('project_id',r.project_id); else if(r.project_name) q=q.eq('project_name',r.project_name);
+    if(r.report_date) q=q.eq('report_date',r.report_date);
+    const related=await q;
+    if(related.error) throw related.error;
+    const ids=(related.data||[]).map(x=>x.id).filter(Boolean);
+    if(!ids.length) throw new Error('لا يمكن نشر التقرير لأنه لا توجد خدمات محفوظة مرتبطة به. أعد فتح التقرير من المشرف وحفظ الخدمات أولًا.');
+    const sr=await sb.from('client_report_services').select('*').in('report_id',ids).order('sort_order',{ascending:true});
+    if(sr.error) throw sr.error;
+    const source=sr.data||[];
+    if(!source.length) throw new Error('لا يمكن نشر التقرير لأنه لا توجد خدمات محفوظة مرتبطة به.');
+    const allowed=['sort_order','service_type','title','service_description','scope_work','notes','before_images','during_images','after_images','status','service_status','source'];
+    const copies=source.map((x,i)=>{const o={report_id:id};allowed.forEach(k=>{if(x[k]!==undefined)o[k]=x[k]});if(o.sort_order==null)o.sort_order=i+1;return o});
+    const ins=await sb.from('client_report_services').insert(copies).select('*');
+    if(ins.error) throw ins.error;
+    return ins.data||copies;
+  }
   window.tasneefApproveSupervisorReportV475=async function(id,btn){
     try{
-      if(btn){btn.disabled=true;btn.textContent='جاري الاعتماد...';}
+      if(btn){btn.disabled=true;btn.textContent='جاري ربط الخدمات والاعتماد...';}
+      const linked=await ensureReportServicesBeforePublish(id);
+      if(!linked.length) throw new Error('لا يمكن نشر تقرير فارغ. لا توجد خدمات مرتبطة بالتقرير.');
       const row=pending.find(x=>String(x.id)===String(id))||{};
       const token=row.public_token||newToken();
       const u=typeof session==='function'?(session()||{}):{};
-      const up=await sb.from('client_reports').update({status:'published',public_token:token,published_at:new Date().toISOString(),updated_at:new Date().toISOString(),approval_note:`اعتمد بواسطة: ${u.full_name||u.username||'الإدارة'}`}).eq('id',id);
+      const now=new Date().toISOString();
+      const up=await sb.from('client_reports').update({status:'published',public_token:token,published_at:now,updated_at:now,approval_note:`اعتمد بواسطة: ${u.full_name||u.username||'الإدارة'}`}).eq('id',id).select('*').single();
       if(up.error){
-        // approval_note may not exist in older schemas: retry only standard columns.
-        const retry=await sb.from('client_reports').update({status:'published',public_token:token,published_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',id); if(retry.error) throw retry.error;
+        const retry=await sb.from('client_reports').update({status:'published',public_token:token,published_at:now,updated_at:now}).eq('id',id).select('*').single(); if(retry.error) throw retry.error;
       }
-      if(window.msg) msg('تم اعتماد التقرير ونشره في بوابة العميل');
+      const verify=await sb.from('client_report_services').select('id',{count:'exact',head:true}).eq('report_id',id);
+      if(verify.error) throw verify.error;
+      if(!verify.count){await sb.from('client_reports').update({status:'draft',public_token:null,published_at:null}).eq('id',id);throw new Error('تم إيقاف النشر لأن الخدمات لم ترتبط بالتقرير. لم يتم نشر تقرير فارغ.');}
+      if(window.msg) msg('تم اعتماد التقرير ونشره مع '+verify.count+' خدمة');
       await loadPending(true);
       const url=reportUrl(token);
-      if(confirm('تم النشر بنجاح. هل تريد فتح تقرير العميل الآن؟')) window.open(url,'_blank');
+      if(confirm('تم النشر بنجاح مع الخدمات. هل تريد فتح تقرير العميل الآن؟')) window.open(url,'_blank');
     }catch(e){if(window.msg)msg(e.message||String(e),'err');else alert(e.message||String(e));}
     finally{if(btn){btn.disabled=false;btn.textContent='اعتماد ونشر';}}
   };

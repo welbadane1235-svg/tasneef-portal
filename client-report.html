@@ -81,6 +81,22 @@ async function loadData(){
   }
   const ids=portal.reports.map(r=>r.id).filter(Boolean);portal.services=[];
   if(ids.length){try{const sr=await sb.from('client_report_services').select('id,report_id,sort_order,service_type,title,service_description,scope_work,notes,before_images,during_images,after_images,status,service_status').in('report_id',ids).order('id',{ascending:true}).limit(500);portal.services=sr.data||[]}catch(_){portal.services=[]}}
+  // إصلاح جذري للتقارير المنشورة القديمة التي نُشر غلافها دون الخدمات:
+  // إذا كان تقرير منشور بلا خدمات، نبحث عن خدمات تقرير المشرف لنفس المشروع والتاريخ ونربطها للعرض فورًا.
+  const emptyReports=portal.reports.filter(r=>!portal.services.some(s=>String(s.report_id)===String(r.id)));
+  for(const r of emptyReports){
+    try{
+      let rq=sb.from('client_reports').select('id').eq('project_id',portal.projectId).neq('id',r.id).order('created_at',{ascending:false}).limit(20);
+      if(r.report_date) rq=rq.eq('report_date',r.report_date);
+      const rel=await rq;
+      const relIds=(rel.data||[]).map(x=>x.id).filter(Boolean);
+      if(!relIds.length) continue;
+      const rs=await sb.from('client_report_services').select('id,report_id,sort_order,service_type,title,service_description,scope_work,notes,before_images,during_images,after_images,status,service_status').in('report_id',relIds).order('id',{ascending:true}).limit(500);
+      if(!rs.error && (rs.data||[]).length){
+        (rs.data||[]).forEach(x=>portal.services.push({...x,report_id:r.id,_source_report_id:x.report_id}));
+      }
+    }catch(_){ }
+  }
 }
 function stats(){const minutes=portal.timeLogs.reduce((a,l)=>a+(Number(l.duration_minutes)||minutesBetween(l.check_in,l.check_out)),0);const days=new Set(portal.timeLogs.map(l=>dateOnly(l.log_date||l.check_in)).filter(Boolean)).size;const open=portal.tickets.filter(t=>String(t.status||'open')!=='closed').length;const nums=portal.ratings.map(r=>Number(r.score||({'ممتاز':5,'جيد جدًا':4,'جيد':3,'يحتاج تحسين':2}[r.rating]||0))).filter(Boolean);const avg=nums.length?(nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(1):'-';return{minutes,days,open,closed:portal.tickets.length-open,avg,annualDone:annualDoneCount(),annualRemain:annualRemainCount(),contractLeft:daysLeft(portal.project.contract_end||portal.project.end_date)}}
 function renderHome(){const st=stats();$('app').className='container';document.title=`بوابة ${portal.projectName} - شركة تصنيف`; $('app').innerHTML=`
