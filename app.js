@@ -24935,18 +24935,71 @@ ${finalUrl}
   }
   function openWhatsapp(text){window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener')}
   async function captureImageFromCamera(){
-    return new Promise(resolve=>{
-      const input=document.createElement('input');
-      input.type='file';
-      input.accept='image/*';
-      input.capture='environment';
-      input.style.position='fixed';
-      input.style.left='-9999px';
-      input.style.top='-9999px';
-      document.body.appendChild(input);
-      const done=file=>{setTimeout(()=>input.remove(),300);resolve(file||null)};
-      input.addEventListener('change',()=>done(input.files&&input.files[0]?input.files[0]:null),{once:true});
-      input.click();
+    // كاميرا داخل التطبيق. نستخدم getUserMedia حتى لا ينتقل المستخدم إلى تطبيق الكاميرا الخارجي.
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      return new Promise(resolve=>{
+        const input=document.createElement('input');
+        input.type='file'; input.accept='image/*'; input.capture='environment';
+        input.style.position='fixed'; input.style.left='-9999px'; document.body.appendChild(input);
+        const done=file=>{setTimeout(()=>input.remove(),200);resolve(file||null)};
+        input.addEventListener('change',()=>done(input.files&&input.files[0]?input.files[0]:null),{once:true});
+        input.click();
+      });
+    }
+    return new Promise(async resolve=>{
+      let stream=null,closed=false;
+      const finish=file=>{
+        if(closed)return; closed=true;
+        try{stream&&stream.getTracks().forEach(t=>t.stop())}catch(_){ }
+        modal.remove(); resolve(file||null);
+      };
+      const modal=document.createElement('div');
+      modal.className='tasneef-inapp-camera-v10504';
+      modal.innerHTML=`<div class="tasneef-camera-card-v10504" dir="rtl">
+        <div class="tasneef-camera-head-v10504"><b>التقاط صورة الدخول / الخروج</b><button type="button" data-act="close">إلغاء</button></div>
+        <video playsinline autoplay muted></video>
+        <canvas hidden></canvas>
+        <div class="tasneef-camera-actions-v10504">
+          <button type="button" data-act="switch" class="light">تبديل الكاميرا</button>
+          <button type="button" data-act="capture">التقاط الصورة</button>
+        </div>
+        <small>بعد التقاط الصورة سيتم حفظ العملية ثم فتح واتساب مباشرة.</small>
+      </div>`;
+      if(!document.getElementById('tasneefCameraStyleV10504')){
+        const st=document.createElement('style');st.id='tasneefCameraStyleV10504';st.textContent=`
+        .tasneef-inapp-camera-v10504{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:14px}
+        .tasneef-camera-card-v10504{width:min(680px,100%);background:#fff;border-radius:18px;padding:12px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+        .tasneef-camera-head-v10504{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;color:#064c3c;font-size:18px}
+        .tasneef-camera-head-v10504 button{background:#c93636;color:#fff;border:0;border-radius:10px;padding:9px 16px}
+        .tasneef-camera-card-v10504 video{width:100%;max-height:68vh;object-fit:cover;background:#111;border-radius:14px;transform:none}
+        .tasneef-camera-actions-v10504{display:flex;gap:10px;justify-content:center;margin-top:10px}
+        .tasneef-camera-actions-v10504 button{border:0;border-radius:12px;padding:12px 22px;background:#075542;color:#fff;font-weight:700}
+        .tasneef-camera-actions-v10504 .light{background:#edf5f2;color:#075542;border:1px solid #bdd5cc}
+        .tasneef-camera-card-v10504 small{display:block;text-align:center;margin-top:8px;color:#667}
+        `;document.head.appendChild(st);
+      }
+      document.body.appendChild(modal);
+      const video=modal.querySelector('video'),canvas=modal.querySelector('canvas');
+      let facing='environment';
+      async function startCamera(){
+        try{stream&&stream.getTracks().forEach(t=>t.stop())}catch(_){ }
+        try{
+          stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facing},width:{ideal:1280},height:{ideal:960}},audio:false});
+          video.srcObject=stream; await video.play();
+        }catch(e){
+          console.warn('in-app camera failed',e);
+          notify('تعذر فتح كاميرا التطبيق. تأكد من السماح للمتصفح باستخدام الكاميرا.','err');
+          finish(null);
+        }
+      }
+      modal.querySelector('[data-act="close"]').onclick=()=>finish(null);
+      modal.querySelector('[data-act="switch"]').onclick=async()=>{facing=facing==='environment'?'user':'environment';await startCamera()};
+      modal.querySelector('[data-act="capture"]').onclick=()=>{
+        const w=video.videoWidth||1280,h=video.videoHeight||960;
+        canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d');ctx.drawImage(video,0,0,w,h);
+        canvas.toBlob(blob=>finish(blob?new File([blob],'camera-capture.jpg',{type:'image/jpeg'}):null),'image/jpeg',0.92);
+      };
+      await startCamera();
     });
   }
   function wrapCanvasText(ctx,text,maxWidth){
