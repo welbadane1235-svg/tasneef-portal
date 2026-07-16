@@ -97,7 +97,7 @@ async function loadAll(){
     sb.from('workers').select('*').order('id'),
     sb.from('attendance').select('*').order('attendance_date',{ascending:false}),
     sb.from('time_logs').select('*').order('check_in',{ascending:false}),
-    sb.from('tickets').select('*').order('created_at',{ascending:false})
+    sb.rpc('tasneef_tickets_all_v10519')
   ]);
 
   let contractServices = await sb.from('contract_services').select('*').order('id', { ascending: false });
