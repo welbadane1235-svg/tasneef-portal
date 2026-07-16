@@ -103,8 +103,13 @@ async function loadPortal(){try{const payload=await resolvePortalPayload();porta
 async function loadData(){
   let logsQ=sb.from('time_logs').select('*').eq('project_id',portal.projectId).order('check_in',{ascending:false}).limit(250);
   if(portal.from)logsQ=logsQ.gte('log_date',portal.from);if(portal.to)logsQ=logsQ.lte('log_date',portal.to);
-  let ticQ=sb.from('tickets').select('*').eq('project_id',portal.projectId).order('created_at',{ascending:false}).limit(500);
-  if(portal.from)ticQ=ticQ.gte('created_at',portal.from+'T00:00:00');if(portal.to)ticQ=ticQ.lte('created_at',portal.to+'T23:59:59');
+  const ticQ=(async()=>{
+    const r=await sb.rpc('tasneef_client_project_tickets_v10517',{p_project_id:String(portal.projectId),p_from:portal.from||null,p_to:portal.to||null});
+    if(!r.error)return r;
+    let q=sb.from('tickets').select('*').eq('project_id',portal.projectId).order('created_at',{ascending:false}).limit(500);
+    if(portal.from)q=q.gte('created_at',portal.from+'T00:00:00');if(portal.to)q=q.lte('created_at',portal.to+'T23:59:59');
+    return await q;
+  })();
   let repQ=sb.from('client_reports').select('*').eq('project_id',portal.projectId).eq('status','published').order('report_date',{ascending:false}).limit(100);
   if(portal.from)repQ=repQ.gte('report_date',portal.from);if(portal.to)repQ=repQ.lte('report_date',portal.to);
   let rtQ=sb.from('client_service_ratings').select('*').eq('project_id',portal.projectId).order('created_at',{ascending:false}).limit(30);
@@ -286,8 +291,12 @@ function openModal(title,sub,body,detailMode=false){$('modalTitle').textContent=
         }catch(e){ err=e; try{ const d=await G.sb.from('tickets').insert({project_id:Number(portal.projectId)||portal.projectId,title,description:[desc,loc?('الموقع: '+loc):'',type?('النوع: '+type):''].filter(Boolean).join('\n'),status:'open',created_at:new Date().toISOString()}).select('*').single(); if(d.error) throw d.error; inserted=d.data; err=null; }catch(e2){ err=e2; } }
       }
       if(err) throw err;
-      if(inserted) portal.tickets=[inserted,...(portal.tickets||[])];
-      try{localStorage.setItem('tasneef_client_ticket_changed_v10516',String(Date.now()))}catch(_){}
+      if(inserted) portal.tickets=[inserted,...(portal.tickets||[]).filter(x=>String(x.id)!==String(inserted.id))];
+      try{localStorage.setItem('tasneef_client_ticket_changed_v10517',String(Date.now()))}catch(_){}
+      try{
+        const rr=await G.sb.rpc('tasneef_client_project_tickets_v10517',{p_project_id:String(portal.projectId),p_from:portal.from||null,p_to:portal.to||null});
+        if(!rr.error&&Array.isArray(rr.data)) portal.tickets=rr.data;
+      }catch(_){}
       if(typeof G.toast==='function') G.toast('تم رفع التذكرة بنجاح');
       if(typeof G.closeModal==='function') G.closeModal();
       if(typeof G.showMain==='function') G.showMain('tickets');
