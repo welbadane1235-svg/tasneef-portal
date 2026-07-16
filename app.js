@@ -24904,6 +24904,27 @@ ${finalUrl}
       return base || {id:N(v.worker_id),worker_id:N(v.worker_id),name:S(v.worker_name||v.name||('عامل '+v.worker_id)),worker_name:S(v.worker_name||v.name||('عامل '+v.worker_id)),employee_code:S(v.worker_employee_code||v.employee_code||'')};
     }));
   }
+  function selectedWorkersSnapshot(ids,selector){
+    const byId=uniqueWorkers((ids||[]).map(id=>assignedWorkers().find(w=>S(w.id)===S(id))||null).filter(Boolean));
+    if(byId.length===ids.length)return byId;
+    const fromDom=[];
+    (ids||[]).forEach(id=>{
+      const input=[...document.querySelectorAll(selector)].find(x=>S(x.value)===S(id));
+      const label=input?.closest('label');
+      const name=S(label?.querySelector('b')?.textContent||label?.textContent||('عامل '+id));
+      const known=assignedWorkers().find(w=>S(w.id)===S(id));
+      fromDom.push(known||{id:N(id),worker_id:N(id),name,worker_name:name});
+    });
+    return uniqueWorkers(fromDom);
+  }
+  async function finalizeCameraShare(rawPhoto,title,pid,workers){
+    const text=waMessage(title,pid,workers);
+    try{
+      const composed=await renderPhotoWithText(rawPhoto,text);
+      const shared=await shareWhatsappWithImage(text,composed);
+      if(!shared && !(navigator.share&&navigator.canShare)) notify('تم تجهيز رسالة واتساب والصورة. اختر واتساب من نافذة المشاركة أو أرفق الصورة المفتوحة.','warn');
+    }catch(e){console.warn('finalize camera share',e);openWhatsapp(text)}
+  }
   function waMessage(title,pid,workers){
     const unique=uniqueWorkers(workers);
     const supName=S(currentUser().full_name||currentUser().name||'');
@@ -24987,9 +25008,64 @@ ${finalUrl}
     }catch(e){ console.warn('capture/share checkout failed',e); openWhatsapp(text); }
   }
   async function ensureSupervisorCheckIn(pid){const u=currentUser();const open=(window.data?.logs||[]).find(l=>S(l.supervisor_id)===S(u.id)&&S(l.project_id)===S(pid)&&!l.check_out);if(open)return open;const row={user_id:u.id,supervisor_id:N(u.id),project_id:N(pid),check_in:nowIso(),check_out:null,log_date:(typeof today==='function'?today():new Date().toISOString().slice(0,10)),duration_minutes:0,travel_minutes:N($id('logTravel')?.value),visit_type:$id('logVisitType')?.value||'surface',required_minutes:0,time_difference_minutes:0,time_status:'open',notes:$id('logNotes')?.value||''};const r=await sb.from('time_logs').insert(row).select('*').single();if(r.error)throw r.error;(window.data.logs||[]).push(r.data);return r.data}
-  window.supervisorCheckIn=async function(btn){const pid=currentPid();if(!pid)return notify('اختر المشروع','err');const ids=selectedIds('.sup-enter-worker');if(!ids.length)return notify('حدد عاملًا واحدًا على الأقل للدخول','err');if(state.action)return;setBusy(btn,true,'جارٍ تسجيل الدخول...');const tok=opToken('worker_checkin',pid);try{await fetchVisits();const workers=assignedWorkers().filter(w=>ids.includes(N(w.id))&&!openVisitForWorker(w.id));if(!workers.length){notify('تم تسجيل هؤلاء العمال مسبقًا أو أصبحوا داخل مشروع آخر','warn');return}await ensureSupervisorCheckIn(pid);const t=nowIso();const rows=workers.map(w=>({operation_token:tok.token+'-'+w.id,worker_id:N(w.id),supervisor_id:N(supervisorId()),project_id:N(pid),check_in:t,check_out:null,created_by:N(supervisorId()),notes:$id('logNotes')?.value||''}));const r=await sb.from(TABLE).upsert(rows,{onConflict:'operation_token'}).select('*');if(r.error)throw r.error;clearToken(tok.key);await fetchVisits();notify('تم تسجيل دخول '+workers.length+' عامل');openWhatsapp(waMessage('تم تسجيل دخول المشروع',pid,workers))}catch(e){console.error(e);notify('تعذر الحفظ: '+(e.message||e),'err')}finally{setBusy(btn,false)}};
-  window.supervisorExitSelectedWorkers=async function(btn){const pid=currentPid(),ids=selectedIds('.sup-exit-worker');if(!ids.length)return notify('حدد العامل المطلوب خروجه','err');if(state.action)return;setBusy(btn,true,'جارٍ تسجيل الخروج...');try{await fetchVisits();const openRows=state.visits.filter(v=>ids.includes(N(v.worker_id))&&!v.check_out&&(!pid||S(v.project_id)===pid));if(!openRows.length){notify('لا توجد سجلات دخول مفتوحة للعامل المحدد','warn');return}const out=nowIso(),rowIds=openRows.map(v=>v.id);const r=await sb.from(TABLE).update({check_out:out,updated_by:N(supervisorId()),updated_at:out}).in('id',rowIds).is('check_out',null).select('*');if(r.error)throw r.error;const workers=workersFromVisits(openRows);await fetchVisits();notify('تم تسجيل خروج '+workers.length+' عامل');openWhatsapp(waMessage('تم تسجيل خروج عامل/عمال',pid||openRows[0].project_id,workers))}catch(e){notify('تعذر تسجيل الخروج: '+(e.message||e),'err')}finally{setBusy(btn,false)}};
-  window.supervisorCheckOut=async function(btn){const pid=currentPid();if(!pid)return notify('اختر المشروع','err');if(state.action)return;setBusy(btn,true,'جارٍ تسجيل خروج الجميع...');try{await fetchVisits();const rows=state.visits.filter(v=>S(v.project_id)===pid&&!v.check_out),out=nowIso();if(rows.length){const r=await sb.from(TABLE).update({check_out:out,updated_by:N(supervisorId()),updated_at:out}).in('id',rows.map(v=>v.id)).is('check_out',null);if(r.error)throw r.error}const u=currentUser(),openLogs=(window.data?.logs||[]).filter(l=>S(l.supervisor_id)===S(u.id)&&S(l.project_id)===pid&&!l.check_out);for(const l of openLogs){await sb.from('time_logs').update({check_out:out,duration_minutes:Math.max(0,Math.round((new Date(out)-new Date(l.check_in))/60000))}).eq('id',l.id).is('check_out',null);l.check_out=out}const workers=workersFromVisits(rows);await fetchVisits();if(typeof renderTimeLogs==='function')renderTimeLogs();notify('تم تسجيل خروج المشرف وجميع العمال');await captureAndShareCheckout('تم تسجيل خروج المشروع',pid,workers)}catch(e){notify('تعذر تسجيل الخروج: '+(e.message||e),'err')}finally{setBusy(btn,false)}};
+  window.supervisorCheckIn=async function(btn){
+    const pid=currentPid();if(!pid)return notify('اختر المشروع','err');
+    const ids=selectedIds('.sup-enter-worker');if(!ids.length)return notify('حدد عاملًا واحدًا على الأقل للدخول','err');
+    if(state.action)return;
+    const selectedWorkers=selectedWorkersSnapshot(ids,'.sup-enter-worker');
+    const rawPhoto=await captureImageFromCamera();
+    if(!rawPhoto)return notify('تم إلغاء العملية: صورة الدخول مطلوبة','warn');
+    setBusy(btn,true,'جارٍ تسجيل الدخول...');
+    const tok=opToken('worker_checkin',pid);
+    try{
+      await fetchVisits();
+      const allowedIds=new Set(selectedWorkers.map(w=>N(w.id)));
+      const workers=selectedWorkers.filter(w=>allowedIds.has(N(w.id))&&!openVisitForWorker(w.id));
+      if(!workers.length){notify('تم تسجيل هؤلاء العمال مسبقًا أو أصبحوا داخل مشروع آخر','warn');return}
+      await ensureSupervisorCheckIn(pid);
+      const t=nowIso();
+      const rows=workers.map(w=>({operation_token:tok.token+'-'+w.id,worker_id:N(w.id),supervisor_id:N(supervisorId()),project_id:N(pid),check_in:t,check_out:null,created_by:N(supervisorId()),notes:$id('logNotes')?.value||''}));
+      const r=await sb.from(TABLE).upsert(rows,{onConflict:'operation_token'}).select('*');if(r.error)throw r.error;
+      clearToken(tok.key);await fetchVisits();notify('تم تسجيل دخول '+workers.length+' عامل');
+      await finalizeCameraShare(rawPhoto,'تم تسجيل دخول المشروع',pid,workers);
+    }catch(e){console.error(e);notify('تعذر الحفظ: '+(e.message||e),'err')}finally{setBusy(btn,false)}
+  };
+  window.supervisorExitSelectedWorkers=async function(btn){
+    const pid=currentPid(),ids=selectedIds('.sup-exit-worker');if(!ids.length)return notify('حدد العامل المطلوب خروجه','err');
+    if(state.action)return;
+    const selectedWorkers=selectedWorkersSnapshot(ids,'.sup-exit-worker');
+    const rawPhoto=await captureImageFromCamera();
+    if(!rawPhoto)return notify('تم إلغاء العملية: صورة الخروج مطلوبة','warn');
+    setBusy(btn,true,'جارٍ تسجيل الخروج...');
+    try{
+      await fetchVisits();
+      const openRows=state.visits.filter(v=>ids.includes(N(v.worker_id))&&!v.check_out&&(!pid||S(v.project_id)===pid));
+      if(!openRows.length){notify('لا توجد سجلات دخول مفتوحة للعامل المحدد','warn');return}
+      const out=nowIso(),rowIds=openRows.map(v=>v.id);
+      const r=await sb.from(TABLE).update({check_out:out,updated_by:N(supervisorId()),updated_at:out}).in('id',rowIds).is('check_out',null).select('*');if(r.error)throw r.error;
+      const workers=uniqueWorkers([...selectedWorkers,...workersFromVisits(openRows)]);
+      await fetchVisits();notify('تم تسجيل خروج '+workers.length+' عامل');
+      await finalizeCameraShare(rawPhoto,'تم تسجيل خروج عامل/عمال',pid||openRows[0].project_id,workers);
+    }catch(e){notify('تعذر تسجيل الخروج: '+(e.message||e),'err')}finally{setBusy(btn,false)}
+  };
+  window.supervisorCheckOut=async function(btn){
+    const pid=currentPid();if(!pid)return notify('اختر المشروع','err');if(state.action)return;
+    const currentRows=state.visits.filter(v=>S(v.project_id)===pid&&!v.check_out);
+    const selectedWorkers=workersFromVisits(currentRows);
+    const rawPhoto=await captureImageFromCamera();
+    if(!rawPhoto)return notify('تم إلغاء العملية: صورة الخروج مطلوبة','warn');
+    setBusy(btn,true,'جارٍ تسجيل خروج الجميع...');
+    try{
+      await fetchVisits();
+      const rows=state.visits.filter(v=>S(v.project_id)===pid&&!v.check_out),out=nowIso();
+      if(rows.length){const r=await sb.from(TABLE).update({check_out:out,updated_by:N(supervisorId()),updated_at:out}).in('id',rows.map(v=>v.id)).is('check_out',null);if(r.error)throw r.error}
+      const u=currentUser(),openLogs=(window.data?.logs||[]).filter(l=>S(l.supervisor_id)===S(u.id)&&S(l.project_id)===pid&&!l.check_out);
+      for(const l of openLogs){await sb.from('time_logs').update({check_out:out,duration_minutes:Math.max(0,Math.round((new Date(out)-new Date(l.check_in))/60000))}).eq('id',l.id).is('check_out',null);l.check_out=out}
+      const workers=uniqueWorkers([...selectedWorkers,...workersFromVisits(rows)]);
+      await fetchVisits();if(typeof renderTimeLogs==='function')renderTimeLogs();notify('تم تسجيل خروج المشرف وجميع العمال');
+      await finalizeCameraShare(rawPhoto,'تم تسجيل خروج المشروع',pid,workers);
+    }catch(e){notify('تعذر تسجيل الخروج: '+(e.message||e),'err')}finally{setBusy(btn,false)}
+  };
   const oldProjectChange=window.onLogProjectChange;window.onLogProjectChange=function(){try{if(typeof oldProjectChange==='function')oldProjectChange()}catch(_){}state.lastProject=currentPid();render()};
   const oldInit=window.initSupervisor;window.initSupervisor=async function(){await oldInit.apply(this,arguments);await fetchVisits();render()};
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)fetchVisits()});
