@@ -176,6 +176,7 @@ body .tasneef-version-badge, body .version-badge, body .build-badge, body #versi
 <button class="nav" onclick="showPage('daily',this)">التسجيلات اليومية</button>
 <button class="nav" onclick="showPage('users',this)">إدارة المستخدمين</button>
 <button class="nav" onclick="showPage('projects',this)">المشاريع</button>
+<button class="nav" onclick="showPage('crm',this)">CRM المبيعات</button>
 <button class="nav" data-page="distribution" onclick="showPage('distribution',this); setTimeout(function(){window.tasneefDistributionV404&amp;&amp;tasneefDistributionV404.init&amp;&amp;tasneefDistributionV404.init();},120);">التوزيع</button>
 <button class="nav" onclick="showPage('contracts',this)">العقود والخدمات</button>
 <button class="nav" onclick="showPage('workers',this)">العمال</button>
@@ -751,6 +752,8 @@ body .tasneef-version-badge, body .version-badge, body .build-badge, body #versi
 </div>
 </div>
 </div>
+<section class="page hidden" id="crm"><div id="crmRootV10600"></div></section>
+<link rel="stylesheet" href="tasneef_crm_unified_v10600.css?v=10600">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
@@ -800,5 +803,6 @@ window.__tasneefSupervisorOrdersV10061=true;
 <script defer="" src="tasneef_salaries_unified_source_v440.js?v=465"></script>
 <script defer="" src="tasneef_core_salaries_tab_v440.js?v=465"></script>
 <script defer src="tasneef_logs_tickets_canonical_v10519.js?v=10519-canonical-only"></script>
+<script defer src="tasneef_crm_unified_v10600.js?v=10600"></script>
 </body>
 </html>
