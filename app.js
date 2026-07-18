@@ -21580,7 +21580,7 @@ function financePrintReport(kind){
   function projectRequired(p){ return N(p.required_daily_minutes || p.daily_required_minutes || p.required_minutes || 0); }
   function required(l,p){ try{ if(typeof logRequiredMinutes==='function') return N(logRequiredMinutes(l)); }catch(_){} return N(l.required_minutes || l.required_daily_minutes || projectRequired(p)); }
   function isProjectLive(p){
-    if(!p) return false;
+    if(!p || p.is_active !== true) return false;
     const st=norm(p.status || p.project_status || 'active');
     const deletedWords = ['inactive','deleted','archived','stopped','closed','محذوف','محذوفه','موقوف','متوقف','مغلق','ملغي','الغاء','الغيت'];
     if(deletedWords.includes(st)) return false;
@@ -21636,8 +21636,17 @@ function financePrintReport(kind){
       const row=rows.get(pid); if(!row) return;
       row.a += actual(l); row.r += required(l,row.project); row.t += N(l.travel_minutes || l.transfer_minutes); row.c += 1;
     });
-    const supTotals={}; [...rows.values()].forEach(r=>{supTotals[idv(r.s)]=(supTotals[idv(r.s)]||0)+N(r.a);});
-    return [...rows.values()].map(r=>({ ...r, percent:supTotals[idv(r.s)]?N(r.a)/supTotals[idv(r.s)]*100:0, commitment:N(r.r)?N(r.a)/N(r.r)*100:0 })).sort((a,b)=>a.supervisorName.localeCompare(b.supervisorName,'ar') || a.projectName.localeCompare(b.projectName,'ar'));
+    // نسبة مشاريع الزيارة اليومية تُحسب من المشاريع النشطة الظاهرة ذات الدقائق الفعلية فقط.
+    const supTotals={};
+    [...rows.values()].forEach(r=>{
+      if(r.type==='زيارة' && N(r.a)>0) supTotals[idv(r.s)]=(supTotals[idv(r.s)]||0)+N(r.a);
+    });
+    return [...rows.values()].map(r=>{
+      const rawPercentage=(r.type==='زيارة' && N(r.a)>0 && N(supTotals[idv(r.s)])>0)
+        ? (N(r.a)/N(supTotals[idv(r.s)]))*100
+        : 0;
+      return { ...r, rawPercentage, percent:rawPercentage, supTotal:N(supTotals[idv(r.s)]), commitment:N(r.r)?N(r.a)/N(r.r)*100:0 };
+    }).sort((a,b)=>a.supervisorName.localeCompare(b.supervisorName,'ar') || a.projectName.localeCompare(b.projectName,'ar'));
   }
 
   function fillFilters(){
@@ -21650,13 +21659,29 @@ function financePrintReport(kind){
   function renderRows(rows){
     const total=rows.reduce((a,r)=>a+N(r.a),0), logs=rows.reduce((a,r)=>a+N(r.c),0), travel=rows.reduce((a,r)=>a+N(r.t),0);
     const summary=$('mt52Summary'); if(summary) summary.innerHTML=`<div class="kpi"><small>المشاريع الحالية</small><b>${rows.length}</b></div><div class="kpi"><small>عدد السجلات</small><b>${logs}</b></div><div class="kpi"><small>إجمالي الوقت</small><b>${minsText(total)}</b></div><div class="kpi"><small>وقت الانتقال</small><b>${travel} دقيقة</b></div><div class="kpi"><small>آخر تحديث مباشر</small><b>${new Date().toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'})}</b></div>`;
-    const bySup=new Map(); rows.forEach(r=>{ const k=idv(r.s)||'بدون'; if(!bySup.has(k)) bySup.set(k,[]); bySup.get(k).push(r); });
+    // كروت الزيارة اليومية: النشط فقط، دقائق أكبر من صفر، وتجميع وحيد حسب project_id.
+    const visitRowsByProject=new Map();
+    rows.filter(r=>r.type==='زيارة' && r.project?.is_active===true && N(r.a)>0).forEach(r=>{
+      const pid=idv(r.p);
+      if(!visitRowsByProject.has(pid)) visitRowsByProject.set(pid,{...r});
+      else {
+        const x=visitRowsByProject.get(pid);
+        x.a+=N(r.a); x.r+=N(r.r); x.t+=N(r.t); x.c+=N(r.c);
+        x.workers=[...new Set([...(x.workers||[]),...(r.workers||[])])];
+      }
+    });
+    const bySup=new Map(); [...visitRowsByProject.values()].forEach(r=>{ const k=idv(r.s)||'بدون'; if(!bySup.has(k)) bySup.set(k,[]); bySup.get(k).push(r); });
     const grid=$('mt52VisitGrid'); if(grid){ grid.innerHTML=[...bySup.entries()].map(([sid,items])=>{
-      const totalSup=items.reduce((a,r)=>a+N(r.a),0);
-      const trs=items.map(r=>`<tr><td style="text-align:right"><b>${esc(r.projectName)}</b><br><small>${esc(r.type)}</small></td><td>${Math.round(N(r.a)).toLocaleString('en-US')}</td><td>${pctText(r.percent)}</td></tr>`).join('');
-      const names=[...new Set(items.flatMap(r=>r.workers))];
-      return `<div class="mt52-supervisor-card"><h3>${esc(items[0]?.supervisorName || supNameById(sid))}</h3><table><tbody>${trs}<tr class="total"><td>الإجمالي</td><td>${Math.round(totalSup).toLocaleString('en-US')}</td><td>${totalSup?'100%':'0%'}</td></tr></tbody></table><div class="mt52-workers-title">أسماء العمال الحالية</div><div class="mt52-worker-names">${names.length?names.map(n=>`<span>${esc(n)}</span>`).join(''):'<span>-</span>'}</div></div>`;
-    }).join('') || '<div class="empty">لا توجد مشاريع حالية</div>'; }
+      const activeProjects=items.filter(r=>r.project?.is_active===true && N(r.a)>0);
+      const supervisorTotalMinutes=activeProjects.reduce((sum,project)=>sum+N(project.a),0);
+      activeProjects.forEach(project=>{ project.rawPercentage=supervisorTotalMinutes>0?(N(project.a)/supervisorTotalMinutes)*100:0; project.percent=project.rawPercentage; });
+      const totalPercentage=activeProjects.reduce((sum,project)=>sum+N(project.rawPercentage),0);
+      const displayedTotalPercentage=supervisorTotalMinutes>0 && Math.abs(totalPercentage-100)<0.01 ? '100.0' : (supervisorTotalMinutes>0?totalPercentage.toFixed(1):'0.0');
+      const trs=activeProjects.map(r=>`<tr><td style="text-align:right"><b>${esc(r.projectName)}</b><br><small>${esc(r.type)}</small></td><td>${Math.round(N(r.a)).toLocaleString('en-US')}</td><td>${pctText(r.rawPercentage)}</td></tr>`).join('');
+      const names=[...new Set(activeProjects.flatMap(r=>r.workers))];
+      const summaryPills=`<div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line,#dce6e2);direction:rtl"><span class="badge neutral">المشاريع: <b>${activeProjects.length}</b></span><span class="badge neutral">إجمالي الوقت: <b>${esc(minsText(supervisorTotalMinutes))}</b></span><span class="badge neutral">الدقائق: <b>${Math.round(supervisorTotalMinutes).toLocaleString('en-US')}</b></span><span class="badge green">مجموع النسب: <b>${displayedTotalPercentage}%</b></span></div>`;
+      return `<div class="mt52-supervisor-card"><h3>${esc(activeProjects[0]?.supervisorName || supNameById(sid))}</h3>${summaryPills}<table><tbody>${trs}<tr class="total"><td>الإجمالي</td><td>${Math.round(supervisorTotalMinutes).toLocaleString('en-US')}</td><td>${displayedTotalPercentage}%</td></tr></tbody></table><div class="mt52-workers-title">أسماء العمال الحالية</div><div class="mt52-worker-names">${names.length?names.map(n=>`<span>${esc(n)}</span>`).join(''):'<span>-</span>'}</div></div>`;
+    }).join('') || '<div class="empty">لا توجد مشاريع زيارة يومية نشطة لها وقت فعلي</div>'; }
     const wg=$('mt52WorkersGrid'); if(wg){ wg.innerHTML=rows.map(r=>`<div class="mt52-project-workers"><h3>${esc(r.projectName)}</h3><div><small>${esc(r.supervisorName)} - ${esc(r.type)}</small>${r.workers.length?r.workers.map(n=>`<span>${esc(n)}</span>`).join(''):'<span>-</span>'}</div></div>`).join('') || '<div class="empty">لا توجد عمال</div>'; }
     const body=$('mt52Body'); if(body){ body.innerHTML=rows.map(r=>`<tr><td>${esc(r.supervisorName)}</td><td>${esc(r.projectName)}</td><td>${r.workers.map(esc).join('، ')||'-'}</td><td>${Math.round(N(r.c)).toLocaleString('en-US')}</td><td>${Math.round(N(r.a)).toLocaleString('en-US')}</td><td>${minsText(r.a)}</td><td>${Math.round(N(r.t)).toLocaleString('en-US')} دقيقة</td><td>${pctText(r.percent)}</td><td>المشاريع الحالية فقط</td><td>${new Date().toLocaleString('ar-SA')}</td><td>${esc(r.type)}</td></tr>`).join('') || '<tr><td colspan="11">لا توجد مشاريع حالية لهذا الفلتر</td></tr>'; }
     const oldBody=$('monthlyBody'); if(oldBody){ const table=oldBody.closest('table'); if(table?.tHead) table.tHead.innerHTML='<tr><th>المشرف الحالي</th><th>المشروع الحالي</th><th>أسماء العمال الحالية</th><th>عدد السجلات</th><th>الساعات الفعلية</th><th>وقت الانتقال</th><th>النسبة</th><th>نوع المشروع</th></tr>'; oldBody.innerHTML=rows.map(r=>`<tr><td>${esc(r.supervisorName)}</td><td>${esc(r.projectName)}</td><td>${r.workers.map(esc).join('، ')||'-'}</td><td>${r.c}</td><td>${minsText(r.a)}</td><td>${r.t} دقيقة</td><td>${pctText(r.percent)}</td><td>${esc(r.type)}</td></tr>`).join('') || '<tr><td colspan="8">لا توجد مشاريع حالية</td></tr>'; }
