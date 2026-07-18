@@ -1,8 +1,8 @@
 (function(){
 'use strict';
-if(window.__tasneefPayrollRebuiltV472) return;
-window.__tasneefPayrollRebuiltV472=true;
-const VERSION='V472 ربط نهائي — نشط فقط وغياب من أول حضور';
+if(window.__tasneefPayrollRebuiltV473) return;
+window.__tasneefPayrollRebuiltV473=true;
+const VERSION='V473 ربط التوزيع والحضور من المصدر التشغيلي';
 const $=id=>document.getElementById(id);
 const S=v=>String(v??'').trim();
 const N=v=>Number(String(v??'').replace(/,/g,''))||0;
@@ -20,7 +20,7 @@ function isExplicitlyActive(o){if(!o)return false;if(Object.prototype.hasOwnProp
 function isApprovedAttendance(r){if(!r||r.deleted_at||r.is_deleted===true||r.is_cancelled===true||r.cancelled===true)return false;const st=norm(field(r,['status','attendance_status','approval_status','record_status']));if(st&&(['ملغي','مرفوض','غير معتمد','failed','cancelled','rejected'].some(x=>st.includes(norm(x)))))return false;if(Object.prototype.hasOwnProperty.call(r,'is_approved')&&r.is_approved===false)return false;const checkIn=timeOnly(field(r,['check_in','in_time','start_time','login_time']));return !!checkIn;}
 const state={rows:[],employees:[],projects:[],users:[],assignments:[],attendance:[],daily:[],adjustments:[],sources:[],diagnostics:{},incomplete:false,loading:false};
 let printBusy=false;
-function msg(text,bad=false){const el=$('salaryMsg');if(el){el.textContent=text;el.className='msg '+(bad?'err':'');el.style.display='block';}console[bad?'error':'log']('[payroll-v471]',text);}
+function msg(text,bad=false){const el=$('salaryMsg');if(el){el.textContent=text;el.className='msg '+(bad?'err':'');el.style.display='block';}console[bad?'error':'log']('[payroll-v473]',text);}
 function sourceError(name,table,error){const e={name,table,ok:false,count:0,error:S(error?.message||error),code:S(error?.code||''),details:S(error?.details||'')};state.sources.push(e);console.error('[payroll source]',e);return e;}
 async function fetchAll(table,queryBuilder){let rows=[],from=0,size=1000;while(true){let q=window.sb.from(table).select('*').range(from,from+size-1);if(queryBuilder)q=queryBuilder(q);const r=await q;if(r.error)throw r.error;const part=r.data||[];rows.push(...part);if(part.length<size)break;from+=size;if(from>100000)throw new Error(`تجاوز حد القراءة الآمن في ${table}`);}return rows;}
 async function readFirst(name,tables,builder,{required=false,merge=false}={}){let all=[],used=[],errors=[];for(const table of tables){try{const rows=await fetchAll(table,builder);used.push(table);state.sources.push({name,table,ok:true,count:rows.length,error:''});if(merge){all.push(...rows);}else if(rows.length){return{rows,table,ok:true};}}catch(e){errors.push(sourceError(name,table,e));}}
@@ -74,7 +74,13 @@ function projectName(ref){const p=projectByRef(ref);return human(field(p,['name'
 function projectOperation(ref){const p=projectByRef(ref);return human(field(p,['operation_type','work_type','project_type','type']))||'';}
 function isDaily(ref){const n=norm(projectOperation(ref));return n.includes('زياره')||n.includes('زيارة')||n.includes('daily')||n.includes('visit')||n.includes('جزئي');}
 function userName(ref){const r=S(ref);const u=state.users.find(x=>[x.id,x.employee_id,x.worker_id,x.employee_code,x.code,x.username].map(S).includes(r));if(u)return human(field(u,['full_name','name','display_name','username']))||'';const e=state.employees.find(x=>employeeAliases(x).includes(r));return e?employeeName(e):'';}
-function activeSupervisor(ref){const r=S(ref);if(!r)return null;const u=state.users.find(x=>[x.id,x.employee_id,x.worker_id,x.employee_code,x.code,x.username].map(S).includes(r));if(u)return isExplicitlyActive(u)?u:null;const e=state.employees.find(x=>employeeAliases(x).includes(r));return e&&isExplicitlyActive(e)?e:null;}
+function isExplicitlyStopped(o){if(!o)return false;if(Object.prototype.hasOwnProperty.call(o,'is_active')&&o.is_active===false)return true;if(Object.prototype.hasOwnProperty.call(o,'active')&&o.active===false)return true;return inactiveStatusValue(field(o,['status','employee_status','work_status','account_status']));}
+function activeSupervisor(ref){const r=S(ref);if(!r)return null;const e=state.employees.find(x=>employeeAliases(x).includes(r));if(e)return isExplicitlyStopped(e)?null:e;const u=state.users.find(x=>[x.id,x.employee_id,x.worker_id,x.employee_code,x.code,x.username].map(S).includes(r));return u&&!isExplicitlyStopped(u)?u:null;}
+function canonicalEmployeeFromRef(ref,aliasMap){const r=S(ref);if(!r)return'';return aliasMap.get(r)||'';}
+function assignmentSourceRank(a){const s=S(a.__source_table);if(s==='monthly_distribution')return 1;if(s==='monthly_distribution_view')return 2;if(s==='worker_project_assignments')return 3;return 9;}
+function resolveProjectHuman(ref){const p=projectByRef(ref);if(!p||isExplicitlyStopped(p))return null;return p;}
+function employeeServiceStart(emp,range){const d=iso(field(emp,['work_start_date','hire_date','joining_date','service_start','start_date']));return d&&d>range.start?d:range.start;}
+function employeeServiceEnd(emp,range){const d=iso(field(emp,['work_end_date','termination_date','stop_date','service_end','end_date']));return d&&d<range.end?d:range.end;}
 function attendanceEmployeeRef(a){return S(field(a,['worker_id','employee_id','app_worker_id','user_id','employee_code','worker_code','employee_ts_id']));}
 function rowDate(a){return iso(field(a,['attendance_date','work_date','record_date','log_date','date','check_in','created_at']));}
 function timeOnly(v){if(!v)return'';const s=S(v);if(/^\d{2}:\d{2}/.test(s))return s.slice(0,5);const d=new Date(v);return Number.isNaN(d.getTime())?'':d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:false});}
@@ -88,37 +94,170 @@ async function buildUnifiedPayroll(period){
  if(!window.sb)throw new Error('اتصال Supabase غير جاهز');
  const range=monthRange(period);state.sources=[];state.incomplete=false;
  const employeeSources=[];
- for(const table of ['employees_master_v386','employees','workers']){const r=await readFirst('الموظفون',[table],null,{required:table==='employees_master_v386'});employeeSources.push({table,rows:r.rows});}
- const merged=mergeEmployeeProfiles(employeeSources,range);state.employees=merged.employees;state.employeeMap=new Map(state.employees.map(e=>[employeeKey(e),e]));
- const [projects,users,assignments,attendance,daily,adjustments]=await Promise.all([
+ for(const table of ['employees_master_v386','employees','workers']){
+   const r=await readFirst('الموظفون',[table],null,{required:table==='employees_master_v386'});
+   employeeSources.push({table,rows:r.rows});
+ }
+ const merged=mergeEmployeeProfiles(employeeSources,range);
+ state.employees=merged.employees;
+ state.employeeMap=new Map(state.employees.map(e=>[employeeKey(e),e]));
+ const [projects,users,monthlyDist,monthlyDistView,currentAssignments,attendance,daily,adjustments]=await Promise.all([
    readFirst('المشاريع',['projects'],null,{required:true}),
-   readFirst('المشرفون',['app_users','employees_master_v386'],null,{required:true,merge:true}),
-   readFirst('التوزيعات',['monthly_distribution','worker_project_assignments','monthly_distribution_view'],q=>q,{required:true,merge:true}),
+   readFirst('المشرفون',['employees_master_v386','employees','app_users'],null,{required:true,merge:true}),
+   readFirst('التوزيع الشهري',['monthly_distribution'],q=>q.eq('month_key',range.month),{required:false}),
+   readFirst('عرض التوزيع الشهري',['monthly_distribution_view'],q=>q.eq('month_key',range.month),{required:false}),
+   readFirst('توزيعات المشاريع',['worker_project_assignments'],q=>q,{required:false}),
    readFirst('الحضور والغياب',['attendance'],q=>q,{required:true}),
    readFirst('التسجيلات والأوقات',['time_logs','daily_records','daily_registrations'],q=>q,{required:true,merge:true}),
    readFirst('التعديلات المالية',['payroll_adjustments','salary_adjustments'],null,{required:false,merge:true})
  ]);
- state.projects=projects.rows;state.users=users.rows;state.assignments=dedupeAssignments(assignments.rows,range);const attendanceInRange=attendance.rows.filter(a=>{const d=rowDate(a);return d>=range.start&&d<=range.end&&isApprovedAttendance(a)});const dailyInRange=daily.rows.filter(a=>{const d=rowDate(a);return d>=range.start&&d<=range.end&&!a.deleted_at&&a.is_deleted!==true});state.attendance=dedupeEmployeeEvents(attendanceInRange,merged.aliases,'attendance');state.daily=dedupeEmployeeEvents(dailyInRange,merged.aliases,'daily');state.adjustments=adjustments.rows;
+ state.projects=projects.rows;
+ state.users=users.rows;
+ const distRaw=[
+   ...monthlyDist.rows.map(x=>({...x,__source_table:'monthly_distribution'})),
+   ...monthlyDistView.rows.map(x=>({...x,__source_table:'monthly_distribution_view'})),
+   ...currentAssignments.rows.map(x=>({...x,__source_table:'worker_project_assignments'}))
+ ];
+ state.assignments=dedupeAssignments(distRaw,range).sort((a,b)=>assignmentSourceRank(a)-assignmentSourceRank(b));
+ const attendanceInRange=attendance.rows.filter(a=>{const d=rowDate(a);return d>=range.start&&d<=range.end&&isApprovedAttendance(a)});
+ const dailyInRange=daily.rows.filter(a=>{const d=rowDate(a);return d>=range.start&&d<=range.end&&!a.deleted_at&&a.is_deleted!==true});
+ state.attendance=dedupeEmployeeEvents(attendanceInRange,merged.aliases,'attendance');
+ state.daily=dedupeEmployeeEvents(dailyInRange,merged.aliases,'daily');
+ state.adjustments=adjustments.rows;
+
  const eligibleKeys=new Set();
- for(const e of state.employees)if(payrollEligibleProfile(e,range)&&isExplicitlyActive(e))employeeAliases(e).forEach(a=>{const k=merged.aliases.get(a);if(k)eligibleKeys.add(k)});
- for(const a of state.assignments){const k=merged.aliases.get(assignmentEmployeeRef(a));if(k)eligibleKeys.add(k);}for(const x of [...state.attendance,...state.daily]){const k=S(x.__canonical_employee_id)||merged.aliases.get(attendanceEmployeeRef(x));if(k&&state.employeeMap.has(k))eligibleKeys.add(k);}
- const rows=[];const unlinked=[];let stoppedEmployeesRemoved=0,stoppedSupervisorsRemoved=0,duplicateAttendanceRemoved=Math.max(0,attendanceInRange.length-state.attendance.length);const duplicateEmployeeIdsBeforeMerge=merged.stats.duplicateCanonicalIds.map(x=>x.canonical_employee_id);const firstAttendanceByEmployee={};
- for(const key of eligibleKeys){const emp=state.employeeMap.get(key);if(!emp){unlinked.push(key);continue;}if(!isExplicitlyActive(emp)){stoppedEmployeesRemoved++;continue;}const empId=employeeKey(emp);const empAssignmentsAll=state.assignments.filter(a=>merged.aliases.get(assignmentEmployeeRef(a))===empId);const empAttendance=state.attendance.filter(a=>S(a.__canonical_employee_id)===empId&&isApprovedAttendance(a));const empDaily=state.daily.filter(a=>S(a.__canonical_employee_id)===empId);
-   const serviceStart0=iso(field(emp,['work_start_date','start_date','hire_date','joining_date','service_start']))||range.start;const serviceEnd0=iso(field(emp,['work_end_date','end_date','termination_date','stop_date','service_end']))||range.end;let serviceStart=serviceStart0>range.start?serviceStart0:range.start;const serviceEnd=serviceEnd0<range.end?serviceEnd0:range.end;if(serviceStart>serviceEnd)continue;
-   const validAttendanceDates=[...new Set(empAttendance.map(rowDate).filter(d=>d>=range.start&&d<=range.end))].sort();const firstAttendanceDate=validAttendanceDates[0]||'';if(firstAttendanceDate){firstAttendanceByEmployee[empId]=firstAttendanceDate;if(firstAttendanceDate>serviceStart)serviceStart=firstAttendanceDate;}
-   const assignmentDetails=empAssignmentsAll.map(a=>{const rawSup=supervisorRef(a),sup=activeSupervisor(rawSup);if(rawSup&&!sup)stoppedSupervisorsRemoved++;const pr=projectByRef(projectRef(a));if(pr&&!isExplicitlyActive(pr))return null;const st=aStart(a,range)>serviceStart?aStart(a,range):serviceStart;const en=aEnd(a,range)<serviceEnd?aEnd(a,range):serviceEnd;return{raw:a,start:st,end:en,days:dateDiffInclusive(st,en),project_id:projectRef(a),project_name:projectName(projectRef(a)),supervisor_id:sup?rawSup:'',supervisor_name:sup?(userName(rawSup)||human(field(a,['supervisor_name']))||'دون مشرف نشط'):'دون مشرف نشط',operation_type:projectOperation(projectRef(a))||human(field(a,['operation_type','work_type']))};}).filter(x=>x&&x.days>0);
-   const supervisorChoice=supervisorSelection(assignmentDetails);const primarySup=supervisorChoice.primary;const supervisorName=primarySup?(userName(primarySup)||assignmentDetails.find(a=>a.supervisor_id===primarySup)?.supervisor_name||'دون مشرف نشط'):'دون مشرف نشط';
-   const locations=[...new Set(assignmentDetails.map(a=>isDaily(a.project_id)?supervisorName:a.project_name).filter(Boolean))];let workLocation='';const role=employeeRole(emp);if(locations.length===1)workLocation=locations[0];else if(locations.length>1)workLocation='متعدد';else if(role==='فني')workLocation='فريق الصيانة';else if(role==='مشرف')workLocation='المشرفون';else workLocation='دون توزيع';
-   const days=firstAttendanceDate?dateList(serviceStart,serviceEnd):[];const dayRows=[];let present=0,absent=0,actualMinutes=0,requiredMinutes=0,requiredWorkDays=0,missingAttendance=0;
-   for(const date of days){const dayAs=assignmentDetails.filter(a=>a.start<=date&&a.end>=date);const a=dayAs.sort((x,y)=>y.days-x.days)[0];const p=projectByRef(a?.project_id);const ats=empAttendance.filter(x=>rowDate(x)===date);const logs=empDaily.filter(x=>rowDate(x)===date);const ins=ats.map(x=>timeOnly(field(x,['check_in','in_time','start_time','login_time']))).filter(Boolean).sort();const outs=ats.map(x=>timeOnly(field(x,['check_out','out_time','end_time','logout_time']))).filter(Boolean).sort();let actual=logs.reduce((s,x)=>s+N(field(x,['work_minutes','total_minutes','minutes','actual_minutes'])),0);if(!actual&&ins.length&&outs.length)actual=minutesBetween(ins[0],outs[outs.length-1]);const required=a?requiredDailyMinutes(p,date):0;const has=ins.length>0||actual>0;if(required>0)requiredWorkDays++;if(has)present++;else if(a&&required>0){absent++;missingAttendance++;}actualMinutes+=actual;requiredMinutes+=required;dayRows.push({date,supervisor_name:a?.supervisor_name||supervisorName,project_name:a?.project_name||'',operation_type:a?.operation_type||'',check_in:ins[0]||'',check_out:outs[outs.length-1]||'',required_minutes:required,actual_minutes:actual,status:has?'حضور':required===0?'راحة/جمعة غير مطلوبة':a?'غياب':'لا يوجد توزيع'});}
-   const base=N(field(emp,['basic_salary','base_salary','salary','main_salary']));const directAllow=N(field(emp,['allowances','allowance','salary_allowance','benefits']));const fin=financialFor(empId,range.month);const overrides=approvedOverrides(empId,range.month);const periodDays=firstAttendanceDate?dateDiffInclusive(serviceStart,serviceEnd):0;const dueDays=overrides.due_days!==undefined?N(overrides.due_days):periodDays;const baseFinal=overrides.base_salary!==undefined?N(overrides.base_salary):base;const allowanceFinal=overrides.allowances!==undefined?N(overrides.allowances):directAllow+fin.allowances;const commissions=overrides.commissions!==undefined?N(overrides.commissions):fin.commissions;const advances=overrides.advances!==undefined?N(overrides.advances):fin.advances;const otherDed=overrides.other_deductions!==undefined?N(overrides.other_deductions):fin.deductions;const gross=baseFinal+allowanceFinal;const periodSalary=gross/30*dueDays;const attendanceSourceOk=state.sources.some(s=>s.name==='الحضور والغياب'&&s.ok);const absenceDeduction=attendanceSourceOk&&firstAttendanceDate?(baseFinal/30)*absent:0;const deductions=otherDed+absenceDeduction;const net=periodSalary+commissions+fin.rounding-deductions-advances;const issues=[];if(!baseFinal)issues.push('الراتب الأساسي غير مسجل');if(!empAssignmentsAll.length&&['عامل','حارس'].includes(role))issues.push('دون توزيع');if(!primarySup&&role==='عامل')issues.push('دون مشرف نشط');if(state.incomplete)issues.push('مصدر أساسي غير مكتمل');if(!attendanceSourceOk)issues.push('بيانات الحضور غير مكتملة');else if(!firstAttendanceDate)issues.push('لا يوجد حضور صحيح لبداية الاستحقاق');
-   rows.push({worker_id:empId,canonical_employee_id:empId,employee_code:employeeCode(emp),month:range.month,residency_name:iqamaName(emp),worker_name:employeeName(emp),iqama_number:human(field(emp,['iqama_number','residency_number','national_id']))||'',job_title:role,supervisor_id:primarySup,supervisor_name:supervisorName,work_location:human(workLocation)||'غير محدد',project_ids:[...new Set(assignmentDetails.map(a=>a.project_id).filter(Boolean))],project_names:[...new Set(assignmentDetails.map(a=>a.project_name).filter(Boolean))],multiple_supervisors:supervisorChoice.multiple,supervisor_tie:supervisorChoice.tie,supervisor_days:supervisorChoice.ranked,assignment_details:assignmentDetails,service_start:firstAttendanceDate||serviceStart,first_attendance_date:firstAttendanceDate,service_end:serviceEnd,month_days:range.days,work_days:periodDays,required_work_days:requiredWorkDays,present_days:present,absent_days:attendanceSourceOk&&firstAttendanceDate?absent:null,due_days:dueDays,required_minutes:requiredMinutes,actual_minutes:actualMinutes,base_salary:baseFinal,allowances:allowanceFinal,gross_salary:gross,period_salary:periodSalary,commissions,other_deductions:otherDed,absence_deduction:absenceDeduction,deductions,rounding:fin.rounding,advances,net_salary:net,notes:human(field(emp,['notes','payroll_notes']))||'',status:state.incomplete||!attendanceSourceOk?'بيانات ناقصة':issues.length?'يحتاج مراجعة':'مسودة',issues,details:dayRows,__employee:emp});
+ for(const e of state.employees){
+   if(payrollEligibleProfile(e,range)&&!isExplicitlyStopped(e))eligibleKeys.add(employeeKey(e));
  }
- const payrollByEmployee=new Map();const duplicateRowIds=[];for(const r of rows){if(payrollByEmployee.has(r.worker_id)){duplicateRowIds.push(r.worker_id);continue;}payrollByEmployee.set(r.worker_id,r);}const finalRows=[...payrollByEmployee.values()];finalRows.sort((a,b)=>a.supervisor_name.localeCompare(b.supervisor_name,'ar')||a.job_title.localeCompare(b.job_title,'ar')||a.employee_code.localeCompare(b.employee_code,'ar'));
+ for(const a of state.assignments){
+   const k=canonicalEmployeeFromRef(assignmentEmployeeRef(a),merged.aliases);if(k)eligibleKeys.add(k);
+ }
+ for(const x of [...state.attendance,...state.daily]){
+   const k=S(x.__canonical_employee_id)||canonicalEmployeeFromRef(attendanceEmployeeRef(x),merged.aliases);if(k&&state.employeeMap.has(k))eligibleKeys.add(k);
+ }
+
+ const assignmentsByEmployee=new Map();
+ const unlinkedAssignments=[];
+ for(const a of state.assignments){
+   const k=canonicalEmployeeFromRef(assignmentEmployeeRef(a),merged.aliases);
+   if(!k){unlinkedAssignments.push({ref:assignmentEmployeeRef(a),project_id:projectRef(a),supervisor_id:supervisorRef(a),source:a.__source_table});continue;}
+   if(!assignmentsByEmployee.has(k))assignmentsByEmployee.set(k,[]);
+   assignmentsByEmployee.get(k).push(a);
+ }
+ const attendanceByEmployee=new Map(),dailyByEmployee=new Map();
+ for(const x of state.attendance){const k=S(x.__canonical_employee_id);if(!attendanceByEmployee.has(k))attendanceByEmployee.set(k,[]);attendanceByEmployee.get(k).push(x);}
+ for(const x of state.daily){const k=S(x.__canonical_employee_id);if(!dailyByEmployee.has(k))dailyByEmployee.set(k,[]);dailyByEmployee.get(k).push(x);}
+
+ const rows=[];const unlinked=[];let stoppedEmployeesRemoved=0,stoppedSupervisorsRemoved=0;
+ const duplicateAttendanceRemoved=Math.max(0,attendanceInRange.length-state.attendance.length);
+ const duplicateEmployeeIdsBeforeMerge=merged.stats.duplicateCanonicalIds.map(x=>x.canonical_employee_id);
+ const firstAttendanceByEmployee={};
+ const distributionPrimaryExpected=new Map();
+
+ for(const key of eligibleKeys){
+   const emp=state.employeeMap.get(key);if(!emp){unlinked.push(key);continue;}
+   if(isExplicitlyStopped(emp)){stoppedEmployeesRemoved++;continue;}
+   const empId=employeeKey(emp),role=employeeRole(emp);
+   const rawAssignments=assignmentsByEmployee.get(empId)||[];
+   const assignmentDetails=[];
+   for(const a of rawAssignments){
+     const p=resolveProjectHuman(projectRef(a));
+     if(!p)continue;
+     const rawSup=supervisorRef(a),supObj=activeSupervisor(rawSup);
+     if(rawSup&&!supObj){stoppedSupervisorsRemoved++;continue;}
+     const start=aStart(a,range),end=aEnd(a,range);
+     if(start>range.end||end<range.start)continue;
+     assignmentDetails.push({
+       source:a.__source_table,
+       project_id:S(field(p,['id','project_id']))||projectRef(a),
+       project_name:human(field(p,['name','project_name','title']))||human(field(a,['project_name']))||'',
+       supervisor_id:rawSup,
+       supervisor_name:supObj?(employeeName(supObj)||userName(rawSup)):human(field(a,['supervisor_name']))||'',
+       start:start<range.start?range.start:start,
+       end:end>range.end?range.end:end,
+       days:dateDiffInclusive(start<range.start?range.start:start,end>range.end?range.end:end),
+       operation_type:projectOperation(projectRef(a))||human(field(a,['operation_type','work_type','role_type']))||''
+     });
+   }
+   assignmentDetails.sort((a,b)=>a.start.localeCompare(b.start)||a.source.localeCompare(b.source));
+   const supervisorChoice=supervisorSelection(assignmentDetails);
+   const primarySup=supervisorChoice.primary;
+   const primaryDetail=assignmentDetails.find(a=>a.supervisor_id===primarySup);
+   const supervisorName=primarySup?(primaryDetail?.supervisor_name||userName(primarySup)||'مشرف غير مربوط'):(role==='عامل'||role==='حارس'?'دون مشرف نشط':'');
+   if(primarySup){if(!distributionPrimaryExpected.has(primarySup))distributionPrimaryExpected.set(primarySup,new Set());distributionPrimaryExpected.get(primarySup).add(empId);}
+
+   const empAttendance=attendanceByEmployee.get(empId)||[];
+   const empDaily=dailyByEmployee.get(empId)||[];
+   const validAttendanceDates=[...new Set(empAttendance.map(rowDate).filter(Boolean))].sort();
+   const firstAttendanceDate=validAttendanceDates[0]||'';
+   if(firstAttendanceDate)firstAttendanceByEmployee[empId]=firstAttendanceDate;
+   const officialStart=employeeServiceStart(emp,range);
+   const firstAssignmentStart=assignmentDetails.map(a=>a.start).sort()[0]||'';
+   const fallbackStart=[officialStart,firstAssignmentStart].filter(Boolean).sort().slice(-1)[0]||range.start;
+   const serviceStart=firstAttendanceDate||fallbackStart;
+   const serviceEnd=employeeServiceEnd(emp,range);
+
+   const locations=[...new Set(assignmentDetails.map(a=>isDaily(a.project_id)?supervisorName:a.project_name).filter(Boolean))];
+   let workLocation='';
+   if(locations.length===1)workLocation=locations[0];
+   else if(locations.length>1)workLocation='متعدد';
+   else if(role==='فني')workLocation='فريق الصيانة';
+   else if(role==='مشرف')workLocation='المشرفون';
+   else workLocation=rawAssignments.length?'تعذر ربط التوزيع':'دون توزيع';
+
+   const attendanceSourceOk=state.sources.some(s=>s.name==='الحضور والغياب'&&s.ok);
+   const days=serviceStart&&serviceEnd&&serviceStart<=serviceEnd?dateList(serviceStart,serviceEnd):[];
+   const dayRows=[];let present=0,absent=0,actualMinutes=0,requiredMinutes=0,requiredWorkDays=0;
+   for(const date of days){
+     const dayAs=assignmentDetails.filter(a=>a.start<=date&&a.end>=date);
+     const a=dayAs.sort((x,y)=>y.days-x.days||y.start.localeCompare(x.start))[0];
+     const p=projectByRef(a?.project_id);
+     const ats=empAttendance.filter(x=>rowDate(x)===date);
+     const logs=empDaily.filter(x=>rowDate(x)===date);
+     const ins=ats.map(x=>timeOnly(field(x,['check_in','in_time','start_time','login_time']))).filter(Boolean).sort();
+     const outs=ats.map(x=>timeOnly(field(x,['check_out','out_time','end_time','logout_time']))).filter(Boolean).sort();
+     let actual=logs.reduce((s,x)=>s+N(field(x,['work_minutes','total_minutes','minutes','actual_minutes'])),0);
+     if(!actual&&ins.length&&outs.length)actual=minutesBetween(ins[0],outs[outs.length-1]);
+     const required=a?requiredDailyMinutes(p,date):0;
+     const has=ins.length>0||actual>0;
+     if(required>0)requiredWorkDays++;
+     if(has)present++;else if(attendanceSourceOk&&firstAttendanceDate&&a&&required>0)absent++;
+     actualMinutes+=actual;requiredMinutes+=required;
+     dayRows.push({date,supervisor_name:a?.supervisor_name||supervisorName,project_name:a?.project_name||'',operation_type:a?.operation_type||'',check_in:ins[0]||'',check_out:outs[outs.length-1]||'',required_minutes:required,actual_minutes:actual,status:has?'حضور':required===0?'راحة/جمعة غير مطلوبة':!attendanceSourceOk?'تعذر تحميل الحضور':!firstAttendanceDate?'الحضور غير مكتمل':a?'غياب':'لا يوجد توزيع'});
+   }
+
+   const base=N(field(emp,['basic_salary','base_salary','salary','main_salary']));
+   const directAllow=N(field(emp,['allowances','allowance','salary_allowance','benefits']));
+   const fin=financialFor(empId,range.month),overrides=approvedOverrides(empId,range.month);
+   const periodDays=serviceStart&&serviceEnd&&serviceStart<=serviceEnd?dateDiffInclusive(serviceStart,serviceEnd):0;
+   const dueDays=overrides.due_days!==undefined?N(overrides.due_days):periodDays;
+   const baseFinal=overrides.base_salary!==undefined?N(overrides.base_salary):base;
+   const allowanceFinal=overrides.allowances!==undefined?N(overrides.allowances):directAllow+fin.allowances;
+   const commissions=overrides.commissions!==undefined?N(overrides.commissions):fin.commissions;
+   const advances=overrides.advances!==undefined?N(overrides.advances):fin.advances;
+   const otherDed=overrides.other_deductions!==undefined?N(overrides.other_deductions):fin.deductions;
+   const gross=baseFinal+allowanceFinal,periodSalary=gross/30*dueDays;
+   const absenceDeduction=attendanceSourceOk&&firstAttendanceDate?(baseFinal/30)*absent:0;
+   const deductions=otherDed+absenceDeduction,net=periodSalary+commissions+fin.rounding-deductions-advances;
+   const issues=[];
+   if(!baseFinal)issues.push('الراتب الأساسي غير مسجل');
+   if(!assignmentDetails.length&&['عامل','حارس'].includes(role))issues.push(rawAssignments.length?'تعذر ربط التوزيع':'دون توزيع');
+   if(!primarySup&&role==='عامل')issues.push(rawAssignments.length?'تعذر ربط المشرف':'دون مشرف نشط');
+   if(state.incomplete)issues.push('مصدر أساسي غير مكتمل');
+   if(!attendanceSourceOk)issues.push('بيانات الحضور غير مكتملة');else if(!firstAttendanceDate)issues.push('الحضور غير مكتمل');
+   rows.push({worker_id:empId,canonical_employee_id:empId,employee_code:employeeCode(emp),month:range.month,residency_name:iqamaName(emp),worker_name:employeeName(emp),iqama_number:human(field(emp,['iqama_number','residency_number','national_id']))||'',job_title:role,supervisor_id:primarySup,supervisor_name:supervisorName||'دون مشرف',work_location:human(workLocation)||'غير محدد',project_ids:[...new Set(assignmentDetails.map(a=>a.project_id).filter(Boolean))],project_names:[...new Set(assignmentDetails.map(a=>a.project_name).filter(Boolean))],multiple_supervisors:supervisorChoice.multiple,supervisor_tie:supervisorChoice.tie,supervisor_days:supervisorChoice.ranked,assignment_details:assignmentDetails,service_start:serviceStart,first_attendance_date:firstAttendanceDate,service_end:serviceEnd,month_days:range.days,work_days:periodDays,required_work_days:requiredWorkDays,present_days:present,absent_days:attendanceSourceOk&&firstAttendanceDate?absent:null,due_days:dueDays,required_minutes:requiredMinutes,actual_minutes:actualMinutes,base_salary:baseFinal,allowances:allowanceFinal,gross_salary:gross,period_salary:periodSalary,commissions,other_deductions:otherDed,absence_deduction:absenceDeduction,deductions,rounding:fin.rounding,advances,net_salary:net,notes:human(field(emp,['notes','payroll_notes']))||'',status:state.incomplete||!attendanceSourceOk?'بيانات ناقصة':issues.length?'يحتاج مراجعة':'مسودة',issues,details:dayRows,__employee:emp});
+ }
+
+ const payrollByEmployee=new Map(),duplicateRowIds=[];
+ for(const r of rows){if(payrollByEmployee.has(r.canonical_employee_id)){duplicateRowIds.push(r.canonical_employee_id);continue;}payrollByEmployee.set(r.canonical_employee_id,r);}
+ const finalRows=[...payrollByEmployee.values()];
+ finalRows.sort((a,b)=>a.supervisor_name.localeCompare(b.supervisor_name,'ar')||a.job_title.localeCompare(b.job_title,'ar')||a.employee_code.localeCompare(b.employee_code,'ar'));
  const categories={};finalRows.forEach(r=>categories[r.job_title]=(categories[r.job_title]||0)+1);
- const expectedBySupervisor=new Map();for(const r of finalRows){const sid=r.supervisor_id||'none';if(!expectedBySupervisor.has(sid))expectedBySupervisor.set(sid,new Set());expectedBySupervisor.get(sid).add(r.worker_id);}const displayedBySupervisor=new Map();for(const r of finalRows){const sid=r.supervisor_id||'none';if(!displayedBySupervisor.has(sid))displayedBySupervisor.set(sid,new Set());displayedBySupervisor.get(sid).add(r.worker_id);}const supervisorCoverage=[...expectedBySupervisor.entries()].map(([sid,set])=>{const shown=displayedBySupervisor.get(sid)||new Set();return{supervisor_id:sid,supervisor_name:sid==='none'?'دون مشرف':userName(sid)||sid,assigned_unique_workers:set.size,displayed_payroll_workers:shown.size,missing:[...set].filter(id=>!shown.has(id))};});
- state.diagnostics={periodStart:range.start,periodEnd:range.end,rawEmployeesCount:merged.stats.before,stoppedEmployeesRemoved,stoppedSupervisorsRemoved,uniqueEmployeeIdsCount:eligibleKeys.size,duplicateEmployeesMerged:merged.stats.merged+duplicateRowIds.length,duplicateEmployeeIdsBeforeMerge,finalEmployeesCount:finalRows.length,employeesWithoutSupervisor:finalRows.filter(r=>!r.supervisor_id).length,attendanceRecordsCount:state.attendance.length,duplicateAttendanceRemoved,employeesWithFirstAttendance:Object.keys(firstAttendanceByEmployee).length,firstAttendanceByEmployee,employeesWithAbsenceDeduction:finalRows.filter(r=>r.absence_deduction>0).length,duplicateRowsRemoved:merged.stats.merged+duplicateRowIds.length,duplicateRowIds:[...new Set(duplicateRowIds)],baseEmployees:state.employees.length,workers:categories['عامل']||0,guards:categories['حارس']||0,supervisors:categories['مشرف']||0,technicians:categories['فني']||0,assignmentsInPeriod:state.assignments.length,sourceFailures:state.sources.filter(s=>!s.ok).length,supervisorCoverage,missingWorkersBySupervisor:supervisorCoverage.flatMap(x=>x.missing.map(id=>({supervisor_id:x.supervisor_id,worker_id:id})))};
- if(state.diagnostics.finalPayrollRows!==state.diagnostics.uniqueEmployeeIds)console.error('[payroll invariant] final rows do not equal unique employee ids',state.diagnostics);console.table(supervisorCoverage);window.__tasneefPayrollDiagnostics=state.diagnostics;console.table(state.diagnostics);console.table(state.sources);state.rows=finalRows;return finalRows;
+ const displayedBySupervisor=new Map();for(const r of finalRows){const sid=r.supervisor_id||'none';if(!displayedBySupervisor.has(sid))displayedBySupervisor.set(sid,new Set());displayedBySupervisor.get(sid).add(r.worker_id);}
+ const allSupervisorIds=new Set([...distributionPrimaryExpected.keys(),...displayedBySupervisor.keys()]);
+ const supervisorCoverage=[...allSupervisorIds].map(sid=>{const expected=distributionPrimaryExpected.get(sid)||new Set(),shown=displayedBySupervisor.get(sid)||new Set();return{supervisor_id:sid,supervisor_name:sid==='none'?'دون مشرف':userName(sid)||sid,distribution_workers:expected.size,payroll_workers:shown.size,missing_workers:[...expected].filter(id=>!shown.has(id)),extra_workers:[...shown].filter(id=>!expected.has(id))};});
+ state.diagnostics={periodStart:range.start,periodEnd:range.end,distributionTable:'monthly_distribution (أساسي) + monthly_distribution_view + worker_project_assignments (مساند)',distributionFunction:'buildUnifiedPayroll → monthly_distribution بنفس month_key المستخدم في tasneefDistributionV404.loadDistribution',attendanceTable:'attendance',attendanceFunction:'isApprovedAttendance + rowDate + canonicalEmployeeFromRef',rawEmployeesCount:merged.stats.before,stoppedEmployeesRemoved,stoppedSupervisorsRemoved,uniqueEmployeeIdsCount:eligibleKeys.size,duplicateEmployeesMerged:merged.stats.merged+duplicateRowIds.length,duplicateEmployeeIdsBeforeMerge,finalEmployeesCount:finalRows.length,employeesWithoutSupervisor:finalRows.filter(r=>!r.supervisor_id).length,attendanceRecordsCount:state.attendance.length,duplicateAttendanceRemoved,employeesWithFirstAttendance:Object.keys(firstAttendanceByEmployee).length,firstAttendanceByEmployee,employeesWithAbsenceDeduction:finalRows.filter(r=>r.absence_deduction>0).length,duplicateRowsRemoved:merged.stats.merged+duplicateRowIds.length,duplicateRowIds:[...new Set(duplicateRowIds)],baseEmployees:state.employees.length,workers:categories['عامل']||0,guards:categories['حارس']||0,supervisors:categories['مشرف']||0,technicians:categories['فني']||0,assignmentsInPeriod:state.assignments.length,unlinkedAssignments,sourceFailures:state.sources.filter(s=>!s.ok).length,supervisorCoverage,missingWorkersBySupervisor:supervisorCoverage.flatMap(x=>x.missing_workers.map(id=>({supervisor_id:x.supervisor_id,worker_id:id}))),extraWorkersBySupervisor:supervisorCoverage.flatMap(x=>x.extra_workers.map(id=>({supervisor_id:x.supervisor_id,worker_id:id}))),employeesRelinkedFromWithoutSupervisor:finalRows.filter(r=>r.supervisor_id&&r.assignment_details.length).map(r=>({worker_id:r.worker_id,worker_name:r.worker_name,supervisor:r.supervisor_name}))};
+ console.table(supervisorCoverage);window.__tasneefPayrollDiagnostics=state.diagnostics;console.table(state.diagnostics);console.table(state.sources);state.rows=finalRows;return finalRows;
 }
 function currentRows(){let rows=[...state.rows];const sup=S($('salarySupervisor')?.value),proj=S($('salaryProject')?.value),op=S($('salaryOperation')?.value),st=S($('salaryStatus')?.value),q=norm($('salarySearch')?.value);if(sup)rows=rows.filter(r=>r.supervisor_id===sup);if(proj)rows=rows.filter(r=>r.project_ids.includes(proj));if(op)rows=rows.filter(r=>op==='زيارة يومية'?r.assignment_details.some(a=>isDaily(a.project_id)):r.assignment_details.some(a=>!isDaily(a.project_id)));if(st)rows=rows.filter(r=>r.status===st);if(q)rows=rows.filter(r=>norm([r.worker_name,r.residency_name,r.employee_code,r.iqama_number,r.supervisor_name,r.work_location,r.project_names.join(' '),r.notes].join(' ')).includes(q));return rows;}
 function fillFilters(){const s=$('salarySupervisor'),p=$('salaryProject');if(s){const old=s.value;s.innerHTML='<option value="">كل المشرفين</option>'+[...new Map(state.rows.map(r=>[r.supervisor_id,r.supervisor_name])).entries()].filter(x=>x[0]).map(([id,n])=>`<option value="${esc(id)}">${esc(n)}</option>`).join('');s.value=old;}if(p){const old=p.value;p.innerHTML='<option value="">كل المشاريع</option>'+state.projects.map(x=>`<option value="${esc(S(x.id))}">${esc(human(field(x,['name','project_name','title']))||'مشروع')}</option>`).join('');p.value=old;}}
