@@ -1,8 +1,8 @@
 (function(){
 'use strict';
-if(window.__tasneefPayrollRebuiltV473) return;
-window.__tasneefPayrollRebuiltV473=true;
-const VERSION='V473 ربط التوزيع والحضور من المصدر التشغيلي';
+if(window.__tasneefPayrollServerOnlyV474) return;
+window.__tasneefPayrollServerOnlyV474=true;
+const VERSION='V474 مصدر الرواتب من السيرفر فقط';
 const $=id=>document.getElementById(id);
 const S=v=>String(v??'').trim();
 const N=v=>Number(String(v??'').replace(/,/g,''))||0;
@@ -20,7 +20,7 @@ function isExplicitlyActive(o){if(!o)return false;if(Object.prototype.hasOwnProp
 function isApprovedAttendance(r){if(!r||r.deleted_at||r.is_deleted===true||r.is_cancelled===true||r.cancelled===true)return false;const st=norm(field(r,['status','attendance_status','approval_status','record_status']));if(st&&(['ملغي','مرفوض','غير معتمد','failed','cancelled','rejected'].some(x=>st.includes(norm(x)))))return false;if(Object.prototype.hasOwnProperty.call(r,'is_approved')&&r.is_approved===false)return false;const checkIn=timeOnly(field(r,['check_in','in_time','start_time','login_time']));return !!checkIn;}
 const state={rows:[],employees:[],projects:[],users:[],assignments:[],attendance:[],daily:[],adjustments:[],sources:[],diagnostics:{},incomplete:false,loading:false};
 let printBusy=false;
-function msg(text,bad=false){const el=$('salaryMsg');if(el){el.textContent=text;el.className='msg '+(bad?'err':'');el.style.display='block';}console[bad?'error':'log']('[payroll-v473]',text);}
+function msg(text,bad=false){const el=$('salaryMsg');if(el){el.textContent=text;el.className='msg '+(bad?'err':'');el.style.display='block';}console[bad?'error':'log']('[payroll-v474]',text);}
 function sourceError(name,table,error){const e={name,table,ok:false,count:0,error:S(error?.message||error),code:S(error?.code||''),details:S(error?.details||'')};state.sources.push(e);console.error('[payroll source]',e);return e;}
 async function fetchAll(table,queryBuilder){let rows=[],from=0,size=1000;while(true){let q=window.sb.from(table).select('*').range(from,from+size-1);if(queryBuilder)q=queryBuilder(q);const r=await q;if(r.error)throw r.error;const part=r.data||[];rows.push(...part);if(part.length<size)break;from+=size;if(from>100000)throw new Error(`تجاوز حد القراءة الآمن في ${table}`);}return rows;}
 async function readFirst(name,tables,builder,{required=false,merge=false}={}){let all=[],used=[],errors=[];for(const table of tables){try{const rows=await fetchAll(table,builder);used.push(table);state.sources.push({name,table,ok:true,count:rows.length,error:''});if(merge){all.push(...rows);}else if(rows.length){return{rows,table,ok:true};}}catch(e){errors.push(sourceError(name,table,e));}}
@@ -91,173 +91,46 @@ function findEmployeeByRef(ref,aliasMap){const key=aliasMap.get(S(ref));return k
 function financialFor(empId,month){const rows=state.adjustments.filter(x=>S(field(x,['worker_id','employee_id','entity_id']))===S(empId)&&(!x.salary_month||S(x.salary_month).slice(0,7)===month));const sum=types=>rows.filter(x=>types.includes(norm(field(x,['type','adjustment_type','category'])))).reduce((s,x)=>s+N(field(x,['amount','value'])),0);return{allowances:sum(['بدل','بدلات','allowance']),commissions:sum(['عموله','عمولة','حافز','حوافز','commission','bonus']),advances:sum(['سلفه','سلفة','سلف','advance']),deductions:sum(['خصم','خصومات','جزاء','deduction']),rounding:sum(['جبر الكسور','rounding']),rows};}
 function approvedOverrides(empId,month){const rows=state.adjustments.filter(x=>S(field(x,['worker_id','employee_id','entity_id']))===S(empId)&&S(x.salary_month||x.month_key).slice(0,7)===month&&(x.is_approved===true||norm(x.status)==='معتمد'));const out={};for(const x of rows){const k=S(field(x,['field_name','target_field']));if(k)out[k]=field(x,['new_value','value','amount']);}return out;}
 async function buildUnifiedPayroll(period){
- if(!window.sb)throw new Error('اتصال Supabase غير جاهز');
- const range=monthRange(period);state.sources=[];state.incomplete=false;
- const employeeSources=[];
- for(const table of ['employees_master_v386','employees','workers']){
-   const r=await readFirst('الموظفون',[table],null,{required:table==='employees_master_v386'});
-   employeeSources.push({table,rows:r.rows});
+ const range=monthRange(period);
+ if(!window.sb)throw new Error('اتصال Supabase غير متاح');
+ // لا Cache ولا fallback ولا دمج داخل الواجهة: استجابة واحدة نهائية من RPC السيرفر.
+ state.rows=[];state.projects=[];state.assignments=[];state.attendance=[];state.daily=[];state.sources=[];state.diagnostics={};state.incomplete=true;
+ const startedAt=Date.now();
+ const response=await window.sb.rpc('get_unified_payroll_from_server',{p_month:range.month});
+ if(response.error){
+   state.sources=[{name:'مصدر الرواتب الموحد',table:'RPC get_unified_payroll_from_server',ok:false,count:0,error:S(response.error.message||response.error),code:S(response.error.code||'')}];
+   throw response.error;
  }
- const merged=mergeEmployeeProfiles(employeeSources,range);
- state.employees=merged.employees;
- state.employeeMap=new Map(state.employees.map(e=>[employeeKey(e),e]));
- const [projects,users,monthlyDist,monthlyDistView,currentAssignments,attendance,daily,adjustments]=await Promise.all([
-   readFirst('المشاريع',['projects'],null,{required:true}),
-   readFirst('المشرفون',['employees_master_v386','employees','app_users'],null,{required:true,merge:true}),
-   readFirst('التوزيع الشهري',['monthly_distribution'],q=>q.eq('month_key',range.month),{required:false}),
-   readFirst('عرض التوزيع الشهري',['monthly_distribution_view'],q=>q.eq('month_key',range.month),{required:false}),
-   readFirst('توزيعات المشاريع',['worker_project_assignments'],q=>q,{required:false}),
-   readFirst('الحضور والغياب',['attendance'],q=>q,{required:true}),
-   readFirst('التسجيلات والأوقات',['time_logs','daily_records','daily_registrations'],q=>q,{required:true,merge:true}),
-   readFirst('التعديلات المالية',['payroll_adjustments','salary_adjustments'],null,{required:false,merge:true})
- ]);
- state.projects=projects.rows;
- state.users=users.rows;
- const distRaw=[
-   ...monthlyDist.rows.map(x=>({...x,__source_table:'monthly_distribution'})),
-   ...monthlyDistView.rows.map(x=>({...x,__source_table:'monthly_distribution_view'})),
-   ...currentAssignments.rows.map(x=>({...x,__source_table:'worker_project_assignments'}))
- ];
- state.assignments=dedupeAssignments(distRaw,range).sort((a,b)=>assignmentSourceRank(a)-assignmentSourceRank(b));
- const attendanceInRange=attendance.rows.filter(a=>{const d=rowDate(a);return d>=range.start&&d<=range.end&&isApprovedAttendance(a)});
- const dailyInRange=daily.rows.filter(a=>{const d=rowDate(a);return d>=range.start&&d<=range.end&&!a.deleted_at&&a.is_deleted!==true});
- state.attendance=dedupeEmployeeEvents(attendanceInRange,merged.aliases,'attendance');
- state.daily=dedupeEmployeeEvents(dailyInRange,merged.aliases,'daily');
- state.adjustments=adjustments.rows;
-
- const eligibleKeys=new Set();
- for(const e of state.employees){
-   if(payrollEligibleProfile(e,range)&&!isExplicitlyStopped(e))eligibleKeys.add(employeeKey(e));
- }
- for(const a of state.assignments){
-   const k=canonicalEmployeeFromRef(assignmentEmployeeRef(a),merged.aliases);if(k)eligibleKeys.add(k);
- }
- for(const x of [...state.attendance,...state.daily]){
-   const k=S(x.__canonical_employee_id)||canonicalEmployeeFromRef(attendanceEmployeeRef(x),merged.aliases);if(k&&state.employeeMap.has(k))eligibleKeys.add(k);
- }
-
- const assignmentsByEmployee=new Map();
- const unlinkedAssignments=[];
- for(const a of state.assignments){
-   const k=canonicalEmployeeFromRef(assignmentEmployeeRef(a),merged.aliases);
-   if(!k){unlinkedAssignments.push({ref:assignmentEmployeeRef(a),project_id:projectRef(a),supervisor_id:supervisorRef(a),source:a.__source_table});continue;}
-   if(!assignmentsByEmployee.has(k))assignmentsByEmployee.set(k,[]);
-   assignmentsByEmployee.get(k).push(a);
- }
- const attendanceByEmployee=new Map(),dailyByEmployee=new Map();
- for(const x of state.attendance){const k=S(x.__canonical_employee_id);if(!attendanceByEmployee.has(k))attendanceByEmployee.set(k,[]);attendanceByEmployee.get(k).push(x);}
- for(const x of state.daily){const k=S(x.__canonical_employee_id);if(!dailyByEmployee.has(k))dailyByEmployee.set(k,[]);dailyByEmployee.get(k).push(x);}
-
- const rows=[];const unlinked=[];let stoppedEmployeesRemoved=0,stoppedSupervisorsRemoved=0;
- const duplicateAttendanceRemoved=Math.max(0,attendanceInRange.length-state.attendance.length);
- const duplicateEmployeeIdsBeforeMerge=merged.stats.duplicateCanonicalIds.map(x=>x.canonical_employee_id);
- const firstAttendanceByEmployee={};
- const distributionPrimaryExpected=new Map();
-
- for(const key of eligibleKeys){
-   const emp=state.employeeMap.get(key);if(!emp){unlinked.push(key);continue;}
-   if(isExplicitlyStopped(emp)){stoppedEmployeesRemoved++;continue;}
-   const empId=employeeKey(emp),role=employeeRole(emp);
-   const rawAssignments=assignmentsByEmployee.get(empId)||[];
-   const assignmentDetails=[];
-   for(const a of rawAssignments){
-     const p=resolveProjectHuman(projectRef(a));
-     if(!p)continue;
-     const rawSup=supervisorRef(a),supObj=activeSupervisor(rawSup);
-     if(rawSup&&!supObj){stoppedSupervisorsRemoved++;continue;}
-     const start=aStart(a,range),end=aEnd(a,range);
-     if(start>range.end||end<range.start)continue;
-     assignmentDetails.push({
-       source:a.__source_table,
-       project_id:S(field(p,['id','project_id']))||projectRef(a),
-       project_name:human(field(p,['name','project_name','title']))||human(field(a,['project_name']))||'',
-       supervisor_id:rawSup,
-       supervisor_name:supObj?(employeeName(supObj)||userName(rawSup)):human(field(a,['supervisor_name']))||'',
-       start:start<range.start?range.start:start,
-       end:end>range.end?range.end:end,
-       days:dateDiffInclusive(start<range.start?range.start:start,end>range.end?range.end:end),
-       operation_type:projectOperation(projectRef(a))||human(field(a,['operation_type','work_type','role_type']))||''
-     });
-   }
-   assignmentDetails.sort((a,b)=>a.start.localeCompare(b.start)||a.source.localeCompare(b.source));
-   const supervisorChoice=supervisorSelection(assignmentDetails);
-   const primarySup=supervisorChoice.primary;
-   const primaryDetail=assignmentDetails.find(a=>a.supervisor_id===primarySup);
-   const supervisorName=primarySup?(primaryDetail?.supervisor_name||userName(primarySup)||'مشرف غير مربوط'):(role==='عامل'||role==='حارس'?'دون مشرف نشط':'');
-   if(primarySup){if(!distributionPrimaryExpected.has(primarySup))distributionPrimaryExpected.set(primarySup,new Set());distributionPrimaryExpected.get(primarySup).add(empId);}
-
-   const empAttendance=attendanceByEmployee.get(empId)||[];
-   const empDaily=dailyByEmployee.get(empId)||[];
-   const validAttendanceDates=[...new Set(empAttendance.map(rowDate).filter(Boolean))].sort();
-   const firstAttendanceDate=validAttendanceDates[0]||'';
-   if(firstAttendanceDate)firstAttendanceByEmployee[empId]=firstAttendanceDate;
-   const officialStart=employeeServiceStart(emp,range);
-   const firstAssignmentStart=assignmentDetails.map(a=>a.start).sort()[0]||'';
-   const fallbackStart=[officialStart,firstAssignmentStart].filter(Boolean).sort().slice(-1)[0]||range.start;
-   const serviceStart=firstAttendanceDate||fallbackStart;
-   const serviceEnd=employeeServiceEnd(emp,range);
-
-   const locations=[...new Set(assignmentDetails.map(a=>isDaily(a.project_id)?supervisorName:a.project_name).filter(Boolean))];
-   let workLocation='';
-   if(locations.length===1)workLocation=locations[0];
-   else if(locations.length>1)workLocation='متعدد';
-   else if(role==='فني')workLocation='فريق الصيانة';
-   else if(role==='مشرف')workLocation='المشرفون';
-   else workLocation=rawAssignments.length?'تعذر ربط التوزيع':'دون توزيع';
-
-   const attendanceSourceOk=state.sources.some(s=>s.name==='الحضور والغياب'&&s.ok);
-   const days=serviceStart&&serviceEnd&&serviceStart<=serviceEnd?dateList(serviceStart,serviceEnd):[];
-   const dayRows=[];let present=0,absent=0,actualMinutes=0,requiredMinutes=0,requiredWorkDays=0;
-   for(const date of days){
-     const dayAs=assignmentDetails.filter(a=>a.start<=date&&a.end>=date);
-     const a=dayAs.sort((x,y)=>y.days-x.days||y.start.localeCompare(x.start))[0];
-     const p=projectByRef(a?.project_id);
-     const ats=empAttendance.filter(x=>rowDate(x)===date);
-     const logs=empDaily.filter(x=>rowDate(x)===date);
-     const ins=ats.map(x=>timeOnly(field(x,['check_in','in_time','start_time','login_time']))).filter(Boolean).sort();
-     const outs=ats.map(x=>timeOnly(field(x,['check_out','out_time','end_time','logout_time']))).filter(Boolean).sort();
-     let actual=logs.reduce((s,x)=>s+N(field(x,['work_minutes','total_minutes','minutes','actual_minutes'])),0);
-     if(!actual&&ins.length&&outs.length)actual=minutesBetween(ins[0],outs[outs.length-1]);
-     const required=a?requiredDailyMinutes(p,date):0;
-     const has=ins.length>0||actual>0;
-     if(required>0)requiredWorkDays++;
-     if(has)present++;else if(attendanceSourceOk&&firstAttendanceDate&&a&&required>0)absent++;
-     actualMinutes+=actual;requiredMinutes+=required;
-     dayRows.push({date,supervisor_name:a?.supervisor_name||supervisorName,project_name:a?.project_name||'',operation_type:a?.operation_type||'',check_in:ins[0]||'',check_out:outs[outs.length-1]||'',required_minutes:required,actual_minutes:actual,status:has?'حضور':required===0?'راحة/جمعة غير مطلوبة':!attendanceSourceOk?'تعذر تحميل الحضور':!firstAttendanceDate?'الحضور غير مكتمل':a?'غياب':'لا يوجد توزيع'});
-   }
-
-   const base=N(field(emp,['basic_salary','base_salary','salary','main_salary']));
-   const directAllow=N(field(emp,['allowances','allowance','salary_allowance','benefits']));
-   const fin=financialFor(empId,range.month),overrides=approvedOverrides(empId,range.month);
-   const periodDays=serviceStart&&serviceEnd&&serviceStart<=serviceEnd?dateDiffInclusive(serviceStart,serviceEnd):0;
-   const dueDays=overrides.due_days!==undefined?N(overrides.due_days):periodDays;
-   const baseFinal=overrides.base_salary!==undefined?N(overrides.base_salary):base;
-   const allowanceFinal=overrides.allowances!==undefined?N(overrides.allowances):directAllow+fin.allowances;
-   const commissions=overrides.commissions!==undefined?N(overrides.commissions):fin.commissions;
-   const advances=overrides.advances!==undefined?N(overrides.advances):fin.advances;
-   const otherDed=overrides.other_deductions!==undefined?N(overrides.other_deductions):fin.deductions;
-   const gross=baseFinal+allowanceFinal,periodSalary=gross/30*dueDays;
-   const absenceDeduction=attendanceSourceOk&&firstAttendanceDate?(baseFinal/30)*absent:0;
-   const deductions=otherDed+absenceDeduction,net=periodSalary+commissions+fin.rounding-deductions-advances;
-   const issues=[];
-   if(!baseFinal)issues.push('الراتب الأساسي غير مسجل');
-   if(!assignmentDetails.length&&['عامل','حارس'].includes(role))issues.push(rawAssignments.length?'تعذر ربط التوزيع':'دون توزيع');
-   if(!primarySup&&role==='عامل')issues.push(rawAssignments.length?'تعذر ربط المشرف':'دون مشرف نشط');
-   if(state.incomplete)issues.push('مصدر أساسي غير مكتمل');
-   if(!attendanceSourceOk)issues.push('بيانات الحضور غير مكتملة');else if(!firstAttendanceDate)issues.push('الحضور غير مكتمل');
-   rows.push({worker_id:empId,canonical_employee_id:empId,employee_code:employeeCode(emp),month:range.month,residency_name:iqamaName(emp),worker_name:employeeName(emp),iqama_number:human(field(emp,['iqama_number','residency_number','national_id']))||'',job_title:role,supervisor_id:primarySup,supervisor_name:supervisorName||'دون مشرف',work_location:human(workLocation)||'غير محدد',project_ids:[...new Set(assignmentDetails.map(a=>a.project_id).filter(Boolean))],project_names:[...new Set(assignmentDetails.map(a=>a.project_name).filter(Boolean))],multiple_supervisors:supervisorChoice.multiple,supervisor_tie:supervisorChoice.tie,supervisor_days:supervisorChoice.ranked,assignment_details:assignmentDetails,service_start:serviceStart,first_attendance_date:firstAttendanceDate,service_end:serviceEnd,month_days:range.days,work_days:periodDays,required_work_days:requiredWorkDays,present_days:present,absent_days:attendanceSourceOk&&firstAttendanceDate?absent:null,due_days:dueDays,required_minutes:requiredMinutes,actual_minutes:actualMinutes,base_salary:baseFinal,allowances:allowanceFinal,gross_salary:gross,period_salary:periodSalary,commissions,other_deductions:otherDed,absence_deduction:absenceDeduction,deductions,rounding:fin.rounding,advances,net_salary:net,notes:human(field(emp,['notes','payroll_notes']))||'',status:state.incomplete||!attendanceSourceOk?'بيانات ناقصة':issues.length?'يحتاج مراجعة':'مسودة',issues,details:dayRows,__employee:emp});
- }
-
- const payrollByEmployee=new Map(),duplicateRowIds=[];
- for(const r of rows){if(payrollByEmployee.has(r.canonical_employee_id)){duplicateRowIds.push(r.canonical_employee_id);continue;}payrollByEmployee.set(r.canonical_employee_id,r);}
- const finalRows=[...payrollByEmployee.values()];
- finalRows.sort((a,b)=>a.supervisor_name.localeCompare(b.supervisor_name,'ar')||a.job_title.localeCompare(b.job_title,'ar')||a.employee_code.localeCompare(b.employee_code,'ar'));
- const categories={};finalRows.forEach(r=>categories[r.job_title]=(categories[r.job_title]||0)+1);
- const displayedBySupervisor=new Map();for(const r of finalRows){const sid=r.supervisor_id||'none';if(!displayedBySupervisor.has(sid))displayedBySupervisor.set(sid,new Set());displayedBySupervisor.get(sid).add(r.worker_id);}
- const allSupervisorIds=new Set([...distributionPrimaryExpected.keys(),...displayedBySupervisor.keys()]);
- const supervisorCoverage=[...allSupervisorIds].map(sid=>{const expected=distributionPrimaryExpected.get(sid)||new Set(),shown=displayedBySupervisor.get(sid)||new Set();return{supervisor_id:sid,supervisor_name:sid==='none'?'دون مشرف':userName(sid)||sid,distribution_workers:expected.size,payroll_workers:shown.size,missing_workers:[...expected].filter(id=>!shown.has(id)),extra_workers:[...shown].filter(id=>!expected.has(id))};});
- state.diagnostics={periodStart:range.start,periodEnd:range.end,distributionTable:'monthly_distribution (أساسي) + monthly_distribution_view + worker_project_assignments (مساند)',distributionFunction:'buildUnifiedPayroll → monthly_distribution بنفس month_key المستخدم في tasneefDistributionV404.loadDistribution',attendanceTable:'attendance',attendanceFunction:'isApprovedAttendance + rowDate + canonicalEmployeeFromRef',rawEmployeesCount:merged.stats.before,stoppedEmployeesRemoved,stoppedSupervisorsRemoved,uniqueEmployeeIdsCount:eligibleKeys.size,duplicateEmployeesMerged:merged.stats.merged+duplicateRowIds.length,duplicateEmployeeIdsBeforeMerge,finalEmployeesCount:finalRows.length,employeesWithoutSupervisor:finalRows.filter(r=>!r.supervisor_id).length,attendanceRecordsCount:state.attendance.length,duplicateAttendanceRemoved,employeesWithFirstAttendance:Object.keys(firstAttendanceByEmployee).length,firstAttendanceByEmployee,employeesWithAbsenceDeduction:finalRows.filter(r=>r.absence_deduction>0).length,duplicateRowsRemoved:merged.stats.merged+duplicateRowIds.length,duplicateRowIds:[...new Set(duplicateRowIds)],baseEmployees:state.employees.length,workers:categories['عامل']||0,guards:categories['حارس']||0,supervisors:categories['مشرف']||0,technicians:categories['فني']||0,assignmentsInPeriod:state.assignments.length,unlinkedAssignments,sourceFailures:state.sources.filter(s=>!s.ok).length,supervisorCoverage,missingWorkersBySupervisor:supervisorCoverage.flatMap(x=>x.missing_workers.map(id=>({supervisor_id:x.supervisor_id,worker_id:id}))),extraWorkersBySupervisor:supervisorCoverage.flatMap(x=>x.extra_workers.map(id=>({supervisor_id:x.supervisor_id,worker_id:id}))),employeesRelinkedFromWithoutSupervisor:finalRows.filter(r=>r.supervisor_id&&r.assignment_details.length).map(r=>({worker_id:r.worker_id,worker_name:r.worker_name,supervisor:r.supervisor_name}))};
- console.table(supervisorCoverage);window.__tasneefPayrollDiagnostics=state.diagnostics;console.table(state.diagnostics);console.table(state.sources);state.rows=finalRows;return finalRows;
+ const payload=response.data;
+ if(!payload||!Array.isArray(payload.rows))throw new Error('استجابة السيرفر لا تحتوي صفوف رواتب نهائية');
+ const rows=payload.rows.map(r=>({
+   ...r,
+   worker_id:S(r.worker_id||r.canonical_employee_id),
+   canonical_employee_id:S(r.canonical_employee_id||r.worker_id),
+   supervisor_id:S(r.supervisor_id||''),
+   project_ids:Array.isArray(r.project_ids)?r.project_ids.map(S):[],
+   project_names:Array.isArray(r.project_names)?r.project_names:[],
+   assignment_details:Array.isArray(r.assignment_details)?r.assignment_details:[],
+   details:Array.isArray(r.details)?r.details:[],
+   issues:Array.isArray(r.issues)?r.issues:[],
+   base_salary:N(r.base_salary),allowances:N(r.allowances),gross_salary:N(r.gross_salary),period_salary:N(r.period_salary),
+   commissions:N(r.commissions),other_deductions:N(r.other_deductions),absence_deduction:N(r.absence_deduction),deductions:N(r.deductions),
+   rounding:N(r.rounding),advances:N(r.advances),net_salary:N(r.net_salary),work_days:N(r.work_days),required_work_days:N(r.required_work_days),
+   present_days:N(r.present_days),absent_days:r.absent_days===null?null:N(r.absent_days),due_days:N(r.due_days),required_minutes:N(r.required_minutes),actual_minutes:N(r.actual_minutes)
+ }));
+ const ids=rows.map(r=>r.canonical_employee_id).filter(Boolean),unique=new Set(ids);
+ if(ids.length!==unique.size)throw new Error('Duplicate payroll employees detected');
+ const diagnostics={...(payload.diagnostics||{}),client_received_rows:rows.length,request_duration_ms:Date.now()-startedAt,source_function:'public.get_unified_payroll_from_server'};
+ if(N(diagnostics.duplicate_ids_found)!==0)throw new Error('Duplicate payroll employees detected');
+ if(N(diagnostics.final_payroll_rows)!==N(diagnostics.canonical_employee_ids))throw new Error('Payroll row count does not match canonical employees');
+ state.rows=rows;
+ state.projects=Array.isArray(payload.projects)?payload.projects:[];
+ state.diagnostics=diagnostics;
+ state.sources=[{name:'مصدر الرواتب الموحد',table:'RPC public.get_unified_payroll_from_server',ok:true,count:rows.length,error:''}];
+ state.incomplete=payload.incomplete===true;
+ window.__tasneefPayrollDiagnostics=diagnostics;
+ console.table(diagnostics);
+ return rows;
 }
 function currentRows(){let rows=[...state.rows];const sup=S($('salarySupervisor')?.value),proj=S($('salaryProject')?.value),op=S($('salaryOperation')?.value),st=S($('salaryStatus')?.value),q=norm($('salarySearch')?.value);if(sup)rows=rows.filter(r=>r.supervisor_id===sup);if(proj)rows=rows.filter(r=>r.project_ids.includes(proj));if(op)rows=rows.filter(r=>op==='زيارة يومية'?r.assignment_details.some(a=>isDaily(a.project_id)):r.assignment_details.some(a=>!isDaily(a.project_id)));if(st)rows=rows.filter(r=>r.status===st);if(q)rows=rows.filter(r=>norm([r.worker_name,r.residency_name,r.employee_code,r.iqama_number,r.supervisor_name,r.work_location,r.project_names.join(' '),r.notes].join(' ')).includes(q));return rows;}
 function fillFilters(){const s=$('salarySupervisor'),p=$('salaryProject');if(s){const old=s.value;s.innerHTML='<option value="">كل المشرفين</option>'+[...new Map(state.rows.map(r=>[r.supervisor_id,r.supervisor_name])).entries()].filter(x=>x[0]).map(([id,n])=>`<option value="${esc(id)}">${esc(n)}</option>`).join('');s.value=old;}if(p){const old=p.value;p.innerHTML='<option value="">كل المشاريع</option>'+state.projects.map(x=>`<option value="${esc(S(x.id))}">${esc(human(field(x,['name','project_name','title']))||'مشروع')}</option>`).join('');p.value=old;}}
@@ -272,7 +145,7 @@ function sourceDetails(){let m=$('payrollSourceModal');if(!m){m=document.createE
 async function save(approve){if(state.incomplete)return msg('لا يمكن حفظ أو اعتماد كشف ناقص.',true);try{const month=$('salaryMonth')?.value||today().slice(0,7),payload=currentRows().map(r=>({salary_month:month,entity_type:'employee',entity_id:r.worker_id,base_salary:r.base_salary,allowances:r.allowances,commissions:r.commissions,deductions:r.deductions,advances:r.advances,net_salary:r.net_salary,status:approve?'معتمد':'مسودة',is_approved:approve,approved_at:approve?new Date().toISOString():null,notes:r.notes,updated_at:new Date().toISOString()}));const res=await window.sb.from('monthly_salaries').upsert(payload,{onConflict:'salary_month,entity_type,entity_id'});if(res.error)throw res.error;msg(approve?'تم اعتماد الكشف':'تم حفظ المسودة');}catch(e){msg('تعذر الحفظ: '+S(e.message||e),true);}}
 function printRows(){if(state.incomplete)return msg('الطباعة النهائية متوقفة حتى تكتمل المصادر.',true);if(printBusy)return;printBusy=true;try{const rows=JSON.parse(JSON.stringify(currentRows())),month=$('salaryMonth')?.value||'';const w=window.open('','_blank');if(!w)throw new Error('المتصفح منع نافذة الطباعة');const sum=k=>rows.reduce((s,r)=>s+N(r[k]),0);w.document.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><style>@page{size:A4 landscape;margin:6mm}body{font-family:Tahoma,Arial}.title{background:#07513f;color:#fff;text-align:center;padding:10px;font-weight:900;font-size:21px}.sub{text-align:center;padding:6px}table{border-collapse:collapse;width:100%;font-size:7px}th,td{border:1px solid #8ba39a;padding:3px;text-align:center;white-space:nowrap}th{background:#1f6f58;color:#fff}thead{display:table-header-group}tr{break-inside:avoid}.total td{background:#cfe8dc;font-weight:900}</style></head><body><div class="title">كشف الرواتب</div><div class="sub">شركة تصنيف لإدارة المرافق - الشهر: ${esc(month)}</div><table><thead><tr><th>#</th><th>الكود</th><th>الاسم</th><th>الإقامة</th><th>المشرف</th><th>مكان العمل</th><th>الوظيفة</th><th>البداية</th><th>النهاية</th><th>الأيام</th><th>الغياب</th><th>الاستحقاق</th><th>الأساسي</th><th>البدلات</th><th>الإجمالي</th><th>راتب الفترة</th><th>العمولة</th><th>الخصومات</th><th>السلف</th><th>الصافي</th><th>ملاحظات</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.employee_code)}</td><td>${esc(r.worker_name)}</td><td>${esc(r.iqama_number)}</td><td>${esc(r.supervisor_name)}</td><td>${esc(r.work_location)}</td><td>${esc(r.job_title)}</td><td>${r.service_start}</td><td>${r.service_end}</td><td>${r.work_days}</td><td>${r.absent_days===null?'غير محتسب':r.absent_days}</td><td>${r.due_days}</td><td>${money(r.base_salary)}</td><td>${money(r.allowances)}</td><td>${money(r.gross_salary)}</td><td>${money(r.period_salary)}</td><td>${money(r.commissions)}</td><td>${money(r.deductions)}</td><td>${money(r.advances)}</td><td>${money(r.net_salary)}</td><td>${esc(r.notes||r.issues.join('، '))}</td></tr>`).join('')}<tr class="total"><td colspan="12">الإجمالي</td><td>${money(sum('base_salary'))}</td><td>${money(sum('allowances'))}</td><td>${money(sum('gross_salary'))}</td><td>${money(sum('period_salary'))}</td><td>${money(sum('commissions'))}</td><td>${money(sum('deductions'))}</td><td>${money(sum('advances'))}</td><td>${money(sum('net_salary'))}</td><td></td></tr></tbody></table><script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);w.document.close();setTimeout(()=>printBusy=false,1000);}catch(e){printBusy=false;msg('تعذر الطباعة: '+S(e.message||e),true);}}
 function csv(){if(state.incomplete)return msg('التصدير متوقف حتى تكتمل المصادر.',true);const X=window.XLSX;if(!X)return msg('مكتبة Excel غير متاحة.',true);const rows=currentRows(),month=$('salaryMonth')?.value||'',headers=['رقم','أيدي الموظف','الشهر','اسم الموظف في الإقامة','اسم الموظف الحركي','رقم الإقامة','المشرف','مكان العمل','الوظيفة','بداية الخدمة','نهاية الخدمة','أيام العمل','أيام الغياب','الأيام المستحقة','قيمة الرواتب الأساسية','البدلات','الإجمالي','إجمالي الراتب على أيام الفترة','العمولات','الخصومات','جبر الكسور','خصم السلف','الصافي','ملاحظات'];const aoa=[['كشف الرواتب'],[`شركة تصنيف لإدارة المرافق - الشهر: ${month}`],headers];rows.forEach((r,i)=>aoa.push([i+1,r.employee_code,r.month,r.residency_name,r.worker_name,r.iqama_number,r.supervisor_name,r.work_location,r.job_title,r.service_start,r.service_end,r.work_days,r.absent_days,r.due_days,r.base_salary,r.allowances,r.gross_salary,r.period_salary,r.commissions,r.deductions,r.rounding,r.advances,r.net_salary,r.notes||r.issues.join('، ')]));const ws=X.utils.aoa_to_sheet(aoa),wb=X.utils.book_new();ws['!rtl']=true;X.utils.book_append_sheet(wb,ws,'مع العمولة');X.writeFile(wb,`كشف_الرواتب_${month}.xlsx`);}
-function inject(){let sec=$('salaries');if(!sec){sec=document.createElement('section');sec.id='salaries';sec.className='page hidden';(document.querySelector('main.content')||document.body).appendChild(sec);}sec.innerHTML=`<style>.salary-excel-card{border:1px solid #b6c9c1;border-radius:14px;overflow:hidden;background:#fff}.salary-excel-title{background:#07513f;color:#fff;text-align:center;padding:14px;font-size:24px;font-weight:900}.salary-excel-sub{text-align:center;padding:8px;background:#edf6f2;font-weight:800;color:#07513f}.salary-table-wrap{max-height:650px;overflow:auto}.salary-table{min-width:3000px;border-collapse:collapse}.salary-table th{position:sticky;top:0;z-index:2;background:#1f6f58;color:#fff}.salary-table th,.salary-table td{border:1px solid #9fb4ac;padding:7px;text-align:center;white-space:nowrap}.salary-table tbody tr:nth-child(even):not(.salary-group-row):not(.salary-total-row){background:#f2f8f5}.salary-table td small{display:block;color:#6b7280}.salary-group-row td{background:#dfeee9!important;color:#064537;font-weight:900;text-align:right}.salary-group-row div{display:flex;gap:18px;flex-wrap:wrap}.salary-total-row td{background:#cfe8dc!important;color:#064537;font-weight:900}.salary-row-warning{background:#fff4f4!important}.salary-red{color:#b91c1c;font-weight:900}.salary-actions{display:flex;gap:8px;flex-wrap:wrap}.salary-note{background:#eef8f4;border:1px solid #dce6e2;border-radius:12px;padding:10px}.payroll-modal{position:fixed;inset:0;background:#0008;display:none;z-index:99999;padding:3vh 3vw}.payroll-modal.show{display:block}.payroll-modal-box{background:#fff;border-radius:16px;padding:16px;max-height:94vh;overflow:auto}</style><div class="salary-excel-card"><div class="salary-excel-title">كشف الرواتب</div><div class="salary-excel-sub">شركة تصنيف لإدارة المرافق - الشهر: <span id="salaryTitleMonth">${today().slice(0,7)}</span></div><div class="card" style="border:0;border-radius:0"><div class="table-head"><h2>الرواتب</h2><span class="badge green">${VERSION}</span></div><div class="salary-note">مصدر واحد فقط: buildUnifiedPayroll(period). الدمج النهائي حسب canonical_employee_id قبل إنشاء الصفوف.</div><div id="salaryMsg" class="msg hidden"></div><div id="salaryDataWarning" class="msg err" style="display:none"></div><div class="filters"><div><label>الشهر</label><input type="month" id="salaryMonth" value="${today().slice(0,7)}" onchange="salaryTitleMonth.textContent=this.value;tasneefSalariesUnifiedV440.load()"></div><div><label>المشرف</label><select id="salarySupervisor" onchange="tasneefSalariesUnifiedV440.render()"><option value="">كل المشرفين</option></select></div><div><label>المشروع</label><select id="salaryProject" onchange="tasneefSalariesUnifiedV440.render()"><option value="">كل المشاريع</option></select></div><div><label>نوع التشغيل</label><select id="salaryOperation" onchange="tasneefSalariesUnifiedV440.render()"><option value="">الكل</option><option>دائم</option><option>زيارة يومية</option></select></div><div><label>حالة الراتب</label><select id="salaryStatus" onchange="tasneefSalariesUnifiedV440.render()"><option value="">الكل</option><option>مسودة</option><option>يحتاج مراجعة</option><option>بيانات ناقصة</option><option>معتمد</option></select></div><div><label>بحث</label><input id="salarySearch" oninput="tasneefSalariesUnifiedV440.render()" placeholder="الموظف، الكود، الإقامة، المشرف، المشروع"></div></div><div class="salary-actions"><button onclick="tasneefSalariesUnifiedV440.load()">إعادة الاحتساب</button><button class="light" onclick="tasneefSalariesUnifiedV440.save(false)">حفظ مسودة</button><button id="salaryApproveBtn" class="light" onclick="tasneefSalariesUnifiedV440.save(true)">اعتماد الكشف</button><button id="salaryPrintBtn" class="light" onclick="tasneefSalariesUnifiedV440.print()">طباعة</button><button class="light" onclick="tasneefSalariesUnifiedV440.csv()">تصدير Excel</button><button class="light" onclick="tasneefSalariesUnifiedV440.sourceDetails()">التشخيص والمصادر</button></div><div id="salaryKpis" class="kpis small"></div></div><div class="table-wrap salary-table-wrap"><table class="salary-table"><thead><tr><th>رقم</th><th>أيدي الموظف</th><th>الشهر</th><th>اسم الموظف في الإقامة</th><th>اسم الموظف الحركي</th><th>رقم الإقامة</th><th>مكان العمل</th><th>الوظيفة</th><th>بداية الخدمة</th><th>نهاية الخدمة</th><th>أيام العمل</th><th>أيام الغياب</th><th>الأيام المستحقة</th><th>قيمة الرواتب الأساسية</th><th>البدلات</th><th>الإجمالي</th><th>إجمالي الراتب على أيام الفترة</th><th>العمولات</th><th>الخصومات</th><th>جبر الكسور</th><th>خصم السلف</th><th>الصافي</th><th>ملاحظات</th><th>إجراء</th></tr></thead><tbody id="salaryBody"></tbody></table></div></div>`;}
+function inject(){let sec=$('salaries');if(!sec){sec=document.createElement('section');sec.id='salaries';sec.className='page hidden';(document.querySelector('main.content')||document.body).appendChild(sec);}sec.innerHTML=`<style>.salary-excel-card{border:1px solid #b6c9c1;border-radius:14px;overflow:hidden;background:#fff}.salary-excel-title{background:#07513f;color:#fff;text-align:center;padding:14px;font-size:24px;font-weight:900}.salary-excel-sub{text-align:center;padding:8px;background:#edf6f2;font-weight:800;color:#07513f}.salary-table-wrap{max-height:650px;overflow:auto}.salary-table{min-width:3000px;border-collapse:collapse}.salary-table th{position:sticky;top:0;z-index:2;background:#1f6f58;color:#fff}.salary-table th,.salary-table td{border:1px solid #9fb4ac;padding:7px;text-align:center;white-space:nowrap}.salary-table tbody tr:nth-child(even):not(.salary-group-row):not(.salary-total-row){background:#f2f8f5}.salary-table td small{display:block;color:#6b7280}.salary-group-row td{background:#dfeee9!important;color:#064537;font-weight:900;text-align:right}.salary-group-row div{display:flex;gap:18px;flex-wrap:wrap}.salary-total-row td{background:#cfe8dc!important;color:#064537;font-weight:900}.salary-row-warning{background:#fff4f4!important}.salary-red{color:#b91c1c;font-weight:900}.salary-actions{display:flex;gap:8px;flex-wrap:wrap}.salary-note{background:#eef8f4;border:1px solid #dce6e2;border-radius:12px;padding:10px}.payroll-modal{position:fixed;inset:0;background:#0008;display:none;z-index:99999;padding:3vh 3vw}.payroll-modal.show{display:block}.payroll-modal-box{background:#fff;border-radius:16px;padding:16px;max-height:94vh;overflow:auto}</style><div class="salary-excel-card"><div class="salary-excel-title">كشف الرواتب</div><div class="salary-excel-sub">شركة تصنيف لإدارة المرافق - الشهر: <span id="salaryTitleMonth">${today().slice(0,7)}</span></div><div class="card" style="border:0;border-radius:0"><div class="table-head"><h2>الرواتب</h2><span class="badge green">${VERSION}</span></div><div class="salary-note">مصدر واحد فقط من السيرفر: public.get_unified_payroll_from_server. لا دمج ولا Cache للرواتب داخل الواجهة.</div><div id="salaryMsg" class="msg hidden"></div><div id="salaryDataWarning" class="msg err" style="display:none"></div><div class="filters"><div><label>الشهر</label><input type="month" id="salaryMonth" value="${today().slice(0,7)}" onchange="salaryTitleMonth.textContent=this.value;tasneefSalariesUnifiedV440.load()"></div><div><label>المشرف</label><select id="salarySupervisor" onchange="tasneefSalariesUnifiedV440.render()"><option value="">كل المشرفين</option></select></div><div><label>المشروع</label><select id="salaryProject" onchange="tasneefSalariesUnifiedV440.render()"><option value="">كل المشاريع</option></select></div><div><label>نوع التشغيل</label><select id="salaryOperation" onchange="tasneefSalariesUnifiedV440.render()"><option value="">الكل</option><option>دائم</option><option>زيارة يومية</option></select></div><div><label>حالة الراتب</label><select id="salaryStatus" onchange="tasneefSalariesUnifiedV440.render()"><option value="">الكل</option><option>مسودة</option><option>يحتاج مراجعة</option><option>بيانات ناقصة</option><option>معتمد</option></select></div><div><label>بحث</label><input id="salarySearch" oninput="tasneefSalariesUnifiedV440.render()" placeholder="الموظف، الكود، الإقامة، المشرف، المشروع"></div></div><div class="salary-actions"><button onclick="tasneefSalariesUnifiedV440.load()">إعادة الاحتساب</button><button class="light" onclick="tasneefSalariesUnifiedV440.save(false)">حفظ مسودة</button><button id="salaryApproveBtn" class="light" onclick="tasneefSalariesUnifiedV440.save(true)">اعتماد الكشف</button><button id="salaryPrintBtn" class="light" onclick="tasneefSalariesUnifiedV440.print()">طباعة</button><button class="light" onclick="tasneefSalariesUnifiedV440.csv()">تصدير Excel</button><button class="light" onclick="tasneefSalariesUnifiedV440.sourceDetails()">التشخيص والمصادر</button></div><div id="salaryKpis" class="kpis small"></div></div><div class="table-wrap salary-table-wrap"><table class="salary-table"><thead><tr><th>رقم</th><th>أيدي الموظف</th><th>الشهر</th><th>اسم الموظف في الإقامة</th><th>اسم الموظف الحركي</th><th>رقم الإقامة</th><th>مكان العمل</th><th>الوظيفة</th><th>بداية الخدمة</th><th>نهاية الخدمة</th><th>أيام العمل</th><th>أيام الغياب</th><th>الأيام المستحقة</th><th>قيمة الرواتب الأساسية</th><th>البدلات</th><th>الإجمالي</th><th>إجمالي الراتب على أيام الفترة</th><th>العمولات</th><th>الخصومات</th><th>جبر الكسور</th><th>خصم السلف</th><th>الصافي</th><th>ملاحظات</th><th>إجراء</th></tr></thead><tbody id="salaryBody"></tbody></table></div></div>`;}
 const api={inject,load,buildUnifiedPayroll,render,details,edit,saveEdit,sourceDetails,save,print:printRows,csv};window.tasneefSalariesUnifiedV440=api;
 const oldShow=window.showPage;window.showPage=function(page,btn){const x=oldShow?oldShow.apply(this,arguments):undefined;if(page==='salaries')setTimeout(()=>{inject();load();},60);return x;};
 document.addEventListener('DOMContentLoaded',()=>setTimeout(inject,500));window.addEventListener('load',()=>setTimeout(inject,800));
