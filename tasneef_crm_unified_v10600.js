@@ -70,7 +70,7 @@ async function load(){
   const [customers,communications,tasks,quotes,contracts,rejections,history,auditRows]=await Promise.all([
    safeLoad('crm_customers','crm_opportunities'),safeLoad('crm_communications','crm_activities'),safeLoad('crm_tasks'),safeLoad('crm_quotes'),safeLoad('crm_contracts'),safeLoad('crm_rejection_reasons'),safeLoad('crm_customer_status_history','crm_stage_history'),safeLoad('crm_audit_logs')
   ]);
-  state.customers=customers.map(normalizeCustomer);state.communications=communications;state.tasks=tasks;state.quotes=quotes;state.contracts=contracts;state.rejections=rejections;state.history=history;state.audit=auditRows;
+  state.customers=customers.map(normalizeCustomer);state.communications=communications;state.tasks=tasks.map(t=>({...t,customer_id:t.customer_id||t.opportunity_id||null}));state.quotes=quotes;state.contracts=contracts;state.rejections=rejections;state.history=history;state.audit=auditRows;
  }catch(e){toast('تعذر تحميل بيانات CRM: '+e.message,true)}
  state.loading=false;render();
 }
