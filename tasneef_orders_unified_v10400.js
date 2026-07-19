@@ -1,4 +1,4 @@
-/* Tasneef Orders Unified v10420 / RPC Scalar Scope Fix V485
+/* Tasneef Orders Unified v10422 / Show All Fast V487
    المصدر الوحيد لقسم الأوردرات.
    - يحافظ على كل بيانات orders_shared القديمة دون حذف أو إعادة كتابة جماعية.
    - يمنع تشغيل سكربتات الأوردرات القديمة.
@@ -9,15 +9,16 @@
 */
 (function(){
   'use strict';
-  if(window.__tasneefOrdersUnifiedV10418) return;
-  window.__tasneefOrdersUnifiedV10418=true;
+  if(window.__tasneefOrdersUnifiedV10422) return;
+  window.__tasneefOrdersUnifiedV10422=true;
 
   const URL='https://zmjdqiswytxlbfgnfjfv.supabase.co';
   const KEY='sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb';
   const TABLE='orders_shared';
   const AUDIT='order_audit_logs';
-  const PAGE_SIZE=25;
-  let rows=[], page=1, totalRows=0, saving=false, editNo='', ordersLoading=false, ordersAbort=null, searchTimer=null, summaryState={total_orders:0,completed_orders:0,unpaid_orders:0,billed_orders:0,total_before_vat:0,total_vat:0,total_inclusive:0,total_cost:0,total_net_profit:0};
+  const PAGE_SIZE=10000;
+  const RENDER_BATCH_SIZE=80;
+  let rows=[], page=1, totalRows=0, saving=false, editNo='', ordersLoading=false, ordersAbort=null, searchTimer=null, ordersRenderToken=0, summaryState={total_orders:0,completed_orders:0,unpaid_orders:0,billed_orders:0,total_before_vat:0,total_vat:0,total_inclusive:0,total_cost:0,total_net_profit:0};
   let filterOptions={projects:[],executors:[],senders:[],statuses:[],payments:[],billings:[],types:[]};
   const $=id=>document.getElementById(id);
   const S=v=>String(v??'').trim();
@@ -361,7 +362,7 @@
   function getFilterPayload(){
     const isSup=!!$('supOrderSearchV10061')&&!$('orderSearchV233');
     const clean=v=>{const x=S(v);return !x||/^(الكل|كل\s|جميع\s)/.test(x)?null:x;};
-    return {p_page:page,p_page_size:PAGE_SIZE,p_search:clean($(isSup?'supOrderSearchV10061':'orderSearchV233')?.value),p_project:clean($(isSup?'supOrderFilterProjectV10061':'orderProjectFilterV233')?.value),p_executor:clean($(isSup?'ouSupExecutorFilter':'orderExecutorFilterV233')?.value),p_sender:isSup?null:clean($('orderSenderFilterV233')?.value),p_order_type:clean($(isSup?'ouSupTypeFilter':'ouAdminTypeFilter')?.value),p_execution_status:clean($(isSup?'supOrderFilterStatusV10061':'orderStatusFilterV233')?.value),p_payment_status:clean($(isSup?'ouSupPaymentFilter':'orderPaymentFilterV233')?.value),p_billing_status:clean($(isSup?'ouSupBillingFilter':'orderBillingFilterV233')?.value),p_date_from:isSup?null:clean($('orderFromDateV233')?.value),p_date_to:isSup?null:clean($('orderToDateV233')?.value),p_supervisor_scope:isSupervisorPage()?[...supervisorProjectNames()]:[]};
+    return {p_page:1,p_page_size:PAGE_SIZE,p_show_all:true,p_export_mode:true,p_search:clean($(isSup?'supOrderSearchV10061':'orderSearchV233')?.value),p_project:clean($(isSup?'supOrderFilterProjectV10061':'orderProjectFilterV233')?.value),p_executor:clean($(isSup?'ouSupExecutorFilter':'orderExecutorFilterV233')?.value),p_sender:isSup?null:clean($('orderSenderFilterV233')?.value),p_order_type:clean($(isSup?'ouSupTypeFilter':'ouAdminTypeFilter')?.value),p_execution_status:clean($(isSup?'supOrderFilterStatusV10061':'orderStatusFilterV233')?.value),p_payment_status:clean($(isSup?'ouSupPaymentFilter':'orderPaymentFilterV233')?.value),p_billing_status:clean($(isSup?'ouSupBillingFilter':'orderBillingFilterV233')?.value),p_date_from:isSup?null:clean($('orderFromDateV233')?.value),p_date_to:isSup?null:clean($('orderToDateV233')?.value),p_supervisor_scope:isSupervisorPage()?[...supervisorProjectNames()]:[]};
   }
   async function rpc(name,payload={},signal){
     const res=await fetch(`${URL}/rest/v1/rpc/${name}`,{method:'POST',cache:'no-store',signal,headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(payload)});
@@ -371,10 +372,10 @@
   function showOrdersError(message){const html=`<div class="ou-note" style="background:#fff0f0;color:#a32121">تعذر تحميل الأوردرات من السيرفر: ${E(message)} <button class="light" onclick="tasneefOrders10400.load()">إعادة المحاولة</button></div>`;const admin=$('ordersCardsV360');if(admin)admin.innerHTML=html;const sup=$('supOrdersBodyV10061');if(sup)sup.innerHTML=html;}
   async function load(){
     if(ordersAbort)ordersAbort.abort();ordersAbort=new AbortController();const requestId=Date.now();window.__tasneefOrdersRequestId=requestId;ordersLoading=true;setOrdersLoadingState('جارٍ تحميل الصفحة المطلوبة من السيرفر...');const t0=performance.now();
-    try{const out=await rpc('get_unified_orders_from_server_v486',{p_request:getFilterPayload()},ordersAbort.signal);if(requestId!==window.__tasneefOrdersRequestId)return;rows=Array.isArray(out?.rows)?out.rows:[];totalRows=Number(out?.total||0);summaryState=out?.summary||summaryState;window.__tasneefOrdersDiagnostics={...(out?.diagnostics||{}),client_duration_ms:Math.round(performance.now()-t0),loaded_rows:rows.length,total_rows:totalRows,request_id:requestId};render();optionList('ouCustomersList',rows.map(r=>S(field(r,'اسم العميل','customer_name'))));}
+    try{const out=await rpc('get_unified_orders_from_server_v487',{p_request:getFilterPayload()},ordersAbort.signal);if(requestId!==window.__tasneefOrdersRequestId)return;rows=Array.isArray(out?.rows)?out.rows:[];totalRows=Number(out?.total||0);summaryState=out?.summary||summaryState;window.__tasneefOrdersDiagnostics={...(out?.diagnostics||{}),client_duration_ms:Math.round(performance.now()-t0),loaded_rows:rows.length,total_rows:totalRows,request_id:requestId};render();optionList('ouCustomersList',rows.map(r=>S(field(r,'اسم العميل','customer_name'))));}
     catch(e){if(e?.name==='AbortError')return;console.error('Orders server load failed',e);showOrdersError(e.message);}finally{if(requestId===window.__tasneefOrdersRequestId)ordersLoading=false;}
   }
-  async function fetchAllFilteredOrders(){const out=await rpc('get_unified_orders_from_server_v486',{p_request:{...getFilterPayload(),p_page:1,p_page_size:5000,p_export_mode:true}});return Array.isArray(out?.rows)?out.rows:[];}
+  async function fetchAllFilteredOrders(){const out=await rpc('get_unified_orders_from_server_v487',{p_request:{...getFilterPayload(),p_page:1,p_page_size:10000,p_show_all:true,p_export_mode:true}});return Array.isArray(out?.rows)?out.rows:[];}
   async function checkSystemHealth(){try{const t=performance.now(),out=await rpc('get_system_health',{}),ms=Math.round(performance.now()-t);window.__tasneefSystemHealth={...out,client_response_time_ms:ms};let el=$('ordersHealthV483');if(!el){el=document.createElement('button');el.id='ordersHealthV483';el.className='light';el.style.cssText='padding:7px 10px;border-radius:999px';document.querySelector('#orders .section-head .actions')?.appendChild(el);}if(el){const status=out?.status==='healthy'?'يعمل':out?.status==='slow'?'بطء في الاستجابة':'مشكلة جزئية';el.textContent=`حالة النظام: ${status}`;el.onclick=()=>alert(`حالة السيرفر: ${status}
 زمن الاستجابة: ${ms}ms
 آخر فحص: ${out?.checked_at||'-'}`);}}catch(e){console.warn('System health failed',e);}}
@@ -496,10 +497,27 @@
     const receipt=receiptFromRow(r),state=cardState(r);
     return `<article class="ou-card ${state}"><div class="ou-head"><div><h3>${E(orderNo(r))}</h3><small>${E(field(r,'تاريخ الطلب','created_at')||'-')}</small></div><span class="ou-chip">${E(type)}</span></div><div class="ou-chips"><span class="ou-chip">${E(field(r,'حالة التنفيذ','status')||'-')}</span><span class="ou-chip">${E(field(r,'حالة السداد','payment_status')||'غير محدد')}</span><span class="ou-chip">المنفذ: ${E(field(r,'المنفذ','executor_name')||'غير محدد')}</span><span class="ou-chip">الفوترة: ${E(field(r,'حالة الفوترة','billing_status')||'لم تتم')}</span></div><div class="ou-meta"><div><small>المشروع</small><b>${E(projectName(r)||'-')}</b></div><div><small>العميل</small><b>${E(field(r,'اسم العميل','customer_name')||'-')}</b></div><div><small>الجوال</small><b>${E(field(r,'رقم العميل','customer_phone')||'-')}</b></div><div><small>الوحدة</small><b>${E(field(r,'رقم الشقة','unit_number')||'-')}</b></div><div><small>المنشئ</small><b>${E(creator)}</b></div><div><small>آخر تعديل</small><b>${E(d.updated_by_name||'-')}</b></div><div><small>رقم الفاتورة</small><b>${E(field(r,'رقم الفاتورة','invoice_number')||'-')}</b></div><div><small>تاريخ الفوترة</small><b>${E(field(r,'تاريخ الفوترة','invoice_date')||'-')}</b></div></div><div class="ou-money-grid"><div class="ou-money"><small>قبل الضريبة</small><b>${E(money(before))}</b></div><div class="ou-money"><small>الضريبة 15%</small><b>${E(money(vat))}</b></div><div class="ou-money"><small>شامل الضريبة</small><b>${E(money(inclusive))}</b></div><div class="ou-money"><small>التكلفة</small><b>${E(money(cost))}</b></div><div class="ou-money"><small>صافي الربح</small><b>${E(money(profit))}</b></div></div><p>${E(field(r,'التفاصيل','description')||'')}</p><div class="ou-actions"><button class="light" onclick="tasneefOrders10400.view(${idx})">عرض</button><button onclick="tasneefOrders10400.edit(${idx})">تعديل</button><button class="light ${receipt?'':'ou-receipt-disabled'}" ${receipt?'':'disabled'} onclick="tasneefOrders10400.openReceipt(${idx})">عرض الإيصال</button><button class="light" onclick="tasneefOrders10400.sendWhatsApp(${idx})">إرسال واتساب</button><button class="light" onclick="tasneefOrders10400.history('${E(orderNo(r))}')">سجل التعديلات</button><button class="danger" onclick="tasneefOrders10400.del(${idx})">حذف</button></div></article>`;
   }
+  function renderCardsProgressively(container,list){
+    if(!container)return;
+    const token=++ordersRenderToken;
+    container.innerHTML='';
+    if(!list.length){container.innerHTML='<div class="ou-note">لا توجد أوردرات مطابقة</div>';return;}
+    let index=0;
+    const step=()=>{
+      if(token!==ordersRenderToken)return;
+      const end=Math.min(index+RENDER_BATCH_SIZE,list.length);
+      const html=[];
+      for(let i=index;i<end;i++)html.push(card(list[i],i));
+      container.insertAdjacentHTML('beforeend',html.join(''));
+      index=end;
+      if(index<list.length)requestAnimationFrame(step);
+    };
+    step();
+  }
   function render(){
-    const list=filterRows(),pages=Math.max(1,Math.ceil(totalRows/PAGE_SIZE));page=Math.min(page,pages);renderSummary();
-    const admin=$('ordersCardsV360');if(admin){admin.innerHTML=list.map((r,i)=>card(r,i)).join('')||'<div class="ou-note">لا توجد أوردرات مطابقة</div>';const p=$('ordersPagerV360');if(p)p.innerHTML=`<button class="light" ${page<=1||ordersLoading?'disabled':''} onclick="tasneefOrders10400.page(-1)">السابق</button><b>صفحة ${page} من ${pages} — ${totalRows} نتيجة</b><button class="light" ${page>=pages||ordersLoading?'disabled':''} onclick="tasneefOrders10400.page(1)">التالي</button>`;}
-    const sup=$('supOrdersBodyV10061');if(sup)sup.innerHTML=list.map((r,i)=>card(r,i)).join('')||'<div class="ou-note">لا توجد أوردرات مطابقة</div>';
+    const list=filterRows();page=1;renderSummary();
+    const admin=$('ordersCardsV360');if(admin){renderCardsProgressively(admin,list);const p=$('ordersPagerV360');if(p)p.innerHTML=`<b>تم عرض جميع الأوردرات: ${totalRows.toLocaleString('ar-SA')} نتيجة</b>`;}
+    const sup=$('supOrdersBodyV10061');if(sup)renderCardsProgressively(sup,list);
     if($('ordersTotalKpiV233'))$('ordersTotalKpiV233').textContent=Number(summaryState.total_orders||0).toLocaleString('ar-SA');if($('ordersDoneKpiV233'))$('ordersDoneKpiV233').textContent=Number(summaryState.completed_orders||0).toLocaleString('ar-SA');if($('ordersDueKpiV233'))$('ordersDueKpiV233').textContent=Number(summaryState.unpaid_orders||0).toLocaleString('ar-SA');if($('ordersProfitKpiV233'))$('ordersProfitKpiV233').textContent=money(summaryState.total_net_profit||0).replace(' ر.س','');
   }
   function hydrateFilters(){
