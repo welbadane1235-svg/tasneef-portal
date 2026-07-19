@@ -1,4 +1,4 @@
-/* Tasneef Orders Unified v10418 / Performance V483
+/* Tasneef Orders Unified v10419 / RPC Contract V484
    المصدر الوحيد لقسم الأوردرات.
    - يحافظ على كل بيانات orders_shared القديمة دون حذف أو إعادة كتابة جماعية.
    - يمنع تشغيل سكربتات الأوردرات القديمة.
@@ -370,10 +370,10 @@
   function showOrdersError(message){const html=`<div class="ou-note" style="background:#fff0f0;color:#a32121">تعذر تحميل الأوردرات من السيرفر: ${E(message)} <button class="light" onclick="tasneefOrders10400.load()">إعادة المحاولة</button></div>`;const admin=$('ordersCardsV360');if(admin)admin.innerHTML=html;const sup=$('supOrdersBodyV10061');if(sup)sup.innerHTML=html;}
   async function load(){
     if(ordersAbort)ordersAbort.abort();ordersAbort=new AbortController();const requestId=Date.now();window.__tasneefOrdersRequestId=requestId;ordersLoading=true;setOrdersLoadingState('جارٍ تحميل الصفحة المطلوبة من السيرفر...');const t0=performance.now();
-    try{const out=await rpc('get_unified_orders_from_server',getFilterPayload(),ordersAbort.signal);if(requestId!==window.__tasneefOrdersRequestId)return;rows=Array.isArray(out?.rows)?out.rows:[];totalRows=Number(out?.total||0);summaryState=out?.summary||summaryState;window.__tasneefOrdersDiagnostics={...(out?.diagnostics||{}),client_duration_ms:Math.round(performance.now()-t0),loaded_rows:rows.length,total_rows:totalRows,request_id:requestId};render();optionList('ouCustomersList',rows.map(r=>S(field(r,'اسم العميل','customer_name'))));}
+    try{const out=await rpc('get_unified_orders_from_server_v484',{p_request:getFilterPayload()},ordersAbort.signal);if(requestId!==window.__tasneefOrdersRequestId)return;rows=Array.isArray(out?.rows)?out.rows:[];totalRows=Number(out?.total||0);summaryState=out?.summary||summaryState;window.__tasneefOrdersDiagnostics={...(out?.diagnostics||{}),client_duration_ms:Math.round(performance.now()-t0),loaded_rows:rows.length,total_rows:totalRows,request_id:requestId};render();optionList('ouCustomersList',rows.map(r=>S(field(r,'اسم العميل','customer_name'))));}
     catch(e){if(e?.name==='AbortError')return;console.error('Orders server load failed',e);showOrdersError(e.message);}finally{if(requestId===window.__tasneefOrdersRequestId)ordersLoading=false;}
   }
-  async function fetchAllFilteredOrders(){const out=await rpc('get_unified_orders_from_server',{...getFilterPayload(),p_page:1,p_page_size:5000,p_export_mode:true});return Array.isArray(out?.rows)?out.rows:[];}
+  async function fetchAllFilteredOrders(){const out=await rpc('get_unified_orders_from_server_v484',{p_request:{...getFilterPayload(),p_page:1,p_page_size:5000,p_export_mode:true}});return Array.isArray(out?.rows)?out.rows:[];}
   async function checkSystemHealth(){try{const t=performance.now(),out=await rpc('get_system_health',{}),ms=Math.round(performance.now()-t);window.__tasneefSystemHealth={...out,client_response_time_ms:ms};let el=$('ordersHealthV483');if(!el){el=document.createElement('button');el.id='ordersHealthV483';el.className='light';el.style.cssText='padding:7px 10px;border-radius:999px';document.querySelector('#orders .section-head .actions')?.appendChild(el);}if(el){const status=out?.status==='healthy'?'يعمل':out?.status==='slow'?'بطء في الاستجابة':'مشكلة جزئية';el.textContent=`حالة النظام: ${status}`;el.onclick=()=>alert(`حالة السيرفر: ${status}
 زمن الاستجابة: ${ms}ms
 آخر فحص: ${out?.checked_at||'-'}`);}}catch(e){console.warn('System health failed',e);}}
