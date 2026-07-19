@@ -142,7 +142,7 @@
         <label>بحث العامل<input id="supUniSearch" placeholder="اسم العامل أو الكود"></label>
         <label>النسخة<input value="${BUILD}" disabled></label>
       </div>
-      <div class="sup-uni-actions"><button id="supUniRefresh">تحديث الأسماء</button><button id="supUniAllP">اعتماد الكل حاضر</button><button id="supUniAllA">اعتماد الكل غائب</button><button class="main" id="supUniSave">حفظ تحضير اليوم</button></div>
+      <div class="sup-uni-actions"><button id="supUniRefresh">تحديث الأسماء</button><button id="supUniAllP">اعتماد الكل حاضر</button><button id="supUniAllA">اعتماد الكل غائب</button></div>
       <div class="sup-uni-group">المشرف: ${esc((state.workers?.[0]?.supervisor_name)||getUser().full_name||getUser().name||getUser().username||'-')} <small>عدد العمال: ${workers.length}</small></div>
       <div class="sup-uni-workers" id="supUniWorkers">${workers.map(w=>{
         const r=getRecord(rec,w,date); const st=statusCode(r?.status||'present');
@@ -158,7 +158,7 @@
     $('supUniAllP').onclick=()=>document.querySelectorAll('#supUniWorkers select').forEach(s=>{s.value='present'; s.closest('.sup-uni-worker')?.classList.remove('absent');});
     $('supUniAllA').onclick=()=>document.querySelectorAll('#supUniWorkers select').forEach(s=>{s.value='absent'; s.closest('.sup-uni-worker')?.classList.add('absent');});
     $('supUniRefresh').onclick=()=>renderSupervisorUnified(true);
-    $('supUniSave').onclick=saveSupervisorUnified;
+    if($('supUniSave')) $('supUniSave').onclick=saveSupervisorUnified;
     document.querySelectorAll('#supUniWorkers select').forEach(sel=>sel.onchange=()=>sel.closest('.sup-uni-worker')?.classList.toggle('absent',sel.value==='absent'));
   }
   async function renderSupervisorUnified(force){

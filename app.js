@@ -24005,9 +24005,11 @@ try{ exportSupervisorDailyPDFV10310 = window.exportSupervisorDailyPDFV10310; }ca
   }
 
   function boot(){ applyScope(); refillSupervisorProjectSelects(); }
-  document.addEventListener('DOMContentLoaded',()=>{ setTimeout(boot,300); setTimeout(boot,1200); setTimeout(boot,2500); });
-  window.addEventListener('load',()=>{ setTimeout(boot,600); setTimeout(boot,1800); });
-  setInterval(boot,3000);
+  // V10706: تشغيل ضبط نطاق مشاريع المشرف عند فتح الصفحة فقط.
+  // أُلغي التحديث الدوري كل 3 ثوانٍ لأنه كان يعيد تصفية data.projects
+  // فوق قائمة مصفاة مسبقًا، فتظهر المشاريع ثم تختفي.
+  document.addEventListener('DOMContentLoaded',()=>{ setTimeout(boot,300); setTimeout(boot,1200); });
+  window.addEventListener('load',()=>{ setTimeout(boot,600); });
   console.log('Tasneef '+BUILD+' loaded');
 })();
 
