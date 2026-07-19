@@ -20,28 +20,42 @@
   setTimeout(removeLoading, 500);
 })();
 
-/* V358: lightweight performance guard. No stored data is changed. */
+/* V482: centralized performance guard — pauses background polling and prevents overlap. */
 (function(){
-  if(window.__tasneefPerfGuardV358) return;
-  window.__tasneefPerfGuardV358 = true;
+  if(window.__tasneefPerfGuardV482) return;
+  window.__tasneefPerfGuardV482 = true;
   const nativeSetInterval = window.setInterval.bind(window);
+  const nativeClearInterval = window.clearInterval.bind(window);
+  window.__tasneefPerfMetrics = window.__tasneefPerfMetrics || {requests:0,intervals:0,lastLoads:{}};
   window.setInterval = function(fn, delay, ...args){
-    const ms = Number(delay) || 0;
-    return nativeSetInterval(fn, ms > 0 && ms < 5000 ? 5000 : ms, ...args);
+    const requested = Number(delay) || 0;
+    const ms = requested > 0 && requested < 15000 ? 15000 : requested;
+    let running=false;
+    const wrapped=async function(){
+      if(document.hidden || running) return;
+      running=true;
+      try{ await fn(...args); }catch(e){ console.warn('[V482 interval]',e); }
+      finally{ running=false; }
+    };
+    window.__tasneefPerfMetrics.intervals++;
+    return nativeSetInterval(wrapped, ms);
   };
+  window.clearInterval = function(id){ return nativeClearInterval(id); };
+  window.tasneefDebounce=function(fn,wait=400){let t;return function(...a){clearTimeout(t);t=setTimeout(()=>fn.apply(this,a),wait)}};
+  window.tasneefMarkStart=function(k){try{performance.mark(k+'-start')}catch(_){}};
+  window.tasneefMarkEnd=function(k){try{performance.mark(k+'-end');performance.measure(k,k+'-start',k+'-end');const e=performance.getEntriesByName(k).at(-1);window.__tasneefPerfMetrics.lastLoads[k]=Math.round(e?.duration||0)}catch(_){}};
 })();
 
 
 
-/* V370: جذري - منع أي تحويل لدومين غير مملوك وتنظيف كاش النسخ القديمة */
+/* V482: one-time safe build-cache cleanup. Operational/user data is never deleted. */
 (function(){
   try{
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(regs){ regs.forEach(function(r){ r.unregister(); }); }).catch(function(){});
-    }
-    if (window.caches && location.protocol !== 'file:') {
-      caches.keys().then(function(keys){ keys.forEach(function(k){ caches.delete(k); }); }).catch(function(){});
-    }
+    const build='V482';
+    if(localStorage.getItem('tasneef_asset_cache_version')===build) return;
+    localStorage.setItem('tasneef_asset_cache_version',build);
+    if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(regs=>Promise.all(regs.map(r=>r.unregister()))).catch(()=>{});
+    if (window.caches && location.protocol !== 'file:') caches.keys().then(keys=>Promise.all(keys.filter(k=>/tasneef|static|asset|build/i.test(k)).map(k=>caches.delete(k)))).catch(()=>{});
   }catch(e){}
 })();
 function tasneefGo(page){
@@ -96,12 +110,13 @@ async function login(){
 }
 function logout(){ clearSession(); tasneefGo('index.html'); }
 async function loadAll(){
+  window.tasneefMarkStart?.('core-loadAll');
   const [users, projects, workers, attendance, logs, tickets] = await Promise.all([
     sb.from('app_users').select('*').order('id'),
     sb.from('projects').select('*').eq('is_active', true).order('id'),
     sb.from('workers').select('*').eq('is_active', true).order('id'),
-    sb.from('attendance').select('*').order('attendance_date',{ascending:false}),
-    sb.from('time_logs').select('*').order('check_in',{ascending:false}),
+    sb.from('attendance').select('*').gte('attendance_date', new Date(Date.now()-62*86400000).toISOString().slice(0,10)).order('attendance_date',{ascending:false}).limit(5000),
+    sb.from('time_logs').select('*').gte('check_in', new Date(Date.now()-62*86400000).toISOString()).order('check_in',{ascending:false}).limit(5000),
     sb.rpc('tasneef_tickets_all_v10519')
   ]);
 
@@ -118,6 +133,7 @@ async function loadAll(){
   data.tickets = tickets.data || [];
   data.contractServices = contractServices.data || [];
   data.contractServicesError = contractServices.error ? contractServices.error.message : '';
+  window.tasneefMarkEnd?.('core-loadAll');
 }
 function fillSelect(id, rows, label='name', allLabel=null, value='id'){ const el=$(id); if(!el) return; el.innerHTML = (allLabel!==null?`<option value="">${allLabel}</option>`:'') + rows.map(r=>`<option value="${r[value]}">${esc(r[label]||r.full_name||r.username)}</option>`).join(''); }
 function userRoleLabel(role){ return ({admin:'مدير عام',general_manager:'مدير عام',financial_manager:'مدير مالي',operations_manager:'مدير تشغيلي',warehouse_manager:'مدير مخازن',technician:'فني',supervisor:'مشرف'}[role] || role || '-'); }

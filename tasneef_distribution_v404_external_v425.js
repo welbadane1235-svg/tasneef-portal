@@ -10,7 +10,7 @@
   const todayMonth=()=>new Date().toISOString().slice(0,7);
   const prevMonth=m=>{const d=new Date((m||todayMonth())+'-01T00:00:00'); d.setMonth(d.getMonth()-1); return d.toISOString().slice(0,7)};
   const state={ready:false,employees:null,projects:null,users:null,distByMonth:{},selected:new Map(),lastLoad:0};
-  const cacheTtl=1000*60*20;
+  const cacheTtl=1000*60*2;
   function sb(){return window.sb || window.supabaseClient || window._supabase || null;}
   function msg(t,err){const el=$('td404Msg'); if(!el) return; el.textContent=t; el.className='msg '+(err?'err':''); el.classList.remove('hidden');}
   async function safe(q,label){try{const r=await q; if(r.error){console.warn(label,r.error); return []} return r.data||[]}catch(e){console.warn(label,e); return []}}

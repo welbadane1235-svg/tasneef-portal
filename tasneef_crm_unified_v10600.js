@@ -38,27 +38,20 @@ function toast(text,error=false){
  const el=document.createElement('div'); el.id='crmToastV10600'; el.className='crm-toast '+(error?'error':'success'); el.textContent=text;
  document.body.appendChild(el); setTimeout(()=>el.remove(),3500);
 }
-function storageKey(table){return 'tasneef_'+table;}
-function localRows(table){try{return JSON.parse(localStorage.getItem(storageKey(table))||'[]')}catch{return []}}
-function saveLocal(table,rows){localStorage.setItem(storageKey(table),JSON.stringify(rows));}
 async function selectRows(table){
- const s=sbx(); if(!s) return {data:localRows(table),error:null};
- const r=await s.from(table).select('*'); return r;
+ const s=sbx(); if(!s) return {data:null,error:{message:'لا يوجد اتصال بالسيرفر'}};
+ return s.from(table).select('*');
 }
 async function insertRow(table,row){
- const s=sbx(); const data={id:row.id||uid(),...row};
- if(!s){const rows=localRows(table);rows.unshift(data);saveLocal(table,rows);return {data:[data],error:null};}
- return s.from(table).insert(data).select();
+ const s=sbx(); if(!s)return {data:null,error:{message:'لا يوجد اتصال بالسيرفر'}};
+ return s.from(table).insert({id:row.id||uid(),...row}).select();
 }
 async function updateRow(table,id,patch){
- const s=sbx();
- if(!s){const rows=localRows(table),i=rows.findIndex(x=>String(x.id)===String(id));if(i<0)return {data:[],error:{message:'السجل غير موجود'}};rows[i]={...rows[i],...patch};saveLocal(table,rows);return {data:[rows[i]],error:null};}
+ const s=sbx(); if(!s)return {data:null,error:{message:'لا يوجد اتصال بالسيرفر'}};
  return s.from(table).update(patch).eq('id',id).select();
 }
-async function safeLoad(table,legacy){
- let r=await selectRows(table);
- if(r.error&&legacy) r=await selectRows(legacy);
- return r.data||[];
+async function safeLoad(table){
+ const r=await selectRows(table); if(r.error) throw new Error(`${table}: ${r.error.message}`); return r.data||[];
 }
 async function audit(action,entityType,entityId,oldData,newData,reason=''){
  const u=currentUser();
@@ -68,7 +61,7 @@ async function load(){
  state.loading=true; renderLoading();
  try{
   const [customers,communications,tasks,quotes,contracts,rejections,history,auditRows]=await Promise.all([
-   safeLoad('crm_customers','crm_opportunities'),safeLoad('crm_communications','crm_activities'),safeLoad('crm_tasks'),safeLoad('crm_quotes'),safeLoad('crm_contracts'),safeLoad('crm_rejection_reasons'),safeLoad('crm_customer_status_history','crm_stage_history'),safeLoad('crm_audit_logs')
+   safeLoad('crm_customers'),safeLoad('crm_communications'),safeLoad('crm_tasks'),safeLoad('crm_quotes'),safeLoad('crm_contracts'),safeLoad('crm_rejection_reasons'),safeLoad('crm_customer_status_history'),safeLoad('crm_audit_logs')
   ]);
   state.customers=customers.map(normalizeCustomer);state.communications=communications;state.tasks=tasks.map(t=>({...t,customer_id:t.customer_id||t.opportunity_id||null}));state.quotes=quotes;state.contracts=contracts;state.rejections=rejections;state.history=history;state.audit=auditRows;
  }catch(e){toast('تعذر تحميل بيانات CRM: '+e.message,true)}
@@ -95,7 +88,7 @@ function render(){
 }
 function toolbar(){
  return `<header class="crm-header"><div><h2>إدارة العملاء المحتملين والمبيعات</h2><p>إضافة العميل، المتابعة، العرض، التفاوض، التعاقد أو الرفض</p></div><div class="crm-header-actions"><button onclick="tasneefCRM.openCustomer()">+ إضافة عميل محتمل</button><button class="secondary" onclick="tasneefCRM.openTask()">+ مهمة</button><button class="secondary" onclick="tasneefCRM.load()">تحديث</button></div></header>
- <section class="crm-filterbar"><input placeholder="بحث باسم المشروع، المسؤول، الجوال، المدينة أو رقم العميل" value="${esc(state.filters.q||'')}" oninput="tasneefCRM.setFilter('q',this.value)"><select onchange="tasneefCRM.setFilter('status',this.value)"><option value="">كل الحالات</option>${Object.entries(stageMeta).filter(([k])=>k!=='operations').map(([k,m])=>`<option value="${k}" ${state.filters.status===k?'selected':''}>${m.label}</option>`).join('')}</select><select onchange="tasneefCRM.setFilter('project_type',this.value)"><option value="">كل أنواع المشاريع</option><option>سكني</option><option>تجاري</option><option>مختلط</option></select><select onchange="tasneefCRM.changeView(this.value)"><option value="table" ${state.view==='table'?'selected':''}>عرض جدولي</option><option value="cards" ${state.view==='cards'?'selected':''}>بطاقات</option><option value="kanban" ${state.view==='kanban'?'selected':''}>Kanban</option><option value="tasks" ${state.view==='tasks'?'selected':''}>المهام</option></select><button class="secondary" onclick="tasneefCRM.clearFilters()">مسح</button><button class="secondary" onclick="tasneefCRM.exportCsv()">Excel</button></section>`;
+ <section class="crm-filterbar"><input placeholder="بحث باسم المشروع، المسؤول، الجوال، المدينة أو رقم العميل" value="${esc(state.filters.q||'')}" oninput="tasneefCRM.search(this.value)"><select onchange="tasneefCRM.setFilter('status',this.value)"><option value="">كل الحالات</option>${Object.entries(stageMeta).filter(([k])=>k!=='operations').map(([k,m])=>`<option value="${k}" ${state.filters.status===k?'selected':''}>${m.label}</option>`).join('')}</select><select onchange="tasneefCRM.setFilter('project_type',this.value)"><option value="">كل أنواع المشاريع</option><option>سكني</option><option>تجاري</option><option>مختلط</option></select><select onchange="tasneefCRM.changeView(this.value)"><option value="table" ${state.view==='table'?'selected':''}>عرض جدولي</option><option value="cards" ${state.view==='cards'?'selected':''}>بطاقات</option><option value="kanban" ${state.view==='kanban'?'selected':''}>Kanban</option><option value="tasks" ${state.view==='tasks'?'selected':''}>المهام</option></select><button class="secondary" onclick="tasneefCRM.clearFilters()">مسح</button><button class="secondary" onclick="tasneefCRM.exportCsv()">Excel</button></section>`;
 }
 function dashboard(){const s=stats();const cards=[['عملاء محتملون',s.prospect,'prospect'],['جاري التواصل',s.contacting,'contacting'],['متابعة',s.followup,'followup'],['عروض مرسلة',s.quote,'quote_sent'],['تفاوض',s.negotiation,'negotiation'],['تم التعاقد',s.contracted,'contracted'],['مرفوض',s.rejected,'rejected'],['مهام متأخرة',s.overdue,'tasks']];return `<section class="crm-kpis">${cards.map(x=>`<button type="button" title="عرض ${x[0]}" onclick="tasneefCRM.kpi('${x[2]}')"><small>${x[0]}</small><strong>${x[1]}</strong></button>`).join('')}</section><section class="crm-summary"><button type="button" title="عرض العملاء في مرحلة عروض الأسعار" onclick="tasneefCRM.kpi('quote_sent')"><small>إجمالي عروض الأسعار</small><b>${money(s.quoteValue)}</b></button><button type="button" title="عرض العملاء المتعاقد معهم" onclick="tasneefCRM.kpi('contracted')"><small>إجمالي العقود</small><b>${money(s.contractValue)}</b></button><button type="button" title="عرض الصفقات المتعاقد عليها" onclick="tasneefCRM.kpi('contracted')"><small>نسبة التحويل</small><b>${s.rate}%</b></button><button type="button" title="عرض العملاء دون متابعة منذ 3 أيام" onclick="tasneefCRM.kpi('stale')"><small>دون متابعة 3 أيام</small><b>${s.stale}</b></button></section>`}
 function filtered(){const f=state.filters,q=(f.q||'').trim().toLowerCase();return state.customers.filter(x=>{if(q&&!([x.customer_number,x.project_name,customerName(x),x.mobile,x.city,x.district,x.sales_employee_name].join(' ').toLowerCase().includes(q)))return false;if(f.status&&x.status!==f.status)return false;if(f.stale&&(['contracted','rejected','operations'].includes(x.status)||daysSince(x.last_contact_at||x.created_at)<3))return false;if(f.project_type&&x.project_type!==f.project_type)return false;return true;});}
@@ -157,7 +150,8 @@ function kpi(k){state.filters={};if(k==='tasks'){state.filters.task_overdue=true
 async function drop(e,status){const id=e.dataTransfer.getData('text/plain');const x=state.customers.find(v=>String(v.id)===String(id));if(!x||x.status===status)return;if(['followup','quote_sent','negotiation','contracted','rejected'].includes(status))openStatus(id,status);else await changeStatus(id,status,'نقل عبر لوحة Kanban');}
 function exportCsv(){const rows=filtered();const headers=['رقم العميل','اسم المشروع','نوع المشروع','عدد الشقق','عدد المحلات','المدينة','الحي','اسم المسؤول','الجوال','الحالة','موظف المبيعات','تاريخ الإضافة','آخر تواصل','المتابعة القادمة'];const data=rows.map(x=>[x.customer_number,x.project_name,x.project_type,x.apartments_count,x.shops_count,x.city,x.district,customerName(x),x.mobile,stageMeta[x.status]?.label||x.status,x.sales_employee_name,x.created_at,x.last_contact_at,x.next_followup_at]);const csv='\ufeff'+[headers,...data].map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='CRM_Customers_'+today()+'.csv';a.click();URL.revokeObjectURL(a.href);}
 
-window.tasneefCRM={load,render,openCustomer,saveCustomer,toggleProjectCounts,openProfile,openCommunication,saveCommunication,toggleOtherResult,openTask,saveTask,completeTask,openStatus,prepareStatus,changeStatus,saveFollowupStatus,saveQuoteStatus,saveNegotiationStatus,saveContractStatus,saveRejectionStatus,toggleOtherRejection,calcTax,convertToOperations,openOperations,closeDrawer,setFilter,clearFilters,changeView,kpi,drop,exportCsv};
+const debouncedSearch=(window.tasneefDebounce||((f)=>f))(v=>{state.filters.q=v;render();},400);
+window.tasneefCRM={search:debouncedSearch,load,render,openCustomer,saveCustomer,toggleProjectCounts,openProfile,openCommunication,saveCommunication,toggleOtherResult,openTask,saveTask,completeTask,openStatus,prepareStatus,changeStatus,saveFollowupStatus,saveQuoteStatus,saveNegotiationStatus,saveContractStatus,saveRejectionStatus,toggleOtherRejection,calcTax,convertToOperations,openOperations,closeDrawer,setFilter,clearFilters,changeView,kpi,drop,exportCsv};
 const originalShow=window.showPage;
 window.showPage=function(id,btn){if(typeof originalShow==='function')originalShow(id,btn);if(id==='crm')setTimeout(load,50)};
 window.addEventListener('load',()=>{const page=$('crm');if(page&&!$(ROOT_ID))page.innerHTML=`<div id="${ROOT_ID}"></div>`;});

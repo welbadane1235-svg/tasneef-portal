@@ -33,5 +33,5 @@
   window.addEventListener('storage',e=>{if(e.key==='tasneef_client_ticket_changed_v10519')loadTickets()});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden){loadLogs();if($('ticketsBody')||$('supTicketsBody'))loadTickets()}});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(bind,800));else setTimeout(bind,800);
-  setInterval(()=>{if($('logsBody'))loadLogs();if($('ticketsBody')||$('supTicketsBody'))loadTickets()},7000);
+  setInterval(()=>{if(document.hidden)return;const active=document.querySelector('.page:not(.hidden)');if(active&&['dailyLogs','tickets','supervisorDaily'].includes(active.id)){if($('logsBody'))loadLogs();if($('ticketsBody')||$('supTicketsBody'))loadTickets();}},30000);
 })();
