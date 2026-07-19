@@ -1,4 +1,4 @@
-/* Tasneef Orders Unified v10419 / RPC Contract V484
+/* Tasneef Orders Unified v10420 / RPC Scalar Scope Fix V485
    المصدر الوحيد لقسم الأوردرات.
    - يحافظ على كل بيانات orders_shared القديمة دون حذف أو إعادة كتابة جماعية.
    - يمنع تشغيل سكربتات الأوردرات القديمة.
@@ -360,13 +360,13 @@
   const wait=ms=>new Promise(r=>setTimeout(r,ms));
   function getFilterPayload(){
     const isSup=!!$('supOrderSearchV10061')&&!$('orderSearchV233');
-    return {p_page:page,p_page_size:PAGE_SIZE,p_search:S($(isSup?'supOrderSearchV10061':'orderSearchV233')?.value),p_project:S($(isSup?'supOrderFilterProjectV10061':'orderProjectFilterV233')?.value)||null,p_executor:S($(isSup?'ouSupExecutorFilter':'orderExecutorFilterV233')?.value)||null,p_sender:isSup?null:(S($('orderSenderFilterV233')?.value)||null),p_order_type:S($(isSup?'ouSupTypeFilter':'ouAdminTypeFilter')?.value)||null,p_execution_status:S($(isSup?'supOrderFilterStatusV10061':'orderStatusFilterV233')?.value)||null,p_payment_status:S($(isSup?'ouSupPaymentFilter':'orderPaymentFilterV233')?.value)||null,p_billing_status:S($(isSup?'ouSupBillingFilter':'orderBillingFilterV233')?.value)||null,p_date_from:isSup?null:(S($('orderFromDateV233')?.value)||null),p_date_to:isSup?null:(S($('orderToDateV233')?.value)||null),p_supervisor_scope:isSupervisorPage()?[...supervisorProjectNames()]:null};
+    return {p_page:page,p_page_size:PAGE_SIZE,p_search:S($(isSup?'supOrderSearchV10061':'orderSearchV233')?.value),p_project:S($(isSup?'supOrderFilterProjectV10061':'orderProjectFilterV233')?.value)||null,p_executor:S($(isSup?'ouSupExecutorFilter':'orderExecutorFilterV233')?.value)||null,p_sender:isSup?null:(S($('orderSenderFilterV233')?.value)||null),p_order_type:S($(isSup?'ouSupTypeFilter':'ouAdminTypeFilter')?.value)||null,p_execution_status:S($(isSup?'supOrderFilterStatusV10061':'orderStatusFilterV233')?.value)||null,p_payment_status:S($(isSup?'ouSupPaymentFilter':'orderPaymentFilterV233')?.value)||null,p_billing_status:S($(isSup?'ouSupBillingFilter':'orderBillingFilterV233')?.value)||null,p_date_from:isSup?null:(S($('orderFromDateV233')?.value)||null),p_date_to:isSup?null:(S($('orderToDateV233')?.value)||null),p_supervisor_scope:isSupervisorPage()?[...supervisorProjectNames()]:[]};
   }
   async function rpc(name,payload={},signal){
     const res=await fetch(`${URL}/rest/v1/rpc/${name}`,{method:'POST',cache:'no-store',signal,headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(payload)});
     const text=await res.text();if(!res.ok)throw new Error(text||`HTTP ${res.status}`);return text?JSON.parse(text):null;
   }
-  async function loadFilterOptions(){try{const out=await rpc('get_orders_filter_options_server',{p_supervisor_scope:isSupervisorPage()?[...supervisorProjectNames()]:null});filterOptions=out||filterOptions;hydrateFilters();}catch(e){console.warn('تعذر تحميل خيارات فلاتر الأوردرات',e);hydrateFilters();}}
+  async function loadFilterOptions(){try{const out=await rpc('get_orders_filter_options_server',{p_supervisor_scope:isSupervisorPage()?[...supervisorProjectNames()]:[]});filterOptions=out||filterOptions;hydrateFilters();}catch(e){console.warn('تعذر تحميل خيارات فلاتر الأوردرات',e);hydrateFilters();}}
   function showOrdersError(message){const html=`<div class="ou-note" style="background:#fff0f0;color:#a32121">تعذر تحميل الأوردرات من السيرفر: ${E(message)} <button class="light" onclick="tasneefOrders10400.load()">إعادة المحاولة</button></div>`;const admin=$('ordersCardsV360');if(admin)admin.innerHTML=html;const sup=$('supOrdersBodyV10061');if(sup)sup.innerHTML=html;}
   async function load(){
     if(ordersAbort)ordersAbort.abort();ordersAbort=new AbortController();const requestId=Date.now();window.__tasneefOrdersRequestId=requestId;ordersLoading=true;setOrdersLoadingState('جارٍ تحميل الصفحة المطلوبة من السيرفر...');const t0=performance.now();
