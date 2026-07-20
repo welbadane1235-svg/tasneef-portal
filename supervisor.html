@@ -177,6 +177,12 @@ window.__tasneefOrdersV233=true;
 window.__tasneefOrdersSharedSyncDisabled=true;
 window.__tasneefOrdersRootCleanV10189=true;
 window.__tasneefSupervisorOrdersV10061=true;
+window.__tasneefOrdersRootMasterV10031=true;
+window.__tasneefOrdersRootLockV10033=true;
+window.__tasneefOrdersMasterLockV10024=true;
+window.__tasneefOrdersStabilityPatchV10022=true;
+window.__tasneefOrdersFinalStabilityV10023=true;
+window.__tasneefOrdersUnifiedOnlyV10713=true;
 </script>
 <script defer="" src="app.js?v=10713-unified-supervisor-workers"></script>
 
@@ -202,7 +208,7 @@ window.__tasneefSupervisorOrdersV10061=true;
     if (loadingPromise) return loadingPromise;
     loadingPromise = new Promise(function(resolve,reject){
       const script=document.createElement('script');
-      script.src='tasneef_orders_unified_v10400.js?v=10712-emergency-data-fix';
+      script.src='tasneef_orders_unified_v10400.js?v=10713-orders-stable-restore';
       script.async=true;
       script.onload=function(){
         try { if(typeof window.supOrdersLoadV10061==='function') window.supOrdersLoadV10061(); } finally { resolve(); }
