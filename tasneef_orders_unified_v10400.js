@@ -9,8 +9,8 @@
 */
 (function(){
   'use strict';
-  if(window.__tasneefOrdersUnifiedV10711) return;
-  window.__tasneefOrdersUnifiedV10711=true;
+  if(window.__tasneefOrdersUnifiedV10417) return;
+  window.__tasneefOrdersUnifiedV10417=true;
 
   const URL='https://zmjdqiswytxlbfgnfjfv.supabase.co';
   const KEY='sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb';
@@ -103,34 +103,34 @@
     if(!isSupervisorPage())return null;
     return [...supervisorProjectNames()];
   }
-  function rpcBody(f,{requestPage=page,requestPageSize=pageSize}={}){
+  function rpcBody(f,{exportAll=false}={}){
     return {
-      p_page:requestPage,p_page_size:requestPageSize,p_search:f.search||null,p_project:f.project||null,
+      p_page:exportAll?1:page,p_page_size:exportAll?100:pageSize,p_search:f.search||null,p_project:f.project||null,
       p_executor:f.executor||null,p_sender:f.sender||null,p_execution_status:f.executionStatus||null,
       p_payment_status:f.paymentStatus||null,p_invoice_status:f.invoiceStatus||null,p_order_type:f.orderType||null,
-      p_date_from:f.dateFrom||null,p_date_to:f.dateTo||null,p_allowed_projects:allowedProjectsForRequest()
+      p_date_from:f.dateFrom||null,p_date_to:f.dateTo||null,p_allowed_projects:allowedProjectsForRequest(),p_export:!!exportAll
     };
   }
-  async function fetchUnifiedOrders(f=currentFilters(),{requestPage=page,requestPageSize=pageSize,signal}={}){
-    const out=await api('/rest/v1/rpc/get_unified_orders_page_v10711',{method:'POST',body:JSON.stringify(rpcBody(f,{requestPage,requestPageSize})),signal});
+  async function fetchUnifiedOrders(f=currentFilters(),{exportAll=false,signal}={}){
+    const out=await api('/rest/v1/rpc/get_orders_page_v10712',{method:'POST',body:JSON.stringify(rpcBody(f,{exportAll})),signal});
     const r=Array.isArray(out)?out[0]:out;
-    return {rows:Array.isArray(r?.rows)?r.rows:[],total:Number(r?.total||0),page:Number(r?.page||requestPage||1),pageSize:Number(r?.page_size||requestPageSize||pageSize),totalPages:Number(r?.total_pages||1)};
+    return {rows:Array.isArray(r?.rows)?r.rows:[],total:Number(r?.total||0),page:Number(r?.page||1),pageSize:Number(r?.page_size||pageSize),totalPages:Number(r?.total_pages||1)};
   }
   async function fetchUnifiedSummary(f=currentFilters(),signal){
-    const b=rpcBody(f,{requestPage:1,requestPageSize:1});delete b.p_page;delete b.p_page_size;
-    const out=await api('/rest/v1/rpc/get_unified_orders_summary_v10711',{method:'POST',body:JSON.stringify(b),signal});
+    const b=rpcBody(f);delete b.p_page;delete b.p_page_size;delete b.p_export;
+    const out=await api('/rest/v1/rpc/get_orders_summary_v10712',{method:'POST',body:JSON.stringify(b),signal});
     return Array.isArray(out)?out[0]:out;
   }
-  async function fetchAllFilteredOrdersInBatches(f=currentFilters(),signal){
-    const batchSize=500,all=[];
-    let current=1,pages=1,expected=0;
-    do{
-      const result=await fetchUnifiedOrders(f,{requestPage:current,requestPageSize:batchSize,signal});
-      if(current===1){pages=result.totalPages;expected=result.total;}
-      all.push(...result.rows);
-      current+=1;
-    }while(current<=pages);
-    if(all.length!==expected)console.warn('Orders batch export count differs',{expected,actual:all.length});
+  async function fetchAllUnifiedOrders(f=currentFilters()){
+    const all=[];let exportPage=1,expected=Infinity;
+    while(all.length<expected){
+      const b=rpcBody(f,{exportAll:true});b.p_page=exportPage;
+      const out=await api('/rest/v1/rpc/get_orders_page_v10712',{method:'POST',body:JSON.stringify(b)});
+      const r=Array.isArray(out)?out[0]:out;const batch=Array.isArray(r?.rows)?r.rows:[];
+      expected=Number(r?.total||0);all.push(...batch);
+      if(!batch.length||batch.length<500)break;
+      exportPage++;
+    }
     return {rows:all,total:expected};
   }
   async function fetchFullOrder(no){
@@ -424,22 +424,21 @@
     try{
       const f=currentFilters();
       const listPromise=fetchUnifiedOrders(f,{signal:loadController.signal});
-      const summaryPromise=fetchUnifiedSummary(f,loadController.signal).then(summary=>{
-        if(requestId===latestRequestId){lastSummary=summary;renderSummaryFromServer(summary);}
-      }).catch(e=>{if(e.name!=='AbortError')console.warn('Orders summary failed',e);});
+      const summaryPromise=fetchUnifiedSummary(f,loadController.signal).catch(e=>{if(e.name!=='AbortError')console.warn('Orders summary failed',e);return null;});
       const result=await listPromise;
       if(requestId!==latestRequestId)return;
       rows=result.rows;total=result.total;page=result.page;pageSize=result.pageSize;totalPages=result.totalPages;
       render();hydrateFilters();optionList('ouCustomersList',rows.map(r=>S(field(r,'اسم العميل','customer_name'))));
-      void summaryPromise;
+      summaryPromise.then(summary=>{if(summary&&requestId===latestRequestId){lastSummary=summary;const n=Number(summary.total_orders);if(Number.isFinite(n)){total=n;totalPages=Math.max(1,Math.ceil(total/pageSize));render();}renderSummaryFromServer(summary);}});
     }catch(e){
       if(e.name==='AbortError')return;
       console.error('Orders load failed',e);
       rows=[];total=0;totalPages=1;
-      setOrdersError('تعذر تحميل الأوردرات من السيرفر.');
-      notify('تعذر تحميل الأوردرات: '+e.message,'err');
+      setOrdersError(String(e.message||'').includes('57014')?'استغرق تحميل الأوردرات وقتًا أطول من المتوقع.':'تعذر تحميل الأوردرات من السيرفر.');
+      notify(String(e.message||'').includes('57014')?'استغرق تحميل الأوردرات وقتًا أطول من المتوقع.':'تعذر تحميل الأوردرات من السيرفر.','err');
     }
   }
+
   async function save(ev){
     ev?.preventDefault?.(); if(saving)return; const v=values(); if(!validate(v))return; saving=true;
     try{
@@ -638,7 +637,7 @@
   }
   async function exportOrdersExcel(){
     try{
-      const XLSX=await ensureXlsx(), result=await fetchAllFilteredOrdersInBatches(currentFilters()), list=result.rows;
+      const XLSX=await ensureXlsx(), result=await fetchAllUnifiedOrders(currentFilters()), list=result.rows;
       if(Number(result.total)!==list.length)console.warn('Export count differs',result.total,list.length);
       if(!list.length){notify('لا توجد أوردرات مطابقة للتصدير','err');return;}
       const aoa=[['رقم الأوردر','تاريخ الطلب','نوع الطلب','المشروع','اسم العميل','رقم العميل','الوحدة/الموقع','المنفذ','حالة التنفيذ','حالة السداد','حالة الفوترة','رقم الفاتورة','تاريخ الفوترة','قبل الضريبة','الضريبة 15%','شامل الضريبة','التكلفة','صافي الربح','التفاصيل','الملاحظات','منشئ الطلب','آخر تعديل بواسطة']];
@@ -707,7 +706,7 @@
     w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${E(qno)}</title><style>@page{size:A4;margin:10mm}*{box-sizing:border-box}body{font-family:Arial,Tahoma,sans-serif;color:#111;margin:0;font-size:11px}.head{display:grid;grid-template-columns:1fr 150px 1fr;align-items:start;gap:18px;border-bottom:2px solid #d7e0eb;padding:4px 0 16px}.en{text-align:left;direction:ltr}.ar{text-align:right}.head h2{font-size:21px;margin:0 0 5px}.logo{display:flex;align-items:center;justify-content:center;height:95px}.logo img{max-width:135px;max-height:82px}.title{text-align:center;font-size:28px;margin:25px 0}.info,.items{width:100%;border-collapse:collapse}.info td,.items th,.items td{border:1px solid #c8d5e5;padding:6px}.info td.label{font-weight:bold;width:12%}.items{margin-top:24px}.items th{text-align:center;font-weight:bold}.items td{text-align:center}.items .desc{text-align:right;min-width:240px}.totals{margin:18px 0 0 auto;width:47%;border-collapse:collapse}.totals td{padding:6px;font-weight:bold}.notes{margin-top:28px;text-align:right}.footer{position:fixed;bottom:0;left:0;right:0;text-align:center;color:#556070;font-size:9px}.currency{font-weight:bold;margin-inline-start:5px}@media print{button{display:none}}</style></head><body><div class="head"><div class="ar"><h2>شركة تصنيف للتشغيل<br>والصيانة</h2><div>6441، حي قرطبة، شارع سعيد بن زيد، الرياض، 13248، المملكة العربية السعودية</div><div>920015589</div><div>رقم التسجيل الضريبي 311784213300003</div><div>رقم السجل التجاري 1010915542</div></div><div class="logo"><img src="tasneef_logo_print.png"></div><div class="en"><h2>Tasnef Future Company</h2><div>6441, Qurtubah Dist, Said Ibn Zaid, Riyadh, 13248, Kingdom of Saudi Arabia</div><div>920015589</div><div>VAT number 311784213300003</div><div>CR Number 1010915542</div></div></div><h1 class="title">عرض سعر Quote</h1><table class="info"><tr><td class="label">العميل<br>Customer</td><td>${E(customer||p)}</td></tr><tr><td class="label">العنوان<br>Address</td><td>${E(address||p)}</td></tr><tr><td class="label">الهاتف<br>Phone</td><td>${E(phone)}</td></tr><tr><td class="label">التاريخ<br>Date</td><td>${E(qdate)}</td><td class="label">رقم<br>Number</td><td>${E(qno)}</td></tr><tr><td class="label">المرجع<br>Reference</td><td colspan="3">${E(ref)}</td></tr></table><table class="items"><thead><tr><th>#</th><th>الوصف<br>Description</th><th>الكمية<br>Qty</th><th>السعر<br>Price</th><th>المبلغ الخاضع للضريبة<br>Taxable amount</th><th>القيمة المضافة<br>VAT amount</th><th>المجموع<br>Line amount</th></tr></thead><tbody>${lines}</tbody></table><table class="totals"><tr><td>المجموع الفرعي Subtotal</td><td>${subtotal.toFixed(2)} <span class="currency">ر.س</span></td></tr><tr><td>إجمالي ضريبة القيمة المضافة VAT Total</td><td>${vatTotal.toFixed(2)} <span class="currency">ر.س</span></td></tr><tr><td>المجموع شامل القيمة المضافة Total</td><td>${total.toFixed(2)} <span class="currency">ر.س</span></td></tr></table><div class="notes"><b>ملاحظات<br>Notes</b><p>${E(notes)}</p></div><div class="footer">Tasnef Future Company - شركة تصنيف للتشغيل والصيانة &nbsp; | &nbsp; ${E(qno)}</div><script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script></body></html>`);w.document.close();
   }
   async function printFilteredOrders(){
-    let list=[];try{list=(await fetchAllFilteredOrdersInBatches(currentFilters())).rows;}catch(e){notify('تعذر تحميل بيانات الطباعة: '+e.message,'err');return;}
+    let list=[];try{list=(await fetchAllUnifiedOrders(currentFilters())).rows;}catch(e){notify('تعذر تحميل بيانات الطباعة: '+e.message,'err');return;}
     if(!list.length){notify('لا توجد أوردرات مطابقة للطباعة','err');return;}
     const w=window.open('','_blank');if(!w)return;w.document.write(`<html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>الأوردرات</title><style>@page{size:A4 landscape;margin:10mm}body{font-family:Tahoma,Arial}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #bbb;padding:6px;text-align:right}th{background:#eef6f3}</style></head><body><h2>سجل الأوردرات حسب الفلتر</h2><table><thead><tr><th>الرقم</th><th>المشروع</th><th>العميل</th><th>المنفذ</th><th>التنفيذ</th><th>السداد</th><th>الفوترة</th><th>شامل الضريبة</th></tr></thead><tbody>${list.map(r=>`<tr><td>${E(orderNo(r))}</td><td>${E(projectName(r))}</td><td>${E(field(r,'اسم العميل','customer_name'))}</td><td>${E(field(r,'المنفذ','executor_name'))}</td><td>${E(field(r,'حالة التنفيذ','status'))}</td><td>${E(field(r,'حالة السداد','payment_status'))}</td><td>${E(effectiveBilling(r))}</td><td>${E(money(field(r,'السعر (شامل الضريبة)','inclusive_total','total_with_vat')))}</td></tr>`).join('')}</tbody></table><script>window.onload=()=>window.print()<\/script></body></html>`);w.document.close();
   }

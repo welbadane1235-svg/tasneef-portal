@@ -88,9 +88,9 @@
 <section class="sup-page active" id="supLogs">
 <section class="card sup-worker-visit-card"><h2>تسجيل دخول / خروج مشروع</h2><div class="sup-help">اختر المشروع، ثم حدد العمال الذين دخلوا معك. يمنع النظام تكرار التسجيل حتى عند ضعف الإنترنت.</div><input id="logId" type="hidden"/><label>المشروع</label><select id="logProject" onchange="onLogProjectChange()"></select><label>نوع الزيارة</label><select id="logVisitType"><option value="surface">نظافة سطحية</option><option value="deep">نظافة عميقة</option></select><label>التاريخ</label><input id="logDate" type="date"/><div class="split"><div><label>وقت الدخول</label><input id="logIn" type="time"/></div><div><label>وقت الخروج</label><input id="logOut" type="time"/></div></div><label>وقت الانتقال / الضائع بالدقائق</label><input id="logTravel" type="number" value="0"/><label>ملاحظات</label><textarea id="logNotes"></textarea>
 <div class="sup-worker-kpis">
-  <div class="sup-worker-kpi"><small>عمال المشرف</small><b id="supWorkersTotalCount">0</b></div>
-  <div class="sup-worker-kpi"><small>داخل المشروع الآن</small><b id="supWorkersInsideCount">0</b></div>
-  <div class="sup-worker-kpi"><small>العمال المتاحون</small><b id="supWorkersAvailableCount">0</b></div>
+  <div class="sup-worker-kpi"><small>عمال المشرف</small><b id="supWorkersTotalCount">...</b></div>
+  <div class="sup-worker-kpi"><small>داخل المشروع الآن</small><b id="supWorkersInsideCount">...</b></div>
+  <div class="sup-worker-kpi"><small>العمال المتاحون</small><b id="supWorkersAvailableCount">...</b></div>
 </div>
 <div class="sup-worker-panels">
   <div class="sup-worker-panel"><h3>العمال المرتبطون بالمشرف</h3><div id="supAssignedWorkers" class="sup-worker-list"></div></div>
@@ -178,7 +178,7 @@ window.__tasneefOrdersSharedSyncDisabled=true;
 window.__tasneefOrdersRootCleanV10189=true;
 window.__tasneefSupervisorOrdersV10061=true;
 </script>
-<script defer="" src="app.js?v=10710-fast-supervisor-workers"></script>
+<script defer="" src="app.js?v=10712-emergency-data-fix"></script>
 
 
 
@@ -202,7 +202,7 @@ window.__tasneefSupervisorOrdersV10061=true;
     if (loadingPromise) return loadingPromise;
     loadingPromise = new Promise(function(resolve,reject){
       const script=document.createElement('script');
-      script.src='tasneef_orders_unified_v10400.js?v=10711-timeout-fix';
+      script.src='tasneef_orders_unified_v10400.js?v=10712-emergency-data-fix';
       script.async=true;
       script.onload=function(){
         try { if(typeof window.supOrdersLoadV10061==='function') window.supOrdersLoadV10061(); } finally { resolve(); }
