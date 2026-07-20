@@ -120,7 +120,7 @@
 <textarea id="ticketClosureNote" placeholder="اكتب طريقة الحل أو الإجراء المنفذ"></textarea>
 <div class="sup-help">لن يتم إغلاق التذكرة إلا بعد كتابة طريقة الإغلاق واسم من أغلقه.</div>
 </div><div class="actions"><button onclick="saveTicket()">حفظ التذكرة</button><button class="light" onclick="clearTicketForm()">تذكرة جديدة</button></div></section>
-<section class="card"><h2>تذاكري</h2><div class="filters"><select id="supTicketFilterProject" onchange="renderTickets()"><option value="">كل المشاريع</option></select><select id="supTicketFilterStatus" onchange="renderTickets()"><option value="">كل الحالات</option><option value="open">مفتوحة</option><option value="processing">تحت المعالجة</option><option value="closed">مغلقة</option></select><select id="supTicketSortOrder" onchange="renderTickets()"><option value="newest">الأحدث أولاً</option><option value="oldest">الأقدم أولاً</option></select><input id="supTicketSearch" oninput="renderTickets()" placeholder="بحث برقم التذكرة أو العنوان"/></div><div class="smart-ticket-summary" id="supTicketsSmartSummary"></div><div class="smart-ticket-grid" id="supTicketsBody"></div></section>
+<section class="card"><h2>تذاكري</h2><div class="filters"><select id="supTicketFilterProject" onchange="renderTickets()"><option value="">كل المشاريع</option></select><select id="supTicketFilterStatus" onchange="renderTickets()"><option value="">كل الحالات</option><option value="open">مفتوحة</option><option value="processing">تحت المعالجة</option><option value="closed">مغلقة</option></select><select id="supTicketFilterRecipient" onchange="renderTickets()"><option value="">كل المستلمين</option><option value="__unclaimed__">بدون استلام</option></select><select id="supTicketSortOrder" onchange="renderTickets()"><option value="newest">الأحدث أولاً</option><option value="oldest">الأقدم أولاً</option></select><input id="supTicketSearch" oninput="renderTickets()" placeholder="بحث برقم التذكرة أو العنوان"/></div><div class="smart-ticket-summary" id="supTicketsSmartSummary"></div><div class="smart-ticket-grid" id="supTicketsBody"></div></section>
 </section>
 <section class="sup-page" id="supAdminTasks">
 <section class="card">
@@ -184,7 +184,7 @@ window.__tasneefOrdersStabilityPatchV10022=true;
 window.__tasneefOrdersFinalStabilityV10023=true;
 window.__tasneefOrdersUnifiedOnlyV10713=true;
 </script>
-<script defer="" src="app.js?v=10713-unified-supervisor-workers"></script>
+<script defer="" src="app.js?v=10714-finance-ticket-filters"></script>
 
 
 
@@ -208,7 +208,7 @@ window.__tasneefOrdersUnifiedOnlyV10713=true;
     if (loadingPromise) return loadingPromise;
     loadingPromise = new Promise(function(resolve,reject){
       const script=document.createElement('script');
-      script.src='tasneef_orders_unified_v10400.js?v=10713-orders-stable-restore';
+      script.src='tasneef_orders_unified_v10400.js?v=10714-financial-summary';
       script.async=true;
       script.onload=function(){
         try { if(typeof window.supOrdersLoadV10061==='function') window.supOrdersLoadV10061(); } finally { resolve(); }

@@ -23417,9 +23417,13 @@ try{ exportSupervisorDailyPDFV10310 = window.exportSupervisorDailyPDFV10310; }ca
   function supervisorNameSafe(id){ try{ if(typeof window.supervisorName==='function'){ const v=window.supervisorName(id); if(S(v)&&S(v)!=='-') return v; } }catch(_){ } const u=A(D().users||D().app_users).find(x=>String(x.id)===String(id)); return S(u&&(u.full_name||u.name||u.username))||'-'; }
   function projectOf(t){ return S(t.project_name||t.projectName||t.project) || projectNameSafe(t.project_id||t.projectId); }
   function supervisorOf(t){ return S(t.supervisor_name||t.supervisorName||t.supervisor) || supervisorNameSafe(t.supervisor_id||t.supervisorId); }
-  function recipientOf(t){ return S(t.claimed_by_name||t.received_by_name||t.recipient_name||t.assignee_name||t.technician_name) || supervisorNameSafe(t.claimed_by||t.assigned_to||t.technician_id) || '-'; }
+  function recipientValue(t){ const direct=S(t.claimed_by_name||t.received_by_name||t.recipient_name||t.assignee_name||t.technician_name); if(direct)return direct; const id=S(t.claimed_by||t.assigned_to||t.technician_id); if(!id)return ''; const mapped=S(supervisorNameSafe(id)); return mapped&&mapped!=='-'?mapped:('مستخدم '+id); }
+  function recipientOf(t){ return recipientValue(t) || '-'; }
   function closedByOf(t){ return S(t.closed_by_name||t.closed_name||t.closer_name) || supervisorNameSafe(t.closed_by||t.closed_by_id) || '-'; }
   function dateMs(t){ const raw=S(t.created_at||t.createdAt||t.date||t.updated_at); const n=Date.parse(raw); return isNaN(n)?(Number(t.id)||0):n; }
+  function dateOnly(v){ const raw=S(v); const m=raw.match(/(20\d{2})[-\/](\d{1,2})[-\/](\d{1,2})/); if(m)return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0'); const d=new Date(raw); if(isNaN(d.getTime()))return ''; return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function inDateRange(t,from,to){ const d=dateOnly(t.created_at||t.createdAt||t.date||t.updated_at); if(!d)return true; return (!from||d>=from)&&(!to||d<=to); }
+  function fillRecipientOptions(rows){ ['ticketFilterRecipient','supTicketFilterRecipient'].forEach(id=>{ const el=$(id); if(!el)return; const current=S(el.value); const names=[...new Set(rows.map(recipientValue).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ar')); el.innerHTML='<option value="">كل المستلمين</option><option value="__unclaimed__">بدون استلام</option>'+names.map(n=>'<option value="'+E(n)+'">'+E(n)+'</option>').join(''); if([...el.options].some(o=>o.value===current))el.value=current; }); }
   function fmtDate(v){ const d=v?new Date(v):null; if(!d||isNaN(d)) return '-'; try{return d.toLocaleString('ar-SA',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});}catch(_){return S(v).slice(0,16);} }
   function durationText(min){ min=Math.max(0,Math.round(Number(min)||0)); const d=Math.floor(min/1440), h=Math.floor((min%1440)/60), m=min%60; if(d) return d+' يوم '+h+' س'; if(h) return h+' س '+m+' د'; return m+' د'; }
   function slaInfo(t){
@@ -23463,12 +23467,12 @@ try{ exportSupervisorDailyPDFV10310 = window.exportSupervisorDailyPDFV10310; }ca
   }
   function filterAdmin(rows){
     const st=S($('ticketRootStatusV10246')?.value || $('ticketFilterStatus')?.value); const q=(S($('ticketRootSearchV10246')?.value || $('ticketSearch')?.value)).toLowerCase(); const title=S($('ticketRootTitleV10246')?.value); const sla=selectedSlaFilter();
-    const proj=S($('ticketRootProjectV10246')?.value).toLowerCase(); const sup=S($('ticketRootSupervisorV10246')?.value).toLowerCase();
-    return rows.filter(t=>{ if(st && S(t.status||'open')!==st) return false; if(title && S(t.title)!==title) return false; if(proj && projectOf(t).toLowerCase()!==proj) return false; if(sup && supervisorOf(t).toLowerCase()!==sup) return false; if(sla && slaInfo(t).state!==sla) return false; if(q && ![ticketNo(t),t.title,t.description,projectOf(t),supervisorOf(t),statusLabel(t.status),priorityLabel(t.priority),recipientOf(t),closedByOf(t),t.closure_note].join(' ').toLowerCase().includes(q)) return false; return true; });
+    const proj=S($('ticketRootProjectV10246')?.value).toLowerCase(); const sup=S($('ticketRootSupervisorV10246')?.value).toLowerCase(); const recipient=S($('ticketFilterRecipient')?.value); const from=S($('ticketFilterFrom')?.value); const to=S($('ticketFilterTo')?.value);
+    return rows.filter(t=>{ const rv=recipientValue(t); if(st && S(t.status||'open')!==st) return false; if(title && S(t.title)!==title) return false; if(proj && projectOf(t).toLowerCase()!==proj) return false; if(sup && supervisorOf(t).toLowerCase()!==sup) return false; if(recipient==='__unclaimed__'&&rv)return false; if(recipient&&recipient!=='__unclaimed__'&&rv!==recipient)return false; if(!inDateRange(t,from,to))return false; if(sla && slaInfo(t).state!==sla) return false; if(q && ![ticketNo(t),t.title,t.description,projectOf(t),supervisorOf(t),statusLabel(t.status),priorityLabel(t.priority),recipientOf(t),closedByOf(t),t.closure_note].join(' ').toLowerCase().includes(q)) return false; return true; });
   }
   function filterSup(rows){
-    const st=S($('supTicketFilterStatus')?.value); const pid=S($('supTicketFilterProject')?.value); const q=S($('supTicketSearch')?.value).toLowerCase(); const sla=normalizeFilterValue($('supTicketSlaFilterV10364')?.value);
-    return rows.filter(t=>{ if(pid && String(t.project_id)!==pid) return false; if(st && S(t.status||'open')!==st) return false; if(sla && slaInfo(t).state!==sla) return false; if(q && ![ticketNo(t),t.title,t.description,projectOf(t),supervisorOf(t),statusLabel(t.status),priorityLabel(t.priority),recipientOf(t),closedByOf(t),t.closure_note].join(' ').toLowerCase().includes(q)) return false; return true; });
+    const st=S($('supTicketFilterStatus')?.value); const pid=S($('supTicketFilterProject')?.value); const q=S($('supTicketSearch')?.value).toLowerCase(); const sla=normalizeFilterValue($('supTicketSlaFilterV10364')?.value); const recipient=S($('supTicketFilterRecipient')?.value); const from=S($('supTicketFromV10310')?.value||$('supTicketFilterFrom')?.value); const to=S($('supTicketToV10310')?.value||$('supTicketFilterTo')?.value);
+    return rows.filter(t=>{ const rv=recipientValue(t); if(pid && String(t.project_id)!==pid) return false; if(st && S(t.status||'open')!==st) return false; if(recipient==='__unclaimed__'&&rv)return false; if(recipient&&recipient!=='__unclaimed__'&&rv!==recipient)return false; if(!inDateRange(t,from,to))return false; if(sla && slaInfo(t).state!==sla) return false; if(q && ![ticketNo(t),t.title,t.description,projectOf(t),supervisorOf(t),statusLabel(t.status),priorityLabel(t.priority),recipientOf(t),closedByOf(t),t.closure_note].join(' ').toLowerCase().includes(q)) return false; return true; });
   }
   function card(t, mode){
     const id=Number(t.id)||0, inf=slaInfo(t), cls=stateClass(inf.state);
@@ -23481,6 +23485,7 @@ try{ exportSupervisorDailyPDFV10310 = window.exportSupervisorDailyPDFV10310; }ca
     ensurePanels();
     const adminBody=$('ticketsBody'), supBody=$('supTicketsBody'); if(!adminBody&&!supBody) return;
     let rows=[]; try{ rows=await loadTicketsQuick(); }catch(e){ console.warn(BUILD,e); rows=A(D().tickets); }
+    fillRecipientOptions(rows);
     const sort=S($('ticketRootSortV10246')?.value || $('ticketSortOrder')?.value || $('supTicketSortOrder')?.value || 'newest');
     if(adminBody){ let list=filterAdmin(rows); list.sort((a,b)=>sort==='oldest'?dateMs(a)-dateMs(b):dateMs(b)-dateMs(a)); adminBody.classList.add('smart-ticket-grid'); adminBody.innerHTML=list.map(t=>card(t,'admin')).join('') || '<div class="muted" style="padding:16px">لا توجد تكتات مطابقة للفلاتر الحالية</div>'; updateSummary(list,rows,'admin'); }
     if(supBody){ let list=filterSup(rows); list.sort((a,b)=>sort==='oldest'?dateMs(a)-dateMs(b):dateMs(b)-dateMs(a)); supBody.classList.add('smart-ticket-grid'); supBody.innerHTML=list.map(t=>card(t,'sup')).join('') || '<div class="muted" style="padding:16px">لا توجد تكتات مطابقة للفلاتر الحالية</div>'; updateSummary(list,rows,'sup'); }
@@ -23498,7 +23503,7 @@ try{ exportSupervisorDailyPDFV10310 = window.exportSupervisorDailyPDFV10310; }ca
   };
   window.renderTickets=renderTicketsNew;
   window.renderTicketsSlaV10364=renderTicketsNew;
-  function bindExistingFilters(){ ['ticketFilterStatus','ticketSortOrder','ticketSearch','supTicketFilterProject','supTicketFilterStatus','supTicketSortOrder','supTicketSearch','ticketRootProjectV10246','ticketRootSupervisorV10246','ticketRootTitleV10246','ticketRootStatusV10246','ticketRootSortV10246','ticketRootSearchV10246'].forEach(id=>{ const el=$(id); if(el&&!el.dataset.slaV10364){ el.dataset.slaV10364='1'; el.addEventListener((el.tagName==='INPUT')?'input':'change',()=>renderTicketsSafe(),true); } }); }
+  function bindExistingFilters(){ ['ticketFilterStatus','ticketFilterRecipient','ticketFilterFrom','ticketFilterTo','ticketSortOrder','ticketSearch','supTicketFilterProject','supTicketFilterStatus','supTicketFilterRecipient','supTicketFromV10310','supTicketToV10310','supTicketSortOrder','supTicketSearch','ticketRootProjectV10246','ticketRootSupervisorV10246','ticketRootTitleV10246','ticketRootStatusV10246','ticketRootSortV10246','ticketRootSearchV10246'].forEach(id=>{ const el=$(id); if(el&&!el.dataset.slaV10364){ el.dataset.slaV10364='1'; el.addEventListener((el.tagName==='INPUT'&&el.type!=='date')?'input':'change',()=>renderTicketsSafe(),true); } }); }
   function boot(){ ensurePanels(); bindExistingFilters(); setTimeout(renderTicketsSafe,150); }
   document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,700)); window.addEventListener('load',()=>setTimeout(boot,1100)); setTimeout(boot,1800);
   console.log('Tasneef '+BUILD+' loaded');
@@ -23538,9 +23543,12 @@ try{ exportSupervisorDailyPDFV10310 = window.exportSupervisorDailyPDFV10310; }ca
     const isSup=!!$('supTicketsBody') && !$('ticketsBody');
     const user=(typeof window.session==='function'?window.session():null)||window.currentUser||{};
     if(isSup && user && user.role==='supervisor' && user.id) rows=rows.filter(t=>S(t.supervisor_id)===S(user.id)||!S(t.supervisor_id));
-    const from=S($('supTicketFromV10310')?.value||$('ticketFromV10310')?.value||'');
-    const to=S($('supTicketToV10310')?.value||$('ticketToV10310')?.value||from);
+    const from=S($('supTicketFromV10310')?.value||$('supTicketFilterFrom')?.value||$('ticketFilterFrom')?.value||$('ticketFromV10310')?.value||'');
+    const to=S($('supTicketToV10310')?.value||$('supTicketFilterTo')?.value||$('ticketFilterTo')?.value||$('ticketToV10310')?.value||from);
     if(from||to) rows=rows.filter(t=>inRange(dateOnly(t.created_at||t.opened_at||t.updated_at),from,to));
+    const recipient=S($('supTicketFilterRecipient')?.value||$('ticketFilterRecipient')?.value||'');
+    if(recipient==='__unclaimed__')rows=rows.filter(t=>!S(t.claimed_by_name||t.received_by_name||t.recipient_name||t.assignee_name||t.technician_name||t.claimed_by||t.assigned_to||t.technician_id));
+    else if(recipient)rows=rows.filter(t=>S(t.claimed_by_name||t.received_by_name||t.recipient_name||t.assignee_name||t.technician_name)===recipient);
     const pid=S($('supTicketFilterProject')?.value||$('ticketRootProjectV10246')?.value||'');
     if(pid) rows=rows.filter(t=>S(t.project_id)===pid || projectName(t.project_id)===pid);
     const sid=S($('ticketRootSupervisorV10246')?.value||'');
@@ -26023,3 +26031,6 @@ ${finalUrl}
   try{ initSupervisor=initSupervisorUnified; }catch(_){ }
   console.log('Tasneef '+VERSION+' loaded');
 })();
+
+/* ===== V10714 FINANCIAL SUMMARY + TICKET RECIPIENT/DATE FILTERS ===== */
+console.info('Tasneef V10714 financial summary and ticket filters active');

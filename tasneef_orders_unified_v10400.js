@@ -1,4 +1,4 @@
-/* Tasneef Orders Unified v10713 stable restore
+/* Tasneef Orders Unified v10714 financial summary
    المصدر الوحيد لقسم الأوردرات.
    - يحافظ على كل بيانات orders_shared القديمة دون حذف أو إعادة كتابة جماعية.
    - يمنع تشغيل سكربتات الأوردرات القديمة.
@@ -289,8 +289,8 @@
   }
   function renderSummary(list){
     const host=$('ordersSummaryV233');if(!host)return;
-    const totals=list.reduce((a,r)=>{const inc=num(field(r,'السعر (شامل الضريبة)','inclusive_total','total_with_vat')),bef=num(field(r,'السعر قبل الضريبة','before_vat'))||(inc/1.15),vat=num(field(r,'الضريبة 15%','vat_amount'))||(inc-bef),profit=num(field(r,'الربح','net_profit'))||(bef-num(field(r,'التكلفة','cost')));a.before+=bef;a.vat+=vat;a.inclusive+=inc;a.profit+=profit;return a;},{before:0,vat:0,inclusive:0,profit:0});
-    host.className='ou-summary-fixed';host.innerHTML=`<div><small>إجمالي قبل الضريبة</small><b>${E(money(totals.before))}</b></div><div><small>إجمالي الضريبة</small><b>${E(money(totals.vat))}</b></div><div><small>إجمالي شامل الضريبة</small><b>${E(money(totals.inclusive))}</b></div><div><small>إجمالي صافي الربح</small><b>${E(money(totals.profit))}</b></div>`;
+    const totals=list.reduce((a,r)=>{const inc=num(field(r,'السعر (شامل الضريبة)','inclusive_total','total_with_vat')),bef=num(field(r,'السعر قبل الضريبة','before_vat'))||(inc/1.15),vat=num(field(r,'الضريبة 15%','vat_amount'))||(inc-bef);a.before+=bef;a.vat+=vat;a.inclusive+=inc;return a;},{before:0,vat:0,inclusive:0});
+    host.className='ou-summary-fixed';host.innerHTML=`<div><small>السعر قبل الضريبة</small><b>${E(money(totals.before))}</b></div><div><small>الضريبة 15%</small><b>${E(money(totals.vat))}</b></div><div><small>شامل الضريبة</small><b>${E(money(totals.inclusive))}</b></div>`;
   }
 
   function orderDate(r){
@@ -327,7 +327,7 @@
 
   function injectStyle(){ if($('ordersUnifiedStyle10400'))return; const st=document.createElement('style');st.id='ordersUnifiedStyle10400';st.textContent=`
   .ou-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.ou-wide{grid-column:1/-1}.ou-required label:after{content:' *';color:#b42318}.ou-invalid{border-color:#d92d20!important;box-shadow:0 0 0 3px rgba(217,45,32,.12)!important}.ou-select{position:relative}.ou-note{background:#f3f8f6;border:1px solid #d7e7e0;padding:9px;border-radius:11px;color:#315d50}.ou-card{background:#fff;border:1px solid var(--line,#dce7e2);border-radius:17px;padding:13px;display:grid;gap:9px}.ou-head{display:flex;justify-content:space-between;gap:9px}.ou-head h3{margin:0;color:var(--brand,#075e4c)}.ou-chips{display:flex;gap:6px;flex-wrap:wrap}.ou-chip{padding:5px 9px;border-radius:999px;background:#edf7f3;color:#075e4c;font-size:12px;font-weight:800}.ou-meta{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.ou-meta div{padding:8px;background:#f8fbfa;border-radius:10px}.ou-meta small{display:block;color:#6a7974}.ou-actions{display:flex;gap:7px;flex-wrap:wrap}.ou-history{display:grid;gap:8px}.ou-history article{padding:10px;border:1px solid #e0e9e5;border-radius:12px;background:#fbfdfc}.ou-modal{position:fixed;inset:0;background:rgba(0,35,28,.52);z-index:100000;display:grid;place-items:center;padding:16px}.ou-modal>div{width:min(900px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:18px;padding:16px}.ou-creator{font-weight:800;color:#075e4c}.ou-money-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.ou-money{padding:10px;border-radius:12px;background:#f4f8f6;border:1px solid #dce8e3}.ou-money small{display:block;color:#67766f}.ou-money b{font-size:15px}.ou-smart-wrap{position:relative}.ou-smart-menu{position:absolute;z-index:10020;top:calc(100% + 4px);right:0;left:0;max-height:230px;overflow:auto;background:#fff;border:1px solid #d7e4de;border-radius:12px;box-shadow:0 12px 30px rgba(0,40,30,.14);padding:5px;display:none}.ou-smart-menu.open{display:block}.ou-smart-option{padding:9px 10px;border-radius:9px;cursor:pointer}.ou-smart-option:hover,.ou-smart-option.active{background:#edf7f3;color:#075e4c}.ou-smart-empty{padding:10px;color:#77847f;text-align:center}.ou-filter-extra{min-width:150px}@media(max-width:800px){.ou-grid{grid-template-columns:1fr}.ou-wide{grid-column:auto}.ou-meta,.ou-money-grid{grid-template-columns:1fr}}
-  #ordersSummaryV233.ou-summary-fixed{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:10px!important;height:auto!important;min-height:0!important;align-items:stretch!important;margin:10px 0!important}
+  #ordersSummaryV233.ou-summary-fixed{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:10px!important;height:auto!important;min-height:0!important;align-items:stretch!important;margin:10px 0!important}
   #ordersSummaryV233.ou-summary-fixed>div{height:auto!important;min-height:76px!important;max-height:none!important;padding:12px!important;border:1px solid #dce7e2!important;border-radius:14px!important;background:#fff!important;display:flex!important;flex-direction:column!important;justify-content:center!important;overflow:visible!important}
   #ordersSummaryV233.ou-summary-fixed small{display:block;color:#66756f;margin-bottom:5px}#ordersSummaryV233.ou-summary-fixed b{font-size:20px;line-height:1.3;color:#063f33;white-space:nowrap}
   .ou-card.ou-card-complete{background:#effaf4;border-color:#80c99f;box-shadow:inset 5px 0 0 #21864f}.ou-card.ou-card-warning{background:#fff9e8;border-color:#e7c96a;box-shadow:inset 5px 0 0 #d5a514}.ou-card.ou-card-pending{background:#fff1f1;border-color:#efaaaa;box-shadow:inset 5px 0 0 #e15c5c}.ou-card.ou-card-cancelled{background:#f7dddd;border-color:#a72b2b;box-shadow:inset 5px 0 0 #861f1f}.ou-card.ou-card-cancelled .ou-head h3{color:#7f1d1d}
@@ -654,7 +654,10 @@
     if($('ordersDoneKpiV233'))$('ordersDoneKpiV233').textContent=Number(summary.completed_orders||0).toLocaleString('ar-SA');
     if($('ordersDueKpiV233'))$('ordersDueKpiV233').textContent=Number(summary.unpaid_orders||0).toLocaleString('ar-SA');
     if($('ordersProfitKpiV233'))$('ordersProfitKpiV233').textContent=money(summary.total_net_profit||0).replace(' ر.س','');
-    const host=$('ordersSummaryV233');if(host){host.className='ou-summary-fixed';host.innerHTML=`<div><small>إجمالي الأوردرات</small><b>${E(Number(summary.total_orders||0).toLocaleString('ar-SA'))}</b></div><div><small>تم التنفيذ</small><b>${E(Number(summary.completed_orders||0).toLocaleString('ar-SA'))}</b></div><div><small>آجل / غير مسدد</small><b>${E(Number(summary.unpaid_orders||0).toLocaleString('ar-SA'))}</b></div><div><small>إجمالي صافي الربح</small><b>${E(money(summary.total_net_profit||0))}</b></div>`;}
+    const hasFinancial=['total_before_vat','total_vat_amount','total_inclusive'].some(k=>Object.prototype.hasOwnProperty.call(summary,k));
+    if(!hasFinancial){renderSummary(rows);return;}
+    const before=num(summary.total_before_vat),vat=num(summary.total_vat_amount),inclusive=num(summary.total_inclusive);
+    const host=$('ordersSummaryV233');if(host){host.className='ou-summary-fixed';host.innerHTML=`<div><small>السعر قبل الضريبة</small><b>${E(money(before))}</b></div><div><small>الضريبة 15%</small><b>${E(money(vat))}</b></div><div><small>شامل الضريبة</small><b>${E(money(inclusive))}</b></div>`;}
   }
   function render(){
     const startNo=rows.length?((page-1)*pageSize+1):0,endNo=rows.length?(startNo+rows.length-1):0;
