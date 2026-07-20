@@ -5,7 +5,7 @@
 (function(){
   'use strict';
 
-  const BUILD='V10801-PRINT-FULLTIME-HOTFIX';
+  const BUILD='V10801-PROFESSIONAL-PRINT-HOTFIX';
   const $=id=>document.getElementById(id);
   const S=v=>(v==null?'':String(v)).trim();
   const N=v=>{const n=Number(v||0);return Number.isFinite(n)?n:0;};
@@ -366,7 +366,7 @@
     if(values.includes(current))sup.value=current;
   }
   function fullCard(row){
-    const p=fullDisplayPercentage(row.percentage);
+    const p=100;
     const pText=Math.abs(p-100)<0.0001?'100%':p.toFixed(1).replace(/\.0$/,'')+'%';
     const overtime=N(row.overtimeMinutes)>0?`<div class="mc401-row"><span>وقت إضافي</span><b>${esc(minsText(row.overtimeMinutes))}</b></div>`:'';
     return `<article class="mc401-card full"><h3>${esc(row.projectName)}</h3><div class="mc401-row"><span>المشرف</span><b>${esc(row.supervisorName||'-')}</b></div><div class="mc401-row"><span>نوع المشروع</span><b>${esc(row.projectType)}</b></div><div class="mc401-row"><span>عدد العمال المحتسبين</span><b>${N(row.workerCount||row.workers?.length)}</b></div><div class="mc401-row"><span>الوقت الفعلي</span><b>${esc(minsText(row.totalMinutes))}</b></div><div class="mc401-row"><span>الوقت المطلوب</span><b>${esc(minsText(row.requiredMinutes))}</b></div><div class="mc401-row"><span>النسبة</span><b>${pText}</b></div>${overtime}<div class="mc401-bar"><i style="width:${Math.min(Math.max(p,0),100).toFixed(0)}%"></i></div><div class="mc401-workers">${(row.workers||[]).map(w=>`<span class="mc401-pill">${esc(w)}</span>`).join('')||'<span class="mc401-pill">لا يوجد توزيع نشط</span>'}</div></article>`;
@@ -497,32 +497,31 @@
     const logo=document.querySelector('img[src*="tasneef_logo_print"]')?.src||'tasneef_logo_print.png';
     const month=esc(currentMonthLoaded||selectedMonth());
     const printCss=`
-      @page{size:A4 landscape;margin:8mm}
+      @page{size:A4 landscape;margin:7mm}
       *{box-sizing:border-box}
-      html,body{margin:0;padding:0;background:#fff!important;color:#061f18!important;visibility:visible!important}
-      body{font-family:Tahoma,Arial,sans-serif;direction:rtl;padding:8px;font-size:12px}
-      body *{visibility:visible!important}
-      .print-head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #0A4033;padding-bottom:10px;margin-bottom:10px}
-      .print-head img{width:70px;height:auto}.print-head h1{margin:0 0 6px;color:#0A4033}
-      .print-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:10px 0}
-      .print-kpi{border:1px solid #cfe2dc;border-radius:10px;padding:8px;text-align:center;background:#fff}
-      .section-title{background:#eef8f5;border-right:6px solid #0A4033;border-radius:8px;padding:8px;color:#0A4033;margin:14px 0 8px}
-      .mc406-daily-card{border:1.5px solid #0A4033;border-radius:12px;padding:10px;margin:8px 0;background:#fff;break-inside:avoid;page-break-inside:avoid}
-      .mc406-daily-head{display:flex;justify-content:space-between;gap:8px;align-items:center;border-bottom:1px solid #dce6e2;padding-bottom:6px;margin-bottom:6px}
-      .mc406-daily-head h3{margin:0;color:#0A4033}.mc406-mini{display:flex;gap:4px;flex-wrap:wrap}
-      .mc406-mini span{background:#eef8f5;border:1px solid #cfe2dc;border-radius:999px;padding:4px 7px;font-weight:700}
-      .mc406-table{width:100%;border-collapse:collapse}.mc406-table th{background:#f2f8f5;color:#0A4033}
-      .mc406-table th,.mc406-table td{padding:6px;border-bottom:1px solid #edf1ef;text-align:right;font-size:10px}
-      .mc406-progress,.mc401-bar{height:6px;background:#edf3f1;border-radius:999px;overflow:hidden}.mc406-progress i,.mc401-bar i{display:block;height:100%;background:#0A4033}
-      .mc406-workers,.mc401-workers{margin-top:6px}.mc406-pill,.mc401-pill{display:inline-block;background:#eef8f5;border:1px solid #d5e9e2;border-radius:999px;padding:3px 6px;margin:2px;font-size:9px;font-weight:700;color:#0A4033}
-      .mc401-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-      .mc401-card{background:#fff;border:1.5px solid #0A4033;border-radius:12px;padding:10px;break-inside:avoid;page-break-inside:avoid;min-height:0}
-      .mc401-card h3{margin:0 0 7px;text-align:center;color:#061f18;font-size:15px}
-      .mc401-row{display:grid;grid-template-columns:1fr 1.2fr;gap:6px;border-top:1px solid #e7efec;padding:5px 0;align-items:center;font-size:10px}
-      .mc401-row span{color:#65746f}.mc401-row b{color:#061f18}
-      @media print{html,body,body *{visibility:visible!important;display:revert!important}.mc401-grid{display:grid!important}.mc406-table{display:table!important}}
+      html,body{margin:0;padding:0;background:#fff;color:#102b23}
+      body{font-family:Tahoma,Arial,sans-serif;direction:rtl;font-size:10px;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .print-head{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#0A4033,#13634f);color:#fff;padding:12px 16px;border-radius:12px;margin-bottom:9px}
+      .print-brand{display:flex;align-items:center;gap:10px}.print-head img{width:62px;height:62px;object-fit:contain;background:#fff;border-radius:10px;padding:4px}.print-head h1{margin:0 0 4px;font-size:23px}.print-head p{margin:0;opacity:.9}.print-date{text-align:left;line-height:1.7}
+      .print-kpis{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:7px;margin:8px 0 10px}
+      .print-kpi{border:1px solid #cfe2dc;border-top:4px solid #0A4033;border-radius:10px;padding:7px;text-align:center;background:#f9fcfb;min-height:58px;display:flex;flex-direction:column;justify-content:center}
+      .print-kpi span{display:block;color:#62746d;font-size:9px}.print-kpi b{display:block;color:#0A4033;font-size:15px;margin-top:3px}
+      .section-title{background:#edf7f3;border-right:5px solid #0A4033;border-radius:7px;padding:6px 10px;color:#0A4033;margin:10px 0 6px;font-size:14px}
+      .mc406-daily-card{border:1px solid #aecbc0;border-radius:9px;padding:7px;margin:6px 0;background:#fff;break-inside:avoid-page;page-break-inside:avoid}
+      .mc406-daily-head{display:flex!important;justify-content:space-between;gap:6px;align-items:center;border-bottom:1px solid #dce6e2;padding-bottom:5px;margin-bottom:5px}
+      .mc406-daily-head h3{margin:0;color:#0A4033;font-size:13px}.mc406-mini{display:flex!important;gap:4px;flex-wrap:wrap}
+      .mc406-mini span{background:#eef8f5;border:1px solid #cfe2dc;border-radius:999px;padding:3px 6px;font-weight:700;font-size:8px}
+      .mc406-table{display:table!important;width:100%;border-collapse:collapse;table-layout:fixed}.mc406-table thead{display:table-header-group!important}.mc406-table th{background:#0A4033;color:#fff}
+      .mc406-table th,.mc406-table td{padding:4px;border:1px solid #e2ebe7;text-align:right;font-size:8px;vertical-align:middle}.mc406-table tr{break-inside:avoid}
+      .mc406-progress,.mc401-bar{height:5px;background:#e5efeb;border-radius:999px;overflow:hidden;margin-top:2px}.mc406-progress i,.mc401-bar i{display:block;height:100%;background:#16865a}
+      .mc406-workers,.mc401-workers{margin-top:4px;line-height:1.5}.mc406-pill,.mc401-pill{display:inline-block;background:#eef8f5;border:1px solid #d5e9e2;border-radius:999px;padding:2px 5px;margin:1px;font-size:7px;font-weight:700;color:#0A4033}
+      .mc401-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px;align-items:start}
+      .mc401-card{display:block!important;background:#fff;border:1px solid #aecbc0;border-top:4px solid #16865a;border-radius:9px;padding:7px;break-inside:avoid-page;page-break-inside:avoid;min-height:0}
+      .mc401-card h3{margin:0 0 5px;text-align:center;color:#0A4033;font-size:12px}.mc401-row{display:grid!important;grid-template-columns:.9fr 1.1fr;gap:4px;border-top:1px solid #e7efec;padding:3px 0;align-items:center;font-size:8px}.mc401-row span{color:#65746f}.mc401-row b{color:#061f18}
+      .print-footer{margin-top:8px;padding-top:6px;border-top:1px solid #d7e4df;text-align:center;color:#67766f;font-size:8px}
+      @media print{.print-kpis{display:grid!important}.mc401-grid{display:grid!important}.mc406-daily-head,.mc406-mini{display:flex!important}.mc406-table{display:table!important}.mc406-table thead{display:table-header-group!important}}
     `;
-    const html=`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير الأوقات الشهرية ${month}</title><style>${printCss}</style></head><body><div class="print-head"><img src="${logo}" alt="شركة تصنيف"><div><h1>تقرير الأوقات الشهرية</h1><b>شهر ${month}</b></div></div><div class="print-kpis"><div class="print-kpi">المشاريع<br><b>${rows.length}</b></div><div class="print-kpi">زيارة يومية<br><b>${daily.length}</b></div><div class="print-kpi">دوام كامل<br><b>${full.length}</b></div><div class="print-kpi">إجمالي الوقت<br><b>${esc(minsText(total))}</b></div><div class="print-kpi">المصدر<br><b>السيرفر</b></div></div><h2 class="section-title">مشاريع الزيارة اليومية</h2>${[...groups.entries()].map(([s,list])=>dailyBox(s,list)).join('')||'<p>لا توجد.</p>'}<h2 class="section-title">مشاريع الدوام الكامل</h2><div class="mc401-grid">${full.map(fullCard).join('')||'<p>لا توجد.</p>'}</div></body></html>`;
+    const html=`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير الأوقات الشهرية ${month}</title><style>${printCss}</style></head><body><header class="print-head"><div class="print-brand"><img src="${logo}" alt="شركة تصنيف"><div><h1>تقرير الأوقات الشهرية</h1><p>شركة تصنيف لإدارة المرافق والتشغيل</p></div></div><div class="print-date"><b>الشهر: ${month}</b><br><span>تاريخ الطباعة: ${esc(new Date().toLocaleDateString('ar-SA'))}</span></div></header><section class="print-kpis"><div class="print-kpi"><span>إجمالي المشاريع</span><b>${rows.length}</b></div><div class="print-kpi"><span>مشاريع الزيارة اليومية</span><b>${daily.length}</b></div><div class="print-kpi"><span>المشاريع الدائمة</span><b>${full.length}</b></div><div class="print-kpi"><span>إجمالي الوقت الفعلي</span><b>${esc(minsText(total))}</b></div><div class="print-kpi"><span>مصدر البيانات</span><b>السيرفر المباشر</b></div></section><h2 class="section-title">مشاريع الزيارة اليومية</h2>${[...groups.entries()].map(([s,list])=>dailyBox(s,list)).join('')||'<p>لا توجد مشاريع زيارة يومية.</p>'}<h2 class="section-title">المشاريع الدائمة — النسبة المعتمدة 100%</h2><div class="mc401-grid">${full.map(fullCard).join('')||'<p>لا توجد مشاريع دائمة.</p>'}</div><footer class="print-footer">تم إنشاء هذا التقرير من نظام شركة تصنيف لإدارة المرافق، ويعتبر معتمدًا ما لم يرد خلاف ذلك.</footer></body></html>`;
     const win=window.open('','_blank');
     if(!win){const message=$('mc401Message');if(message)message.textContent='اسمح بالنوافذ المنبثقة حتى تعمل الطباعة.';return;}
     win.document.open();win.document.write(html);win.document.close();

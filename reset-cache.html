@@ -16,18 +16,18 @@
     <h1>تحديث ملفات نظام تصنيف</h1>
     <p class="muted">يلغي Service Worker وكاش ملفات الموقع فقط. لا يحذف بيانات النظام أو إعدادات المستخدم المحفوظة.</p>
     <button onclick="clean()">تحديث الملفات الآن</button>
-    <a href="index.html?v=10801-print-fulltime-whatsapp-hotfix">فتح تسجيل الدخول</a>
+    <a href="index.html?v=10801-professional-print-inclusive-price-status">فتح تسجيل الدخول</a>
     <pre id="out"></pre>
   </div>
   <script>
     async function clean(){
       const out=document.getElementById('out');
       try{
-        try{localStorage.setItem('tasneef_version','10801-print-fulltime-whatsapp-hotfix');localStorage.setItem('tasneef_build_version','V10801-PRINT-FULLTIME-WHATSAPP-HOTFIX');}catch(_){ }
+        try{localStorage.setItem('tasneef_version','10801-professional-print-inclusive-price-status');localStorage.setItem('tasneef_build_version','V10801-PRO-PRINT-INCLUSIVE-STATUS');}catch(_){ }
         if('serviceWorker' in navigator){const regs=await navigator.serviceWorker.getRegistrations();for(const r of regs)await r.unregister();}
         if(window.caches&&location.protocol!=='file:'){const keys=await caches.keys();for(const k of keys)await caches.delete(k);}
         out.textContent='تم تحديث الملفات بنجاح دون حذف بياناتك. سيتم فتح تسجيل الدخول.';
-        setTimeout(()=>location.href='index.html?v=10801-print-fulltime-whatsapp-hotfix&nocache='+Date.now(),700);
+        setTimeout(()=>location.href='index.html?v=10801-professional-print-inclusive-price-status&nocache='+Date.now(),700);
       }catch(e){out.textContent='حدث خطأ: '+(e.message||e);}
     }
   </script>
