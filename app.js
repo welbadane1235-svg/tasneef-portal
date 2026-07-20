@@ -25712,3 +25712,99 @@ ${finalUrl}
   document.addEventListener('DOMContentLoaded',()=>{hookTabs();setTimeout(()=>{loadSecurityCenterV10700();applyUi();},500);});
   console.log(BUILD+' loaded');
 })();
+
+
+/* ===== V10707: unified project source and stable supervisor bootstrap ===== */
+(function(){
+  'use strict';
+  const VERSION='v10707-unified-project-source';
+  const S=v=>String(v??'').trim();
+  const A=v=>Array.isArray(v)?v:[];
+  let latestRequestId=0;
+  const cache=new Map();
+  function currentUser(){ try{return JSON.parse(localStorage.getItem('tasneef_user')||'{}')||{};}catch(_){return{};} }
+  function active(r){ return r && r.is_active!==false && r.active!==false && !['inactive','stopped','موقوف'].includes(S(r.status).toLowerCase()); }
+  function userTokens(u){ return new Set([u.id,u.user_id,u.employee_id,u.supervisor_id,u.username,u.email,u.full_name,u.name].map(S).filter(Boolean)); }
+  async function queryRows(name,q){
+    const r=await q;
+    if(r.error) throw new Error(name+': '+r.error.message);
+    return A(r.data);
+  }
+  async function resolveCurrentSupervisorId(authUserId){
+    const u=currentUser();
+    if(S(u.supervisor_id)) return S(u.supervisor_id);
+    if(S(u.employee_id)) return S(u.employee_id);
+    if(S(u.id)) return S(u.id);
+    return S(authUserId);
+  }
+  async function getAccessibleProjects(userId,role,filters={}){
+    const u=currentUser();
+    const sid=await resolveCurrentSupervisorId(userId||u.id);
+    const period=S(filters.period||'current');
+    const key=['accessible-projects',S(userId||u.id),sid,period].join('|');
+    const req=++latestRequestId;
+    try{
+      const projects=await queryRows('projects',sb.from('projects').select('*').eq('is_active',true).order('id'));
+      if(req!==latestRequestId) return cache.get(key)||[];
+      if(role!=='supervisor') { cache.set(key,projects); return projects; }
+      const tokens=userTokens({...u,supervisor_id:sid});
+      let workers=[], assignments=[];
+      try{ workers=await queryRows('workers',sb.from('workers').select('*').eq('is_active',true).order('id')); }catch(e){ console.warn(VERSION,e.message); }
+      try{ assignments=await queryRows('worker_project_assignments',sb.from('worker_project_assignments').select('*').eq('is_active',true).order('id')); }catch(e){ console.warn(VERSION,e.message); }
+      const projectIds=new Set();
+      projects.forEach(p=>{
+        const vals=[p.supervisor_id,p.app_supervisor_id,p.manager_id,p.supervisor_user_id,p.supervisor_name];
+        if(vals.map(S).some(v=>tokens.has(v))) projectIds.add(S(p.id));
+      });
+      const workerIds=new Set();
+      workers.forEach(w=>{
+        const vals=[w.supervisor_id,w.app_supervisor_id,w.assigned_supervisor_id,w.manager_id];
+        if(vals.map(S).some(v=>tokens.has(v))){ workerIds.add(S(w.id)); if(w.project_id) projectIds.add(S(w.project_id)); }
+      });
+      assignments.forEach(a=>{ if(workerIds.has(S(a.worker_id)) && a.project_id) projectIds.add(S(a.project_id)); });
+      const result=projects.filter(p=>projectIds.has(S(p.id)) && active(p));
+      cache.set(key,result);
+      return result;
+    }catch(e){
+      console.error('ProjectsService.getAccessibleProjects failed',e);
+      if(cache.has(key)) return cache.get(key);
+      throw e;
+    }
+  }
+  window.ProjectsService={getAccessibleProjects,resolveCurrentSupervisorId,version:VERSION,clearUserCache(userId){ for(const k of [...cache.keys()]) if(k.includes('|'+S(userId)+'|')) cache.delete(k); }};
+  function fillStable(id,rows,first){
+    const el=document.getElementById(id); if(!el)return;
+    const old=el.value;
+    el.innerHTML='<option value="">'+first+'</option>'+rows.map(p=>'<option value="'+String(p.id).replace(/"/g,'&quot;')+'">'+String(p.name||p.project_name||p.id).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</option>').join('');
+    if(old && [...el.options].some(o=>o.value===old)) el.value=old;
+  }
+  async function initSupervisorUnified(){
+    const u=(typeof requireRole==='function'?requireRole('supervisor'):currentUser()); if(!u)return;
+    const title=document.getElementById('supTitle'); if(title) title.textContent='لوحة المشرف - '+(u.full_name||u.name||u.username||'');
+    ['logProject','attendanceProject','ticketProject','supOrderProjectV10061','supOrderFilterProjectV10061','supClientReportProject'].forEach(id=>{const el=document.getElementById(id);if(el&&!el.options.length)el.innerHTML='<option value="">جاري تحديد مشاريع المشرف…</option>';});
+    try{
+      if(typeof loadAll==='function') await loadAll();
+      const projects=await getAccessibleProjects(u.id,'supervisor',{period:'current'});
+      data.projects=projects;
+      fillStable('logProject',projects,'اختر المشروع');
+      fillStable('attendanceProject',projects,'كل مشاريع المشرف');
+      fillStable('ticketProject',projects,'اختر المشروع');
+      fillStable('supOrderProjectV10061',projects,'اختر المشروع');
+      fillStable('supOrderFilterProjectV10061',projects,'كل المشاريع');
+      fillStable('supClientReportProject',projects,'اختر المشروع');
+      if(document.getElementById('logDate')) document.getElementById('logDate').value=today();
+      if(document.getElementById('attendanceDate')) document.getElementById('attendanceDate').value=today();
+      try{ window.renderSupervisorAttendanceList&&await window.renderSupervisorAttendanceList(); }catch(e){console.warn(e);}
+      try{ window.renderTimeLogs&&window.renderTimeLogs(); }catch(e){console.warn(e);}
+      try{ window.supervisorInventoryLoad&&await window.supervisorInventoryLoad(); }catch(e){console.warn(e);}
+      window.__tasneefSupervisorProjectHealth={ok:true,count:projects.length,supervisorId:await resolveCurrentSupervisorId(u.id),version:VERSION,at:new Date().toISOString()};
+    }catch(e){
+      window.__tasneefSupervisorProjectHealth={ok:false,error:e.message,version:VERSION,at:new Date().toISOString()};
+      const el=document.getElementById('logProject'); if(el) el.innerHTML='<option value="">تعذر تحميل المشاريع من السيرفر</option>';
+      if(typeof msg==='function') msg('تعذر تحميل مشاريع المشرف من السيرفر: '+e.message,'err');
+    }
+  }
+  window.initSupervisor=initSupervisorUnified;
+  try{ initSupervisor=initSupervisorUnified; }catch(_){ }
+  console.log('Tasneef '+VERSION+' loaded');
+})();

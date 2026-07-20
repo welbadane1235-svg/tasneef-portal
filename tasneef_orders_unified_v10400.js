@@ -28,13 +28,15 @@
   const user=()=>{ try{return JSON.parse(localStorage.getItem('tasneef_user')||'{}')||{};}catch(_){return{};} };
   const userName=u=>S(u.name||u.full_name||u.display_name||u.username||u.email||'مستخدم النظام');
   const userRole=u=>S(u.role||u.type||u.user_role||'user');
-  const orderNo=r=>S(r?.order_no||r?.data?.['رقم الطلب']||r?.data?.order_no||r?.id);
+  const orderNo=r=>S(r?.order_no||r?.data?.['رقم الطلب']||r?.data?.order_no||r?.data?.external_order_number||r?.data?.excel_order_number||r?.data?.legacy_order_number||r?.id);
   const dataOf=r=>r&&r.data&&typeof r.data==='object'?r.data:r||{};
   const field=(r,...keys)=>{const d=dataOf(r); for(const k of keys){ if(d[k]!==undefined&&d[k]!==null&&S(d[k])!=='') return d[k]; } return '';};
   const num=v=>{const n=Number(S(v).replace(/,/g,'').replace(/[^0-9.-]/g,''));return Number.isFinite(n)?n:0;};
   const money=v=>num(v).toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2})+' ر.س';
   const isSupervisorPage=()=>!!document.getElementById('supOrdersBodyV10061')&&!document.getElementById('ordersCardsV360');
   const norm=v=>S(v).toLowerCase().replace(/[\s_\-]+/g,'').replace(/[^\p{L}\p{N}@.]/gu,'');
+  const normalizeOrderNumber=v=>S(v).replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/\s+/g,'');
+  window.normalizeOrderNumber=normalizeOrderNumber;
   function userKeys(){
     const u=user();
     return new Set([u.id,u.user_id,u.uuid,u.email,u.username,u.name,u.full_name,u.display_name].map(norm).filter(Boolean));
@@ -451,9 +453,9 @@
     const from=S($('orderFromDateV233')?.value),to=S($('orderToDateV233')?.value);
     return rows.filter(r=>{
       const d=dataOf(r),proj=projectName(r),status=S(field(r,'حالة التنفيذ','status')),exec=S(field(r,'المنفذ','executor_name')),payment=S(field(r,'حالة السداد','payment_status')),billing=S(field(r,'حالة الفوترة','billing_status')||'لم تتم'),sender=S(d.created_by_name||d['منشئ الطلب']||d['مرسل الطلب']),dt=orderDate(r);
-      const text=[orderNo(r),proj,...Object.values(d)].join(' ').toLowerCase();
+      const normalizedQuery=normalizeOrderNumber(q); const normalizedNo=normalizeOrderNumber(orderNo(r)); const text=[orderNo(r),proj,...Object.values(d)].join(' ').toLowerCase();
       const rawType=S(d.order_type||(/جمعية/.test(S(d['نوع الطلب']))?'association':/خارجي/.test(S(d['نوع الطلب']))?'external':'internal'));
-      return visibleToSupervisor(r)&&(!q||text.includes(q))&&(!pf||proj===pf)&&(!sf||status===sf)&&(!tf||rawType===tf)&&(!ef||exec===ef)&&(!payf||payment===payf)&&(!billf||billing===billf)&&(!senderf||sender===senderf)&&(!from||dt>=from)&&(!to||dt<=to);
+      return visibleToSupervisor(r)&&(!q||normalizedNo.includes(normalizedQuery)||text.includes(q))&&(!pf||proj===pf)&&(!sf||status===sf)&&(!tf||rawType===tf)&&(!ef||exec===ef)&&(!payf||payment===payf)&&(!billf||billing===billf)&&(!senderf||sender===senderf)&&(!from||dt>=from)&&(!to||dt<=to);
     });
   }
   function receiptFileFromDataUrl(rec, no){
@@ -557,7 +559,7 @@
     ['orderSearchV233','orderProjectFilterV233','orderExecutorFilterV233','orderSenderFilterV233','orderStatusFilterV233','orderPaymentFilterV233','orderBillingFilterV233','orderFromDateV233','orderToDateV233','supOrderSearchV10061','supOrderFilterProjectV10061','supOrderFilterStatusV10061','ouAdminTypeFilter','ouSupTypeFilter','ouSupExecutorFilter','ouSupPaymentFilter','ouSupBillingFilter'].forEach(id=>{const el=$(id);if(el&&!el.dataset.ouBound){el.dataset.ouBound='1';el.addEventListener('input',()=>{page=1;render()});el.addEventListener('change',()=>{page=1;render()});}});
   }
   window.resetOrdersFiltersV233=function(){['orderSearchV233','orderProjectFilterV233','orderExecutorFilterV233','orderSenderFilterV233','orderStatusFilterV233','orderPaymentFilterV233','orderBillingFilterV233','orderFromDateV233','orderToDateV233','ouAdminTypeFilter'].forEach(id=>{if($(id))$(id).value='';});page=1;render();};
-  function boot(){stopLegacy();injectStyle();fixOrdersHeader();const ok=rebuildAdmin()||rebuildSupervisor();cleanupLegacyReceiptFields();if(!ok){setTimeout(boot,300);return;}ensureExtraFilters();setupSmartInputs();['ouInclusive','ouCost'].forEach(id=>{const el=$(id);if(el&&!el.dataset.ouCalc){el.dataset.ouCalc='1';el.addEventListener('input',recalcFinance);}});bind();const bill=$('ouBilling');if(bill&&!bill.dataset.ouBilling){bill.dataset.ouBilling='1';const sync=()=>{const done=bill.value==='تمت';if($('ouInvoiceNo'))$('ouInvoiceNo').disabled=!done;if($('ouInvoiceDate'))$('ouInvoiceDate').disabled=!done;if(!done){if($('ouInvoiceNo'))$('ouInvoiceNo').value='';if($('ouInvoiceDate'))$('ouInvoiceDate').value='';}};bill.addEventListener('change',sync);sync();}clear();load();setInterval(stopLegacy,2000);}
+  function boot(){stopLegacy();injectStyle();fixOrdersHeader();const ok=rebuildAdmin()||rebuildSupervisor();cleanupLegacyReceiptFields();if(!ok){setTimeout(boot,300);return;}ensureExtraFilters();setupSmartInputs();['ouInclusive','ouCost'].forEach(id=>{const el=$(id);if(el&&!el.dataset.ouCalc){el.dataset.ouCalc='1';el.addEventListener('input',recalcFinance);}});bind();const bill=$('ouBilling');if(bill&&!bill.dataset.ouBilling){bill.dataset.ouBilling='1';const sync=()=>{const done=bill.value==='تمت';if($('ouInvoiceNo'))$('ouInvoiceNo').disabled=!done;if($('ouInvoiceDate'))$('ouInvoiceDate').disabled=!done;if(!done){if($('ouInvoiceNo'))$('ouInvoiceNo').value='';if($('ouInvoiceDate'))$('ouInvoiceDate').value='';}};bill.addEventListener('change',sync);sync();}clear();load();}
 
   function currentFilteredOrders(){ return filterRows(); }
   function isDeferredOrder(r){
