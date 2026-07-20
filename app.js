@@ -19707,7 +19707,6 @@ function financePrintReport(kind){
         <button type="button" class="light" onclick="renderSupervisorAttendanceList()">تحديث الأسماء</button>
       </div>
       <div id="supervisorAttendanceList" class="att-v343-grid"></div>
-      <div class="actions"><button onclick="saveSupervisorAttendance()">حفظ تحضير اليوم</button></div>
     `;
   }
   function supervisorContext(){
