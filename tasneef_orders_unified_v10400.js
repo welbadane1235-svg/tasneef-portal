@@ -1,4 +1,4 @@
-/* Tasneef Orders Unified v10714 financial summary
+/* Tasneef Orders Recovery V1 — same approved V10714
    المصدر الوحيد لقسم الأوردرات.
    - يحافظ على كل بيانات orders_shared القديمة دون حذف أو إعادة كتابة جماعية.
    - يمنع تشغيل سكربتات الأوردرات القديمة.
@@ -12,12 +12,13 @@
   if(window.__tasneefOrdersUnifiedV10713Stable) return;
   window.__tasneefOrdersUnifiedV10713Stable=true;
   window.__tasneefOrdersUnifiedV10417=true;
+  console.info('Orders module version: ORDERS-RECOVERY-V1');
 
   const URL='https://zmjdqiswytxlbfgnfjfv.supabase.co';
   const KEY='sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb';
   const TABLE='orders_shared';
   const AUDIT='order_audit_logs';
-  let rows=[], page=1, pageSize=50, total=0, totalPages=1, totalKnown=false, hasMore=false, saving=false, editNo='', latestRequestId=0, loadController=null, searchTimer=null, lastSummary=null, quoteRows=[];
+  let rows=[], page=1, pageSize=50, total=0, totalPages=1, totalKnown=false, hasMore=false, saving=false, editNo='', latestRequestId=0, loadController=null, searchTimer=null, lastSummary=null, quoteRows=[], recoveryCursors=[null];
   const $=id=>document.getElementById(id);
   const S=v=>String(v??'').trim();
   const E=v=>S(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
@@ -181,6 +182,50 @@
       'التفاصيل':pick('description','details_ar'),'منشئ الطلب':pick('created_by_name','created_by_ar','sender_ar'),created_by_name:pick('created_by_name','created_by_ar','sender_ar'),updated_by_name:pick('updated_by_name')
     },__light:true};
   }
+  async function loadOrdersEmergencyPage({signal,requestedPage=page,requestedPageSize=pageSize}={}){
+    const startedAt=new Date(),started=performance.now();
+    const size=Math.max(1,Math.min(Number(requestedPageSize)||50,100));
+    const current=Math.max(1,Number(requestedPage)||1);
+    const f=currentFilters();
+    const exactOrder=normalizeOrderNumber(f.search||'');
+    const cursor=recoveryCursors[current-1]||null;
+    const body={
+      p_limit:size,
+      p_before_updated_at:cursor?.updated_at||null,
+      p_before_order_no:cursor?.order_no||null,
+      p_order_no:exactOrder||null
+    };
+    let httpStatus=0,errorCode='',errorMessage='';
+    try{
+      const res=await apiResponse('/rest/v1/rpc/get_orders_emergency_page_v1',{method:'POST',body:JSON.stringify(body),signal,headers:{Prefer:'return=representation'}});
+      httpStatus=res.status;
+      const payload=await res.json();
+      const raw=Array.isArray(payload)?(payload[0]||{}):(payload||{});
+      const list=Array.isArray(raw.rows)?raw.rows:[];
+      const normalized=list.map(r=>({...r,__light:false}));
+      const nextCursor=raw.next_cursor||null;
+      if(nextCursor)recoveryCursors[current]=nextCursor;
+      console.table({
+        moduleVersion:'ORDERS-RECOVERY-V1',tableName:TABLE,
+        requestStartedAt:startedAt.toISOString(),requestFinishedAt:new Date().toISOString(),
+        durationMs:Math.round(performance.now()-started),httpStatus,rowsCount:normalized.length,
+        errorCode:'',errorMessage:''
+      });
+      return {rows:normalized,page:current,pageSize:size,hasMore:raw.has_more===true};
+    }catch(e){
+      errorCode=S(e?.code||e?.status||'');errorMessage=S(e?.message||e);
+      console.table({
+        moduleVersion:'ORDERS-RECOVERY-V1',tableName:TABLE,
+        requestStartedAt:startedAt.toISOString(),requestFinishedAt:new Date().toISOString(),
+        durationMs:Math.round(performance.now()-started),httpStatus:httpStatus||Number(e?.status)||0,rowsCount:0,
+        errorCode,errorMessage
+      });
+      console.error('Orders load failed:',e);
+      throw e;
+    }
+  }
+  window.loadOrdersEmergencyPage=loadOrdersEmergencyPage;
+
   async function getOrdersPage(f=currentFilters(),{signal,requestedPage=page,requestedPageSize=pageSize}={}){
     const size=Math.max(1,Math.min(Number(requestedPageSize)||50,500)),current=Math.max(1,Number(requestedPage)||1),offset=(current-1)*size;
     const res=await apiResponse(buildOrdersRestPath(f,{offset,limit:size+1}),{signal,headers:{Prefer:'return=representation'}});
@@ -496,20 +541,23 @@
     const admin=$('ordersCardsV360');if(admin)admin.innerHTML=html;const sup=$('supOrdersBodyV10061');if(sup)sup.innerHTML=html;
   }
   async function load(){
-    const requestId=++latestRequestId;if(loadController)loadController.abort();loadController=new AbortController();
-    setOrdersListLoadingState('جاري تحميل الأوردرات…');setSummaryLoadingState();lastSummary=null;totalKnown=false;
-    const f=currentFilters(),signal=loadController.signal;
-    const countPromise=getOrdersCount(f,signal).catch(e=>{if(e.name!=='AbortError')console.warn('Orders count failed',e);return NaN;});
-    const summaryPromise=getOrdersSummary(f,signal).catch(e=>{if(e.name!=='AbortError')console.warn('Orders summary failed',e);return null;});
+    const requestId=++latestRequestId;
+    if(loadController)loadController.abort();
+    loadController=new AbortController();
+    setOrdersListLoadingState('جاري تحميل آخر الأوردرات…');
+    lastSummary=null;totalKnown=false;total=0;totalPages=1;
+    ['ordersTotalKpiV233','ordersDoneKpiV233','ordersDueKpiV233','ordersProfitKpiV233'].forEach(id=>{const el=$(id);if(el)el.textContent='—';});
+    const summaryHost=$('ordersSummaryV233');if(summaryHost)summaryHost.innerHTML='<div class="ou-note">تم فصل الملخص المالي مؤقتًا حتى استعادة قائمة الأوردرات بصورة مستقرة.</div>';
     try{
-      const result=await getOrdersPage(f,{signal});if(requestId!==latestRequestId)return;
-      rows=result.rows;page=result.page;pageSize=result.pageSize;hasMore=result.hasMore;render();hydrateFilters();optionList('ouCustomersList',rows.map(r=>S(field(r,'اسم العميل','customer_name'))));
-      countPromise.then(n=>{if(requestId!==latestRequestId||!Number.isFinite(n))return;total=n;totalKnown=true;totalPages=Math.max(1,Math.ceil(total/pageSize));render();});
-      summaryPromise.then(summary=>{if(requestId!==latestRequestId)return;if(summary){lastSummary=summary;renderSummaryFromServer(summary);}else setSummaryErrorState();});
+      const result=await loadOrdersEmergencyPage({signal:loadController.signal,requestedPage:page,requestedPageSize:pageSize});
+      if(requestId!==latestRequestId)return;
+      rows=result.rows;page=result.page;pageSize=result.pageSize;hasMore=result.hasMore;
+      render();hydrateFilters();optionList('ouCustomersList',rows.map(r=>S(field(r,'اسم العميل','customer_name'))));
     }catch(e){
-      if(e.name==='AbortError')return;console.error('Orders list load failed',e);
-      const timeout=/57014|statement timeout|canceling statement/i.test(S(e.message));const message=timeout?'استغرق طلب الأوردرات وقتًا أطول من المتوقع.':'تعذر تحميل الأوردرات من السيرفر.';
-      if(!rows.length)setOrdersError(message);else{render();notify(message,'err');}setSummaryErrorState();
+      if(e.name==='AbortError')return;
+      const timeout=/57014|statement timeout|canceling statement/i.test(S(e.message));
+      const message=timeout?'تعذر تحميل قائمة الأوردرات بسبب بطء سياسة القراءة في قاعدة البيانات.':'تعذر تحميل قائمة الأوردرات من السيرفر.';
+      setOrdersError(message);
     }
   }
 
@@ -668,7 +716,7 @@
     if(admin){
       admin.innerHTML=rows.map((r,idx)=>card(r,idx)).join('')||'<div class="ou-note">لا توجد أوردرات مطابقة للفلاتر.</div>';
       const p=$('ordersPagerV360');if(p)p.innerHTML=`<button class="light" ${prevDisabled?'disabled':''} onclick="tasneefOrders10400.page(-1)">السابق</button><b>عرض ${startNo.toLocaleString('ar-SA')}–${endNo.toLocaleString('ar-SA')}${totalLabel} — ${pageLabel}</b><select id="ouPageSize" aria-label="عدد الأوردرات في الصفحة"><option value="25" ${pageSize===25?'selected':''}>25</option><option value="50" ${pageSize===50?'selected':''}>50</option><option value="100" ${pageSize===100?'selected':''}>100</option></select><button class="light" ${nextDisabled?'disabled':''} onclick="tasneefOrders10400.page(1)">التالي</button>`;
-      const ps=$('ouPageSize');if(ps)ps.onchange=()=>{pageSize=Number(ps.value)||50;page=1;load();};
+      const ps=$('ouPageSize');if(ps)ps.onchange=()=>{pageSize=Number(ps.value)||50;page=1;recoveryCursors=[null];load();};
     }
     const sup=$('supOrdersBodyV10061');if(sup)sup.innerHTML=rows.map((r,idx)=>card(r,idx)).join('')||'<div class="ou-note">لا توجد أوردرات مطابقة للفلاتر.</div>';
     if(lastSummary)renderSummaryFromServer(lastSummary);
@@ -694,7 +742,7 @@
   }
   function bind(){
     const ids=['orderSearchV233','orderProjectFilterV233','orderExecutorFilterV233','orderSenderFilterV233','orderStatusFilterV233','orderPaymentFilterV233','orderBillingFilterV233','orderFromDateV233','orderToDateV233','supOrderSearchV10061','supOrderFilterProjectV10061','supOrderFilterStatusV10061','ouAdminTypeFilter','ouSupTypeFilter','ouSupExecutorFilter','ouSupPaymentFilter','ouSupBillingFilter'];
-    ids.forEach(id=>{const el=$(id);if(el&&!el.dataset.ouBound){el.dataset.ouBound='1';el.addEventListener('input',()=>{page=1;scheduleLoad(false)});el.addEventListener('change',()=>{page=1;scheduleLoad(true)});}});
+    ids.forEach(id=>{const el=$(id);if(el&&!el.dataset.ouBound){el.dataset.ouBound='1';el.addEventListener('input',()=>{page=1;recoveryCursors=[null];scheduleLoad(false)});el.addEventListener('change',()=>{page=1;recoveryCursors=[null];scheduleLoad(true)});}});
   }
   window.resetOrdersFiltersV233=function(){['orderSearchV233','orderProjectFilterV233','orderExecutorFilterV233','orderSenderFilterV233','orderStatusFilterV233','orderPaymentFilterV233','orderBillingFilterV233','orderFromDateV233','orderToDateV233','ouAdminTypeFilter','supOrderSearchV10061','supOrderFilterProjectV10061','supOrderFilterStatusV10061','ouSupTypeFilter','ouSupExecutorFilter','ouSupPaymentFilter','ouSupBillingFilter'].forEach(id=>{if($(id))$(id).value='';});page=1;load();};
   function boot(){stopLegacy();injectStyle();fixOrdersHeader();const ok=rebuildAdmin()||rebuildSupervisor();cleanupLegacyReceiptFields();if(!ok){console.error('تعذر تهيئة قسم الأوردرات: المكوّن الأساسي غير موجود');return;}ensureExtraFilters();setupSmartInputs();hydrateFilters();['ouInclusive','ouCost'].forEach(id=>{const el=$(id);if(el&&!el.dataset.ouCalc){el.dataset.ouCalc='1';el.addEventListener('input',recalcFinance);}});bind();const bill=$('ouBilling');if(bill&&!bill.dataset.ouBilling){bill.dataset.ouBilling='1';const sync=()=>{const done=bill.value==='تمت';if($('ouInvoiceNo'))$('ouInvoiceNo').disabled=!done;if($('ouInvoiceDate'))$('ouInvoiceDate').disabled=!done;if(!done){if($('ouInvoiceNo'))$('ouInvoiceNo').value='';if($('ouInvoiceDate'))$('ouInvoiceDate').value='';}};bill.addEventListener('change',sync);sync();}clear();load();}
@@ -794,7 +842,7 @@
     const section=$('orders');if(!section)return;const head=section.querySelector('.section-head');if(!head)return;let actions=head.querySelector('.actions');if(!actions){actions=document.createElement('div');actions.className='actions';head.appendChild(actions);}actions.className='actions orders-section-actions-v10410';actions.innerHTML='<button onclick="clearOrderFormV233()">+ أوردر جديد</button><button class="light" onclick="tasneefOrders10400.refresh()">تحديث</button><button class="light" onclick="tasneefOrders10400.exportExcel()">تصدير Excel</button><button class="light" onclick="tasneefOrders10400.openQuoteBuilder()">عروض الأسعار</button><button class="light" onclick="tasneefOrders10400.printFiltered()">طباعة حسب الفلتر</button>';
   }
 
-    window.tasneefOrders10400={load,save,edit,del,history,view:viewOrder,openReceipt,sendWhatsApp,page:d=>{const requested=Math.max(1,page+Number(d||0)),next=totalKnown?Math.min(totalPages,requested):requested;if(next!==page&&(Number(d||0)<0||hasMore||totalKnown)){page=next;load();}},clear,render,exportExcel:exportOrdersExcel,openQuoteBuilder,printFiltered:printFilteredOrders,refresh:load};window.supOrdersLoadV10061=load;
+    window.tasneefOrders10400={load,save,edit,del,history,view:viewOrder,openReceipt,sendWhatsApp,page:d=>{const requested=Math.max(1,page+Number(d||0));if(requested!==page&&(Number(d||0)<0||hasMore)){page=requested;load();}},clear,render,exportExcel:()=>notify('تم إيقاف التصدير مؤقتًا أثناء استعادة قائمة الأوردرات.','err'),openQuoteBuilder,printFiltered:()=>notify('تم إيقاف الطباعة مؤقتًا أثناء استعادة قائمة الأوردرات.','err'),refresh:()=>{recoveryCursors=[null];page=1;load();}};window.supOrdersLoadV10061=load;
   window.saveOrderV233=save;window.clearOrderFormV233=clear;window.deleteCurrentOrderV233=deleteCurrent;window.editOrderV233=edit;window.deleteOrderV233=del;window.renderOrdersV233=render;
   window.supOrdersSaveV10061=save;window.supOrdersClearV10061=clear;window.supOrdersRenderV10061=render;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
