@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const BUILD='V435 supervisor attendance stable verified';
+  const BUILD='V435 unified supervisor workers — V10713';
   const $=id=>document.getElementById(id);
   const S=v=>String(v??'').trim();
   const N=v=>Number(v)||0;
@@ -99,18 +99,18 @@
   }
   let state={};
   let loadSeqV435=0;
-  async function load(date){
+  async function load(date,force=false){
     const mySeq=++loadSeqV435;
     if(!window.sb) throw new Error('Supabase غير جاهز');
     const month=monthOf(date);
-    let dist=[];
-    try{
-      const r=await window.sb.from('monthly_distribution').select('*').eq('month_key',month).order('supervisor_name',{ascending:true});
-      if(r.error) throw r.error; dist=r.data||[];
-    }catch(e){throw new Error('تعذر قراءة توزيع النظام الموحد: '+(e.message||e));}
-    const [att]=await Promise.all([qAttendanceMonth(month)]);
+    if(typeof window.getUnifiedSupervisorWorkersV10713!=='function') throw new Error('مصدر عمال المشرف الموحد غير جاهز');
+    // تحضير اليوم والدخول/الخروج يستخدمان نفس الدالة ونفس قائمة العمال حرفيًا.
+    const [unified,att]=await Promise.all([
+      window.getUnifiedSupervisorWorkersV10713(date,force),
+      qAttendanceMonth(month)
+    ]);
     if(mySeq!==loadSeqV435) return null;
-    return {month,dist,att};
+    return {month,workers:unified?.workers||[],identity:unified?.identity||{},assignments:unified?.assignments||[],att};
   }
   function currentFilters(){return {date:($('supUniDate')?.value||$('attendanceDate')?.value||today()), project:S($('supUniProject')?.value), search:norm($('supUniSearch')?.value)};}
   function projectOptions(workers){
@@ -143,7 +143,7 @@
         <label>النسخة<input value="${BUILD}" disabled></label>
       </div>
       <div class="sup-uni-actions"><button id="supUniRefresh">تحديث الأسماء</button><button id="supUniAllP">اعتماد الكل حاضر</button><button id="supUniAllA">اعتماد الكل غائب</button><button class="main" id="supUniSave">حفظ تحضير اليوم</button></div>
-      <div class="sup-uni-group">المشرف: ${esc((state.workers?.[0]?.supervisor_name)||getUser().full_name||getUser().name||getUser().username||'-')} <small>عدد العمال: ${workers.length}</small></div>
+      <div class="sup-uni-group">المشرف: ${esc((state.identity?.name)||(state.workers?.[0]?.supervisor_name)||getUser().full_name||getUser().name||getUser().username||'-')} <small>عدد العمال: ${(state.workers||[]).length}</small></div>
       <div class="sup-uni-workers" id="supUniWorkers">${workers.map(w=>{
         const r=getRecord(rec,w,date); const st=statusCode(r?.status||'present');
         const projects=(w.projects||[]).map(p=>p.name||p.key).filter(Boolean).join('، ');
@@ -168,9 +168,8 @@
       const date=($('attendanceDate')?.value||$('supUniDate')?.value||today());
       if(!state.loaded || force || state.month!==monthOf(date)){
         list.classList.add('sup-uni-v433'); list.innerHTML='<div class="sup-uni-msg">جار تحميل العمال من النظام الموحد...</div>';
-        const u=getUser(); const data=await load(date); if(!data) return;
-        const supervisorRows=(data.dist||[]).filter(r=>matchSupervisor(r,u));
-        state={loaded:true,month:data.month,dist:supervisorRows,att:data.att,workers:dedupeDistribution(supervisorRows)};
+        const data=await load(date,!!force); if(!data) return;
+        state={loaded:true,month:data.month,dist:data.assignments||[],att:data.att,workers:data.workers||[],identity:data.identity||{}};
       }
       render();
       if(!(state.workers||[]).length) toast('لا يوجد عمال مربوطين بك في النظام الموحد لهذا الشهر. راجع التوزيع.',true);

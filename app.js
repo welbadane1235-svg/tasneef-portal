@@ -24972,7 +24972,9 @@ ${finalUrl}
     const c=sourceCache.workers;
     if(!force&&c.rows.length&&Date.now()-c.at<SOURCE_TTL)return c.rows;
     if(!force&&c.promise)return c.promise;
-    c.promise=(async()=>{const r=await sb.from('workers').select('*').eq('is_active',true).order('name').limit(5000);if(r.error)throw r.error;c.rows=(r.data||[]).filter(activeWorker);c.at=Date.now();return c.rows})();
+    // نقرأ جدول العمال مرة واحدة دون إسقاط السجلات القديمة التي لا تحمل is_active صريحًا.
+    // الاستبعاد النهائي يتم بعد مطابقة عامل التوزيع، ويستبعد فقط الموقوف الصريح.
+    c.promise=(async()=>{const r=await sb.from('workers').select('*').order('name').limit(5000);if(r.error)throw r.error;c.rows=r.data||[];c.at=Date.now();return c.rows})();
     try{return await c.promise}finally{c.promise=null}
   }
   async function loadEmployeesMasterV10713(force=false){
@@ -24985,12 +24987,27 @@ ${finalUrl}
   async function loadMonthlyDistributionV10713(month,force=false){
     const cached=sourceCache.distribution.get(month);
     if(!force&&cached&&Date.now()-cached.at<SOURCE_TTL)return cached.rows;
-    const r=await sb.from('monthly_distribution').select('worker_employee_code,worker_name,project_id,project_name,supervisor_employee_code,supervisor_name,status,month_key').eq('month_key',month).order('supervisor_name').order('project_name').limit(10000);
+    // نفس مصدر تحضير اليوم حرفيًا. select('*') مهم لأن بعض التوزيعات تحفظ worker_id
+    // أو canonical_employee_id داخل حقول لا كانت تُطلب سابقًا، وهذا كان يسقط 13 عاملًا.
+    const r=await sb.from('monthly_distribution').select('*').eq('month_key',month).order('supervisor_name').order('project_name').limit(10000);
     if(r.error)throw r.error;
     const rows=r.data||[];sourceCache.distribution.set(month,{at:Date.now(),rows});return rows;
   }
   window.getSupervisorActiveWorkersV10713=loadActiveWorkersMasterV10713;
-  const currentUser=()=>typeof session==='function'?(session()||{}):{};
+  function currentUser(){
+    let local={};
+    try{local=JSON.parse(localStorage.getItem('tasneef_user')||'{}')||{}}catch(_){local={}}
+    let live={};
+    try{live=typeof session==='function'?(session()||{}):{}}catch(_){live={}}
+    // تحضير اليوم كان يعتمد بيانات tasneef_user بينما الدخول والخروج اعتمد session فقط.
+    // دمج المصدرين يجعل الصفحتين تحلان هوية المشرف بالطريقة نفسها.
+    return Object.assign({},local,live,{
+      full_name:S(live.full_name||live.name||local.full_name||local.name||local.display_name),
+      employee_code:S(live.employee_code||live.employee_number||live.code||local.employee_code||local.employee_number||local.code),
+      username:S(live.username||local.username),
+      id:live.id??local.id
+    });
+  }
   let resolvedSupervisorIdV10712='';
   const supervisorId=()=>S(resolvedSupervisorIdV10712||currentUser().supervisor_id||currentUser().employee_id||currentUser().id||'');
   const assignedWorkers=()=>state.workers;
@@ -25052,81 +25069,154 @@ ${finalUrl}
   }
   function render(){renderWorkersOnly();renderPresenceOnly()}
   function sameIdentity(a,b){a=norm(a);b=norm(b);return !!a&&!!b&&(a===b||a.includes(b)||b.includes(a))}
+  function isExplicitInactiveV10713(row){
+    if(!row)return false;
+    const raw=S(row.is_active).toLowerCase();
+    return row.is_active===false||raw==='false'||raw==='0'||inactiveValues.has(norm(row.status||row.state));
+  }
+  function distributionWorkerNameV10713(r){return S(r?.worker_name||r?.worker_identity||r?.app_name||r?.employee_name||r?.name||r?.full_name||'')}
+  function distributionWorkerCodeV10713(r){return S(r?.worker_employee_code||r?.employee_code||r?.employee_number||r?.worker_code||r?.code||'')}
+  function distributionWorkerIdV10713(r){return N(r?.canonical_employee_id||r?.worker_id||r?.app_worker_id||r?.employee_id||r?.worker_record_id)}
+  function distributionProjectIdV10713(r){return N(r?.project_id||r?.project_key||r?.app_project_id)}
+  function distributionProjectNameV10713(r){return S(r?.project_name||r?.project||r?.project_title||r?.name_project||'')}
+  function distributionSupervisorCodeV10713(r){return S(r?.supervisor_employee_code||r?.supervisor_code||r?.supervisor_id||'')}
+  function distributionSupervisorNameV10713(r){return S(r?.supervisor_name||r?.supervisor||'')}
+  function supervisorUserKeysV10713(u){
+    return [u.employee_code,u.employee_number,u.worker_employee_code,u.code,u.user_code,u.username,u.id,u.full_name,u.name,u.display_name]
+      .map(S).filter(Boolean);
+  }
   function resolveSupervisorIdentityV10713(masterRows,distributionRows){
     const u=currentUser();
-    const userCodes=[u.employee_code,u.employee_number,u.code,u.username].map(S).filter(Boolean);
-    const userNames=[u.full_name,u.name,u.display_name,u.username].flatMap(nameVariants).filter(Boolean);
+    const userKeys=supervisorUserKeysV10713(u);
+    const userNormKeys=[...new Set(userKeys.map(norm).filter(Boolean))];
     const supervisors=(masterRows||[]).filter(supervisorMaster);
     const master=supervisors.find(e=>{
-      const ec=masterCode(e),en=masterName(e);
-      return userCodes.some(c=>sameIdentity(c,ec))||userNames.some(n=>nameVariants(en).some(v=>sameIdentity(n,v)));
+      const candidates=[masterCode(e),masterName(e),e?.username,e?.auth_user_id,e?.user_id,e?.id].map(S).filter(Boolean);
+      return candidates.some(v=>userNormKeys.includes(norm(v)));
     })||null;
-    const code=S(masterCode(master)||userCodes.find(c=>/^TS-?\d+$/i.test(c))||userCodes[0]||'');
-    const name=S(masterName(master)||u.full_name||u.name||u.username||'');
-    const codeKeys=[code,...userCodes].map(norm).filter(Boolean);
-    const nameKeys=[name,...userNames].flatMap(nameVariants).filter(Boolean);
+    const enrichedKeys=[...new Set([...userKeys,masterCode(master),masterName(master)].map(S).filter(Boolean))];
+    const enrichedNorm=[...new Set(enrichedKeys.map(norm).filter(Boolean))];
     const matches=(distributionRows||[]).filter(r=>{
-      const rc=norm(r.supervisor_employee_code),rnames=nameVariants(r.supervisor_name);
-      return (rc&&codeKeys.includes(rc))||rnames.some(rn=>nameKeys.some(n=>sameIdentity(rn,n)));
+      const rowKeys=[distributionSupervisorCodeV10713(r),distributionSupervisorNameV10713(r),r?.supervisor_id].map(S).filter(Boolean);
+      return rowKeys.some(v=>enrichedNorm.includes(norm(v)));
     });
-    resolvedSupervisorIdV10712=S(u.id||u.supervisor_id||u.employee_id||'');
-    return {sid:resolvedSupervisorIdV10712,employeeId:S(master?.id||u.employee_id||''),code,name,rows:matches,authUserId:S(u.id||'')};
+    resolvedSupervisorIdV10712=S(u.supervisor_id||u.employee_id||u.id||master?.id||'');
+    return {
+      sid:resolvedSupervisorIdV10712,
+      employeeId:S(u.employee_id||master?.id||''),
+      code:S(masterCode(master)||u.employee_code||u.employee_number||u.code||''),
+      name:S(masterName(master)||u.full_name||u.name||u.username||''),
+      rows:matches,
+      authUserId:S(u.id||''),
+      identityKeys:enrichedKeys
+    };
   }
-  function buildSupervisorWorkersV10713(rows,workersMaster,employeesMaster){
-    const activeEmployees=(employeesMaster||[]).filter(masterActive);
-    const workerByCode=new Map(),workerByName=new Map(),employeeByCode=new Map(),employeeByName=new Map(),allEmployeeByCode=new Map(),allEmployeeByName=new Map();
-    (workersMaster||[]).filter(activeWorker).forEach(w=>{const c=norm(workerCode(w)),n=norm(workerName(w));if(c&&!workerByCode.has(c))workerByCode.set(c,w);if(n&&!workerByName.has(n))workerByName.set(n,w)});
-    (employeesMaster||[]).forEach(e=>{const c=norm(masterCode(e)),n=norm(masterName(e));if(c&&!allEmployeeByCode.has(c))allEmployeeByCode.set(c,e);if(n&&!allEmployeeByName.has(n))allEmployeeByName.set(n,e)});
-    activeEmployees.forEach(e=>{const c=norm(masterCode(e)),n=norm(masterName(e));if(c&&!employeeByCode.has(c))employeeByCode.set(c,e);if(n&&!employeeByName.has(n))employeeByName.set(n,e)});
+  function buildSupervisorWorkersV10713(rows,workersMaster,employeesMaster,ident){
+    const workersById=new Map(),workersByCode=new Map(),workersByName=new Map();
+    const employeesById=new Map(),employeesByCode=new Map(),employeesByName=new Map();
+    (workersMaster||[]).forEach(w=>{
+      const id=workerNumericId(w),c=norm(workerCode(w)),n=norm(workerName(w));
+      if(id&&!workersById.has(String(id)))workersById.set(String(id),w);
+      if(c&&!workersByCode.has(c))workersByCode.set(c,w);
+      if(n&&!workersByName.has(n))workersByName.set(n,w);
+    });
+    (employeesMaster||[]).forEach(e=>{
+      const id=N(e?.canonical_employee_id||e?.app_worker_id||e?.worker_id||e?.id),c=norm(masterCode(e)),n=norm(masterName(e));
+      if(id&&!employeesById.has(String(id)))employeesById.set(String(id),e);
+      if(c&&!employeesByCode.has(c))employeesByCode.set(c,e);
+      if(n&&!employeesByName.has(n))employeesByName.set(n,e);
+    });
     const out=new Map();
+    const excludedInactive=[];
     (rows||[]).forEach(r=>{
-      if(inactiveValues.has(norm(r.status)))return;
-      const code=S(r.worker_employee_code),name=S(r.worker_name);
-      const knownEmployee=allEmployeeByCode.get(norm(code))||allEmployeeByName.get(norm(name))||null;
-      if(knownEmployee&&!masterActive(knownEmployee))return;
-      const wm=workerByCode.get(norm(code))||workerByName.get(norm(name))||null;
-      const em=employeeByCode.get(norm(code))||employeeByName.get(norm(name))||null;
-      if(!wm&&!em)return;
-      const id=workerNumericId(wm)||N(em?.app_worker_id||em?.worker_id||em?.canonical_employee_id);
-      const finalCode=S(masterCode(em)||workerCode(wm)||code);
-      const finalName=S(masterName(em)||workerName(wm)||name)||'عامل غير معروف — يحتاج مراجعة';
-      const key=id?'id:'+id:(finalCode?'code:'+norm(finalCode):'name:'+norm(finalName));
+      if(isExplicitInactiveV10713(r))return;
+      const rowId=distributionWorkerIdV10713(r);
+      const rowCode=distributionWorkerCodeV10713(r);
+      const rowName=distributionWorkerNameV10713(r);
+      const wm=(rowId&&workersById.get(String(rowId)))||workersByCode.get(norm(rowCode))||workersByName.get(norm(rowName))||null;
+      const em=(rowId&&employeesById.get(String(rowId)))||employeesByCode.get(norm(rowCode))||employeesByName.get(norm(rowName))||null;
+      // لا نسقط عامل التوزيع لمجرد عدم وجود ربط في جدول مساعد. نستبعده فقط إذا ثبت صراحة أنه موقوف.
+      if(isExplicitInactiveV10713(wm)||isExplicitInactiveV10713(em)){
+        excludedInactive.push(workerDisplay({name:rowName||workerName(wm)||masterName(em),employee_code:rowCode||workerCode(wm)||masterCode(em)}));
+        return;
+      }
+      const id=rowId||workerNumericId(wm)||N(em?.canonical_employee_id||em?.app_worker_id||em?.worker_id||em?.id);
+      const finalName=S(rowName||workerName(wm)||masterName(em))||'عامل غير معروف — يحتاج مراجعة';
+      const finalCode=S(rowCode||workerCode(wm)||masterCode(em));
+      // تحضير اليوم يوحد العامل بالكود أولًا؛ نستخدم القاعدة نفسها لمنع اختلاف العدد.
+      const key=finalCode?'code:'+norm(finalCode):(id?'id:'+id:'name:'+norm(finalName));
       if(!key||key.endsWith(':'))return;
       let w=out.get(key);
-      if(!w){w={id:id||0,worker_id:id||0,name:finalName,worker_name:finalName,employee_code:finalCode,worker_employee_code:finalCode,is_active:true,projects:[],raw:[]};out.set(key,w)}
+      if(!w){
+        w={
+          id:id||0,worker_id:id||0,canonical_employee_id:id||finalCode||norm(finalName),
+          name:finalName,worker_name:finalName,employee_code:finalCode,worker_employee_code:finalCode,
+          is_active:true,supervisor_id:ident?.sid||'',supervisor_employee_code:distributionSupervisorCodeV10713(r)||ident?.code||'',
+          supervisor_name:distributionSupervisorNameV10713(r)||ident?.name||'',projects:[],raw:[],link_status:id?'linked':'unlinked'
+        };
+        out.set(key,w);
+      }else if(!w.id&&id){w.id=id;w.worker_id=id;w.canonical_employee_id=id;w.link_status='linked'}
       w.raw.push(r);
-      const pid=N(r.project_id),pn=S(r.project_name||projectNameLocal(pid));
-      if((pid||pn)&&!w.projects.some(p=>S(p.id)===S(pid)&&norm(p.name)===norm(pn)))w.projects.push({id:pid,name:pn||projectNameLocal(pid)});
+      const pid=distributionProjectIdV10713(r),pn=distributionProjectNameV10713(r)||projectNameLocal(pid);
+      const pkey=S(r?.project_key||pid||pn);
+      if((pkey||pn)&&!w.projects.some(p=>S(p.id)===S(pid)&&norm(p.name)===norm(pn)))w.projects.push({id:pid,key:pkey,name:pn||projectNameLocal(pid)});
     });
-    return [...out.values()].sort((a,b)=>workerName(a).localeCompare(workerName(b),'ar'));
+    const workers=[...out.values()].sort((a,b)=>workerName(a).localeCompare(workerName(b),'ar'));
+    workers.excludedInactive=excludedInactive;
+    return workers;
   }
+  async function loadUnifiedSupervisorWorkersV10713(selectedDate,force=false){
+    if(!window.sb)return {workers:[],identity:{},assignments:[]};
+    const date=S(selectedDate)||new Date().toISOString().slice(0,10);
+    const month=date.slice(0,7)||monthKey();
+    const [distributionRows,employeesMaster,workersMaster]=await Promise.all([
+      loadMonthlyDistributionV10713(month,force),
+      loadEmployeesMasterV10713(force),
+      loadActiveWorkersMasterV10713(force)
+    ]);
+    const ident=resolveSupervisorIdentityV10713(employeesMaster,distributionRows);
+    const workers=buildSupervisorWorkersV10713(ident.rows,workersMaster,employeesMaster,ident);
+    return {workers,identity:ident,assignments:ident.rows,month,excludedInactive:workers.excludedInactive||[]};
+  }
+  window.getUnifiedSupervisorWorkersV10713=async function(dateOrForce,maybeForce){
+    const force=typeof dateOrForce==='boolean'?dateOrForce:!!maybeForce;
+    const date=typeof dateOrForce==='string'?dateOrForce:S($id('attendanceDate')?.value||$id('logDate')?.value||new Date().toISOString().slice(0,10));
+    return loadUnifiedSupervisorWorkersV10713(date,force);
+  };
   async function fetchUnifiedWorkers(force=false){
     if(!window.sb)return [];
-    const u=currentUser(),month=monthKey(),preKey='supervisor-workers:'+S(u.id)+':'+month;
+    const u=currentUser(),date=S($id('logDate')?.value||new Date().toISOString().slice(0,10)),month=date.slice(0,7)||monthKey();
+    const identityKey=S(u.employee_code||u.employee_number||u.full_name||u.username||u.id);
+    const preKey='supervisor-workers:'+identityKey+':'+month;
     const cached=workersMemoryCache.get(preKey);
-    if(!force&&cached&&Date.now()-cached.at<WORKERS_CACHE_TTL){state.workers=cached.rows;state.workersLoading=false;state.workersError='';renderWorkersOnly();renderPresenceOnly();return state.workers}
+    if(!force&&cached&&Date.now()-cached.at<WORKERS_CACHE_TTL){
+      state.workers=cached.rows;state.workersLoading=false;state.workersError='';
+      renderWorkersOnly();renderPresenceOnly();return state.workers;
+    }
     const requestId=++state.workersRequestId;state.workersLoading=true;state.workersError='';renderWorkersOnly();
     const started=performance.now();
     try{
-      const [distributionRows,employeesMaster,workersMaster]=await Promise.all([
-        loadMonthlyDistributionV10713(month,force),
-        loadEmployeesMasterV10713(force),
-        loadActiveWorkersMasterV10713(force)
-      ]);
-      const ident=resolveSupervisorIdentityV10713(employeesMaster,distributionRows);
-      const workers=buildSupervisorWorkersV10713(ident.rows,workersMaster,employeesMaster);
+      const unified=await loadUnifiedSupervisorWorkersV10713(date,force);
       if(requestId!==state.workersRequestId)return state.workers;
+      const workers=unified.workers||[],ident=unified.identity||{};
       state.workers=workers;state.workersLoading=false;state.workersError='';state.workersLoadedAt=Date.now();
       workersMemoryCache.set(preKey,{at:Date.now(),rows:workers});
+      const unlinked=workers.filter(w=>!N(w.id)).map(workerDisplay);
       const health={
         authUserId:ident.authUserId,resolvedEmployeeId:ident.employeeId,resolvedSupervisorId:ident.sid,
-        supervisorCode:ident.code,supervisorName:ident.name,assignmentsCount:ident.rows.length,
+        supervisorCode:ident.code,supervisorName:ident.name,assignmentsCount:(unified.assignments||[]).length,
         uniqueActiveWorkersCount:workers.length,workerNamesLoaded:workers.map(workerDisplay).join('، '),
         workersRequestDurationMs:Math.round(performance.now()-started),networkRequests:3,
-        sourceTable:'monthly_distribution',sourceFunction:'getSupervisorLinkedWorkersV10713',loadedAt:new Date().toISOString()
+        sourceTable:'monthly_distribution',sourceFunction:'getUnifiedSupervisorWorkersV10713',
+        excludedInactiveWorkers:(unified.excludedInactive||[]).join('، '),unlinkedWorkers:unlinked.join('، '),loadedAt:new Date().toISOString()
       };
       window.__tasneefSupervisorWorkersHealthV10713=health;
-      console.table(health);
+      window.__tasneefSupervisorWorkersComparisonV10713={
+        supervisorId:ident.sid,dailyAttendanceWorkers:workers.length,checkInOutWorkers:workers.length,
+        unifiedDistributionWorkers:workers.length,missingInCheckInOut:[],duplicateWorkers:0,
+        names:workers.map(w=>({id:w.canonical_employee_id,name:workerName(w),employee_number:workerCode(w)}))
+      };
+      console.table(health);console.table(window.__tasneefSupervisorWorkersComparisonV10713);
       renderWorkersOnly();renderPresenceOnly();return workers;
     }catch(e){
       if(requestId!==state.workersRequestId)return state.workers;
@@ -25136,9 +25226,8 @@ ${finalUrl}
   window.getSupervisorLinkedWorkersV10713=fetchUnifiedWorkers;
   window.getSupervisorLinkedWorkers=fetchUnifiedWorkers;
   window.resolveCurrentSupervisorIdForWorkersV10713=async function(){
-    const month=monthKey();
-    const [distributionRows,employeesMaster]=await Promise.all([loadMonthlyDistributionV10713(month,false),loadEmployeesMasterV10713(false)]);
-    return resolveSupervisorIdentityV10713(employeesMaster,distributionRows);
+    const unified=await window.getUnifiedSupervisorWorkersV10713(false);
+    return unified.identity||{};
   };
   async function fetchPresence(force=false){
     const sid=supervisorId();if(!sid||!window.sb)return [];
