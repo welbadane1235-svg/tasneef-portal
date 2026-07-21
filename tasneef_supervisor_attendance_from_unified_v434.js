@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const BUILD='V10801 R3 unified supervisor workers — date overlap + active normalization';
+  const BUILD='V435 unified supervisor workers — V10713';
   const $=id=>document.getElementById(id);
   const S=v=>String(v??'').trim();
   const N=v=>Number(v)||0;
@@ -149,7 +149,7 @@
         const projects=(w.projects||[]).map(p=>p.name||p.key).filter(Boolean).join('، ');
         const label=esc(w.worker_name||'-')+(w.worker_employee_code?` <span class="sup-uni-code">${esc(w.worker_employee_code)}</span>`:'');
         return `<div class="sup-uni-worker ${st==='absent'?'absent':''}" data-code="${esc(w.worker_employee_code)}" data-name="${esc(w.worker_name)}"><b>${label}</b><small>${esc(projects||'-')}</small><select><option value="present" ${st!=='absent'?'selected':''}>حاضر</option><option value="absent" ${st==='absent'?'selected':''}>غائب</option></select><input placeholder="ملاحظات" value="${esc(r?.notes||'')}"></div>`;
-      }).join('')||'<div class="sup-uni-worker">لا يوجد عمال من التوزيع لهذا المشرف في التاريخ المختار</div>'}</div>
+      }).join('')||'<div class="sup-uni-worker">لا يوجد عمال من التوزيع لهذا المشرف في هذا الشهر</div>'}</div>
     `;
     if($('supUniProject')) $('supUniProject').value=pCur;
     $('supUniDate').onchange=()=>{ if($('attendanceDate')) $('attendanceDate').value=$('supUniDate').value; renderSupervisorUnified(true); };
@@ -172,7 +172,7 @@
         state={loaded:true,month:data.month,dist:data.assignments||[],att:data.att,workers:data.workers||[],identity:data.identity||{}};
       }
       render();
-      if(!(state.workers||[]).length) toast('لا يوجد عمال مربوطون بالمشرف في التاريخ المختار بعد اكتمال التحميل. راجع تقرير التشخيص.',true);
+      if(!(state.workers||[]).length) toast('لا يوجد عمال مربوطين بك في النظام الموحد لهذا الشهر. راجع التوزيع.',true);
       else toast('جاهز - تم تحميل '+state.workers.length+' عامل من التوزيع الموحد.');
     }catch(e){ if(list) list.innerHTML='<div class="sup-uni-msg">تعذر التحميل: '+esc(e.message||e)+'</div>'; }
   }

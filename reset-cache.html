@@ -16,20 +16,20 @@
     <h1>تحديث ملفات نظام تصنيف</h1>
     <p class="muted">يلغي Service Worker وكاش ملفات الموقع فقط. لا يحذف بيانات النظام أو إعدادات المستخدم المحفوظة.</p>
     <button onclick="clean()">تحديث الملفات الآن</button>
-    <a href="index.html?v=10801-mohamed-abdo-workers-r3">فتح تسجيل الدخول</a>
+    <a href="index.html?v=10801-crm-customer-name-fix">فتح تسجيل الدخول</a>
     <pre id="out"></pre>
   </div>
   <script>
     async function clean(){
       const out=document.getElementById('out');
       try{
-        try{localStorage.setItem('tasneef_version','10801-mohamed-abdo-workers-r3');localStorage.setItem('tasneef_build_version','V10801-MOHAMED-ABDO-WORKERS-R3');}catch(_){ }
+        try{localStorage.setItem('tasneef_version','10801-crm-inspection-stage-fix');localStorage.setItem('tasneef_build_version','V10801-CRM-INSPECTION-STAGE-FIX');}catch(_){ }
         if('serviceWorker' in navigator){const regs=await navigator.serviceWorker.getRegistrations();for(const r of regs)await r.unregister();}
         if(window.caches&&location.protocol!=='file:'){const keys=await caches.keys();for(const k of keys)await caches.delete(k);}
         out.textContent='تم تحديث الملفات بنجاح دون حذف بياناتك. سيتم فتح تسجيل الدخول.';
-        setTimeout(()=>location.href='index.html?v=10801-mohamed-abdo-workers-r3&nocache='+Date.now(),700);
+        setTimeout(()=>location.href='index.html?v=10801-crm-customer-name-fix&nocache='+Date.now(),700);
       }catch(e){out.textContent='حدث خطأ: '+(e.message||e);}
     }
   </script>
-<script>try{localStorage.setItem("tasneef_build_marker","V10801-mohamed-abdo-workers-r3");}catch(e){}</script></body>
+<script>try{localStorage.setItem("tasneef_build_marker","V10801-crm-inspection-stage-fix");}catch(e){}</script></body>
 </html>
