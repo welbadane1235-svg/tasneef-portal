@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const BUILD='V10801 unified supervisor workers — server strict identity';
+  const BUILD='V435 unified supervisor workers — V10713';
   const $=id=>document.getElementById(id);
   const S=v=>String(v??'').trim();
   const N=v=>Number(v)||0;
