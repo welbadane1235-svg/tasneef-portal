@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const BUILD='V435 unified supervisor workers — V10713';
+  const BUILD='V10802 strict supervisor worker scope';
   const $=id=>document.getElementById(id);
   const S=v=>String(v??'').trim();
   const N=v=>Number(v)||0;

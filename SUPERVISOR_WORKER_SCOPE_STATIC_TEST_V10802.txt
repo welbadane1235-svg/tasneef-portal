@@ -1,0 +1,10 @@
+V10802 supervisor worker scope tests
+====================================
+1) node --check app.js: PASS
+2) node --check tasneef_supervisor_attendance_from_unified_v434.js: PASS
+3) Synthetic cross-table numeric ID collision: PASS
+4) Correct supervisor code includes own worker: PASS
+5) Other supervisor code excludes foreign worker: PASS
+6) Strong wrong code does not fall back to matching name: PASS
+7) Legacy supervisor_id app-user binding: PASS
+8) Supervisor page cache-bust references V10802: PASS

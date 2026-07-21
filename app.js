@@ -25089,30 +25089,97 @@ ${finalUrl}
     return [u.employee_code,u.employee_number,u.worker_employee_code,u.code,u.user_code,u.username,u.id,u.full_name,u.name,u.display_name]
       .map(S).filter(Boolean);
   }
+  function uniqueNormSetV10802(values){
+    return new Set((values||[]).map(norm).filter(Boolean));
+  }
+  function uniqueStringSetV10802(values){
+    return new Set((values||[]).map(S).filter(Boolean));
+  }
   function resolveSupervisorIdentityV10713(masterRows,distributionRows){
     const u=currentUser();
-    const userKeys=supervisorUserKeysV10713(u);
-    const userNormKeys=[...new Set(userKeys.map(norm).filter(Boolean))];
+    const appUserId=S(u.id||u.user_id||u.uid||'');
+    const explicitEmployeeIds=uniqueStringSetV10802([u.employee_id,u.canonical_employee_id,u.app_employee_id,u.supervisor_employee_id]);
+    const userCodes=uniqueNormSetV10802([u.employee_code,u.employee_number,u.worker_employee_code,u.code,u.user_code]);
+    const userNames=uniqueNormSetV10802([u.full_name,u.name,u.display_name]);
+    const usernameKeys=uniqueNormSetV10802([u.username,u.email]);
     const supervisors=(masterRows||[]).filter(supervisorMaster);
-    const master=supervisors.find(e=>{
-      const candidates=[masterCode(e),masterName(e),e?.username,e?.auth_user_id,e?.user_id,e?.id].map(S).filter(Boolean);
-      return candidates.some(v=>userNormKeys.includes(norm(v)));
+
+    // مهم: لا نطابق app_users.id مع employees_master.id مباشرة؛ الرقمان من جدولين مختلفين
+    // وقد يتساويان بالصدفة، وهو السبب الرئيسي لاختلاط عمال مشرف مع مشرف آخر.
+    let master=supervisors.find(e=>{
+      const links=[e?.auth_user_id,e?.user_id,e?.app_user_id,e?.login_user_id].map(S).filter(Boolean);
+      return !!appUserId && links.includes(appUserId);
     })||null;
-    const enrichedKeys=[...new Set([...userKeys,masterCode(master),masterName(master)].map(S).filter(Boolean))];
-    const enrichedNorm=[...new Set(enrichedKeys.map(norm).filter(Boolean))];
+    let matchStrategy=master?'explicit-user-link':'';
+    if(!master&&userCodes.size){
+      master=supervisors.find(e=>userCodes.has(norm(masterCode(e))))||null;
+      if(master)matchStrategy='employee-code';
+    }
+    if(!master&&explicitEmployeeIds.size){
+      master=supervisors.find(e=>{
+        const ids=[e?.id,e?.employee_id,e?.canonical_employee_id,e?.app_employee_id].map(S).filter(Boolean);
+        return ids.some(v=>explicitEmployeeIds.has(v));
+      })||null;
+      if(master)matchStrategy='explicit-employee-id';
+    }
+    if(!master&&userNames.size){
+      const nameMatches=supervisors.filter(e=>userNames.has(norm(masterName(e))));
+      if(nameMatches.length===1){master=nameMatches[0];matchStrategy='exact-name';}
+    }
+    if(!master&&usernameKeys.size){
+      master=supervisors.find(e=>[e?.username,e?.email].map(norm).some(v=>v&&usernameKeys.has(v)))||null;
+      if(master)matchStrategy='username';
+    }
+
+    const identityCodes=uniqueNormSetV10802([
+      ...[...userCodes],masterCode(master)
+    ]);
+    const identityNames=uniqueNormSetV10802([
+      u.full_name,u.name,u.display_name,masterName(master)
+    ]);
+    const identityIds=uniqueStringSetV10802([
+      appUserId,u.supervisor_id,u.employee_id,u.canonical_employee_id,
+      master?.id,master?.employee_id,master?.canonical_employee_id,master?.app_employee_id
+    ]);
+
     const matches=(distributionRows||[]).filter(r=>{
-      const rowKeys=[distributionSupervisorCodeV10713(r),distributionSupervisorNameV10713(r),r?.supervisor_id].map(S).filter(Boolean);
-      return rowKeys.some(v=>enrichedNorm.includes(norm(v)));
+      // 1) الكود هو المرجع الأقوى. إذا كان موجودًا في السجل وفي هوية المشرف، يجب أن يتطابق.
+      const rowCodes=[
+        r?.supervisor_employee_code,r?.supervisor_code,r?.current_supervisor_code,
+        r?.app_supervisor_code,r?.assigned_supervisor_code
+      ].map(norm).filter(Boolean);
+      if(rowCodes.length&&identityCodes.size) return rowCodes.some(v=>identityCodes.has(v));
+
+      // 2) حقول معرف المستخدم الصريحة لا تُقارن بالأسماء أو الأكواد.
+      const rowExplicitIds=[r?.supervisor_user_id,r?.app_user_id,r?.user_id,r?.manager_id]
+        .map(S).filter(Boolean);
+      if(rowExplicitIds.length&&identityIds.size) return rowExplicitIds.some(v=>identityIds.has(v));
+
+      // 3) supervisor_id حقل قديم/مختلط؛ نقارنه فقط بمعرفات الهوية أو أكوادها، لا بكل مفاتيح المستخدم.
+      const legacyId=S(r?.supervisor_id||'');
+      if(legacyId){
+        if(identityIds.has(legacyId)) return true;
+        if(identityCodes.has(norm(legacyId))) return true;
+      }
+
+      // 4) الاسم حل احتياطي أخير وبمطابقة كاملة بعد التوحيد، دون includes.
+      const rowNames=[r?.supervisor_name,r?.supervisor,r?.manager_name].map(norm).filter(Boolean);
+      return rowNames.length&&identityNames.size&&rowNames.some(v=>identityNames.has(v));
     });
-    resolvedSupervisorIdV10712=S(u.supervisor_id||u.employee_id||u.id||master?.id||'');
+
+    // جدول project_worker_visits مرتبط بمستخدم التطبيق؛ لذلك رقم app_users هو الأولوية.
+    resolvedSupervisorIdV10712=S(appUserId||u.supervisor_id||u.employee_id||master?.id||'');
     return {
       sid:resolvedSupervisorIdV10712,
       employeeId:S(u.employee_id||master?.id||''),
       code:S(masterCode(master)||u.employee_code||u.employee_number||u.code||''),
       name:S(masterName(master)||u.full_name||u.name||u.username||''),
       rows:matches,
-      authUserId:S(u.id||''),
-      identityKeys:enrichedKeys
+      authUserId:appUserId,
+      identityKeys:[...new Set([
+        ...identityIds,...identityCodes,...identityNames
+      ])],
+      matchStrategy:matchStrategy||'typed-distribution-fallback'
     };
   }
   function buildSupervisorWorkersV10713(rows,workersMaster,employeesMaster,ident){
@@ -25190,7 +25257,7 @@ ${finalUrl}
   async function fetchUnifiedWorkers(force=false){
     if(!window.sb)return [];
     const u=currentUser(),date=S($id('logDate')?.value||new Date().toISOString().slice(0,10)),month=date.slice(0,7)||monthKey();
-    const identityKey=S(u.employee_code||u.employee_number||u.full_name||u.username||u.id);
+    const identityKey=S(u.id||u.employee_code||u.employee_number||u.username||u.full_name);
     const preKey='supervisor-workers:'+identityKey+':'+month;
     const cached=workersMemoryCache.get(preKey);
     if(!force&&cached&&Date.now()-cached.at<WORKERS_CACHE_TTL){
@@ -25943,6 +26010,9 @@ ${finalUrl}
   const cache=new Map();
   function currentUser(){ try{return JSON.parse(localStorage.getItem('tasneef_user')||'{}')||{};}catch(_){return{};} }
   function active(r){ return r && r.is_active!==false && r.active!==false && !['inactive','stopped','موقوف'].includes(S(r.status).toLowerCase()); }
+  function normScopeV10802(v){return S(v).toLowerCase().replace(/[إأآا]/g,'ا').replace(/[ىي]/g,'ي').replace(/ة/g,'ه').replace(/[\u064B-\u0652]/g,'').replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim();}
+  function stringSetV10802(values){return new Set((values||[]).map(S).filter(Boolean));}
+  function normSetV10802(values){return new Set((values||[]).map(normScopeV10802).filter(Boolean));}
   function userTokens(u){ return new Set([u.id,u.user_id,u.employee_id,u.supervisor_id,u.username,u.email,u.full_name,u.name].map(S).filter(Boolean)); }
   async function queryRows(name,q){
     const r=await q;
@@ -25951,10 +26021,12 @@ ${finalUrl}
   }
   async function resolveCurrentSupervisorId(authUserId){
     const u=currentUser();
-    if(S(u.supervisor_id)) return S(u.supervisor_id);
-    if(S(u.employee_id)) return S(u.employee_id);
+    // زيارات الدخول والخروج مرتبطة بمستخدم التطبيق؛ لا نقدّم employee_id على app_users.id.
     if(S(u.id)) return S(u.id);
-    return S(authUserId);
+    if(S(u.user_id)) return S(u.user_id);
+    if(S(authUserId)) return S(authUserId);
+    if(S(u.supervisor_id)) return S(u.supervisor_id);
+    return S(u.employee_id);
   }
   async function getAccessibleProjects(userId,role,filters={}){
     const u=currentUser();
@@ -25966,21 +26038,41 @@ ${finalUrl}
       const projects=await queryRows('projects',sb.from('projects').select('*').eq('is_active',true).order('id'));
       if(req!==latestRequestId) return cache.get(key)||[];
       if(role!=='supervisor') { cache.set(key,projects); return projects; }
-      const tokens=userTokens({...u,supervisor_id:sid});
+      const identityIds=stringSetV10802([u.id,u.user_id,u.supervisor_id,u.employee_id,sid]);
+      const identityCodes=normSetV10802([u.employee_code,u.employee_number,u.code,u.user_code]);
+      const identityNames=normSetV10802([u.full_name,u.name,u.display_name]);
       let workers=[], assignments=[];
       try{ workers=await queryRows('workers',sb.from('workers').select('*').eq('is_active',true).order('id')); }catch(e){ console.warn(VERSION,e.message); }
       try{ assignments=await queryRows('worker_project_assignments',sb.from('worker_project_assignments').select('*').eq('is_active',true).order('id')); }catch(e){ console.warn(VERSION,e.message); }
       const projectIds=new Set();
-      projects.forEach(p=>{
-        const vals=[p.supervisor_id,p.app_supervisor_id,p.manager_id,p.supervisor_user_id,p.supervisor_name];
-        if(vals.map(S).some(v=>tokens.has(v))) projectIds.add(S(p.id));
-      });
+      const belongsToSupervisor=row=>{
+        const codes=[row?.supervisor_employee_code,row?.supervisor_code,row?.assigned_supervisor_code].map(normScopeV10802).filter(Boolean);
+        if(codes.length&&identityCodes.size) return codes.some(v=>identityCodes.has(v));
+        const ids=[row?.supervisor_id,row?.app_supervisor_id,row?.manager_id,row?.supervisor_user_id,row?.assigned_supervisor_id].map(S).filter(Boolean);
+        if(ids.length&&identityIds.size&&ids.some(v=>identityIds.has(v))) return true;
+        const names=[row?.supervisor_name,row?.manager_name].map(normScopeV10802).filter(Boolean);
+        return names.length&&identityNames.size&&names.some(v=>identityNames.has(v));
+      };
+      projects.forEach(p=>{ if(belongsToSupervisor(p)) projectIds.add(S(p.id)); });
       const workerIds=new Set();
       workers.forEach(w=>{
-        const vals=[w.supervisor_id,w.app_supervisor_id,w.assigned_supervisor_id,w.manager_id];
-        if(vals.map(S).some(v=>tokens.has(v))){ workerIds.add(S(w.id)); if(w.project_id) projectIds.add(S(w.project_id)); }
+        if(belongsToSupervisor(w)){
+          workerIds.add(S(w.id));
+          if(w.project_id) projectIds.add(S(w.project_id));
+        }
       });
       assignments.forEach(a=>{ if(workerIds.has(S(a.worker_id)) && a.project_id) projectIds.add(S(a.project_id)); });
+
+      // المصدر الحاسم هو نفس توزيع الشهر الذي يحمّل عمال المشرف؛ يضيف مشاريعه فقط.
+      try{
+        if(typeof window.getUnifiedSupervisorWorkersV10713==='function'){
+          const unified=await window.getUnifiedSupervisorWorkersV10713(new Date().toISOString().slice(0,10),false);
+          A(unified?.assignments).forEach(a=>{
+            const pid=S(a?.project_id||a?.project_key||a?.app_project_id);
+            if(pid) projectIds.add(pid);
+          });
+        }
+      }catch(e){console.warn(VERSION,'unified distribution projects:',e.message);}
       const result=projects.filter(p=>projectIds.has(S(p.id)) && active(p));
       cache.set(key,result);
       return result;
@@ -26005,6 +26097,38 @@ ${finalUrl}
       if(typeof loadAll==='function') await loadAll();
       const projects=await getAccessibleProjects(u.id,'supervisor',{period:'current'});
       data.projects=projects;
+
+      // قفل نطاق العمال على المشرف الحالي في الذاكرة العامة أيضًا، وليس في كرت الدخول فقط.
+      // بذلك أي قسم داخل نسخة المشرف يقرأ data.workers لن يرى عمال مشرف آخر.
+      try{
+        if(typeof window.getUnifiedSupervisorWorkersV10713==='function'){
+          const date=S(document.getElementById('attendanceDate')?.value||document.getElementById('logDate')?.value||new Date().toISOString().slice(0,10));
+          const unified=await window.getUnifiedSupervisorWorkersV10713(date,false);
+          const allWorkers=A(data.workers);
+          data.workers=A(unified?.workers).map(uw=>{
+            const id=S(uw?.id||uw?.worker_id||uw?.canonical_employee_id);
+            const code=normScopeV10802(uw?.employee_code||uw?.worker_employee_code);
+            const name=normScopeV10802(uw?.name||uw?.worker_name);
+            const master=allWorkers.find(w=>
+              (id&&S(w?.id||w?.worker_id||w?.canonical_employee_id)===id)||
+              (code&&normScopeV10802(w?.employee_code||w?.worker_employee_code||w?.code)===code)||
+              (name&&normScopeV10802(w?.name||w?.worker_name||w?.full_name)===name)
+            );
+            return Object.assign({},master||{},uw);
+          });
+          window.__tasneefSupervisorWorkerScopeV10802={
+            supervisorId:S(unified?.identity?.sid||u.id),
+            supervisorName:S(unified?.identity?.name||u.full_name||u.name),
+            workerCount:data.workers.length,
+            workerIds:data.workers.map(w=>S(w.id||w.worker_id||w.canonical_employee_id)),
+            matchStrategy:S(unified?.identity?.matchStrategy),
+            at:new Date().toISOString()
+          };
+        }else data.workers=[];
+      }catch(e){
+        data.workers=[];
+        console.error(VERSION,'supervisor worker scope lock:',e);
+      }
       fillStable('logProject',projects,'اختر المشروع');
       fillStable('attendanceProject',projects,'كل مشاريع المشرف');
       fillStable('ticketProject',projects,'اختر المشروع');
