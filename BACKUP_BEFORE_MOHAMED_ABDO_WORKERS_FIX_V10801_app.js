@@ -24959,18 +24959,14 @@ ${finalUrl}
   const norm=v=>S(v).toLowerCase().replace(/[إأآا]/g,'ا').replace(/[ىي]/g,'ي').replace(/ة/g,'ه').replace(/[\u064B-\u0652]/g,'').replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim();
   const monthKey=()=>{try{return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit'}).format(new Date()).slice(0,7)}catch(_){return new Date().toISOString().slice(0,7)}};
   const inactiveValues=new Set(['inactive','stopped','stop','disabled','deleted','ended','موقوف','متوقف','محذوف','منتهي','غير نشط','غيرنشط']);
-  function isExplicitInactiveValueV10801(activeValue,statusValue){
-    const activeRaw=S(activeValue).toLowerCase();
-    return activeValue===false||activeRaw==='false'||activeRaw==='f'||activeRaw==='0'||activeRaw==='no'||inactiveValues.has(norm(activeValue))||inactiveValues.has(norm(statusValue));
-  }
-  const activeWorker=w=>w&&!isExplicitInactiveValueV10801(w?.is_active,w?.status||w?.state);
+  const activeWorker=w=>w&&w.is_active===true&&!inactiveValues.has(norm(w.status||w.state));
   const workerName=w=>S(w?.name||w?.app_name||w?.employee_name||w?.full_name||w?.worker_name||w?.worker_identity||('عامل '+(w?.id||'')));
   const workerCode=w=>S(w?.worker_employee_code||w?.employee_code||w?.employee_number||w?.worker_code||w?.code||'');
   const workerNumericId=w=>N(w?.canonical_employee_id||w?.worker_id||w?.app_worker_id||w?.id);
   const masterName=e=>S(e?.app_name||e?.display_name||e?.name_in_app||e?.employee_name||e?.worker_name||e?.name||e?.full_name||e?.iqama_name||'');
   const masterCode=e=>S(e?.employee_code||e?.employee_number||e?.worker_employee_code||e?.worker_code||e?.code||e?.id_code||'');
   const masterRole=e=>S(e?.job_title||e?.role||e?.position||e?.job||'');
-  const masterActive=e=>e&&!isExplicitInactiveValueV10801(e?.is_active,e?.status||e?.state);
+  const masterActive=e=>e&&e.is_active===true&&!inactiveValues.has(norm(e.status||e.state));
   const supervisorMaster=e=>{const r=norm(masterRole(e));return r.includes('مشرف')||r.includes('supervisor')};
   const nameVariants=v=>{const raw=S(v);if(!raw)return[];const vals=[raw,raw.replace(/^TS-?\d+\s*[-–—:|]?\s*/i,''),...raw.split(/[\/|،,\-–—]+/)];return[...new Set(vals.map(norm).filter(Boolean))]};
   const workerDisplay=w=>{const n=workerName(w)||'عامل غير معروف — يحتاج مراجعة',c=workerCode(w);return c&&norm(n)!==norm(c)?n+' — '+c:n};
@@ -25072,7 +25068,7 @@ ${finalUrl}
       const detail=ov?'داخل '+projectNameLocal(ov.project_id):workerProjectLabel(w);
       const linkNote=w.id?'':' — يحتاج مراجعة ربط رقم العامل';
       return`<div class="sup-worker-row"><span><b>${esc2(workerDisplay(w))}</b><br><small>${esc2(detail+linkNote)}</small></span></div>`
-    }).join('')||'<div class="sup-worker-empty">لا يوجد عمال مرتبطون بالمشرف في التاريخ المختار</div>';
+    }).join('')||'<div class="sup-worker-empty">لا يوجد عمال مرتبطون بالمشرف</div>';
   }
   function renderPresenceOnly(){
     const pid=currentPid();
@@ -25239,7 +25235,7 @@ ${finalUrl}
       const canonical=S(row?.canonical_employee_id||row?.worker_id||'');
       const wid=N(row?.worker_id||row?.canonical_employee_id);
       const assignmentSupervisorId=S(row?.assignment_supervisor_id||row?.supervisor_id||'');
-      if(!canonical||!wid||isExplicitInactiveValueV10801(row?.is_active,row?.status||row?.state))return;
+      if(!canonical||!wid||row?.is_active!==true)return;
       if(assignmentSupervisorId!==ident.supervisorId){foreign.push(row);return;}
       const projects=Array.isArray(row?.projects)?row.projects:[];
       const worker={
@@ -25313,21 +25309,6 @@ ${finalUrl}
         if(requestId!==state.workersRequestId||sessionIdentityKeyV10801()!==sessionKey)return state.workers;
         const workers=unified.workers||[],ident=unified.identity||{};
         if(S(ident.supervisorId||ident.sid)!==S(resolvedSupervisorIdV10712))return state.workers;
-        const d=unified.diagnostics||{};
-        const identityDiagnostic={
-          authUserId:ident.authUserId||'',employeeId:ident.employeeId||'',resolvedSupervisorId:ident.supervisorId||ident.sid||'',
-          supervisorName:ident.supervisorName||ident.name||'',employeeNumber:ident.employeeNumber||ident.code||''
-        };
-        const workersDiagnostic={
-          resolvedSupervisorId:ident.supervisorId||ident.sid||'',selectedDate:date,monthStart:d.monthStart||'',monthEnd:d.monthEnd||'',
-          rawAssignmentsCount:N(d.rawAssignmentsCount),assignmentsAfterDateFilter:N(d.assignmentsAfterDateFilter),
-          assignmentsAfterSupervisorFilter:N(d.currentSupervisorAssignmentRows||d.assignmentsAfterSupervisorResolution),
-          workersBeforeActiveFilter:N(d.workersBeforeActiveFilter),stoppedWorkersRemoved:N(d.stoppedWorkersRemoved),
-          unresolvedWorkerRowsRemoved:N(d.unresolvedWorkerRowsRemoved),uniqueActiveWorkersCount:workers.length
-        };
-        window.__tasneefSupervisorIdentityDiagnosticV10801=identityDiagnostic;
-        window.__tasneefSupervisorWorkerFilterDiagnosticV10801=workersDiagnostic;
-        console.table(identityDiagnostic);console.table(workersDiagnostic);
         state.workers=workers;state.identity=ident;state.conflicts=unified.conflicts||[];state.diagnostics=unified.diagnostics||{};
         state.workersLoading=false;state.workersError='';state.workersLoadedAt=Date.now();
         const actualCacheKey='supervisor-workers:'+S(ident.supervisorId||ident.sid)+':'+date;
