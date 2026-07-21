@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const BUILD='V10910 unified workers system direct link';
+  const BUILD='V435 unified supervisor workers — V10713';
   const $=id=>document.getElementById(id);
   const S=v=>String(v??'').trim();
   const N=v=>Number(v)||0;
@@ -110,7 +110,7 @@
       qAttendanceMonth(month)
     ]);
     if(mySeq!==loadSeqV435) return null;
-    return {month,date,workers:unified?.workers||[],identity:unified?.identity||{},assignments:unified?.assignments||[],att};
+    return {month,workers:unified?.workers||[],identity:unified?.identity||{},assignments:unified?.assignments||[],att};
   }
   function currentFilters(){return {date:($('supUniDate')?.value||$('attendanceDate')?.value||today()), project:S($('supUniProject')?.value), search:norm($('supUniSearch')?.value)};}
   function projectOptions(workers){
@@ -135,7 +135,7 @@
     list.classList.add('sup-uni-v433');
     const projectOpts=projectOptions(state.workers||[]);
     list.innerHTML=`
-      <div class="sup-uni-msg" id="supUniMsg">مصدر الأسماء: النظام الموحد للعمال. التبعية من الربط الشهري الموحد، بدون جداول قديمة.</div>
+      <div class="sup-uni-msg" id="supUniMsg">مصدر الأسماء: النظام الموحد → التوزيع. بدون تكرار للعامل.</div>
       <div class="sup-uni-toolbar">
         <label>التاريخ<input type="date" id="supUniDate" value="${esc(date)}"></label>
         <label>المشروع<select id="supUniProject"><option value="">كل المشاريع</option>${projectOpts}</select></label>
@@ -143,13 +143,13 @@
         <label>النسخة<input value="${BUILD}" disabled></label>
       </div>
       <div class="sup-uni-actions"><button id="supUniRefresh">تحديث الأسماء</button><button id="supUniAllP">اعتماد الكل حاضر</button><button id="supUniAllA">اعتماد الكل غائب</button><button class="main" id="supUniSave">حفظ تحضير اليوم</button></div>
-      <div class="sup-uni-group">المشرف: ${esc((state.identity?.supervisorName)||(state.workers?.[0]?.supervisor_name)||getUser().full_name||getUser().name||getUser().username||'-')} <small>عدد العمال: ${(state.workers||[]).length}</small></div>
+      <div class="sup-uni-group">المشرف: ${esc((state.identity?.name)||(state.workers?.[0]?.supervisor_name)||getUser().full_name||getUser().name||getUser().username||'-')} <small>عدد العمال: ${(state.workers||[]).length}</small></div>
       <div class="sup-uni-workers" id="supUniWorkers">${workers.map(w=>{
         const r=getRecord(rec,w,date); const st=statusCode(r?.status||'present');
         const projects=(w.projects||[]).map(p=>p.name||p.key).filter(Boolean).join('، ');
         const label=esc(w.worker_name||'-')+(w.worker_employee_code?` <span class="sup-uni-code">${esc(w.worker_employee_code)}</span>`:'');
         return `<div class="sup-uni-worker ${st==='absent'?'absent':''}" data-code="${esc(w.worker_employee_code)}" data-name="${esc(w.worker_name)}"><b>${label}</b><small>${esc(projects||'-')}</small><select><option value="present" ${st!=='absent'?'selected':''}>حاضر</option><option value="absent" ${st==='absent'?'selected':''}>غائب</option></select><input placeholder="ملاحظات" value="${esc(r?.notes||'')}"></div>`;
-      }).join('')||'<div class="sup-uni-worker">لا يوجد عمال مربوطون بهذا المشرف داخل النظام الموحد للعمال لهذا الشهر</div>'}</div>
+      }).join('')||'<div class="sup-uni-worker">لا يوجد عمال من التوزيع لهذا المشرف في هذا الشهر</div>'}</div>
     `;
     if($('supUniProject')) $('supUniProject').value=pCur;
     $('supUniDate').onchange=()=>{ if($('attendanceDate')) $('attendanceDate').value=$('supUniDate').value; renderSupervisorUnified(true); };
@@ -166,14 +166,14 @@
     try{
       css();
       const date=($('attendanceDate')?.value||$('supUniDate')?.value||today());
-      if(!state.loaded || force || state.date!==date){
+      if(!state.loaded || force || state.month!==monthOf(date)){
         list.classList.add('sup-uni-v433'); list.innerHTML='<div class="sup-uni-msg">جار تحميل العمال من النظام الموحد...</div>';
         const data=await load(date,!!force); if(!data) return;
-        state={loaded:true,month:data.month,date:data.date,dist:data.assignments||[],att:data.att,workers:data.workers||[],identity:data.identity||{}};
+        state={loaded:true,month:data.month,dist:data.assignments||[],att:data.att,workers:data.workers||[],identity:data.identity||{}};
       }
       render();
       if(!(state.workers||[]).length) toast('لا يوجد عمال مربوطين بك في النظام الموحد لهذا الشهر. راجع التوزيع.',true);
-      else toast('جاهز - تم تحميل '+state.workers.length+' عامل من النظام الموحد للعمال.');
+      else toast('جاهز - تم تحميل '+state.workers.length+' عامل من التوزيع الموحد.');
     }catch(e){ if(list) list.innerHTML='<div class="sup-uni-msg">تعذر التحميل: '+esc(e.message||e)+'</div>'; }
   }
   async function saveSupervisorUnified(){
@@ -202,7 +202,7 @@
       });
       const r=await window.sb.rpc('tasneef_save_attendance_unified_v430',{p_date:date,p_records:payload});
       if(r.error) throw r.error;
-      state.att=await qAttendanceMonth(monthOf(date)); state.date=date; render();
+      state.loaded=false; await renderSupervisorUnified(true);
       const rec=buildRecMap(state.att||[]); let verified=0;
       (state.workers||[]).forEach(w=>{if(getRecord(rec,w,date))verified++;});
       if(verified<cards.length) throw new Error('تم الحفظ لكن لم تظهر كل السجلات بعد التحقق ('+verified+' من '+cards.length+').');
@@ -211,16 +211,16 @@
     finally{if(btn){btn.disabled=false;btn.textContent='حفظ تحضير اليوم';}}
   }
   function bind(){
-    window.renderSupervisorAttendanceList=(force=false)=>renderSupervisorUnified(!!force);
+    window.renderSupervisorAttendanceList=()=>renderSupervisorUnified(true);
     window.saveSupervisorAttendance=saveSupervisorUnified;
     try{ renderSupervisorAttendanceList=window.renderSupervisorAttendanceList; saveSupervisorAttendance=window.saveSupervisorAttendance; }catch(_){}
   }
   bind(); [200,800,1600,2800,4500,7000,10000,15000].forEach(t=>setTimeout(bind,t)); setInterval(bind,3000);
   const oldShow=window.showSupervisorWindow;
-  window.showSupervisorWindow=function(id,btn){const r=oldShow?oldShow.apply(this,arguments):undefined; if(id==='supAttendance') setTimeout(()=>renderSupervisorUnified(false),150); return r;};
+  window.showSupervisorWindow=function(id,btn){const r=oldShow?oldShow.apply(this,arguments):undefined; if(id==='supAttendance') setTimeout(()=>renderSupervisorUnified(true),150); return r;};
   const oldInit=window.initSupervisor;
-  window.initSupervisor=async function(){if(oldInit) await oldInit.apply(this,arguments); setTimeout(()=>renderSupervisorUnified(false),700);};
-  document.addEventListener('DOMContentLoaded',()=>{bind(); setTimeout(()=>{if($('supervisorAttendanceList')) renderSupervisorUnified(false);},1000);});
-  try{new MutationObserver(()=>{if($('supervisorAttendanceList')) { const txt=$('supervisorAttendanceList').textContent||''; if(!$('supervisorAttendanceList').classList.contains('sup-uni-v433') || txt.includes('اختر المشروع') || txt.includes('الفترة')) setTimeout(()=>renderSupervisorUnified(false),80); }}).observe(document.body,{childList:true,subtree:true});}catch(_){}
-  console.log('Tasneef supervisor attendance from unified workers system loaded '+BUILD);
+  window.initSupervisor=async function(){if(oldInit) await oldInit.apply(this,arguments); setTimeout(()=>renderSupervisorUnified(true),700);};
+  document.addEventListener('DOMContentLoaded',()=>{bind(); setTimeout(()=>{if($('supervisorAttendanceList')) renderSupervisorUnified(true);},1000);});
+  try{new MutationObserver(()=>{if($('supervisorAttendanceList')) { const txt=$('supervisorAttendanceList').textContent||''; if(!$('supervisorAttendanceList').classList.contains('sup-uni-v433') || txt.includes('اختر المشروع') || txt.includes('الفترة')) setTimeout(()=>renderSupervisorUnified(true),80); }}).observe(document.body,{childList:true,subtree:true});}catch(_){}
+  console.log('Tasneef supervisor attendance from unified distribution loaded '+BUILD);
 })();
