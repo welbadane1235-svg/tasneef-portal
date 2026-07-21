@@ -7,7 +7,7 @@
   if(window.__tasneefCoreUnifiedV413) return;
   window.__tasneefCoreUnifiedV413 = true;
 
-  const VERSION='461';
+  const VERSION='462';
   const S=v=>String(v??'').trim();
   const N=v=>{const n=Number(v||0);return Number.isFinite(n)?n:0};
   const $=id=>document.getElementById(id);
@@ -359,60 +359,231 @@
   function setXlsxNumberFormat(ws,row,col,fmt){const addr=XLSX.utils.encode_cell({r:row,c:col});if(ws[addr])ws[addr].z=fmt;}
   function setXlsxCellStyle(ws,row,col,style){const addr=XLSX.utils.encode_cell({r:row,c:col});if(ws[addr])ws[addr].s=style;}
   function daySymbol(status){if(!status)return'-';return {present:'ح',late:'ت',early_leave:'خ',absent:'غ',leave:'إ',sick:'م',mission:'أ',weekly_off:'ر'}[status]||'ع';}
-  function buildSupervisorEmployeeWorkbook(month,detailRows,meta){
+  
+function buildSupervisorEmployeeWorkbook(month,detailRows,meta,filters){
     if(!window.XLSX)throw new Error('مكتبة Excel غير محملة. أعد تحميل الصفحة ثم حاول مرة أخرى.');
     const headers=['م','المشرف','الفئة','الكود','اسم الموظف','اسم الإقامة','رقم الإقامة','الحالة','المشروع / المشاريع','الراتب الأساسي','البدلات','إجمالي الراتب','بداية العمل','نهاية العمل','أول حضور / دخول','آخر حضور / خروج','أيام الحضور','أيام الغياب','إجازة','مرضي','مأمورية','راحة أسبوعية','أخرى','تأخير','خروج مبكر','أيام الفترة','أيام غير مسجلة','اكتمال البيانات %','ملاحظات المراجعة'];
     const roleOrder=['worker','technician','guard','employee'],roleTitles={worker:'العمال',technician:'الفنيون',guard:'الحراس',employee:'الموظفون'};
-    const groups=new Map();detailRows.forEach(r=>{const k=r.supervisorKey||'unassigned';if(!groups.has(k))groups.set(k,{name:r.supervisorName||'بدون مشرف',rows:[]});groups.get(k).rows.push(r);});
+    const roleHeaderColors={worker:['E6F4EA','0B6E4F'],technician:['E7F0FF','2752E7'],guard:['FFF0DA','9A5B00'],employee:['F0E8FF','6B38B9']};
+    const supervisorPalette=[['DCEBFF','1F5FBF'],['DFF6EC','0B7A59'],['F9E4FF','8A3FB0'],['FFE8DB','B85A17'],['E4F8F6','0E6C79'],['FFF0C9','8C6A00']];
+    const groups=new Map();
+    detailRows.forEach(r=>{
+      const k=r.supervisorKey||'unassigned';
+      if(!groups.has(k))groups.set(k,{key:k,name:r.supervisorName||'بدون مشرف',code:r.supervisorCode||'',rows:[]});
+      const g=groups.get(k);
+      if(!g.code&&r.supervisorCode)g.code=r.supervisorCode;
+      g.rows.push(r);
+    });
     const ordered=[...groups.values()].sort((a,b)=>{if(a.name==='بدون مشرف')return 1;if(b.name==='بدون مشرف')return-1;return a.name.localeCompare(b.name,'ar');});
     const generated=new Date().toLocaleString('en-GB',{timeZone:'Asia/Riyadh'}),p=reportPeriod(month);
-    const aoa=[['شركة تصنيف لإدارة المرافق'],['التقرير الإداري الموحد للموظفين والحضور والغياب'],['الشهر',month,'الفترة المحتسبة',p.start+' إلى '+(p.cutoff||'لم تبدأ'),'تاريخ التنزيل',generated],['طريقة الاحتساب','الحضور والغياب من آخر الحالة اليومية المجمعة لجميع سجلات الموظف؛ الحضور يشمل المتأخر والخروج المبكر، والغياب لا يُفترض من الأيام الفارغة.'],[]];
-    const merges=[{s:{r:0,c:0},e:{r:0,c:headers.length-1}},{s:{r:1,c:0},e:{r:1,c:headers.length-1}},{s:{r:3,c:1},e:{r:3,c:headers.length-1}}],supRows=[],catRows=[],headerRows=[],dataRows=[];let seq=1;
-    ordered.forEach(g=>{const sr=aoa.length;supRows.push(sr);const sumPresent=g.rows.reduce((a,r)=>a+r.present,0),sumAbsent=g.rows.reduce((a,r)=>a+r.absent,0);aoa.push([`المشرف: ${g.name} | الموظفون: ${g.rows.length} | الحضور: ${sumPresent} | الغياب: ${sumAbsent}`]);merges.push({s:{r:sr,c:0},e:{r:sr,c:headers.length-1}});roleOrder.forEach(role=>{const rows=g.rows.filter(r=>r.roleGroup===role).sort((a,b)=>a.name.localeCompare(b.name,'ar'));if(!rows.length)return;const cr=aoa.length;catRows.push(cr);aoa.push([`${roleTitles[role]} (${rows.length})`]);merges.push({s:{r:cr,c:0},e:{r:cr,c:headers.length-1}});headerRows.push(aoa.length);aoa.push(headers);rows.forEach(r=>{const rr=aoa.length;dataRows.push(rr);const notes=[r.conflicts?`تعارض حضور/غياب في ${r.conflicts} يوم`:'' ,r.unrecorded?`أيام بلا تسجيل: ${r.unrecorded}`:''].filter(Boolean).join('، ');aoa.push([seq++,g.name,r.roleLabel,r.code,r.name,r.iqamaName,r.iqamaNumber,r.status,r.projects.join('، '),r.basic,r.allowances,r.total,r.workStart,r.workEnd,r.firstIn,r.lastOut,r.present,r.absent,r.leave,r.sick,r.mission,r.weeklyOff,r.other,r.late,r.earlyLeave,r.serviceDays,r.unrecorded,r.completeness,notes]);});aoa.push([]);});});
-    const ws=XLSX.utils.aoa_to_sheet(aoa);ws['!merges']=merges;ws['!cols']=[{wch:6},{wch:24},{wch:12},{wch:13},{wch:24},{wch:24},{wch:16},{wch:11},{wch:30},{wch:14},{wch:12},{wch:15},{wch:14},{wch:14},{wch:21},{wch:21},...Array(11).fill({wch:11}),{wch:16},{wch:28}];ws['!rows']=[{hpt:30},{hpt:26},{hpt:21},{hpt:34}];ws['!freeze']={xSplit:0,ySplit:5,topLeftCell:'A6',activePane:'bottomLeft',state:'frozen'};
-    const border={top:{style:'thin',color:{rgb:'DCE6E2'}},bottom:{style:'thin',color:{rgb:'DCE6E2'}},left:{style:'thin',color:{rgb:'DCE6E2'}},right:{style:'thin',color:{rgb:'DCE6E2'}}};
-    styleXlsxRow(ws,0,0,headers.length-1,{fill:{fgColor:{rgb:'084F40'}},font:{bold:true,color:{rgb:'FFFFFF'},sz:17},alignment:{horizontal:'center',vertical:'center'}});styleXlsxRow(ws,1,0,headers.length-1,{fill:{fgColor:{rgb:'126A58'}},font:{bold:true,color:{rgb:'FFFFFF'},sz:14},alignment:{horizontal:'center'}});styleXlsxRow(ws,2,0,headers.length-1,{fill:{fgColor:{rgb:'EEF8F5'}},font:{bold:true,color:{rgb:'084F40'}},alignment:{horizontal:'right'},border});styleXlsxRow(ws,3,0,headers.length-1,{fill:{fgColor:{rgb:'FFF8E4'}},font:{bold:true,color:{rgb:'6B5300'}},alignment:{horizontal:'right',vertical:'center',wrapText:true},border});
-    supRows.forEach(r=>styleXlsxRow(ws,r,0,headers.length-1,{fill:{fgColor:{rgb:'D7EEE6'}},font:{bold:true,color:{rgb:'084F40'},sz:12},alignment:{horizontal:'right'},border}));catRows.forEach(r=>styleXlsxRow(ws,r,0,headers.length-1,{fill:{fgColor:{rgb:'EEF8F5'}},font:{bold:true,color:{rgb:'0A4033'}},alignment:{horizontal:'right'},border}));headerRows.forEach(r=>styleXlsxRow(ws,r,0,headers.length-1,{fill:{fgColor:{rgb:'0A4033'}},font:{bold:true,color:{rgb:'FFFFFF'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border}));
-    dataRows.forEach((r,idx)=>{styleXlsxRow(ws,r,0,headers.length-1,{fill:{fgColor:{rgb:idx%2?'F8FBFA':'FFFFFF'}},alignment:{horizontal:'right',vertical:'center',wrapText:true},border});[9,10,11].forEach(c=>setXlsxNumberFormat(ws,r,c,'#,##0.00'));[16,17,18,19,20,21,22,23,24,25,26].forEach(c=>setXlsxNumberFormat(ws,r,c,'0'));setXlsxNumberFormat(ws,r,27,'0.0%');if(N(aoa[r][17])>0)setXlsxCellStyle(ws,r,17,{fill:{fgColor:{rgb:'FDE2E2'}},font:{bold:true,color:{rgb:'A52222'}},alignment:{horizontal:'center'},border});if(N(aoa[r][16])>0)setXlsxCellStyle(ws,r,16,{fill:{fgColor:{rgb:'E5F4EC'}},font:{bold:true,color:{rgb:'08784D'}},alignment:{horizontal:'center'},border});if(N(aoa[r][26])>0)setXlsxCellStyle(ws,r,26,{fill:{fgColor:{rgb:'FFF2CC'}},font:{bold:true,color:{rgb:'7A5700'}},alignment:{horizontal:'center'},border});});
+    const filterSummary=`البحث: ${S(filters?.search||'')||'الكل'} | الفئة: ${S(filters?.roleLabel||'كل الفئات')} | الحالة: ${S(filters?.statusLabel||'كل الحالات')} | النتائج حسب الفلتر: ${detailRows.length}`;
+    const aoa=[
+      ['شركة تصنيف لإدارة المرافق'],
+      ['التقرير الإداري الموحد للموظفين والحضور والغياب'],
+      ['الشهر',month,'الفترة المحتسبة',p.start+' إلى '+(p.cutoff||'لم تبدأ'),'تاريخ التنزيل',generated],
+      ['الفلاتر المطبقة',filterSummary],
+      ['طريقة الاحتساب','الحضور والغياب من آخر الحالة اليومية المجمعة لجميع سجلات الموظف؛ الحضور يشمل المتأخر والخروج المبكر، والغياب لا يُفترض من الأيام الفارغة.'],
+      []
+    ];
+    const merges=[{s:{r:0,c:0},e:{r:0,c:headers.length-1}},{s:{r:1,c:0},e:{r:1,c:headers.length-1}},{s:{r:3,c:1},e:{r:3,c:headers.length-1}},{s:{r:4,c:1},e:{r:4,c:headers.length-1}}];
+    const supRows=[],catRows=[],headerRows=[],dataRows=[];let seq=1;
 
+    function supervisorRecord(g){
+      const direct=(state.allWorkers||state.workers||[]).find(w=> isSupervisor(w) && ((g.code&&normalizeWorkerCode(workerCode(w))===normalizeWorkerCode(g.code)) || (!g.code && norm(workerName(w))===norm(g.name))));
+      return direct||null;
+    }
+
+    ordered.forEach((g,gIdx)=>{
+      const supRec=supervisorRecord(g);
+      const supCode=normalizeWorkerCode(g.code||workerCode(supRec)||'');
+      const supIqama=S(supRec?.iqama_number||supRec?.national_id||'');
+      const supStatus=supRec ? (statusActive(supRec)?'نشط':'موقوف') : (g.name==='بدون مشرف'?'غير محدد':'-');
+      const projects=[...new Set(g.rows.flatMap(r=>r.projects||[]).map(S).filter(Boolean))];
+      const sumPresent=g.rows.reduce((a,r)=>a+r.present,0),sumAbsent=g.rows.reduce((a,r)=>a+r.absent,0),sumSalary=g.rows.reduce((a,r)=>a+r.total,0),sumUnrec=g.rows.reduce((a,r)=>a+r.unrecorded,0);
+      const service=g.rows.reduce((a,r)=>a+r.serviceDays,0),recorded=g.rows.reduce((a,r)=>a+r.recorded,0),completeness=service?((recorded/service)*100):0;
+      const headParts=[`المشرف: ${g.name}`, supCode?`الكود: ${supCode}`:'', supIqama?`الإقامة: ${supIqama}`:'', `الحالة: ${supStatus}`, `المشاريع: ${projects.length}`, `الموظفون: ${g.rows.length}`, `الحضور: ${sumPresent}`, `الغياب: ${sumAbsent}`, `غير مسجل: ${sumUnrec}`, `إجمالي الرواتب: ${sumSalary.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`, `اكتمال البيانات: ${completeness.toFixed(1)}%`].filter(Boolean);
+      const sr=aoa.length;supRows.push({row:sr,index:gIdx,name:g.name});aoa.push([headParts.join(' | ')]);merges.push({s:{r:sr,c:0},e:{r:sr,c:headers.length-1}});
+      if(projects.length){
+        const pr=aoa.length;aoa.push([`المشاريع المرتبطة: ${projects.join('، ')}`]);merges.push({s:{r:pr,c:0},e:{r:pr,c:headers.length-1}});supRows.push({row:pr,index:gIdx,projectsLine:true,name:g.name});
+      }
+      roleOrder.forEach(role=>{
+        const rows=g.rows.filter(r=>r.roleGroup===role).sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+        if(!rows.length)return;
+        const catSalary=rows.reduce((a,r)=>a+r.total,0),catPresent=rows.reduce((a,r)=>a+r.present,0),catAbsent=rows.reduce((a,r)=>a+r.absent,0),catUnrec=rows.reduce((a,r)=>a+r.unrecorded,0);
+        const cr=aoa.length;catRows.push({row:cr,role});
+        aoa.push([`${roleTitles[role]} (${rows.length}) | الحضور: ${catPresent} | الغياب: ${catAbsent} | غير مسجل: ${catUnrec} | إجمالي الرواتب: ${catSalary.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`]);
+        merges.push({s:{r:cr,c:0},e:{r:cr,c:headers.length-1}});
+        headerRows.push(aoa.length);aoa.push(headers);
+        rows.forEach(r=>{
+          const rr=aoa.length;dataRows.push({row:rr,role});
+          const notes=[r.conflicts?`تعارض حضور/غياب في ${r.conflicts} يوم`:'' ,r.unrecorded?`أيام بلا تسجيل: ${r.unrecorded}`:''].filter(Boolean).join('، ');
+          aoa.push([seq++,g.name,r.roleLabel,r.code,r.name,r.iqamaName,r.iqamaNumber,r.status,r.projects.join('، '),r.basic,r.allowances,r.total,r.workStart,r.workEnd,r.firstIn,r.lastOut,r.present,r.absent,r.leave,r.sick,r.mission,r.weeklyOff,r.other,r.late,r.earlyLeave,r.serviceDays,r.unrecorded,r.completeness,notes]);
+        });
+        aoa.push([]);
+      });
+    });
+
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    ws['!merges']=merges;
+    ws['!cols']=[{wch:6},{wch:24},{wch:12},{wch:13},{wch:24},{wch:24},{wch:16},{wch:11},{wch:30},{wch:14},{wch:12},{wch:15},{wch:14},{wch:14},{wch:21},{wch:21},...Array(11).fill({wch:11}),{wch:16},{wch:28}];
+    ws['!rows']=[{hpt:30},{hpt:26},{hpt:21},{hpt:24},{hpt:34}];
+    ws['!freeze']={xSplit:0,ySplit:6,topLeftCell:'A7',activePane:'bottomLeft',state:'frozen'};
+    const border={top:{style:'thin',color:{rgb:'DCE6E2'}},bottom:{style:'thin',color:{rgb:'DCE6E2'}},left:{style:'thin',color:{rgb:'DCE6E2'}},right:{style:'thin',color:{rgb:'DCE6E2'}}};
+    styleXlsxRow(ws,0,0,headers.length-1,{fill:{fgColor:{rgb:'084F40'}},font:{bold:true,color:{rgb:'FFFFFF'},sz:17},alignment:{horizontal:'center',vertical:'center'}});
+    styleXlsxRow(ws,1,0,headers.length-1,{fill:{fgColor:{rgb:'126A58'}},font:{bold:true,color:{rgb:'FFFFFF'},sz:14},alignment:{horizontal:'center'}});
+    styleXlsxRow(ws,2,0,headers.length-1,{fill:{fgColor:{rgb:'EEF8F5'}},font:{bold:true,color:{rgb:'084F40'}},alignment:{horizontal:'right'},border});
+    styleXlsxRow(ws,3,0,headers.length-1,{fill:{fgColor:{rgb:'E9F2FF'}},font:{bold:true,color:{rgb:'1F4B91'}},alignment:{horizontal:'right',wrapText:true},border});
+    styleXlsxRow(ws,4,0,headers.length-1,{fill:{fgColor:{rgb:'FFF8E4'}},font:{bold:true,color:{rgb:'6B5300'}},alignment:{horizontal:'right',vertical:'center',wrapText:true},border});
+    supRows.forEach(item=>{
+      const pal=supervisorPalette[item.index%supervisorPalette.length], fill=item.projectsLine?'F7FAFF':pal[0], color=item.projectsLine?'425466':pal[1];
+      styleXlsxRow(ws,item.row,0,headers.length-1,{fill:{fgColor:{rgb:fill}},font:{bold:true,color:{rgb:color},sz:item.projectsLine?10:12},alignment:{horizontal:'right',vertical:'center',wrapText:true},border});
+    });
+    catRows.forEach(item=>{const pal=roleHeaderColors[item.role]||['EEF8F5','0A4033'];styleXlsxRow(ws,item.row,0,headers.length-1,{fill:{fgColor:{rgb:pal[0]}},font:{bold:true,color:{rgb:pal[1]}} ,alignment:{horizontal:'right'},border});});
+    headerRows.forEach(r=>styleXlsxRow(ws,r,0,headers.length-1,{fill:{fgColor:{rgb:'0A4033'}},font:{bold:true,color:{rgb:'FFFFFF'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border}));
+    dataRows.forEach((item,idx)=>{
+      const r=item.row;
+      styleXlsxRow(ws,r,0,headers.length-1,{fill:{fgColor:{rgb:idx%2?'F8FBFA':'FFFFFF'}},alignment:{horizontal:'right',vertical:'center',wrapText:true},border});
+      [9,10,11].forEach(c=>setXlsxNumberFormat(ws,r,c,'#,##0.00'));
+      [16,17,18,19,20,21,22,23,24,25,26].forEach(c=>setXlsxNumberFormat(ws,r,c,'0'));
+      setXlsxNumberFormat(ws,r,27,'0.0%');
+      const roleFill=(roleHeaderColors[item.role]||[])[0]||'F3F7F5';
+      setXlsxCellStyle(ws,r,2,{fill:{fgColor:{rgb:roleFill}},font:{bold:true,color:{rgb:'334155'}},alignment:{horizontal:'center'},border});
+      if(N(aoa[r][17])>0)setXlsxCellStyle(ws,r,17,{fill:{fgColor:{rgb:'FDE2E2'}},font:{bold:true,color:{rgb:'A52222'}},alignment:{horizontal:'center'},border});
+      if(N(aoa[r][16])>0)setXlsxCellStyle(ws,r,16,{fill:{fgColor:{rgb:'E5F4EC'}},font:{bold:true,color:{rgb:'08784D'}},alignment:{horizontal:'center'},border});
+      if(N(aoa[r][26])>0)setXlsxCellStyle(ws,r,26,{fill:{fgColor:{rgb:'FFF2CC'}},font:{bold:true,color:{rgb:'7A5700'}},alignment:{horizontal:'center'},border});
+    });
+
+    const flatTop=[
+      ['تقرير الموظفين حسب الفلاتر'],
+      ['الشهر',month,'الفئة',S(filters?.roleLabel||'كل الفئات'),'الحالة',S(filters?.statusLabel||'كل الحالات'),'البحث',S(filters?.search||'الكل')||'الكل'],
+      []
+    ];
     const flat=[headers,...detailRows.map((r,i)=>[i+1,r.supervisorName,r.roleLabel,r.code,r.name,r.iqamaName,r.iqamaNumber,r.status,r.projects.join('، '),r.basic,r.allowances,r.total,r.workStart,r.workEnd,r.firstIn,r.lastOut,r.present,r.absent,r.leave,r.sick,r.mission,r.weeklyOff,r.other,r.late,r.earlyLeave,r.serviceDays,r.unrecorded,r.completeness,r.conflicts?`تعارض ${r.conflicts} يوم`:'' ])];
-    const ws2=XLSX.utils.aoa_to_sheet(flat);ws2['!cols']=ws['!cols'];ws2['!autofilter']={ref:`A1:${XLSX.utils.encode_col(headers.length-1)}${flat.length}`};ws2['!freeze']={xSplit:5,ySplit:1,topLeftCell:'F2',activePane:'bottomRight',state:'frozen'};styleXlsxRow(ws2,0,0,headers.length-1,{fill:{fgColor:{rgb:'0A4033'}},font:{bold:true,color:{rgb:'FFFFFF'}},alignment:{horizontal:'center',wrapText:true},border});for(let r=1;r<flat.length;r++){styleXlsxRow(ws2,r,0,headers.length-1,{fill:{fgColor:{rgb:r%2?'FFFFFF':'F8FBFA'}},alignment:{horizontal:'right',wrapText:true},border});[9,10,11].forEach(c=>setXlsxNumberFormat(ws2,r,c,'#,##0.00'));setXlsxNumberFormat(ws2,r,27,'0.0%');}
+    const ws2=XLSX.utils.aoa_to_sheet([...flatTop,...flat]);
+    ws2['!merges']=[{s:{r:0,c:0},e:{r:0,c:headers.length-1}}];
+    ws2['!cols']=ws['!cols'];
+    ws2['!autofilter']={ref:`A4:${XLSX.utils.encode_col(headers.length-1)}${flat.length+3}`};
+    ws2['!freeze']={xSplit:5,ySplit:4,topLeftCell:'F5',activePane:'bottomRight',state:'frozen'};
+    styleXlsxRow(ws2,0,0,headers.length-1,{fill:{fgColor:{rgb:'084F40'}},font:{bold:true,color:{rgb:'FFFFFF'},sz:15},alignment:{horizontal:'center'},border});
+    styleXlsxRow(ws2,1,0,headers.length-1,{fill:{fgColor:{rgb:'E9F2FF'}},font:{bold:true,color:{rgb:'1F4B91'}},alignment:{horizontal:'right',wrapText:true},border});
+    styleXlsxRow(ws2,3,0,headers.length-1,{fill:{fgColor:{rgb:'0A4033'}},font:{bold:true,color:{rgb:'FFFFFF'}},alignment:{horizontal:'center',wrapText:true},border});
+    for(let r=4;r<flat.length+3;r++){styleXlsxRow(ws2,r,0,headers.length-1,{fill:{fgColor:{rgb:r%2?'FFFFFF':'F8FBFA'}},alignment:{horizontal:'right',wrapText:true},border});[9,10,11].forEach(c=>setXlsxNumberFormat(ws2,r,c,'#,##0.00'));setXlsxNumberFormat(ws2,r,27,'0.0%');}
 
     const days=[];for(let d=1;d<=Number(monthBounds(month).end.slice(8,10));d++)days.push(String(d).padStart(2,'0'));
     const dailyHeaders=['المشرف','الفئة','الكود','اسم الموظف',...days,'حضور','غياب','إجازة/أخرى','غير مسجل','اكتمال %'];
     const dailyRows=detailRows.map(r=>[r.supervisorName,r.roleLabel,r.code,r.name,...days.map(day=>daySymbol(r.dayMap?.get(month+'-'+day)?.status)),r.present,r.absent,r.leave+r.sick+r.mission+r.weeklyOff+r.other,r.unrecorded,r.completeness]);
-    const wsDaily=XLSX.utils.aoa_to_sheet([['كشف الحضور اليومي - '+month],dailyHeaders,...dailyRows]);wsDaily['!merges']=[{s:{r:0,c:0},e:{r:0,c:dailyHeaders.length-1}}];wsDaily['!cols']=[{wch:24},{wch:11},{wch:12},{wch:24},...days.map(()=>({wch:4.5})),{wch:9},{wch:9},{wch:12},{wch:11},{wch:11}];wsDaily['!autofilter']={ref:`A2:${XLSX.utils.encode_col(dailyHeaders.length-1)}${dailyRows.length+2}`};wsDaily['!freeze']={xSplit:4,ySplit:2,topLeftCell:'E3',activePane:'bottomRight',state:'frozen'};styleXlsxRow(wsDaily,0,0,dailyHeaders.length-1,{fill:{fgColor:{rgb:'084F40'}},font:{bold:true,color:{rgb:'FFFFFF'},sz:15},alignment:{horizontal:'center'}});styleXlsxRow(wsDaily,1,0,dailyHeaders.length-1,{fill:{fgColor:{rgb:'0A4033'}},font:{bold:true,color:{rgb:'FFFFFF'}},alignment:{horizontal:'center'},border});for(let r=2;r<dailyRows.length+2;r++){styleXlsxRow(wsDaily,r,0,dailyHeaders.length-1,{fill:{fgColor:{rgb:r%2?'FFFFFF':'F8FBFA'}},alignment:{horizontal:'center'},border});setXlsxNumberFormat(wsDaily,r,dailyHeaders.length-1,'0.0%');for(let c=4;c<4+days.length;c++){const val=S(wsDaily[XLSX.utils.encode_cell({r,c})]?.v);const fill=val==='ح'||val==='ت'||val==='خ'?'E5F4EC':val==='غ'?'FDE2E2':val==='-'?'F2F4F3':'FFF2CC';const color=val==='غ'?'A52222':val==='-'?'8A9993':val==='ح'||val==='ت'||val==='خ'?'08784D':'7A5700';setXlsxCellStyle(wsDaily,r,c,{fill:{fgColor:{rgb:fill}},font:{bold:true,color:{rgb:color}},alignment:{horizontal:'center'},border});}}
+    const wsDaily=XLSX.utils.aoa_to_sheet([['كشف الحضور اليومي - '+month],['حسب الفلاتر: '+filterSummary],dailyHeaders,...dailyRows]);
+    wsDaily['!merges']=[{s:{r:0,c:0},e:{r:0,c:dailyHeaders.length-1}},{s:{r:1,c:0},e:{r:1,c:dailyHeaders.length-1}}];
+    wsDaily['!cols']=[{wch:24},{wch:11},{wch:12},{wch:24},...days.map(()=>({wch:4.5})),{wch:9},{wch:9},{wch:12},{wch:11},{wch:11}];
+    wsDaily['!autofilter']={ref:`A3:${XLSX.utils.encode_col(dailyHeaders.length-1)}${dailyRows.length+3}`};
+    wsDaily['!freeze']={xSplit:4,ySplit:3,topLeftCell:'E4',activePane:'bottomRight',state:'frozen'};
+    styleXlsxRow(wsDaily,0,0,dailyHeaders.length-1,{fill:{fgColor:{rgb:'084F40'}},font:{bold:true,color:{rgb:'FFFFFF'},sz:15},alignment:{horizontal:'center'}});
+    styleXlsxRow(wsDaily,1,0,dailyHeaders.length-1,{fill:{fgColor:{rgb:'E9F2FF'}},font:{bold:true,color:{rgb:'1F4B91'}},alignment:{horizontal:'right',wrapText:true},border});
+    styleXlsxRow(wsDaily,2,0,dailyHeaders.length-1,{fill:{fgColor:{rgb:'0A4033'}},font:{bold:true,color:{rgb:'FFFFFF'}},alignment:{horizontal:'center'},border});
+    for(let r=3;r<dailyRows.length+3;r++){
+      styleXlsxRow(wsDaily,r,0,dailyHeaders.length-1,{fill:{fgColor:{rgb:r%2?'FFFFFF':'F8FBFA'}},alignment:{horizontal:'center'},border});
+      setXlsxNumberFormat(wsDaily,r,dailyHeaders.length-1,'0.0%');
+      for(let c=4;c<4+days.length;c++){
+        const val=S(wsDaily[XLSX.utils.encode_cell({r,c})]?.v);
+        const fill=val==='ح'||val==='ت'||val==='خ'?'E5F4EC':val==='غ'?'FDE2E2':val==='-'?'F2F4F3':'FFF2CC';
+        const color=val==='غ'?'A52222':val==='-'?'8A9993':val==='ح'||val==='ت'||val==='خ'?'08784D':'7A5700';
+        setXlsxCellStyle(wsDaily,r,c,{fill:{fgColor:{rgb:fill}},font:{bold:true,color:{rgb:color}},alignment:{horizontal:'center'},border});
+      }
+    }
 
-    const sumHeaders=['المشرف','العمال','الفنيون','الحراس','الموظفون','الإجمالي','إجمالي الرواتب','الحضور','الغياب','إجازة/أخرى','غير مسجل','اكتمال البيانات %'];
-    const sumRows=ordered.map(g=>{const x={worker:0,technician:0,guard:0,employee:0};g.rows.forEach(r=>x[r.roleGroup]=(x[r.roleGroup]||0)+1);const service=g.rows.reduce((a,r)=>a+r.serviceDays,0),recorded=g.rows.reduce((a,r)=>a+r.recorded,0);return [g.name,x.worker,x.technician,x.guard,x.employee,g.rows.length,g.rows.reduce((a,r)=>a+r.total,0),g.rows.reduce((a,r)=>a+r.present,0),g.rows.reduce((a,r)=>a+r.absent,0),g.rows.reduce((a,r)=>a+r.leave+r.sick+r.mission+r.weeklyOff+r.other,0),g.rows.reduce((a,r)=>a+r.unrecorded,0),service?recorded/service:0];});
-    const totals=['الإجمالي',...Array(4).fill(0),detailRows.length,detailRows.reduce((a,r)=>a+r.total,0),detailRows.reduce((a,r)=>a+r.present,0),detailRows.reduce((a,r)=>a+r.absent,0),detailRows.reduce((a,r)=>a+r.leave+r.sick+r.mission+r.weeklyOff+r.other,0),detailRows.reduce((a,r)=>a+r.unrecorded,0),0];for(let i=1;i<=4;i++)totals[i]=sumRows.reduce((a,r)=>a+N(r[i]),0);const totalService=detailRows.reduce((a,r)=>a+r.serviceDays,0),totalRecorded=detailRows.reduce((a,r)=>a+r.recorded,0);totals[11]=totalService?totalRecorded/totalService:0;
-    const ws3=XLSX.utils.aoa_to_sheet([['ملخص المشرفين - '+month],sumHeaders,...sumRows,totals]);ws3['!merges']=[{s:{r:0,c:0},e:{r:0,c:sumHeaders.length-1}}];ws3['!cols']=[{wch:26},...Array(5).fill({wch:11}),{wch:17},...Array(4).fill({wch:13}),{wch:18}];ws3['!autofilter']={ref:`A2:L${sumRows.length+3}`};styleXlsxRow(ws3,0,0,11,{fill:{fgColor:{rgb:'084F40'}},font:{bold:true,color:{rgb:'FFFFFF'},sz:15},alignment:{horizontal:'center'}});styleXlsxRow(ws3,1,0,11,{fill:{fgColor:{rgb:'0A4033'}},font:{bold:true,color:{rgb:'FFFFFF'}},alignment:{horizontal:'center'},border});styleXlsxRow(ws3,sumRows.length+2,0,11,{fill:{fgColor:{rgb:'D7EEE6'}},font:{bold:true,color:{rgb:'084F40'}},alignment:{horizontal:'right'},border});for(let r=2;r<sumRows.length+3;r++){styleXlsxRow(ws3,r,0,11,{fill:{fgColor:{rgb:r%2?'FFFFFF':'F8FBFA'}},alignment:{horizontal:'right'},border});setXlsxNumberFormat(ws3,r,6,'#,##0.00');setXlsxNumberFormat(ws3,r,11,'0.0%');}
+    const sumHeaders=['المشرف','الكود','الإقامة','الحالة','العمال','الفنيون','الحراس','الموظفون','الإجمالي','إجمالي الرواتب','الحضور','الغياب','إجازة/أخرى','غير مسجل','اكتمال البيانات %'];
+    const sumRows=ordered.map(g=>{
+      const x={worker:0,technician:0,guard:0,employee:0};g.rows.forEach(r=>x[r.roleGroup]=(x[r.roleGroup]||0)+1);
+      const service=g.rows.reduce((a,r)=>a+r.serviceDays,0),recorded=g.rows.reduce((a,r)=>a+r.recorded,0);
+      const supRec=(state.allWorkers||state.workers||[]).find(w=>isSupervisor(w)&&((g.code&&normalizeWorkerCode(workerCode(w))===normalizeWorkerCode(g.code))||norm(workerName(w))===norm(g.name)));
+      return [g.name,normalizeWorkerCode(g.code||workerCode(supRec)||''),S(supRec?.iqama_number||supRec?.national_id||''),supRec?(statusActive(supRec)?'نشط':'موقوف'):(g.name==='بدون مشرف'?'غير محدد':'-'),x.worker,x.technician,x.guard,x.employee,g.rows.length,g.rows.reduce((a,r)=>a+r.total,0),g.rows.reduce((a,r)=>a+r.present,0),g.rows.reduce((a,r)=>a+r.absent,0),g.rows.reduce((a,r)=>a+r.leave+r.sick+r.mission+r.weeklyOff+r.other,0),g.rows.reduce((a,r)=>a+r.unrecorded,0),service?recorded/service:0];
+    });
+    const totals=['الإجمالي','','','',...Array(4).fill(0),detailRows.length,detailRows.reduce((a,r)=>a+r.total,0),detailRows.reduce((a,r)=>a+r.present,0),detailRows.reduce((a,r)=>a+r.absent,0),detailRows.reduce((a,r)=>a+r.leave+r.sick+r.mission+r.weeklyOff+r.other,0),detailRows.reduce((a,r)=>a+r.unrecorded,0),0];
+    for(let i=4;i<=7;i++)totals[i]=sumRows.reduce((a,r)=>a+N(r[i]),0);
+    const totalService=detailRows.reduce((a,r)=>a+r.serviceDays,0),totalRecorded=detailRows.reduce((a,r)=>a+r.recorded,0);totals[14]=totalService?totalRecorded/totalService:0;
+    const ws3=XLSX.utils.aoa_to_sheet([['ملخص المشرفين - '+month],['حسب الفلاتر: '+filterSummary],sumHeaders,...sumRows,totals]);
+    ws3['!merges']=[{s:{r:0,c:0},e:{r:0,c:sumHeaders.length-1}},{s:{r:1,c:0},e:{r:1,c:sumHeaders.length-1}}];
+    ws3['!cols']=[{wch:26},{wch:13},{wch:16},{wch:11},...Array(5).fill({wch:11}),{wch:17},...Array(4).fill({wch:13}),{wch:18}];
+    ws3['!autofilter']={ref:`A3:O${sumRows.length+4}`};
+    styleXlsxRow(ws3,0,0,14,{fill:{fgColor:{rgb:'084F40'}},font:{bold:true,color:{rgb:'FFFFFF'},sz:15},alignment:{horizontal:'center'}});
+    styleXlsxRow(ws3,1,0,14,{fill:{fgColor:{rgb:'E9F2FF'}},font:{bold:true,color:{rgb:'1F4B91'}},alignment:{horizontal:'right',wrapText:true},border});
+    styleXlsxRow(ws3,2,0,14,{fill:{fgColor:{rgb:'0A4033'}},font:{bold:true,color:{rgb:'FFFFFF'}},alignment:{horizontal:'center'},border});
+    styleXlsxRow(ws3,sumRows.length+3,0,14,{fill:{fgColor:{rgb:'D7EEE6'}},font:{bold:true,color:{rgb:'084F40'}},alignment:{horizontal:'right'},border});
+    for(let r=3;r<sumRows.length+4;r++){styleXlsxRow(ws3,r,0,14,{fill:{fgColor:{rgb:r%2?'FFFFFF':'F8FBFA'}},alignment:{horizontal:'right'},border});setXlsxNumberFormat(ws3,r,9,'#,##0.00');setXlsxNumberFormat(ws3,r,14,'0.0%');}
 
-    const legend=[['دليل التقرير وطريقة الاحتساب'],['الرمز','المعنى'],['ح','حاضر'],['ت','متأخر ويُحتسب حضورًا'],['خ','خروج مبكر ويُحتسب حضورًا'],['غ','غائب مسجل صراحة'],['إ','إجازة'],['م','إجازة مرضية'],['أ','مأمورية'],['ر','راحة أسبوعية'],['ع','حالة أخرى'],['-','لا يوجد تسجيل'],[],['ملاحظات فنية'],['1','يتم دمج جميع سجلات الموظف في اليوم الواحد ومنع التكرار.'],['2','إذا وُجد أكثر من سجل في اليوم نفسه، يتم اعتماد آخر تعديل زمني، مع إظهار التعارض للمراجعة.'],['3','الغياب لا يُفترض من اليوم الفارغ؛ يظهر اليوم الفارغ في عمود أيام غير مسجلة.'],['4','فترة الشهر الحالي تنتهي بتاريخ اليوم بتوقيت الرياض، لمنع احتساب الأيام المستقبلية.'],['5',`سجلات غير مرتبطة بموظف: ${N(meta?.unresolved)} | سجلات مستبعدة/ملغاة: ${N(meta?.ignored)}`]];
+    const legend=[['دليل التقرير وطريقة الاحتساب'],['الرمز','المعنى'],['ح','حاضر'],['ت','متأخر ويُحتسب حضورًا'],['خ','خروج مبكر ويُحتسب حضورًا'],['غ','غائب مسجل صراحة'],['إ','إجازة'],['م','إجازة مرضية'],['أ','مأمورية'],['ر','راحة أسبوعية'],['ع','حالة أخرى'],['-','لا يوجد تسجيل'],[],['ملاحظات فنية'],['1','يتم دمج جميع سجلات الموظف في اليوم الواحد ومنع التكرار.'],['2','إذا وُجد أكثر من سجل في اليوم نفسه، يتم اعتماد آخر تعديل زمني، مع إظهار التعارض للمراجعة.'],['3','الغياب لا يُفترض من اليوم الفارغ؛ يظهر اليوم الفارغ في عمود أيام غير مسجلة.'],['4','فترة الشهر الحالي تنتهي بتاريخ اليوم بتوقيت الرياض، لمنع احتساب الأيام المستقبلية.'],['5',`سجلات غير مرتبطة بموظف: ${N(meta?.unresolved)} | سجلات مستبعدة/ملغاة: ${N(meta?.ignored)}`],['6','التقرير الحالي يراعي الفلاتر المحددة في صفحة العمال والموظفين وقت التنزيل.']];
     const ws4=XLSX.utils.aoa_to_sheet(legend);ws4['!merges']=[{s:{r:0,c:0},e:{r:0,c:5}},{s:{r:13,c:0},e:{r:13,c:5}}];ws4['!cols']=[{wch:12},{wch:75},...Array(4).fill({wch:12})];styleXlsxRow(ws4,0,0,5,{fill:{fgColor:{rgb:'084F40'}},font:{bold:true,color:{rgb:'FFFFFF'},sz:15},alignment:{horizontal:'center'}});styleXlsxRow(ws4,1,0,1,{fill:{fgColor:{rgb:'0A4033'}},font:{bold:true,color:{rgb:'FFFFFF'}},alignment:{horizontal:'center'},border});styleXlsxRow(ws4,13,0,5,{fill:{fgColor:{rgb:'D7EEE6'}},font:{bold:true,color:{rgb:'084F40'}},alignment:{horizontal:'right'},border});for(let r=2;r<legend.length;r++)styleXlsxRow(ws4,r,0,Math.min(5,legend[r].length-1),{alignment:{horizontal:'right',wrapText:true},border});
 
-    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'التقرير الإداري');XLSX.utils.book_append_sheet(wb,wsDaily,'كشف يومي');XLSX.utils.book_append_sheet(wb,ws2,'بيانات قابلة للفلترة');XLSX.utils.book_append_sheet(wb,ws3,'ملخص المشرفين');XLSX.utils.book_append_sheet(wb,ws4,'دليل الاحتساب');wb.Workbook={Views:[{RTL:true}]};return wb;
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'التقرير الإداري');
+    XLSX.utils.book_append_sheet(wb,wsDaily,'كشف يومي');
+    XLSX.utils.book_append_sheet(wb,ws2,'بيانات قابلة للفلترة');
+    XLSX.utils.book_append_sheet(wb,ws3,'ملخص المشرفين');
+    XLSX.utils.book_append_sheet(wb,ws4,'دليل الاحتساب');
+    wb.Workbook={Views:[{RTL:true}]};
+    return wb;
   }
   async function exportSupervisorEmployeesExcel(){
     const btn=$('cu413ExportWorkersExcel');if(btn?.disabled)return;const original=btn?.textContent||'تنزيل تقرير Excel احترافي';
     try{
       if(!window.XLSX)throw new Error('مكتبة Excel غير متاحة. أعد تحميل الصفحة.');
       const month=S($('cu413WorkerExportMonth')?.value||$('cu413Month')?.value||todayMonth()).slice(0,7);if(!/^\d{4}-\d{2}$/.test(month))throw new Error('اختر شهرًا صحيحًا.');
-      if(btn){btn.disabled=true;btn.textContent='جاري التدقيق والتجهيز...';}showMsg('جاري توحيد هويات الموظفين ومراجعة الحضور يومًا بيوم...');
+      const search=S($('cu413WorkerSearch')?.value||'');
+      const roleValue=S($('cu413WorkerRoleFilter')?.value||'');
+      const statusValue=S($('cu413WorkerStatusFilter')?.value||'');
+      const filters={search,role:roleValue,status:statusValue,roleLabel:$('cu413WorkerRoleFilter')?.selectedOptions?.[0]?.textContent||'كل الفئات',statusLabel:$('cu413WorkerStatusFilter')?.selectedOptions?.[0]?.textContent||'كل الحالات'};
+      if(btn){btn.disabled=true;btn.textContent='جاري التدقيق والتجهيز...';}
+      showMsg('جاري توحيد هويات الموظفين ومراجعة الحضور يومًا بيوم حسب الفلاتر الحالية...');
       await Promise.all([loadWorkers(false),loadProjects(false)]);
-      const b=monthBounds(month),[distRows,attendanceRows]=await Promise.all([fetchPagedRows('monthly_distribution',q=>q.eq('month_key',month).order('supervisor_name',{ascending:true})),fetchPagedRows('attendance',q=>q.gte('attendance_date',b.start).lt('attendance_date',b.next).order('attendance_date',{ascending:true}))]);
-      const workers=(state.allWorkers&&state.allWorkers.length?state.allWorkers:state.workers).filter(w=>!statusDeleted(w));const index=buildEmployeeAliasIndex(workers);
-      const assignments=new Map();(distRows||[]).filter(r=>statusActive(r)).forEach(r=>{const key=resolveEmployeeKey(r,index);if(!key)return;if(!assignments.has(key))assignments.set(key,{supervisors:new Map(),projects:new Set()});const a=assignments.get(key),sup=supervisorIdentity(r),weight=Math.max(1,assignmentOverlapDays(r,month));if(!a.supervisors.has(sup.key))a.supervisors.set(sup.key,{...sup,count:0});a.supervisors.get(sup.key).count+=weight;const pid=S(r.project_id||r.project_code||''),project=state.projects.find(p=>projectId(p)===pid);const pn=S(r.project_name||r.project_display_name||projectName(project)||'');if(pn)a.projects.add(pn);});
-      const attStats=buildEmployeeAttendanceStats(attendanceRows,index,month);const source=workers.filter(w=>!isSupervisor(w)&&workerOverlapsMonth(w,month));const seen=new Set(),details=[];
-      source.forEach(w=>{const key=canonicalEmployeeKey(w);if(!key||seen.has(key))return;seen.add(key);const asg=assignments.get(key);let sup={key:'unassigned',name:'بدون مشرف',code:''};if(asg?.supervisors?.size)sup=[...asg.supervisors.values()].sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name,'ar'))[0];else{const sc=normalizeWorkerCode(S(w.supervisor_employee_code||w.supervisor_code||w.supervisor_id||'')),sn=S(w.supervisor_name||'');const sw=workers.find(x=>normalizeWorkerCode(workerCode(x))===sc||norm(workerName(x))===norm(sn));if(sc||sn||sw)sup={key:sc?('code:'+norm(sc)):('name:'+norm(sn||workerName(sw))),code:sc||workerCode(sw),name:sn||workerName(sw)||'بدون مشرف'};}
-        const st=attStats.get(key)||{present:0,regularPresent:0,late:0,earlyLeave:0,absent:0,leave:0,sick:0,mission:0,weeklyOff:0,other:0,recorded:0,conflicts:0,days:new Map(),firstIn:'',lastOut:''};const service=employeeServiceRange(w,month),unrecorded=Math.max(0,service.days-N(st.recorded)),completeness=service.days?Math.min(1,N(st.recorded)/service.days):0;
-        details.push({supervisorKey:sup.key,supervisorName:sup.name||'بدون مشرف',roleGroup:exportRoleGroup(w),roleLabel:exportRoleLabel(w),code:normalizeWorkerCode(workerCode(w)),name:workerName(w),iqamaName:S(w.iqama_name||w.residency_name||w.official_name||''),iqamaNumber:S(w.iqama_number||w.national_id||w.residency_number||''),status:statusActive(w)?'نشط':'موقوف',projects:[...(asg?.projects||[])],basic:workerBasicSalary(w),allowances:workerAllowances(w),total:workerTotalSalary(w),workStart:workerStartDate(w),workEnd:workerEndDate(w),firstIn:st.firstIn||'',lastOut:st.lastOut||'',present:N(st.present),absent:N(st.absent),leave:N(st.leave),sick:N(st.sick),mission:N(st.mission),weeklyOff:N(st.weeklyOff),late:N(st.late),earlyLeave:N(st.earlyLeave),other:N(st.other),recorded:N(st.recorded),conflicts:N(st.conflicts),dayMap:st.days||new Map(),serviceDays:service.days,unrecorded,completeness});
+      const b=monthBounds(month),[distRows,attendanceRows]=await Promise.all([
+        fetchPagedRows('monthly_distribution',q=>q.eq('month_key',month).order('supervisor_name',{ascending:true})),
+        fetchPagedRows('attendance',q=>q.gte('attendance_date',b.start).lt('attendance_date',b.next).order('attendance_date',{ascending:true}))
+      ]);
+      const workers=(state.allWorkers&&state.allWorkers.length?state.allWorkers:state.workers).filter(w=>!statusDeleted(w));
+      const index=buildEmployeeAliasIndex(workers);
+      const assignments=new Map();
+      (distRows||[]).filter(r=>statusActive(r)).forEach(r=>{
+        const key=resolveEmployeeKey(r,index);if(!key)return;
+        if(!assignments.has(key))assignments.set(key,{supervisors:new Map(),projects:new Set()});
+        const a=assignments.get(key),sup=supervisorIdentity(r),weight=Math.max(1,assignmentOverlapDays(r,month));
+        if(!a.supervisors.has(sup.key))a.supervisors.set(sup.key,{...sup,count:0});
+        a.supervisors.get(sup.key).count+=weight;
+        const pid=S(r.project_id||r.project_code||''),project=state.projects.find(p=>projectId(p)===pid);
+        const pn=S(r.project_name||r.project_display_name||projectName(project)||'');
+        if(pn)a.projects.add(pn);
       });
-      if(!details.length)throw new Error('لا يوجد موظفون ضمن فترة الشهر المحدد.');details.sort((a,b)=>a.supervisorName.localeCompare(b.supervisorName,'ar')||(['worker','technician','guard','employee'].indexOf(a.roleGroup)-['worker','technician','guard','employee'].indexOf(b.roleGroup))||a.name.localeCompare(b.name,'ar'));
-      const wb=buildSupervisorEmployeeWorkbook(month,details,attStats.meta||{});XLSX.writeFile(wb,`Tasneef_Professional_Employees_Attendance_${month}.xlsx`,{cellStyles:true,compression:true});showMsg(`تم تنزيل التقرير الاحترافي لشهر ${month}: ${details.length} موظف، الحضور ${details.reduce((a,r)=>a+r.present,0)} يوم، الغياب ${details.reduce((a,r)=>a+r.absent,0)} يوم.`);
-    }catch(e){console.error('Unified employee Excel V10805',e);showMsg('تعذر تنزيل Excel: '+(e?.message||e),true);}finally{if(btn){btn.disabled=false;btn.textContent=original;}}
+      const visible=filteredWorkers();
+      const visibleNonSup=visible.filter(w=>!isSupervisor(w));
+      const filterActive=!!(search||roleValue||statusValue);
+      const allowedKeys=new Set(visibleNonSup.map(w=>canonicalEmployeeKey(w)).filter(Boolean));
+      const attStats=buildEmployeeAttendanceStats(attendanceRows,index,month);
+      const baseSource=workers.filter(w=>!isSupervisor(w)&&workerOverlapsMonth(w,month));
+      const source=baseSource.filter(w=>filterActive?allowedKeys.has(canonicalEmployeeKey(w)):true);
+      const seen=new Set(),details=[];
+      source.forEach(w=>{
+        const key=canonicalEmployeeKey(w);if(!key||seen.has(key))return;seen.add(key);
+        const asg=assignments.get(key);
+        let sup={key:'unassigned',name:'بدون مشرف',code:''};
+        if(asg?.supervisors?.size)sup=[...asg.supervisors.values()].sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name,'ar'))[0];
+        else{
+          const sc=normalizeWorkerCode(S(w.supervisor_employee_code||w.supervisor_code||w.supervisor_id||'')),sn=S(w.supervisor_name||'');
+          const sw=workers.find(x=>normalizeWorkerCode(workerCode(x))===sc||norm(workerName(x))===norm(sn));
+          if(sc||sn||sw)sup={key:sc?('code:'+norm(sc)):('name:'+norm(sn||workerName(sw))),code:sc||workerCode(sw),name:sn||workerName(sw)||'بدون مشرف'};
+        }
+        const st=attStats.get(key)||{present:0,regularPresent:0,late:0,earlyLeave:0,absent:0,leave:0,sick:0,mission:0,weeklyOff:0,other:0,recorded:0,conflicts:0,days:new Map(),firstIn:'',lastOut:''};
+        const service=employeeServiceRange(w,month),unrecorded=Math.max(0,service.days-N(st.recorded)),completeness=service.days?Math.min(1,N(st.recorded)/service.days):0;
+        details.push({supervisorKey:sup.key,supervisorName:sup.name||'بدون مشرف',supervisorCode:normalizeWorkerCode(sup.code||''),roleGroup:exportRoleGroup(w),roleLabel:exportRoleLabel(w),code:normalizeWorkerCode(workerCode(w)),name:workerName(w),iqamaName:S(w.iqama_name||w.residency_name||w.official_name||''),iqamaNumber:S(w.iqama_number||w.national_id||w.residency_number||''),status:statusActive(w)?'نشط':'موقوف',projects:[...(asg?.projects||[])],basic:workerBasicSalary(w),allowances:workerAllowances(w),total:workerTotalSalary(w),workStart:workerStartDate(w),workEnd:workerEndDate(w),firstIn:st.firstIn||'',lastOut:st.lastOut||'',present:N(st.present),absent:N(st.absent),leave:N(st.leave),sick:N(st.sick),mission:N(st.mission),weeklyOff:N(st.weeklyOff),late:N(st.late),earlyLeave:N(st.earlyLeave),other:N(st.other),recorded:N(st.recorded),conflicts:N(st.conflicts),dayMap:st.days||new Map(),serviceDays:service.days,unrecorded,completeness});
+      });
+      if(roleValue==='supervisor')throw new Error('فلتر المشرفين في هذه الشاشة مخصص لعرض المشرفين أنفسهم، بينما تقرير Excel الحالي يصدّر العمال والفنيين والحراس والموظفين تحت كل مشرف. اختر فئة أخرى أو أزل الفلتر.');
+      if(filterActive && !visibleNonSup.length)throw new Error('الفلاتر الحالية لا تعرض أي عمال أو فنيين أو حراس أو موظفين للتصدير.');
+      if(!details.length)throw new Error('لا توجد نتائج مطابقة للفلاتر الحالية ضمن الشهر المحدد.');
+      details.sort((a,b)=>a.supervisorName.localeCompare(b.supervisorName,'ar')||(['worker','technician','guard','employee'].indexOf(a.roleGroup)-['worker','technician','guard','employee'].indexOf(b.roleGroup))||a.name.localeCompare(b.name,'ar'));
+      const wb=buildSupervisorEmployeeWorkbook(month,details,attStats.meta||{},filters);
+      XLSX.writeFile(wb,`Tasneef_Professional_Employees_Attendance_${month}.xlsx`,{cellStyles:true,compression:true});
+      showMsg(`تم تنزيل التقرير الاحترافي حسب الفلاتر الحالية لشهر ${month}: ${details.length} موظف، الحضور ${details.reduce((a,r)=>a+r.present,0)} يوم، الغياب ${details.reduce((a,r)=>a+r.absent,0)} يوم.`);
+    }catch(e){console.error('Unified employee Excel V10806',e);showMsg('تعذر تنزيل Excel: '+(e?.message||e),true);}finally{if(btn){btn.disabled=false;btn.textContent=original;}}
   }
-  function printWorkersFiltered(){
+function printWorkersFiltered(){
     const rows=filteredWorkers();
     const roleLabel=$('cu413WorkerRoleFilter')?.selectedOptions?.[0]?.textContent||'كل الفئات';
     const statusLabel=$('cu413WorkerStatusFilter')?.selectedOptions?.[0]?.textContent||'كل الحالات';
