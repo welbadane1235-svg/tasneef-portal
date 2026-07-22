@@ -7,9 +7,9 @@
   'use strict';
   if(window.__tasneefContractsServicesEditorV10807) return;
   window.__tasneefContractsServicesEditorV10807=true;
-  window.TASNEEF_BUILD='V10814_CONTRACT_RENEWAL_NON_RENEW_ID_TYPES';
+  window.TASNEEF_BUILD='V10814_CONTRACT_ACTOR_ID_TYPE_FIX_R2';
 
-  const VERSION='V10814';
+  const VERSION='V10814-R2';
   const MODAL_ID='contractsServicesEditorV10807';
   const LS_KEY='tasneef_contract_smart_v299';
   const CONTRACT_FILES_BUCKET='contract-files';
@@ -70,7 +70,7 @@
   function friendlyError(error){
     const raw=S(error?.message||error);
     console.error('[ContractsServicesEditor '+VERSION+']',error);
-    if(/operator does not exist:\s*(text|bigint)\s*=\s*(text|bigint)|invalid input syntax for type bigint|22P02|42883/i.test(raw))return 'تعذر حفظ التعديلات بسبب عدم تطابق معرف السجل. يرجى تحديث البيانات ثم إعادة المحاولة.';
+    if(/operator does not exist:\s*(text|bigint)\s*=\s*(text|bigint)|invalid input syntax for type bigint|column\s+"?[^"]+"?\s+is of type\s+[^\s]+\s+but expression is of type\s+[^\s]+|42804|22P02|42883/i.test(raw))return 'تعذر حفظ التعديلات بسبب عدم تطابق معرف السجل. يرجى تحديث البيانات ثم إعادة المحاولة.';
     if(/PGRST202|Could not find the function|function .* does not exist|schema cache|bucket not found|storage.*policy|row-level security/i.test(raw))return 'تحديث قاعدة بيانات العقود والتخزين مطلوب. شغّل ملف SQL المرفق ثم أعد المحاولة.';
     return raw||'تعذر تنفيذ العملية. حاول مرة أخرى.';
   }
