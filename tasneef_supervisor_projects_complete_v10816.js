@@ -4,7 +4,7 @@
   if(window.__tasneefSupervisorProjectsCompleteV10816) return;
   window.__tasneefSupervisorProjectsCompleteV10816 = true;
 
-  const BUILD='V10816_SUPERVISOR_PROJECTS_COMPLETE';
+  const BUILD='V10819_SECURE_SUPERVISOR_PROJECTS_WORKERS';
   const $=id=>document.getElementById(id);
   const S=v=>String(v??'').trim();
   const A=v=>Array.isArray(v)?v:[];
@@ -68,12 +68,27 @@
     try{const r=await promise; if(r?.error){console.warn(BUILD,label,r.error.message); return [];} return r?.data||[];}
     catch(e){console.warn(BUILD,label,e?.message||e); return [];}
   }
+  function rpcMissing(error){const c=S(error?.code),m=S(error?.message||error).toLowerCase();return c==='PGRST202'||c==='42883'||(m.includes('tasneef_get_supervisor_distribution_v10819')&&(m.includes('not find')||m.includes('does not exist')));}
+  async function secureDistribution(month){
+    try{
+      const r=await sb.rpc('tasneef_get_supervisor_distribution_v10819',{p_month:month});
+      if(r?.error){if(rpcMissing(r.error))return null;throw r.error;}
+      const payload=r?.data||{};
+      if(payload?.ok===false)throw new Error(payload?.message||'تعذر تحميل توزيع المشرف');
+      return Array.isArray(payload)?payload:A(payload?.rows);
+    }catch(e){if(rpcMissing(e))return null;console.warn(BUILD,'secure distribution',e);return [];}
+  }
+  async function loadDistribution(month){
+    const secure=await secureDistribution(month);
+    if(secure!==null)return secure;
+    return safeQuery('monthly_distribution '+month,sb.from('monthly_distribution').select('*').eq('month_key',month).limit(20000));
+  }
   async function fetchBase(month){
     const [projects,workers,assignments,dist]=await Promise.all([
       safeQuery('projects',sb.from('projects').select('*').order('name')),
       safeQuery('workers',sb.from('workers').select('*').order('name')),
       safeQuery('worker_project_assignments',sb.from('worker_project_assignments').select('*').eq('is_active',true).order('id')),
-      safeQuery('monthly_distribution '+month,sb.from('monthly_distribution').select('*').eq('month_key',month).limit(20000))
+      loadDistribution(month)
     ]);
     return {projects,workers,assignments,dist};
   }
@@ -111,7 +126,7 @@
       let matchedDist=A(base.dist).filter(r=>activeRow(r)&&rowMatchesSupervisor(r,id));
       if(!matchedDist.length){
         const pm=previousMonth(month);
-        const prev=await safeQuery('monthly_distribution '+pm,sb.from('monthly_distribution').select('*').eq('month_key',pm).limit(20000));
+        const prev=await loadDistribution(pm);
         matchedDist=A(prev).filter(r=>activeRow(r)&&rowMatchesSupervisor(r,id));
       }
       const pids=new Set(); const pnames=new Set();

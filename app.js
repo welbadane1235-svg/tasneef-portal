@@ -95,6 +95,7 @@ const clearSession = () => {
   localStorage.removeItem(TASNEEF_PERMISSION_SESSION_KEY);
   localStorage.removeItem(TASNEEF_PERMISSION_CACHE_KEY);
   localStorage.removeItem(TASNEEF_PERMISSION_VERSION_KEY);
+  localStorage.removeItem('tasneef_permission_session_v10817');
 };
 const fmt = d => d ? new Date(d).toLocaleString('ar-SA') : '-';
 const timeOnly = d => d ? new Date(d).toLocaleTimeString('ar-SA-u-nu-latn',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Riyadh'}) : '-';
@@ -145,7 +146,12 @@ async function login(){
     user.permissions=payload.permissions||user.permissions||{};
     user.permission_sources=payload.sources||{};
     user.permissions_version=Number(payload.permissions_version||user.permissions_version||1);
-    if(token) localStorage.setItem(TASNEEF_PERMISSION_SESSION_KEY,token);
+    if(token){
+      user.session_token=token;
+      user.permission_session_token=token;
+      localStorage.setItem(TASNEEF_PERMISSION_SESSION_KEY,token);
+      localStorage.setItem('tasneef_permission_session_v10817',token);
+    }
     localStorage.setItem(TASNEEF_PERMISSION_CACHE_KEY,JSON.stringify(user.permissions||{}));
     localStorage.setItem(TASNEEF_PERMISSION_VERSION_KEY,String(user.permissions_version||1));
     setSession(user);
@@ -25306,16 +25312,52 @@ ${finalUrl}
     workers.excludedInactive=excludedInactive;
     return workers;
   }
+  function isMissingSupervisorScopeRpcV10819(error){
+    const code=S(error?.code||'');
+    const text=S(error?.message||error||'').toLowerCase();
+    return code==='PGRST202'||code==='42883'||text.includes('tasneef_get_supervisor_distribution_v10819')&&(text.includes('not find')||text.includes('does not exist'));
+  }
+  async function loadSecureSupervisorDistributionV10819(month){
+    try{
+      const r=await window.sb.rpc('tasneef_get_supervisor_distribution_v10819',{p_month:month});
+      if(r?.error){
+        if(isMissingSupervisorScopeRpcV10819(r.error))return null;
+        throw r.error;
+      }
+      const payload=r?.data||{};
+      if(payload?.ok===false)throw new Error(payload?.message||'تعذر تحميل توزيع المشرف');
+      const rows=Array.isArray(payload)?payload:(Array.isArray(payload?.rows)?payload.rows:[]);
+      rows.__tasneefSecureSupervisorScopeV10819=true;
+      rows.__tasneefIdentityV10819=payload?.identity||{};
+      return rows;
+    }catch(error){
+      if(isMissingSupervisorScopeRpcV10819(error))return null;
+      console.error('V10819 secure supervisor distribution',error);
+      throw error;
+    }
+  }
   async function loadUnifiedSupervisorWorkersV10713(selectedDate,force=false){
     if(!window.sb)return {workers:[],identity:{},assignments:[]};
     const date=S(selectedDate)||new Date().toISOString().slice(0,10);
     const month=date.slice(0,7)||monthKey();
-    const [distributionRows,employeesMaster,workersMaster]=await Promise.all([
-      loadMonthlyDistributionV10713(month,force),
+    const [secureRows,employeesMaster,workersMaster]=await Promise.all([
+      loadSecureSupervisorDistributionV10819(month),
       loadEmployeesMasterV10713(force),
       loadActiveWorkersMasterV10713(force)
     ]);
+    const distributionRows=secureRows===null?await loadMonthlyDistributionV10713(month,force):secureRows;
     const ident=resolveSupervisorIdentityV10713(employeesMaster,distributionRows);
+    // نتيجة RPC تمت فلترتها بالسيرفر بواسطة جلسة المشرف. لا نعيد إسقاطها بسبب اختلاف كتابة الاسم أو الكود محليًا.
+    if(distributionRows?.__tasneefSecureSupervisorScopeV10819){
+      ident.rows=[...distributionRows];
+      const serverIdentity=distributionRows.__tasneefIdentityV10819||{};
+      ident.sid=S(serverIdentity.user_id||ident.sid||currentUser().id||'');
+      ident.code=S(serverIdentity.employee_code||ident.code||'');
+      ident.name=S(serverIdentity.full_name||ident.name||currentUser().full_name||currentUser().name||'');
+      ident.authUserId=S(serverIdentity.user_id||ident.authUserId||currentUser().id||'');
+      ident.matchStrategy='secure-session-rpc-v10819';
+      resolvedSupervisorIdV10712=ident.sid;
+    }
     const workers=buildSupervisorWorkersV10713(ident.rows,workersMaster,employeesMaster,ident);
     return {workers,identity:ident,assignments:ident.rows,month,excludedInactive:workers.excludedInactive||[]};
   }
@@ -26012,8 +26054,14 @@ ${finalUrl}
   const byId=id=>document.getElementById(id), val=id=>byId(id)?.value||'';
   const safeJson=v=>{try{return typeof v==='string'?JSON.parse(v||'{}'):(v||{});}catch(_){return {};}};
   function currentUser(){try{return typeof session==='function'?session():safeJson(localStorage.getItem('tasneef_user'));}catch(_){return {};}}
-  function legacyRoleMap(role){return ({admin:'system_admin',general_manager:'general_manager',financial_manager:'finance_manager',operations_manager:'operations_manager',warehouse_manager:'warehouse_officer',technician:'maintenance_manager',supervisor:'supervisor'}[role]||role||'custom');}
+  function legacyRoleMap(role){
+    const r=String(role||'').trim().toLowerCase();
+    return ({super_admin:'system_admin',system_admin:'system_admin',admin:'system_admin',general_manager:'general_manager',financial_manager:'finance_manager',operations_manager:'operations_manager',warehouse_manager:'warehouse_officer',technician:'maintenance_manager',supervisor:'supervisor'}[r]||r||'custom');
+  }
   window.can=function(user,permissionKey,scopeCtx={},resource=null){
+    if(window.PermissionsService&&typeof window.PermissionsService.can==='function'){
+      return window.PermissionsService.can(permissionKey,{...(scopeCtx||{}),resource});
+    }
     user=user||currentUser(); if(!user||user.is_active===false||['suspended','locked','expired'].includes(user.status)) return false;
     const role=legacyRoleMap(user.role_key||user.role);
     if(role==='system_admin'||role==='general_manager') return true;
@@ -26034,7 +26082,16 @@ ${finalUrl}
     return allowed&&scopeAllowedV10700(user,scopeCtx,resource);
   };
   function scopeAllowedV10700(user,ctx,res){const t=user.scope_type||safeJson(user.access_scope).type||'all';if(t==='all')return true;if(!res&&!ctx)return true;if(t==='own')return String(res?.created_by||ctx?.created_by||'')===String(user.id);if(t==='assigned_projects'){const ids=(user.allowed_project_ids||safeJson(user.access_scope).project_ids||[]).map(String);return !ctx?.project_id&&!res?.project_id?true:ids.includes(String(ctx?.project_id||res?.project_id));}if(t==='department')return !ctx?.department_id||String(ctx.department_id)===String(user.department_id);return true;}
-  window.requirePermissionV10700=function(key,ctx,res){if(can(currentUser(),key,ctx,res))return true;const labels={'view':'العرض','create':'الإضافة','update':'التعديل','delete':'الحذف','approve':'الاعتماد','print':'الطباعة','export':'التصدير','manage':'الإدارة'};const action=labels[key.split('.').pop()]||'هذا الإجراء'; if(typeof msg==='function')msg('ليس لديك صلاحية '+action+' في هذا القسم','err');return false;};
+  window.requirePermissionV10700=function(key,ctx,res){
+    if(window.PermissionsService&&typeof window.PermissionsService.require==='function'){
+      return window.PermissionsService.require(key,{...(ctx||{}),resource:res});
+    }
+    if(window.can(currentUser(),key,ctx,res))return true;
+    const labels={'view':'العرض','create':'الإضافة','update':'التعديل','edit':'التعديل','delete':'الحذف','approve':'الاعتماد','print':'الطباعة','export':'التصدير','manage':'الإدارة','manage_permissions':'إدارة الصلاحيات'};
+    const action=labels[String(key||'').split('.').pop()]||'هذا الإجراء';
+    if(typeof msg==='function')msg('ليس لديك صلاحية '+action+' في هذا القسم','err');
+    return false;
+  };
   async function optionalSelect(table){try{const r=await sb.from(table).select('*');return r.error?[]:(r.data||[]);}catch(_){return [];}}
   window.loadSecurityCenterV10700=async function(force){
     const sd=window.securityDataV10700;
@@ -26710,3 +26767,5 @@ ${finalUrl}
   console.log(BUILD+' loaded');
 })();
 
+
+/* V10820: restored unified permissions runtime bridge on top of V10819. */

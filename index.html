@@ -29,6 +29,7 @@ input{width:100%;border:1px solid #cbdcd6;border-radius:10px;padding:12px;backgr
 (async function(){try{localStorage.removeItem('tasneef_force_domain');sessionStorage.removeItem('tasneef_force_domain');if('serviceWorker' in navigator){const regs=await navigator.serviceWorker.getRegistrations();for(const r of regs) await r.unregister();}if(window.caches && location.protocol !== 'file:'){const keys=await caches.keys();for(const k of keys) await caches.delete(k);}}catch(e){}})();
 document.addEventListener('keydown', function(e){ if(e.key === 'Enter') login(); });
 </script>
-<script src="app.js?v=10818-data-session-dashboard-recovery"></script>
+<script src="app.js?v=10820-permissions-runtime-restored"></script>
+<script defer src="tasneef_permissions_v10817.js?v=10820-permissions-runtime-restored"></script>
 </body>
 </html>
