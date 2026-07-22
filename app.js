@@ -68,7 +68,21 @@ function tasneefGo(page){
 // Tasneef HTML App V86 - Contract Services Cloud View Fix
 const SUPABASE_URL = "https://zmjdqiswytxlbfgnfjfv.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_ADsAC5MtBCusDgX62c8NaQ_LyyuTPeb";
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const TASNEEF_PERMISSION_SESSION_KEY = 'tasneef_session_token_v10817';
+const TASNEEF_PERMISSION_CACHE_KEY = 'tasneef_permissions_v10817';
+const TASNEEF_PERMISSION_VERSION_KEY = 'tasneef_permissions_version_v10817';
+const __tasneefNativeFetchV10818 = window.fetch.bind(window);
+function tasneefSessionFetchV10818(input, init={}){
+  const next = Object.assign({}, init);
+  const headers = new Headers(init.headers || {});
+  const token = localStorage.getItem(TASNEEF_PERMISSION_SESSION_KEY);
+  if(token) headers.set('x-tasneef-session', token);
+  next.headers = headers;
+  return __tasneefNativeFetchV10818(input, next);
+}
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  global: { fetch: tasneefSessionFetchV10818 }
+});
 // V167: expose Supabase client for late-loaded fixes and feature wrappers.
 window.sb = sb;
 const $ = id => document.getElementById(id);
@@ -76,7 +90,12 @@ const today = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.ge
 const nowTime = () => new Date().toTimeString().slice(0,5);
 const session = () => JSON.parse(localStorage.getItem('tasneef_user') || 'null');
 const setSession = u => localStorage.setItem('tasneef_user', JSON.stringify(u));
-const clearSession = () => localStorage.removeItem('tasneef_user');
+const clearSession = () => {
+  localStorage.removeItem('tasneef_user');
+  localStorage.removeItem(TASNEEF_PERMISSION_SESSION_KEY);
+  localStorage.removeItem(TASNEEF_PERMISSION_CACHE_KEY);
+  localStorage.removeItem(TASNEEF_PERMISSION_VERSION_KEY);
+};
 const fmt = d => d ? new Date(d).toLocaleString('ar-SA') : '-';
 const timeOnly = d => d ? new Date(d).toLocaleTimeString('ar-SA-u-nu-latn',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Riyadh'}) : '-';
 const minsToText = m => { m=Number(m||0); const h=Math.floor(m/60), mm=m%60; return `${h}:${String(mm).padStart(2,'0')}`; };
@@ -100,15 +119,62 @@ function requireRole(role){ const u=session(); if(!u){ tasneefGo('index.html'); 
 async function login(){
   const username=$('loginUsername').value.trim(), password=$('loginPassword').value.trim();
   if(!username||!password) return msg('أدخل اسم المستخدم وكلمة المرور','err');
+  const deviceKey='tasneef_device_id_v10818';
+  let deviceId=localStorage.getItem(deviceKey);
+  if(!deviceId){
+    deviceId=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():('web-'+Date.now()+'-'+Math.random().toString(16).slice(2));
+    localStorage.setItem(deviceKey,deviceId);
+  }
+  const functionMissing=e=>{
+    const code=String(e?.code||'');
+    const text=String(e?.message||e||'').toLowerCase();
+    return code==='PGRST202'||code==='42883'||text.includes('could not find the function')||text.includes('does not exist');
+  };
+  let secureLogin=null;
+  try{
+    secureLogin=await sb.rpc('tasneef_login_v10817',{p_username:username,p_password:password,p_device_id:deviceId});
+  }catch(e){ secureLogin={error:e}; }
+  if(!secureLogin?.error && secureLogin?.data?.ok){
+    const payload=secureLogin.data||{};
+    const token=String(payload.session_token||'').trim();
+    const user=Object.assign({},payload.user||{});
+    if(!user.role){
+      const rk=String(user.role_key||'').toLowerCase();
+      user.role=({super_admin:'admin',system_admin:'admin',general_manager:'general_manager',operations_manager:'operations_manager',finance_manager:'financial_manager',financial_manager:'financial_manager',warehouse_officer:'warehouse_manager',maintenance_manager:'technician',supervisor:'supervisor'}[rk]||rk||'supervisor');
+    }
+    user.permissions=payload.permissions||user.permissions||{};
+    user.permission_sources=payload.sources||{};
+    user.permissions_version=Number(payload.permissions_version||user.permissions_version||1);
+    if(token) localStorage.setItem(TASNEEF_PERMISSION_SESSION_KEY,token);
+    localStorage.setItem(TASNEEF_PERMISSION_CACHE_KEY,JSON.stringify(user.permissions||{}));
+    localStorage.setItem(TASNEEF_PERMISSION_VERSION_KEY,String(user.permissions_version||1));
+    setSession(user);
+    tasneefGo(roleHomeUrl(user.role));
+    return;
+  }
+  if(!secureLogin?.error && secureLogin?.data && secureLogin.data.ok===false){
+    return msg(secureLogin.data.message||'بيانات الدخول غير صحيحة أو الحساب موقوف','err');
+  }
+  if(secureLogin?.error && !functionMissing(secureLogin.error)){
+    console.error('V10818 secure login failed',secureLogin.error);
+    return msg('تعذر بدء جلسة الصلاحيات الآمنة. تحقق من اتصال قاعدة البيانات ثم أعد المحاولة.','err');
+  }
+  // توافق مؤقت فقط إذا لم تكن دوال الصلاحيات مثبتة بعد.
   if(username==='admin' && (password==='123456' || password==='121212')){
-    setSession({id:1,full_name:'مدير النظام',username:'admin',role:'admin',is_active:true});
+    setSession({id:1,full_name:'مدير النظام',username:'admin',role:'admin',role_key:'super_admin',is_active:true});
     tasneefGo('admin.html'); return;
   }
   const {data:u,error}=await sb.from('app_users').select('*').eq('username',username).eq('password',password).eq('is_active',true).maybeSingle();
   if(error||!u) return msg(error?.message || 'بيانات الدخول غير صحيحة','err');
   setSession(u); tasneefGo(roleHomeUrl(u.role));
 }
-function logout(){ clearSession(); tasneefGo('index.html'); }
+async function logout(){
+  const token=localStorage.getItem(TASNEEF_PERMISSION_SESSION_KEY);
+  try{ if(token) await sb.rpc('tasneef_logout_v10817',{p_session_token:token}); }catch(e){ console.warn('V10818 logout RPC',e); }
+  clearSession();
+  try{ sessionStorage.clear(); }catch(_){}
+  tasneefGo('index.html');
+}
 async function loadAll(){
   window.tasneefMarkStart?.('core-loadAll');
   const [users, projects, workers, attendance, logs, tickets] = await Promise.all([
@@ -25798,14 +25864,14 @@ ${finalUrl}
     if(btn)btn.disabled=true;
     try{return await oldLogin.apply(this,arguments)}finally{loginBusy=false;if(btn)btn.disabled=false}
   };
-  window.logout=function(){
+  const oldLogout=window.logout;
+  window.logout=async function(){
     if(logoutBusy)return; logoutBusy=true;
     try{
-      localStorage.removeItem('tasneef_user');
-      sessionStorage.clear();
-      Object.keys(localStorage).filter(k=>/^tasneef_(worker_checkin|worker_checkout|supervisor|time_log)/i.test(k)).forEach(k=>localStorage.removeItem(k));
-    }catch(_){}
-    location.replace('index.html?v='+Date.now());
+      if(typeof oldLogout==='function') return await oldLogout.apply(this,arguments);
+      clearSession();
+      location.replace('index.html?v='+Date.now());
+    }finally{ logoutBusy=false; }
   };
   // عند العودة للتطبيق بعد إغلاق الشاشة نعيد تحميل نطاق المشرف مرة واحدة فقط.
   let reloading=false;
@@ -26571,3 +26637,76 @@ ${finalUrl}
   setTimeout(bindButtons,2200);
   console.log('Tasneef',VERSION,'professional filtered employee Excel loaded');
 })();
+
+/* ===== V10818: permission-session transport + dashboard zero recovery ===== */
+(function(){
+  'use strict';
+  if(window.__tasneefDataSessionV10818) return;
+  window.__tasneefDataSessionV10818=true;
+  const BUILD='V10818_DATA_SESSION_DASHBOARD_RECOVERY';
+  const TOKEN_KEY='tasneef_session_token_v10817';
+  const NOTICE_KEY='tasneef_reauth_notice_v10818';
+  const isMissingFunction=e=>{
+    const code=String(e?.code||'');
+    const text=String(e?.message||e||'').toLowerCase();
+    return code==='PGRST202'||code==='42883'||text.includes('could not find the function')||text.includes('does not exist');
+  };
+  function currentUser(){try{return typeof session==='function'?session():JSON.parse(localStorage.getItem('tasneef_user')||'null')}catch(_){return null}}
+  function redirectForReauth(message){
+    try{localStorage.setItem(NOTICE_KEY,message||'تم تحديث نظام الصلاحيات. سجّل الدخول مرة واحدة لإعادة تحميل البيانات.');}catch(_){}
+    try{localStorage.removeItem('tasneef_user');localStorage.removeItem(TOKEN_KEY);}catch(_){}
+    location.replace('index.html?reauth=1&v='+Date.now());
+  }
+  async function ensureDataSession(){
+    const user=currentUser();
+    if(!user) return true;
+    const token=localStorage.getItem(TOKEN_KEY);
+    if(!token){
+      let probe;
+      try{probe=await window.sb.rpc('get_permissions_version_v10817',{p_session_token:null});}catch(e){probe={error:e};}
+      if(probe?.error && isMissingFunction(probe.error)) return true;
+      redirectForReauth('تم تحديث حماية البيانات. سجّل الدخول مرة واحدة حتى تظهر المشاريع والعمال والمستخدمون بصورة صحيحة.');
+      return false;
+    }
+    let result;
+    try{result=await window.sb.rpc('get_permissions_version_v10817',{p_session_token:token});}catch(e){result={error:e};}
+    if(result?.error){
+      if(isMissingFunction(result.error)) return true;
+      console.warn(BUILD,'invalid permission session',result.error);
+      redirectForReauth('انتهت جلسة الصلاحيات. سجّل الدخول من جديد لاستعادة البيانات.');
+      return false;
+    }
+    const version=Number(result?.data?.permissions_version||0);
+    if(version){
+      try{
+        const u=currentUser()||{};u.permissions_version=version;setSession(u);
+        localStorage.setItem('tasneef_permissions_version_v10817',String(version));
+      }catch(_){}
+    }
+    return true;
+  }
+  window.ensureTasneefDataSessionV10818=ensureDataSession;
+  function wrapInit(name){
+    const old=window[name];
+    if(typeof old!=='function'||old.__v10818SessionGuard) return;
+    const wrapped=async function(){ if(!await ensureDataSession()) return; return await old.apply(this,arguments); };
+    wrapped.__v10818SessionGuard=true;window[name]=wrapped;
+    try{ if(name==='initAdmin') initAdmin=wrapped; if(name==='initSupervisor') initSupervisor=wrapped; if(name==='initTechnician') initTechnician=wrapped; }catch(_){}
+  }
+  ['initAdmin','initSupervisor','initTechnician'].forEach(wrapInit);
+  if(document.getElementById('loginUsername')){
+    const showNotice=()=>{
+      let text='';try{text=localStorage.getItem(NOTICE_KEY)||'';localStorage.removeItem(NOTICE_KEY);}catch(_){}
+      if(!text) return;
+      const el=document.getElementById('loginMsg');
+      if(el){el.textContent=text;el.className='msg err';el.classList.remove('hidden');}
+    };
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',showNotice,{once:true});else showNotice();
+  }
+  window.addEventListener('unhandledrejection',function(ev){
+    const text=String(ev?.reason?.message||ev?.reason||'');
+    if(/row-level security|permission denied|جلسة غير صالحة/i.test(text)) console.warn(BUILD,text);
+  });
+  console.log(BUILD+' loaded');
+})();
+

@@ -23,12 +23,12 @@ input{width:100%;border:1px solid #cbdcd6;border-radius:10px;padding:12px;backgr
 <div class="logo">ت</div><h1>نظام تصنيف للتشغيل</h1><p>تسجيل دخول الإدارة والمشرفين والفنيين</p>
 <label for="loginUsername">اسم المستخدم</label><input id="loginUsername" autocomplete="username" placeholder="مثال: admin أو fahad">
 <label for="loginPassword">كلمة المرور</label><input id="loginPassword" type="password" autocomplete="current-password" placeholder="كلمة المرور">
-<button onclick="login()">دخول</button><div id="loginMsg" class="msg hidden"></div><div class="small">V370 - تسجيل دخول بدون أي دومين خارجي</div>
+<button onclick="login()">دخول</button><div id="loginMsg" class="msg hidden"></div><div class="small">V10818 - جلسة بيانات موحدة وآمنة</div>
 </main>
 <script>
 (async function(){try{localStorage.removeItem('tasneef_force_domain');sessionStorage.removeItem('tasneef_force_domain');if('serviceWorker' in navigator){const regs=await navigator.serviceWorker.getRegistrations();for(const r of regs) await r.unregister();}if(window.caches && location.protocol !== 'file:'){const keys=await caches.keys();for(const k of keys) await caches.delete(k);}}catch(e){}})();
 document.addEventListener('keydown', function(e){ if(e.key === 'Enter') login(); });
 </script>
-<script src="app.js?v=10801-ticket-date-receive-scope"></script>
+<script src="app.js?v=10818-data-session-dashboard-recovery"></script>
 </body>
 </html>
