@@ -1,0 +1,60 @@
+V10815 static acceptance tests: 58/58 passed
+
+PASS JS syntax tasneef_contracts_services_editor_v10807.js
+PASS JS syntax tasneef_projects_clean_v390.js
+PASS JS syntax app.js
+PASS V10815 build in HTML
+PASS single contracts editor script
+PASS project module cache bumped
+PASS dashboard smart alerts root
+PASS stopped contract filter
+PASS strict safe integer project ID
+PASS project master loaded by id
+PASS no project link by name
+PASS project shared fields in contract editor
+PASS project shared fields save diff
+PASS optimistic project conflict check
+PASS cross section project event
+PASS stopped project stays in contracts
+PASS stopped project blocks new service
+PASS project section has shared fields
+PASS project section updated_at conflict
+PASS project status filter includes stopped
+PASS contracts renewal RPC v10815
+PASS contracts nonrenew RPC v10815
+PASS service execution RPC v10815
+PASS save RPC v10815
+PASS decision refreshes affected project
+PASS alert priorities
+PASS alert summaries
+PASS alert filters active/resolved
+PASS service overdue alert cards
+PASS alert detail lazy load
+PASS responsive alert CSS
+PASS main SQL transaction
+PASS projects id asserted bigint
+PASS project_id tables aligned
+PASS project ID backup table
+PASS invalid values reported
+PASS alignment fails atomically
+PASS V10815 project RPC params bigint
+PASS direct bigint project joins
+PASS no V10815 text project parameter
+PASS permission helper
+PASS renew server permission
+PASS nonrenew server permissions
+PASS old action RPCs revoked
+PASS unique notification key
+PASS duplicate alerts resolved not deleted
+PASS notification key includes contract and end date
+PASS resolved notifications preserved
+PASS renew wrapper transaction result
+PASS nonrenew wrapper transaction result
+PASS stopped projects dashboard metric
+PASS overdue services union alerts
+PASS preflight is read safe
+PASS verify checks active duplicate keys
+PASS verify checks history
+PASS no historical table deletes
+PASS balanced dollar quotes
+PASS no browser alert prompt confirm

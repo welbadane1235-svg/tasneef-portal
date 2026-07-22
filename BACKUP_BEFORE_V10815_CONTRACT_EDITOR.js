@@ -1,5 +1,5 @@
 /*
- * Tasneef ContractsServicesEditor V10815
+ * Tasneef ContractsServicesEditor V10814
  * Restores the contracts/services editor only inside #contracts.
  * Lazy-loads a single project's smart contracts, annual services, attachments and audit trail.
  */
@@ -7,9 +7,9 @@
   'use strict';
   if(window.__tasneefContractsServicesEditorV10807) return;
   window.__tasneefContractsServicesEditorV10807=true;
-  window.TASNEEF_BUILD='V10815_CONTRACTS_PROJECTS_DIRECT_SYNC_ALERTS';
+  window.TASNEEF_BUILD='V10814_CONTRACT_ACTOR_ID_TYPE_FIX_R2';
 
-  const VERSION='V10815';
+  const VERSION='V10814-R2';
   const MODAL_ID='contractsServicesEditorV10807';
   const LS_KEY='tasneef_contract_smart_v299';
   const CONTRACT_FILES_BUCKET='contract-files';
@@ -18,7 +18,7 @@
   const $=id=>document.getElementById(id);
   const S=v=>String(v??'').trim();
   const N=v=>{const n=Number(v??0);return Number.isFinite(n)?n:0;};
-  const ID=v=>{const x=Number(S(v));if(!Number.isSafeInteger(x)||x<=0)throw new Error('معرف المشروع غير صالح');return x;};
+  const ID=v=>{const x=S(v);if(!x)throw new Error('معرف السجل غير صالح');return x;};
   const safeUserId=v=>/^\d+$/.test(S(v))?S(v):null;
   const E=v=>S(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const clone=v=>JSON.parse(JSON.stringify(v??null));
@@ -53,9 +53,9 @@
   const DEFAULT_ANNUAL=['غسيل الخزانات','مكافحة الحشرات','تنظيف الواجهات','صيانة المصاعد','صيانة الدفاع المدني','صيانة المسابح','فحص المضخات','صيانة الكاميرات','التشجير','خدمة أخرى'];
 
   const state={
-    open:false,loading:false,saving:false,dirty:false,projectId:null,project:null,projectBaseline:null,smartRow:null,rawPayload:{},model:null,baseline:null,
-    projectsRegistry:[],services:[],attachments:[],audit:[],contractRows:[],mode:'view',showArchived:false,lastError:'',closePending:false,
-    renewal:null,nonRenew:null,serviceExecution:null,alertsLoading:false,alerts:[],alertSummary:{},alertFilter:{scope:'active',priority:'',status:'',project_id:'',contract_type:'',responsible:'',search:''}
+    open:false,loading:false,saving:false,dirty:false,projectId:null,project:null,smartRow:null,rawPayload:{},model:null,baseline:null,
+    services:[],attachments:[],audit:[],contractRows:[],mode:'view',showArchived:false,lastError:'',closePending:false,
+    renewal:null,nonRenew:null,serviceExecution:null,alertsLoading:false
   };
 
   function toast(text,type='ok'){
@@ -74,27 +74,8 @@
     if(/PGRST202|Could not find the function|function .* does not exist|schema cache|bucket not found|storage.*policy|row-level security/i.test(raw))return 'تحديث قاعدة بيانات العقود والتخزين مطلوب. شغّل ملف SQL المرفق ثم أعد المحاولة.';
     return raw||'تعذر تنفيذ العملية. حاول مرة أخرى.';
   }
-  function projectList(){return state.projectsRegistry?.length?state.projectsRegistry:(globalData().projects||[]);}
+  function projectList(){return globalData().projects||[];}
   function projectById(id){return projectList().find(p=>S(p.id)===S(id))||null;}
-  function isStoppedProject(p){return !!p&&(p.is_active===false||['inactive','stopped','ended','archived','موقوف','متوقف','منتهي','مؤرشف'].includes(S(p.status).toLowerCase())||S(p.stopped_reason)==='contract_not_renewed');}
-  function upsertProjectCache(project){
-    if(!project)return;
-    state.projectsRegistry=state.projectsRegistry||[];
-    const i=state.projectsRegistry.findIndex(x=>S(x.id)===S(project.id));if(i>=0)state.projectsRegistry[i]=project;else state.projectsRegistry.push(project);
-    const arr=globalData().projects||(globalData().projects=[]);const j=arr.findIndex(x=>S(x.id)===S(project.id));if(j>=0)arr[j]=project;else if(project.is_active!==false)arr.push(project);
-  }
-  async function loadAllProjects(force=false){
-    if(state.projectsRegistry?.length&&!force)return state.projectsRegistry;
-    const r=await safeSelect('projects',q=>q.select('*').order('name',{ascending:true}).limit(5000));
-    if(!r.error&&Array.isArray(r.data))state.projectsRegistry=r.data;
-    return state.projectsRegistry||[];
-  }
-  async function loadProjectMaster(projectId){
-    const r=await safeSelect('projects',q=>q.select('*').eq('id',ID(projectId)).maybeSingle());
-    if(r.error)throw r.error;
-    if(!r.data)throw new Error('لم يتم العثور على المشروع المحدد.');
-    upsertProjectCache(r.data);return r.data;
-  }
   function supervisorOwns(project){const u=getUser();return role()==='supervisor'&&S(project?.supervisor_id)===S(u.id);}
   function canViewProject(project){
     if(['admin','general_manager','financial_manager','operations_manager','warehouse_manager'].includes(role())) return true;
@@ -224,10 +205,6 @@
     if(t.matches('[data-contract-key][data-contract-field]')){
       const c=state.model.contracts[t.dataset.contractKey];if(c)c[t.dataset.contractField]=t.type==='checkbox'?t.checked:(t.type==='number'?N(t.value):t.value);
       markDirty();
-    }else if(t.matches('[data-project-field]')){
-      const f=t.dataset.projectField;state.project[f]=t.type==='checkbox'?t.checked:t.value;
-      if(f==='status')state.project.is_active=!['inactive','stopped','ended','archived'].includes(S(t.value).toLowerCase());
-      markDirty();
     }else if(t.matches('[data-association-field]')){state.model.association[t.dataset.associationField]=t.value;markDirty();}
     else if(t.matches('[data-annual-index][data-annual-field]')){
       const row=state.model.annualServices[Number(t.dataset.annualIndex)];if(row){row[t.dataset.annualField]=t.type==='number'?N(t.value):t.value;row.remaining_count=Math.max(N(row.visit_count)-N(row.executed_count),0);const rem=$(`csRemain_${t.dataset.annualIndex}`);if(rem)rem.textContent=row.remaining_count;markDirty();}
@@ -245,7 +222,7 @@
     forceClose();
   }
   function forceClose(){
-    $(MODAL_ID)?.classList.add('hidden');$('csEditorGuardV10807')?.classList.add('hidden');document.body.style.overflow='';state.open=false;state.dirty=false;state.projectId=null;state.project=null;state.projectBaseline=null;state.renewal=null;state.nonRenew=null;state.serviceExecution=null;hideActionLayer();
+    $(MODAL_ID)?.classList.add('hidden');$('csEditorGuardV10807')?.classList.add('hidden');document.body.style.overflow='';state.open=false;state.dirty=false;state.projectId=null;state.project=null;state.renewal=null;state.nonRenew=null;state.serviceExecution=null;hideActionLayer();
   }
   function switchTab(tab){
     document.querySelectorAll(`#${MODAL_ID} .cs-editor-tab`).forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
@@ -259,7 +236,9 @@
   }
   async function loadProjectContracts(projectId){
     projectId=ID(projectId);
-    const project=await loadProjectMaster(projectId);
+    let project=projectById(projectId);
+    if(!project){const r=await safeSelect('projects',q=>q.select('*').eq('id',projectId).maybeSingle());project=r.data||null;}
+    if(!project)throw new Error('لم يتم العثور على المشروع المحدد.');
     const r=await safeSelect('project_contract_smart',q=>q.select('*').eq('project_id',projectId).maybeSingle());
     const local=readLegacyLocal(projectId);
     let row=r.data||null,payload=row?.payload||{};
@@ -331,7 +310,7 @@
       const model=normalizeSmart(pc.payload,pc.project);
       model.annualServices=mergeAnnual(model,services);
       model.attachments=buildAttachments(model,attachments);
-      state.services=services;state.attachments=attachments;state.audit=audit;state.contractRows=contractRows;state.model=model;state.baseline=clone(model);state.projectBaseline=clone(pc.project);state.loading=false;state.dirty=false;
+      state.services=services;state.attachments=attachments;state.audit=audit;state.contractRows=contractRows;state.model=model;state.baseline=clone(model);state.loading=false;state.dirty=false;
       renderEditor();setStatus(state.mode==='edit'?'تم تحميل البيانات.':'وضع العرض فقط.','ok');
     }catch(e){
       state.loading=false;state.lastError=friendlyError(e);$('csEditorBodyV10807').innerHTML=`<div class="cs-editor-empty"><h3>تعذر تحميل بيانات العقود والخدمات</h3><p>${E(state.lastError)}</p><button class="cs-editor-btn" data-action="reload">إعادة المحاولة</button></div>`;setStatus(state.lastError,'error');
@@ -344,7 +323,7 @@
     $('csEditorSubtitleV10807').textContent=`${p?.name||'-'} — تحميل عند الطلب فقط — ${state.mode==='edit'?'وضع التعديل':'وضع العرض'}`;
     const contractsCount=CONTRACT_DEFS.filter(d=>m.contracts[d.key]?.enabled).length+(m.contracts.others||[]).filter(x=>!x.is_archived).length;
     const annualCount=(m.annualServices||[]).filter(x=>!x.is_archived).length;
-    $('csEditorSummaryV10807').innerHTML=`<div><small>اسم المشروع</small><b>${E(p?.name||'-')}</b></div><div><small>كود المشروع</small><b>${E(p?.project_code||p?.code||p?.id||'-')}</b></div><div><small>حالة المشروع</small><b>${E(isStoppedProject(p)?'متوقف — لم يجدد العقد':(p?.status||'نشط'))}</b></div><div><small>عدد العقود</small><b>${contractsCount}</b></div><div><small>الخدمات السنوية</small><b>${annualCount}</b></div>`;
+    $('csEditorSummaryV10807').innerHTML=`<div><small>اسم المشروع</small><b>${E(p?.name||'-')}</b></div><div><small>كود المشروع</small><b>${E(p?.code||p?.project_code||p?.id||'-')}</b></div><div><small>حالة المشروع</small><b>${E(p?.is_active===false?'موقوف':(p?.status||'نشط'))}</b></div><div><small>عدد العقود</small><b>${contractsCount}</b></div><div><small>الخدمات السنوية</small><b>${annualCount}</b></div>`;
     $('csEditorBodyV10807').innerHTML=`<section class="cs-editor-pane" data-pane="contracts" id="csContractsPaneV10807"></section><section class="cs-editor-pane hidden" data-pane="annual" id="csAnnualPaneV10807"></section><section class="cs-editor-pane hidden" data-pane="attachments" id="csAttachmentsPaneV10807"></section><section class="cs-editor-pane hidden" data-pane="audit" id="csAuditPaneV10807"></section>`;
     $('csEditorSaveV10807').style.display=isEditable()?'':'none';$('csEditorReasonV10807').disabled=!isEditable();
     renderContractsPane();renderAnnualPane();renderAttachmentsPane();renderAuditPane();switchTab('contracts');
@@ -372,19 +351,9 @@
         ${field(def.key,'scope',def.scope,'textarea')}${field(def.key,'attachment','رابط/اسم مرفق العقد')}${field(def.key,'notes','الملاحظات','textarea')}
       </div></article>`;
   }
-  function projectField(field,label,type='text',extra=''){
-    const p=state.project||{},disabled=!isEditable(),val=p[field]??'';
-    if(type==='select')return `<div class="cs-editor-field"><label>${E(label)}</label><select data-project-field="${field}" ${disabled?'disabled':''}>${[['active','نشط'],['stopped','متوقف'],['inactive','غير نشط'],['ended','منتهي'],['archived','مؤرشف']].map(([v,t])=>`<option value="${v}" ${S(val)===v?'selected':''}>${t}</option>`).join('')}</select></div>`;
-    if(type==='textarea')return `<div class="cs-editor-field span-all"><label>${E(label)}</label><textarea data-project-field="${field}" ${disabled?'disabled':''}>${E(val)}</textarea></div>`;
-    return `<div class="cs-editor-field"><label>${E(label)}</label><input type="${type}" value="${E(dateOnly(val)||val)}" data-project-field="${field}" ${disabled?'disabled':''} ${extra}></div>`;
-  }
   function renderContractsPane(){
-    const pane=$('csContractsPaneV10807');if(!pane)return;const stopped=isStoppedProject(state.project);
-    pane.innerHTML=`${renewalPanelHtml()}${stopped?'<div class="cs-project-stopped-banner"><b>متوقف — لم يجدد العقد</b><span>المشروع محفوظ للعرض التاريخي، وتم تعطيل إنشاء وتنفيذ الخدمات التشغيلية الجديدة.</span></div>':''}<div class="cs-editor-card full cs-project-master-card" style="margin-bottom:14px"><div class="cs-editor-toolbar"><div><h3>بيانات المشروع المشتركة</h3><small>المصدر الوحيد: جدول المشاريع في النظام الموحد — الربط بواسطة project_id الحقيقي</small></div><span class="cs-editor-badge ${stopped?'gray':''}">${stopped?'متوقف':'متزامن'}</span></div><div class="cs-editor-fields">
-      ${projectField('name','اسم المشروع')}${projectField('project_code','كود المشروع')}${projectField('status','حالة المشروع','select')}${projectField('project_type','نوع المشروع')}
-      ${projectField('city','المدينة')}${projectField('district','الحي')}${projectField('responsible_name','اسم المسؤول')}${projectField('contact_phone','رقم التواصل','tel')}
-      ${projectField('contract_start','تاريخ بداية المشروع','date')}${projectField('stopped_at','تاريخ الإيقاف','date')}${projectField('stopped_reason','سبب الإيقاف','textarea')}
-      </div></div>
+    const pane=$('csContractsPaneV10807');if(!pane)return;
+    pane.innerHTML=`${renewalPanelHtml()}<div class="cs-editor-card full" style="margin-bottom:14px"><h3>بيانات الجمعية والتواصل</h3><div class="cs-editor-fields"><div class="cs-editor-field"><label>اسم الجمعية</label><input data-association-field="name" value="${E(state.model.association.name)}" ${!isEditable()?'disabled':''}></div><div class="cs-editor-field"><label>مدير الجمعية</label><input data-association-field="manager" value="${E(state.model.association.manager)}" ${!isEditable()?'disabled':''}></div><div class="cs-editor-field"><label>رقم الجوال</label><input data-association-field="phone" value="${E(state.model.association.phone)}" ${!isEditable()?'disabled':''}></div></div></div>
       <div class="cs-editor-grid">${CONTRACT_DEFS.map(contractCard).join('')}<article class="cs-editor-card full"><div class="cs-editor-toolbar"><h3>العقود الأخرى</h3>${isEditable()?'<button class="cs-editor-btn light" data-action="add-other-contract">إضافة عقد آخر</button>':''}</div>${otherContractsHtml()}</article></div>`;
   }
   function otherContractsHtml(){
@@ -416,7 +385,7 @@
   function renderAnnualPane(){
     const pane=$('csAnnualPaneV10807');if(!pane)return;
     const rows=state.model.annualServices||[];const visible=rows.map((r,i)=>({r,i})).filter(x=>state.showArchived||!x.r.is_archived);
-    pane.innerHTML=`<datalist id="csAnnualNamesV10807">${DEFAULT_ANNUAL.map(x=>`<option value="${E(x)}">`).join('')}</datalist><div class="cs-editor-toolbar"><div><h3>الخدمات السنوية</h3><small>المتبقي = العدد السنوي − عدد مرات التنفيذ المعتمدة</small></div><div class="cs-editor-toolbar-actions"><label class="cs-editor-switch" style="margin:0"><input id="csShowArchivedV10807" type="checkbox" ${state.showArchived?'checked':''}> عرض المؤرشف</label>${isEditable()&&!isStoppedProject(state.project)?'<button class="cs-editor-btn light" data-action="add-service">إضافة خدمة سنوية</button>':(isStoppedProject(state.project)?'<span class="cs-editor-badge gray">المشروع موقوف</span>':'')}</div></div>
+    pane.innerHTML=`<datalist id="csAnnualNamesV10807">${DEFAULT_ANNUAL.map(x=>`<option value="${E(x)}">`).join('')}</datalist><div class="cs-editor-toolbar"><div><h3>الخدمات السنوية</h3><small>المتبقي = العدد السنوي − عدد مرات التنفيذ المعتمدة</small></div><div class="cs-editor-toolbar-actions"><label class="cs-editor-switch" style="margin:0"><input id="csShowArchivedV10807" type="checkbox" ${state.showArchived?'checked':''}> عرض المؤرشف</label>${isEditable()?'<button class="cs-editor-btn light" data-action="add-service">إضافة خدمة سنوية</button>':''}</div></div>
       <div class="cs-editor-table-wrap"><table class="cs-editor-table"><thead><tr><th>اسم الخدمة</th><th>النوع</th><th>العدد السنوي</th><th>المنفذ</th><th>المتبقي</th><th>التكرار</th><th>البداية</th><th>النهاية</th><th>آخر تنفيذ</th><th>الموعد القادم</th><th>الحالة</th><th>الملاحظات</th><th>إجراء</th></tr></thead><tbody>${visible.map(x=>annualRowHtml(x.r,x.i)).join('')||'<tr><td colspan="13"><div class="cs-editor-empty">لا توجد خدمات سنوية مسجلة لهذا المشروع.</div></td></tr>'}</tbody></table></div>`;
   }
   function addAnnualService(){
@@ -463,12 +432,9 @@
   function formatDateTime(v){if(!v)return '-';try{return new Date(v).toLocaleString('ar-SA-u-nu-latn',{timeZone:'Asia/Riyadh'});}catch(_){return S(v);}}
 
   function collectProjectChanges(){
-    const op=state.model.contracts.operation||{},baseOp=state.baseline?.contracts?.operation||{},base=state.projectBaseline||{},p=state.project||{},out={};
-    const fields=['name','project_code','status','project_type','city','district','responsible_name','contact_phone','contract_start','stopped_at','stopped_reason'];
-    fields.forEach(f=>{const a=f.includes('_at')||f==='contract_start'?dateOnly(base[f]):base[f];const b=f.includes('_at')||f==='contract_start'?dateOnly(p[f]):p[f];if(changed(a,b))out[f]=b||null;});
-    if(dateOnly(op.start_date)!==dateOnly(baseOp.start_date))out.contract_start=dateOnly(op.start_date)||null;
-    if(dateOnly(op.end_date)!==dateOnly(baseOp.end_date))out.contract_end=dateOnly(op.end_date)||null;
-    if(Object.prototype.hasOwnProperty.call(out,'status')){out.is_active=!['inactive','stopped','ended','archived'].includes(S(out.status).toLowerCase());if(out.is_active){out.stopped_reason=null;out.stopped_at=null;}}
+    const op=state.model.contracts.operation||{},base=state.baseline?.contracts?.operation||{},out={};
+    if(dateOnly(op.start_date)!==dateOnly(base.start_date))out.contract_start=dateOnly(op.start_date)||null;
+    if(dateOnly(op.end_date)!==dateOnly(base.end_date))out.contract_end=dateOnly(op.end_date)||null;
     return out;
   }
   function changed(a,b){return JSON.stringify(a??null)!==JSON.stringify(b??null);}
@@ -494,7 +460,6 @@
   }
   function buildAuditRows(base,current){
     const out=[];
-    diffObjects(state.projectBaseline||{},state.project||{},'project',out);
     diffObjects(base.contracts||{},current.contracts||{},'contracts',out);
     diffObjects(base.association||{},current.association||{},'association',out);
     const annualFields=['service_name','service_type','frequency','visit_count','executed_count','remaining_count','start_date','end_date','last_execution_date','next_due_date','status','notes','is_archived'];
@@ -520,8 +485,8 @@
   async function saveViaRpc(changes,reason){
     const c=client();if(!c)throw new Error('تعذر الاتصال بقاعدة البيانات.');
     const u=getUser();
-    const args={p_project_id:ID(state.projectId),p_expected_project_updated_at:state.projectBaseline?.updated_at||null,p_expected_smart_updated_at:state.smartRow?.updated_at||null,p_smart_payload:changes.smartCurrent,p_project_changes:changes.projectChanges,p_service_changes:changes.serviceChanges,p_new_services:changes.newServices,p_archived_ids:changes.archivedIds,p_audit_rows:changes.auditRows,p_user_id:S(u.id),p_user_name:S(u.full_name||u.username),p_reason:reason,p_source_section:'contracts_services'};
-    const r=await c.rpc('save_contracts_services_editor_v10815',args);
+    const args={p_project_id:ID(state.projectId),p_expected_smart_updated_at:state.smartRow?.updated_at||null,p_smart_payload:changes.smartCurrent,p_project_changes:changes.projectChanges,p_service_changes:changes.serviceChanges,p_new_services:changes.newServices,p_archived_ids:changes.archivedIds,p_audit_rows:changes.auditRows,p_user_id:S(u.id),p_user_name:S(u.full_name||u.username),p_reason:reason};
+    const r=await c.rpc('save_contracts_services_editor_v10814',args);
     if(r.error)throw r.error;
     return r.data;
   }
@@ -529,12 +494,10 @@
   async function fallbackSave(changes,reason){
     const c=client();if(!c)throw new Error('تعذر الاتصال بقاعدة البيانات.');
     const u=getUser(),pid=ID(state.projectId);
-    const projectLatest=await c.from('projects').select('id,updated_at').eq('id',pid).maybeSingle();
-    if(!projectLatest.error&&state.projectBaseline?.updated_at&&projectLatest.data?.updated_at&&S(projectLatest.data.updated_at)!==S(state.projectBaseline.updated_at))throw new Error('تم تعديل بيانات المشروع من مستخدم آخر. يرجى تحديث النافذة قبل الحفظ.');
     const latest=await c.from('project_contract_smart').select('project_id,updated_at').eq('project_id',pid).maybeSingle();
     if(!latest.error&&state.smartRow?.updated_at&&latest.data?.updated_at&&S(latest.data.updated_at)!==S(state.smartRow.updated_at))throw new Error('تم تعديل هذا السجل من مستخدم آخر. حدّث البيانات قبل الحفظ.');
     if(changes.smartChanged){const r=await c.from('project_contract_smart').upsert({project_id:pid,payload:changes.smartCurrent,updated_at:nowIso(),updated_by:Number(u.id)||null},{onConflict:'project_id'});if(r.error)throw r.error;}
-    if(Object.keys(changes.projectChanges).length){const r=await c.from('projects').update(Object.assign({},changes.projectChanges,{updated_at:nowIso()})).eq('id',pid);if(r.error)throw r.error;}
+    if(Object.keys(changes.projectChanges).length){const r=await c.from('projects').update(Object.assign({},changes.projectChanges)).eq('id',pid);if(r.error)throw r.error;}
     for(const row of changes.serviceChanges){
       if(row.expected_updated_at){const chk=await c.from('contract_services').select('updated_at').eq('id',row.id).maybeSingle();if(!chk.error&&chk.data?.updated_at&&S(chk.data.updated_at)!==S(row.expected_updated_at))throw new Error('تم تعديل إحدى الخدمات من مستخدم آخر. حدّث البيانات قبل الحفظ.');}
       const payload=Object.assign({},row);delete payload.id;delete payload.expected_updated_at;delete payload.archive_reason;const r=await c.from('contract_services').update(Object.assign(payload,{updated_at:nowIso()})).eq('id',row.id);if(r.error)throw r.error;
@@ -568,9 +531,6 @@
       const c=client();if(c){const pr=await c.from('projects').select('*').eq('id',state.projectId).maybeSingle();if(!pr.error&&pr.data){const arr=projectList(),idx=arr.findIndex(x=>S(x.id)===S(state.projectId));if(idx>=0)arr[idx]=pr.data;state.project=pr.data;}}
       if(typeof window.renderContracts==='function')window.renderContracts();
       if(typeof window.renderContractServices==='function')window.renderContractServices();
-      if(typeof window.renderContractAlerts==='function')window.renderContractAlerts(true);
-      if(window.tasneefProjectsCleanV390?.refreshAll)window.tasneefProjectsCleanV390.refreshAll();
-      window.dispatchEvent(new CustomEvent('tasneef:project-updated',{detail:{projectId:S(state.projectId),project:state.project,source:'contracts_services'}}));
     }catch(e){console.warn(e);}
   }
 
@@ -612,121 +572,35 @@
       if(file)uploaded=await uploadRenewalFile(file);
       const attachment=uploaded||{name:external,file_url:external,storage_bucket:'',storage_path:'',mime_type:'',size_bytes:0};
       const args={p_project_id:ID(state.projectId),p_contract_id:S(state.renewal.contractId)||null,p_contract_key:S(state.renewal.contractKey),p_new_start:start,p_new_end:end,p_new_value:N($('csRenewValueV10814')?.value),p_provider:S($('csRenewProviderV10814')?.value),p_annual_services:collectRenewalServices(),p_notes:S($('csRenewNotesV10814')?.value),p_attachment:attachment,p_alert_date:dateOnly($('csRenewAlertV10814')?.value)||null,p_reactivate:!!$('csRenewReactivateV10814')?.checked,p_user_id:S(u.id),p_user_name:S(u.full_name||u.username)};
-      const r=await c.rpc('renew_project_contract_v10815',args);if(r.error)throw r.error;committed=true;state.renewal=null;toast('تم تجديد العقد وإنشاء عقد جديد مع حفظ العقد السابق');await refreshAffectedProject();await openEditor(state.projectId,'edit',true);await renderContractAlerts(true);
+      const r=await c.rpc('renew_project_contract_v10814',args);if(r.error)throw r.error;committed=true;state.renewal=null;toast('تم تجديد العقد وإنشاء عقد جديد مع حفظ العقد السابق');await openEditor(state.projectId,'edit',true);renderContractAlerts();
     }catch(e){if(uploaded?.storage_path&&!committed){try{await c.storage.from(uploaded.storage_bucket||CONTRACT_FILES_BUCKET).remove([uploaded.storage_path]);}catch(_){}}const t=friendlyError(e);setStatus(t,'error');toast(t,'error');}finally{state.saving=false;}
   }
   async function startNonRenew(projectId,contractKey='operation',contractId=null){
     if(!canNonRenew()||!canStopFromContract()){toast('لا توجد صلاحية لعدم التجديد وإيقاف المشروع','error');return;}
     await openEditor(ID(projectId),'view');if(!state.open||state.lastError)return;const c=state.model.contracts[contractKey]||emptyContract(),row=(state.contractRows||[]).find(x=>S(x.id)===S(contractId))||currentContractRow(contractKey);state.nonRenew={contractKey,contractId:S(contractId||row?.id||''),contractRow:row};
-    showActionLayer(`<h3>تأكيد عدم التجديد وإيقاف المشروع</h3><p class="cs-action-warning">سيتم إنهاء العقد وإيقاف المشروع وإخفاؤه من العمليات الحالية. لن يتم حذف البيانات التاريخية أو المرفقات.</p><div class="cs-renew-old"><div><small>المشروع</small><b>${E(state.project?.name||'-')}</b></div><div><small>العقد</small><b>${E(contractDef(contractKey).title)}</b></div><div><small>رقم العقد</small><b>${E(c.contract_number||row?.contract_number||'-')}</b></div><div><small>تاريخ النهاية</small><b>${E(dateOnly(c.end_date)||dateOnly(row?.end_date)||'-')}</b></div></div><div class="cs-editor-field"><label>سبب عدم التجديد</label><select id="csNonRenewReasonV10814"><option value="">اختر السبب</option>${['السعر','العميل لم يرغب بالتجديد','تم التعاقد مع شركة أخرى','عدم رضا العميل','انتهاء النشاط','المشروع مغلق','قرار إداري','سبب آخر'].map(x=>`<option>${x}</option>`).join('')}</select></div><div class="cs-editor-field"><label>تاريخ إيقاف المشروع</label><input id="csNonRenewStopDateV10815" type="date" value="${dateOnly(new Date().toISOString())}"></div><div class="cs-editor-field"><label>تفاصيل السبب والملاحظات</label><textarea id="csNonRenewDetailsV10814"></textarea></div><div class="cs-editor-guard-actions"><button class="cs-editor-btn danger" data-action="nonrenew-confirm">تأكيد عدم التجديد</button><button class="cs-editor-btn light" data-action="nonrenew-cancel">إلغاء</button></div>`);
+    showActionLayer(`<h3>تأكيد عدم التجديد وإيقاف المشروع</h3><p class="cs-action-warning">سيتم إنهاء العقد وإيقاف المشروع وإخفاؤه من العمليات الحالية. لن يتم حذف البيانات التاريخية أو المرفقات.</p><div class="cs-renew-old"><div><small>المشروع</small><b>${E(state.project?.name||'-')}</b></div><div><small>العقد</small><b>${E(contractDef(contractKey).title)}</b></div><div><small>رقم العقد</small><b>${E(c.contract_number||row?.contract_number||'-')}</b></div><div><small>تاريخ النهاية</small><b>${E(dateOnly(c.end_date)||dateOnly(row?.end_date)||'-')}</b></div></div><div class="cs-editor-field"><label>سبب عدم التجديد</label><select id="csNonRenewReasonV10814"><option value="">اختر السبب</option>${['السعر','العميل لم يرغب بالتجديد','تم التعاقد مع شركة أخرى','عدم رضا العميل','انتهاء النشاط','المشروع مغلق','قرار إداري','سبب آخر'].map(x=>`<option>${x}</option>`).join('')}</select></div><div class="cs-editor-field"><label>تفاصيل السبب</label><textarea id="csNonRenewDetailsV10814"></textarea></div><div class="cs-editor-guard-actions"><button class="cs-editor-btn danger" data-action="nonrenew-confirm">تأكيد عدم التجديد</button><button class="cs-editor-btn light" data-action="nonrenew-cancel">إلغاء</button></div>`);
   }
   async function confirmNonRenew(){
     if(!state.nonRenew||state.saving)return;const reason=S($('csNonRenewReasonV10814')?.value),details=S($('csNonRenewDetailsV10814')?.value);if(!reason)return toast('اختر سبب عدم التجديد','error');if(reason==='سبب آخر'&&!details)return toast('اكتب تفاصيل السبب الآخر','error');const c=client(),u=getUser();if(!c)return;
-    state.saving=true;try{const r=await c.rpc('non_renew_project_contract_v10815',{p_project_id:ID(state.projectId),p_contract_id:S(state.nonRenew.contractId)||null,p_contract_key:S(state.nonRenew.contractKey),p_reason:reason,p_details:details,p_stop_date:dateOnly($('csNonRenewStopDateV10815')?.value)||dateOnly(new Date().toISOString()),p_user_id:S(u.id),p_user_name:S(u.full_name||u.username)});if(r.error)throw r.error;const p=projectById(state.projectId);if(p){p.is_active=false;p.status='stopped';p.stopped_reason='contract_not_renewed';}hideActionLayer();state.dirty=false;toast('تم إيقاف العقد والمشروع مع الاحتفاظ بجميع البيانات التاريخية');await refreshAffectedProject();forceClose();await renderContractsOnly();await renderContractAlerts(true);}
+    state.saving=true;try{const r=await c.rpc('non_renew_project_contract_v10814',{p_project_id:ID(state.projectId),p_contract_id:S(state.nonRenew.contractId)||null,p_contract_key:S(state.nonRenew.contractKey),p_reason:reason,p_details:details,p_user_id:S(u.id),p_user_name:S(u.full_name||u.username)});if(r.error)throw r.error;const p=projectById(state.projectId);if(p){p.is_active=false;p.status='stopped';p.stopped_reason='contract_not_renewed';}hideActionLayer();state.dirty=false;toast('تم إيقاف العقد والمشروع مع الاحتفاظ بجميع البيانات التاريخية');forceClose();renderContractsOnly();renderContractAlerts();}
     catch(e){const t=friendlyError(e);toast(t,'error');setStatus(t,'error');}finally{state.saving=false;}
   }
   async function startServiceExecution(serviceId){
     let row=(globalData().contractServices||[]).find(x=>S(x.id)===S(serviceId));if(!row){const r=await safeSelect('contract_services',q=>q.select('*').eq('id',S(serviceId)).maybeSingle());row=r.data||null;}if(!row||!row.project_id)return toast('تعذر تحديد المشروع المرتبط بالخدمة','error');
-    await openEditor(ID(row.project_id),'edit');if(!state.open||state.lastError)return;if(isStoppedProject(state.project))return toast('لا يمكن تنفيذ خدمة جديدة لمشروع موقوف','error');state.serviceExecution=row;switchTab('annual');showActionLayer(`<h3>تسجيل تنفيذ خدمة سنوية</h3><div class="cs-renew-old"><div><small>المشروع</small><b>${E(row.project_name||state.project?.name||'-')}</b></div><div><small>الخدمة</small><b>${E(row.service_name||'-')}</b></div><div><small>المنفذ سابقًا</small><b>${N(row.executed_count)}</b></div><div><small>المتبقي</small><b>${Math.max(N(row.visit_count)-N(row.executed_count),0)}</b></div></div><div class="cs-editor-fields"><div class="cs-editor-field"><label>تاريخ التنفيذ</label><input id="csExecuteDateV10814" type="date" value="${dateOnly(new Date().toISOString())}"></div><div class="cs-editor-field"><label>اسم المنفذ</label><input id="csExecuteByV10814" value="${E(getUser().full_name||getUser().username||'')}"></div><div class="cs-editor-field span-all"><label>ملاحظات التنفيذ</label><textarea id="csExecuteNotesV10814"></textarea></div></div><div class="cs-editor-guard-actions"><button class="cs-editor-btn" data-action="execute-service-confirm">حفظ التنفيذ</button><button class="cs-editor-btn light" data-action="execute-service-cancel">إلغاء</button></div>`);
+    await openEditor(ID(row.project_id),'edit');if(!state.open||state.lastError)return;state.serviceExecution=row;switchTab('annual');showActionLayer(`<h3>تسجيل تنفيذ خدمة سنوية</h3><div class="cs-renew-old"><div><small>المشروع</small><b>${E(row.project_name||state.project?.name||'-')}</b></div><div><small>الخدمة</small><b>${E(row.service_name||'-')}</b></div><div><small>المنفذ سابقًا</small><b>${N(row.executed_count)}</b></div><div><small>المتبقي</small><b>${Math.max(N(row.visit_count)-N(row.executed_count),0)}</b></div></div><div class="cs-editor-fields"><div class="cs-editor-field"><label>تاريخ التنفيذ</label><input id="csExecuteDateV10814" type="date" value="${dateOnly(new Date().toISOString())}"></div><div class="cs-editor-field"><label>اسم المنفذ</label><input id="csExecuteByV10814" value="${E(getUser().full_name||getUser().username||'')}"></div><div class="cs-editor-field span-all"><label>ملاحظات التنفيذ</label><textarea id="csExecuteNotesV10814"></textarea></div></div><div class="cs-editor-guard-actions"><button class="cs-editor-btn" data-action="execute-service-confirm">حفظ التنفيذ</button><button class="cs-editor-btn light" data-action="execute-service-cancel">إلغاء</button></div>`);
   }
   async function confirmServiceExecution(){
-    const row=state.serviceExecution;if(!row||state.saving)return;const c=client(),u=getUser();if(!c)return;state.saving=true;try{const r=await c.rpc('execute_annual_service_v10815',{p_service_id:S(row.id),p_project_id:ID(row.project_id),p_execution_date:dateOnly($('csExecuteDateV10814')?.value),p_executor:S($('csExecuteByV10814')?.value),p_notes:S($('csExecuteNotesV10814')?.value),p_user_id:S(u.id),p_user_name:S(u.full_name||u.username)});if(r.error)throw r.error;hideActionLayer();toast('تم تسجيل تنفيذ الخدمة بنجاح');await refreshAffectedProject();await openEditor(state.projectId,'edit',true);}
+    const row=state.serviceExecution;if(!row||state.saving)return;const c=client(),u=getUser();if(!c)return;state.saving=true;try{const r=await c.rpc('execute_annual_service_v10814',{p_service_id:S(row.id),p_project_id:ID(row.project_id),p_execution_date:dateOnly($('csExecuteDateV10814')?.value),p_executor:S($('csExecuteByV10814')?.value),p_notes:S($('csExecuteNotesV10814')?.value),p_user_id:S(u.id),p_user_name:S(u.full_name||u.username)});if(r.error)throw r.error;hideActionLayer();toast('تم تسجيل تنفيذ الخدمة بنجاح');await openEditor(state.projectId,'edit',true);if(typeof window.refreshAll==='function')await window.refreshAll();}
     catch(e){const t=friendlyError(e);toast(t,'error');setStatus(t,'error');}finally{state.saving=false;}
   }
-  function alertPriority(days,status){
-    if(['renewed','not_renewed','resolved'].includes(S(status)))return 'resolved';
-    if(days<0)return 'urgent';if(days<=7)return 'high';if(days<=30)return 'medium';return 'low';
-  }
-  function alertPriorityText(v){return ({urgent:'عاجل',high:'مرتفع',medium:'متوسط',low:'منخفض',resolved:'محسوم'}[S(v)]||S(v)||'منخفض');}
-  function alertScopeLabel(v){return S(v)==='resolved'?'التنبيهات المحسومة':'التنبيهات النشطة';}
   async function loadExpiryRegistry(){
-    await loadAllProjects();
-    const threshold=new Date();threshold.setDate(threshold.getDate()+90);const end=dateOnly(threshold.toISOString());
-    const r=await safeSelect('contracts',q=>q.select('*').lte('end_date',end).order('end_date',{ascending:true}).limit(1000));
-    if(!r.error&&r.data?.length)return r.data;
-    return projectList().filter(projectVisible).map(p=>({id:null,project_id:p.id,project_name:p.name,contract_key:'operation',contract_type:'عقد التشغيل الأساسي',contract_number:'',provider:'',end_date:projectEnd(p),status:contractInfo(p).key==='expired'?'expired':'expiring',is_active:!isStoppedProject(p)})).filter(x=>x.end_date&&daysLeft(x.end_date)<=90);
+    const threshold=new Date();threshold.setDate(threshold.getDate()+30);const end=dateOnly(threshold.toISOString());const r=await safeSelect('contracts',q=>q.select('*').eq('is_active',true).lte('end_date',end).order('end_date',{ascending:true}).limit(500));if(!r.error&&r.data?.length)return r.data;
+    return projectList().filter(projectVisible).map(p=>({id:null,project_id:p.id,project_name:p.name,contract_key:'operation',contract_type:'عقد التشغيل الأساسي',contract_number:'',provider:'',end_date:projectEnd(p),status:contractInfo(p).key==='expired'?'expired':'expiring',is_active:true})).filter(x=>x.end_date&&daysLeft(x.end_date)<=30);
   }
-  async function loadAlertPayload(){
-    const c=client(),f=state.alertFilter||{};
-    if(c){
-      try{await c.rpc('refresh_contract_expiry_notifications_v10815');}catch(_){}
-      const r=await c.rpc('get_contract_dashboard_alerts_v10815',{p_scope:S(f.scope||'active'),p_priority:S(f.priority)||null,p_status:S(f.status)||null,p_project_id:f.project_id?ID(f.project_id):null,p_contract_type:S(f.contract_type)||null,p_responsible:S(f.responsible)||null,p_search:S(f.search)||null,p_limit:500});
-      if(!r.error&&r.data?.rows)return r.data;
-      if(r.error&&!/function .* does not exist|PGRST202|schema cache/i.test(S(r.error.message)))console.warn('[ContractsServicesEditor V10815 alerts]',r.error.message);
-    }
-    const rows=await loadExpiryRegistry(),seen=new Set(),out=[];
-    rows.forEach(x=>{
-      const p=projectById(x.project_id)||{},d=daysLeft(dateOnly(x.end_date));if(d==null)return;
-      const resolved=['renewed','not_renewed','resolved'].includes(S(x.notification_status||x.status))||x.is_active===false;
-      const scope=resolved?'resolved':'active';if(S(f.scope||'active')!==scope)return;
-      const key=S(x.notification_key||`contract_expiry:${x.id||x.contract_key}:${dateOnly(x.end_date)}`);
-      if(seen.has(key))return;seen.add(key);
-      const row=Object.assign({},x,{notification_key:key,project_name:x.project_name||p.name||'-',project_status:isStoppedProject(p)?'stopped':(p.status||'active'),responsible:p.responsible_name||p.supervisor_name||'',days_remaining:d,priority:alertPriority(d,resolved?S(x.status):''),notification_status:scope==='resolved'?'resolved':'open'});
-      if(f.priority&&S(row.priority)!==S(f.priority))return;if(f.status&&S(row.status)!==S(f.status))return;if(f.project_id&&S(row.project_id)!==S(f.project_id))return;if(f.contract_type&&S(row.contract_type)!==S(f.contract_type))return;if(f.responsible&&!S(row.responsible).includes(S(f.responsible)))return;if(f.search&&!S([row.project_name,row.contract_number,row.provider].join(' ')).toLowerCase().includes(S(f.search).toLowerCase()))return;
-      out.push(row);
-    });
-    const services=(globalData().contractServices||[]).filter(s=>!s.is_archived&&S(s.status)!=='cancelled_due_to_non_renewal'&&dateOnly(s.next_due_date)&&daysLeft(dateOnly(s.next_due_date))<0);
-    const allContracts=rows;
-    const summary={expired:allContracts.filter(x=>daysLeft(dateOnly(x.end_date))<0&&x.is_active!==false).length,due_7:allContracts.filter(x=>{const d=daysLeft(dateOnly(x.end_date));return d>=0&&d<=7&&x.is_active!==false}).length,due_30:allContracts.filter(x=>{const d=daysLeft(dateOnly(x.end_date));return d>7&&d<=30&&x.is_active!==false}).length,due_60:allContracts.filter(x=>{const d=daysLeft(dateOnly(x.end_date));return d>30&&d<=60&&x.is_active!==false}).length,overdue_services:services.length,needs_decision:allContracts.filter(x=>daysLeft(dateOnly(x.end_date))<0&&x.is_active!==false).length,renewed_recently:allContracts.filter(x=>S(x.status)==='renewed').length,stopped_nonrenew:projectList().filter(p=>S(p.stopped_reason)==='contract_not_renewed'||(isStoppedProject(p)&&S(p.status)==='stopped')).length,active:out.filter(x=>S(x.notification_status)!=='resolved').length,resolved:out.filter(x=>S(x.notification_status)==='resolved').length,duplicates_fixed:0};
-    return {rows:out,summary};
-  }
-  function alertSummaryHtml(s){
-    const cards=[['عقود منتهية',s.expired||0,'urgent'],['تنتهي خلال 7 أيام',s.due_7||0,'high'],['تنتهي خلال 30 يومًا',s.due_30||0,'medium'],['تنتهي خلال 60 يومًا',s.due_60||0,'low'],['خدمات متأخرة',s.overdue_services||0,'urgent'],['مشاريع تحتاج قرار',s.needs_decision||0,'high'],['مجدد مؤخرًا',s.renewed_recently||0,'renewed'],['متوقفة لعدم التجديد',s.stopped_nonrenew||0,'resolved']];
-    return `<div class="cs-alert-summary-v10815">${cards.map(x=>`<div class="${x[2]}"><small>${E(x[0])}</small><b>${N(x[1])}</b></div>`).join('')}</div>`;
-  }
-  function alertFiltersHtml(){
-    const f=state.alertFilter||{},projects=projectList().filter(projectVisible);
-    return `<div class="cs-alert-filters-v10815">
-      <select onchange="ContractsServicesEditor.setAlertFilter('scope',this.value)"><option value="active" ${f.scope==='active'?'selected':''}>التنبيهات النشطة</option><option value="resolved" ${f.scope==='resolved'?'selected':''}>التنبيهات المحسومة</option></select>
-      <select onchange="ContractsServicesEditor.setAlertFilter('priority',this.value)"><option value="">كل الأولويات</option>${[['urgent','عاجل'],['high','مرتفع'],['medium','متوسط'],['low','منخفض'],['resolved','محسوم']].map(x=>`<option value="${x[0]}" ${f.priority===x[0]?'selected':''}>${x[1]}</option>`).join('')}</select>
-      <select onchange="ContractsServicesEditor.setAlertFilter('status',this.value)"><option value="">كل الحالات</option><option value="expired" ${f.status==='expired'?'selected':''}>منتهي</option><option value="expiring" ${f.status==='expiring'?'selected':''}>قريب الانتهاء</option><option value="renewed" ${f.status==='renewed'?'selected':''}>تم التجديد</option><option value="not_renewed" ${f.status==='not_renewed'?'selected':''}>لم يجدد</option><option value="service_overdue" ${f.status==='service_overdue'?'selected':''}>خدمات متأخرة</option></select>
-      <select onchange="ContractsServicesEditor.setAlertFilter('project_id',this.value)"><option value="">كل المشاريع</option>${projects.map(p=>`<option value="${E(p.id)}" ${S(f.project_id)===S(p.id)?'selected':''}>${E(p.name)}</option>`).join('')}</select>
-      <input placeholder="نوع العقد" value="${E(f.contract_type||'')}" onchange="ContractsServicesEditor.setAlertFilter('contract_type',this.value)">
-      <input placeholder="المسؤول" value="${E(f.responsible||'')}" onchange="ContractsServicesEditor.setAlertFilter('responsible',this.value)">
-      <input placeholder="بحث بالمشروع أو رقم العقد" value="${E(f.search||'')}" oninput="ContractsServicesEditor.setAlertFilter('search',this.value,true)">
-    </div>`;
-  }
-  function alertCardHtml(x){
-    const p=projectById(x.project_id)||{},isService=S(x.alert_kind)==='service'||S(x.status)==='service_overdue'||S(x.notification_key).startsWith('annual_service:'),d=Number.isFinite(Number(x.days_remaining))?Number(x.days_remaining):daysLeft(dateOnly(x.end_date)),resolved=!isService&&(S(x.notification_status)==='resolved'||['renewed','not_renewed'].includes(S(x.status))),priority=resolved?'resolved':S(x.priority||alertPriority(d,x.status));
-    const renew=!isService&&canRenew()&&!resolved?`<button class="cs-editor-btn" onclick="ContractsServicesEditor.startRenewal('${E(x.project_id)}','${E(x.contract_key||'operation')}','${E(x.contract_id||x.id||'')}')">تجديد</button>`:'';
-    const non=!isService&&canNonRenew()&&canStopFromContract()&&!resolved?`<button class="cs-editor-btn danger" onclick="ContractsServicesEditor.startNonRenew('${E(x.project_id)}','${E(x.contract_key||'operation')}','${E(x.contract_id||x.id||'')}')">لم يجدد</button>`:'';
-    const follow=!isService&&!resolved?`<button class="cs-editor-btn light" onclick="ContractsServicesEditor.snoozeAlert('${E(x.notification_key||'')}',7)">تأجيل المتابعة</button>`:'';
-    const title=isService?`خدمة سنوية متأخرة: ${S(x.service_name||x.contract_type||'خدمة')}`:(x.contract_type||contractDef(x.contract_key||'operation').title);
-    const dateLabel=isService?'موعد الاستحقاق':'تاريخ الانتهاء';
-    const timeLabel=isService?(d<0?`متأخرة منذ ${Math.abs(d)} يوم`:`متبقي ${d} يوم`):(d<0?`منتهي منذ ${Math.abs(d)} يوم`:`متبقي ${d} يوم`);
-    return `<article class="cs-smart-alert-v10815 priority-${E(priority)} ${isService?'service-overdue':''}">
-      <div class="cs-smart-alert-main"><div class="cs-smart-alert-head"><span class="cs-alert-priority ${E(priority)}">${E(alertPriorityText(priority))}</span><h4>${E(x.project_name||p.name||'-')}</h4></div>
-      <p><b>${E(title)}</b> — ${E(x.provider||x.executor_name||(isService?'المنفذ غير محدد':'مقدم الخدمة غير محدد'))}</p>
-      <div class="cs-smart-alert-meta"><span>${dateLabel}: <b>${E(dateOnly(x.end_date)||'-')}</b></span><span>${E(timeLabel)}</span><span>حالة المشروع: ${E(isStoppedProject(p)||S(x.project_status)==='stopped'?'متوقف':'نشط')}</span><span>المسؤول: ${E(x.responsible||p.responsible_name||'-')}</span><span>آخر إجراء: ${E(x.last_action||x.resolution||'-')}</span></div></div>
-      <div class="cs-expiry-actions">${renew}${non}<button class="cs-editor-btn light" onclick="ContractsServicesEditor.openAlertDetails('${E(x.notification_key||'')}','${E(x.project_id)}','${E(x.contract_id||x.service_id||x.id||'')}')">عرض التفاصيل</button>${follow}</div>
-    </article>`;
-  }
-  let alertSearchTimer=null;
-  function setAlertFilter(key,value,debounce=false){state.alertFilter[key]=value;if(debounce){clearTimeout(alertSearchTimer);alertSearchTimer=setTimeout(()=>renderContractAlerts(true),250);}else renderContractAlerts(true);}
-  async function renderContractAlerts(force=false){
-    if(state.alertsLoading&&!force)return;state.alertsLoading=true;const targets=[$('contractsAlertsList'),$('contractDashboardAlerts')].filter(Boolean);targets.forEach(x=>x.innerHTML='<div class="cs-editor-empty">جاري تحميل تنبيهات العقود والخدمات...</div>');
-    try{await loadAllProjects(force);const payload=await loadAlertPayload();state.alerts=payload.rows||[];state.alertSummary=payload.summary||{};const html=`${alertSummaryHtml(state.alertSummary)}${alertFiltersHtml()}<div class="cs-smart-alert-list-v10815"><div class="cs-alert-list-title"><b>${E(alertScopeLabel(state.alertFilter.scope))}</b><span>${state.alerts.length} تنبيه</span></div>${state.alerts.map(alertCardHtml).join('')||'<div class="cs-editor-empty">لا توجد تنبيهات مطابقة للفلاتر الحالية.</div>'}</div>`;targets.forEach(x=>x.innerHTML=html);}
+  async function renderContractAlerts(){
+    if(state.alertsLoading)return;state.alertsLoading=true;const targets=[$('contractsAlertsList'),$('contractDashboardAlerts')].filter(Boolean);targets.forEach(x=>x.innerHTML='<div class="cs-editor-empty">جاري تحميل تنبيهات العقود...</div>');
+    try{const rows=await loadExpiryRegistry(),seen=new Set(),clean=rows.filter(x=>{const k=`${S(x.project_id)}:${S(x.contract_key)}:${dateOnly(x.end_date)}`;if(seen.has(k)||['resolved','renewed','not_renewed','archived'].includes(S(x.notification_status||x.status)))return false;seen.add(k);return true;});const html=clean.map(x=>{const p=projectById(x.project_id)||{},d=daysLeft(dateOnly(x.end_date)),expired=d<0,renew=canRenew()?`<button class="cs-editor-btn" onclick="ContractsServicesEditor.startRenewal('${E(x.project_id)}','${E(x.contract_key||'operation')}','${E(x.id||'')}')">تجديد</button>`:'',non=canNonRenew()&&canStopFromContract()?`<button class="cs-editor-btn danger" onclick="ContractsServicesEditor.startNonRenew('${E(x.project_id)}','${E(x.contract_key||'operation')}','${E(x.id||'')}')">لم يجدد</button>`:'';return `<article class="cs-expiry-alert ${expired?'expired':'soon'}"><div><h4>${E(x.project_name||p.name||'-')} — ${E(x.contract_type||contractDef(x.contract_key||'operation').title)}</h4><p>رقم العقد: ${E(x.contract_number||'-')} | مقدم الخدمة: ${E(x.provider||'-')}</p><small>تاريخ الانتهاء: ${E(dateOnly(x.end_date)||'-')} — ${expired?`منتهي منذ ${Math.abs(d)} يوم`:`متبقي ${d} يوم`}</small></div><div class="cs-expiry-actions">${renew}${non}</div></article>`;}).join('')||'<div class="cs-editor-empty">لا توجد عقود منتهية أو قريبة الانتهاء تحتاج قرارًا.</div>';targets.forEach(x=>x.innerHTML=html);}
     catch(e){const t=friendlyError(e);targets.forEach(x=>x.innerHTML=`<div class="cs-editor-empty">${E(t)}</div>`);}finally{state.alertsLoading=false;}
-  }
-  async function snoozeAlert(notificationKey,days=7){
-    const c=client();if(!c||!notificationKey)return;const u=getUser();try{const r=await c.rpc('snooze_contract_alert_v10815',{p_notification_key:S(notificationKey),p_days:N(days)||7,p_user_id:S(u.id),p_user_name:S(u.full_name||u.username)});if(r.error)throw r.error;toast('تم تأجيل المتابعة');renderContractAlerts(true);}catch(e){toast(friendlyError(e),'error');}
-  }
-  async function openAlertDetails(notificationKey,projectId,recordId){
-    await openEditor(ID(projectId),'view',true);if(!state.open||state.lastError)return;const c=client();let detail=null;
-    const isService=S(notificationKey).startsWith('annual_service:');
-    if(c&&notificationKey&&!isService){const r=await c.rpc('get_contract_alert_detail_v10815',{p_notification_key:S(notificationKey)});if(!r.error)detail=r.data;}
-    if(isService){
-      const service=(state.services||[]).find(x=>S(x.id)===S(recordId))||{};
-      showActionLayer(`<div class="cs-editor-toolbar"><div><h3>تفاصيل تنبيه الخدمة المتأخرة</h3><small>يتم تحميل تفاصيل المشروع والخدمات عند فتح التنبيه فقط</small></div><button class="cs-editor-btn light" onclick="document.getElementById('csEditorActionLayerV10814').classList.add('hidden')">إغلاق</button></div>
-        <div class="cs-renew-old"><div><small>المشروع</small><b>${E(state.project?.name||'-')}</b></div><div><small>الخدمة</small><b>${E(service.service_name||'-')}</b></div><div><small>الموعد</small><b>${E(dateOnly(service.next_due_date)||'-')}</b></div><div><small>المتبقي</small><b>${Math.max(N(service.visit_count)-N(service.executed_count),0)}</b></div></div>
-        <div class="cs-editor-guard-actions"><button class="cs-editor-btn light" onclick="ContractsServicesEditor.openEditor('${E(projectId)}','view',true)">فتح الخدمات السنوية</button></div>`);
-      switchTab('annual');return;
-    }
-    const contract=detail?.contract||(state.contractRows||[]).find(x=>S(x.id)===S(recordId))||{},services=detail?.services||state.services||[],attachments=detail?.attachments||state.attachments||[],logs=detail?.audit||state.audit||[];
-    showActionLayer(`<div class="cs-editor-toolbar"><div><h3>تفاصيل تنبيه العقد</h3><small>يتم تحميل التفاصيل عند فتح التنبيه فقط</small></div><button class="cs-editor-btn light" onclick="document.getElementById('csEditorActionLayerV10814').classList.add('hidden')">إغلاق</button></div>
-      <div class="cs-renew-old"><div><small>المشروع</small><b>${E(state.project?.name||'-')}</b></div><div><small>العقد</small><b>${E(contract.contract_type||contractDef(contract.contract_key||'operation').title)}</b></div><div><small>رقم العقد</small><b>${E(contract.contract_number||'-')}</b></div><div><small>تاريخ النهاية</small><b>${E(dateOnly(contract.end_date)||'-')}</b></div></div>
-      <div class="cs-alert-detail-grid"><div><h4>الخدمات السنوية</h4><p>${services.length} سجل</p></div><div><h4>المرفقات</h4><p>${attachments.length} ملف</p></div><div><h4>سجل القرارات والمتابعة</h4><p>${logs.length} عملية</p></div></div>
-      <div class="cs-editor-guard-actions">${canRenew()?`<button class="cs-editor-btn" onclick="ContractsServicesEditor.startRenewal('${E(projectId)}','${E(contract.contract_key||'operation')}','${E(contract.id||recordId)}')">تجديد</button>`:''}${canNonRenew()&&canStopFromContract()?`<button class="cs-editor-btn danger" onclick="ContractsServicesEditor.startNonRenew('${E(projectId)}','${E(contract.contract_key||'operation')}','${E(contract.id||recordId)}')">لم يجدد</button>`:''}<button class="cs-editor-btn light" onclick="ContractsServicesEditor.openEditor('${E(projectId)}','view',true)">فتح كامل البيانات</button></div>`);
   }
 
   function contractDate(p,key){return dateOnly(p?.[key]||'');}
@@ -734,19 +608,17 @@
   function projectEnd(p){return contractDate(p,'contract_end')||contractDate(p,'project_end_date')||contractDate(p,'end_date');}
   function daysLeft(v){if(!v)return null;const d=new Date(v+'T00:00:00');if(Number.isNaN(d.getTime()))return null;const n=new Date();n.setHours(0,0,0,0);return Math.ceil((d-n)/86400000);}
   function contractInfo(p){
-    if(isStoppedProject(p))return {key:'stopped',text:S(p.stopped_reason)==='contract_not_renewed'?'متوقف — لم يجدد العقد':'متوقف',cls:'neutral',days:'-'};
-    const end=projectEnd(p),d=daysLeft(end);if(!end||d==null)return {key:'missing',text:'بيانات ناقصة',cls:'amber',days:'-'};if(d<0)return {key:'expired',text:'منتهي',cls:'red',days:'منتهي'};if(d<=7)return {key:'soon',text:'ينتهي خلال 7 أيام',cls:'red',days:d+' يوم'};if(d<=30)return {key:'soon',text:'قريب الانتهاء',cls:'amber',days:d+' يوم'};return {key:'active',text:'نشط',cls:'green',days:d+' يوم'};
+    const end=projectEnd(p),d=daysLeft(end);if(!end||d==null)return {key:'missing',text:'بيانات ناقصة',cls:'amber',days:'-'};if(d<0)return {key:'expired',text:'منتهي',cls:'red',days:'منتهي'};if(d<=30)return {key:'soon',text:'قريب الانتهاء',cls:'amber',days:d+' يوم'};return {key:'active',text:'نشط',cls:'green',days:d+' يوم'};
   }
-  function projectVisible(p){if(!p)return false;return !(p.deleted_at||p.is_deleted===true);}
-  async function renderContractsOnly(){
+  function projectVisible(p){if(!p)return false;if(p.deleted_at||p.is_deleted===true)return false;if('is_active'in p&&p.is_active!==true)return false;return true;}
+  function renderContractsOnly(){
     const body=$('contractsBody');if(!body)return;
-    await loadAllProjects(true);
     const q=S($('contractSearch')?.value),filter=S($('contractFilterStatus')?.value);
     let rows=projectList().filter(projectVisible).filter(canViewProject);
     if(q)rows=rows.filter(p=>S(p.name).includes(q)||S(p.code||p.project_code).includes(q));if(filter)rows=rows.filter(p=>contractInfo(p).key===filter);
-    rows.sort((a,b)=>{const ac=contractInfo(a),bc=contractInfo(b);if(ac.key==='stopped'&&bc.key!=='stopped')return 1;if(ac.key!=='stopped'&&bc.key==='stopped')return -1;return (daysLeft(projectEnd(a))??999999)-(daysLeft(projectEnd(b))??999999);});
-    body.innerHTML=rows.map(p=>{const c=contractInfo(p),edit=canEditProject(p)?`<button class="cs-editor-trigger" onclick="ContractsServicesEditor.openEditor('${E(p.id)}','edit')">تعديل</button>`:'';return `<tr class="${c.key==='stopped'?'is-stopped-project':''}"><td><b>${E(p.name||'-')}</b>${c.key==='stopped'?'<br><small>محفوظ للعرض التاريخي</small>':''}</td><td>${N(p.buildings_count)}</td><td>${N(p.units_count)}</td><td>${E(projectStart(p)||'-')}</td><td>${E(projectEnd(p)||'-')}</td><td>${E(c.days)}</td><td><span class="badge ${c.cls}">${E(c.text)}</span></td><td class="row-actions"><button class="light cs-editor-trigger" onclick="ContractsServicesEditor.openEditor('${E(p.id)}','view')">عرض</button>${edit}</td></tr>`;}).join('')||'<tr><td colspan="8">لا توجد بيانات</td></tr>';
-    const counted=projectList().filter(projectVisible).filter(p=>!isStoppedProject(p));const set=(id,key)=>{const el=$(id);if(el)el.textContent=counted.filter(p=>contractInfo(p).key===key).length;};set('contractsActiveCount','active');set('contractsSoonCount','soon');set('contractsExpiredCount','expired');set('contractsMissingCount','missing');renderContractAlerts();
+    rows.sort((a,b)=>(daysLeft(projectEnd(a))??999999)-(daysLeft(projectEnd(b))??999999));
+    body.innerHTML=rows.map(p=>{const c=contractInfo(p),edit=canEditProject(p)?`<button class="cs-editor-trigger" onclick="ContractsServicesEditor.openEditor('${E(p.id)}','edit')">تعديل</button>`:'';return `<tr><td><b>${E(p.name||'-')}</b></td><td>${N(p.buildings_count)}</td><td>${N(p.units_count)}</td><td>${E(projectStart(p)||'-')}</td><td>${E(projectEnd(p)||'-')}</td><td>${E(c.days)}</td><td><span class="badge ${c.cls}">${E(c.text)}</span></td><td class="row-actions"><button class="light cs-editor-trigger" onclick="ContractsServicesEditor.openEditor('${E(p.id)}','view')">عرض</button>${edit}</td></tr>`;}).join('')||'<tr><td colspan="8">لا توجد بيانات</td></tr>';
+    const counted=projectList().filter(projectVisible);const set=(id,key)=>{const el=$(id);if(el)el.textContent=counted.filter(p=>contractInfo(p).key===key).length;};set('contractsActiveCount','active');set('contractsSoonCount','soon');set('contractsExpiredCount','expired');set('contractsMissingCount','missing');renderContractAlerts();
   }
   async function openServiceEditor(serviceId){
     let row=(globalData().contractServices||[]).find(x=>S(x.id)===S(serviceId));
@@ -772,9 +644,9 @@
     if(!$('contracts')?.classList.contains('hidden'))renderContractsOnly();
   }
 
-  const ContractsServicesEditor={openEditor,loadProjectContracts,loadAnnualServices,loadContractAttachments,loadNormalizedContracts,loadAllProjects,saveContractChanges,saveAnnualServiceChanges,startRenewal,startNonRenew,startServiceExecution,renderContractAlerts,setAlertFilter,snoozeAlert,openAlertDetails,renderContracts:renderContractsOnly,closeEditor:requestClose,getState:()=>state};
+  const ContractsServicesEditor={openEditor,loadProjectContracts,loadAnnualServices,loadContractAttachments,loadNormalizedContracts,saveContractChanges,saveAnnualServiceChanges,startRenewal,startNonRenew,startServiceExecution,renderContractAlerts,closeEditor:requestClose,getState:()=>state};
   window.ContractsServicesEditor=ContractsServicesEditor;
 
-  function boot(){ensureModal();ensureActionLayer();installContractsScope();setTimeout(installContractsScope,900);setTimeout(installContractsScope,2200);setTimeout(()=>{loadAllProjects(true).then(()=>{renderContractsOnly();renderContractAlerts(true);});},500);window.addEventListener('tasneef:project-updated',e=>{const pid=S(e.detail?.projectId);loadAllProjects(true).then(()=>{renderContractsOnly();renderContractAlerts(true);if(state.open&&S(state.projectId)===pid&&!state.dirty)openEditor(pid,state.mode,true);});});console.log('Tasneef ContractsServicesEditor '+VERSION+' loaded');}
+  function boot(){ensureModal();ensureActionLayer();installContractsScope();setTimeout(installContractsScope,900);setTimeout(installContractsScope,2200);setTimeout(renderContractAlerts,500);console.log('Tasneef ContractsServicesEditor '+VERSION+' loaded');}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();

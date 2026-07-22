@@ -1,0 +1,13 @@
+V10815 logic tests: 11/11 passed
+
+PASS expired urgent
+PASS 7 days high
+PASS 30 days medium
+PASS 60 days low
+PASS resolved
+PASS one active alert per key
+PASS project stopped
+PASS contract retained but nonrenewed
+PASS future service cancelled
+PASS completed service preserved
+PASS only target assignment ended

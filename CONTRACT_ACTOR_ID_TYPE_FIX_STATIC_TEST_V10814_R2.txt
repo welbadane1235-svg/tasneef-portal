@@ -1,0 +1,14 @@
+PASS — helper function exists
+PASS — projects stopped_by dynamic type
+PASS — contracts closed_by dynamic type
+PASS — contracts renewed_by dynamic type
+PASS — notifications resolved_by dynamic type
+PASS — no direct nonrenew stopped_by text assignment
+PASS — no direct closed_by text assignment
+PASS — no direct renewed_by text assignment
+PASS — no direct resolved_by text assignment
+PASS — friendly 42804 mapping
+PASS — build cache updated
+PASS — helper grant exists
+
+RESULT: 12/12 passed

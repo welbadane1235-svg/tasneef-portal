@@ -211,7 +211,7 @@ body .tasneef-version-badge, body .version-badge, body .build-badge, body #versi
 <div class="kpi"><small>تسجيلات اليوم</small><b id="kpiTodayLogs">0</b></div>
 </div>
 <div class="card"><h2>ملخص اليوم</h2><div class="summary-grid" id="todaySummary"></div></div>
-<div class="card cs-dashboard-alerts-card-v10815"><div class="table-head"><div><h2>تنبيهات العقود والخدمات</h2><p class="muted">عرض ذكي حسب الأولوية والحالة، مع تحميل التفاصيل عند الطلب فقط.</p></div><button class="light" onclick="ContractsServicesEditor.renderContractAlerts(true)">تحديث التنبيهات</button></div><div class="alerts" id="contractDashboardAlerts"></div></div>
+<div class="card"><h2>تنبيهات العقود</h2><div class="alerts" id="contractDashboardAlerts"></div></div>
 </section>
 <section class="page hidden" id="daily">
 <div class="grid two">
@@ -308,7 +308,7 @@ body .tasneef-version-badge, body .version-badge, body .build-badge, body #versi
 <div class="card"><h2>العقود القريبة والمنتهية</h2><div class="alerts" id="contractsAlertsList"></div></div>
 <div class="card">
 <div class="table-head"><h2>كل العقود</h2><button class="light" onclick="exportTable('projects')">تصدير CSV</button></div>
-<div class="filters"><input id="contractSearch" oninput="renderContracts()" placeholder="بحث باسم المشروع"/><select id="contractFilterStatus" onchange="renderContracts()"><option value="">كل الحالات</option><option value="active">نشط</option><option value="soon">قريب الانتهاء</option><option value="expired">منتهي</option><option value="missing">بيانات ناقصة</option><option value="stopped">متوقف — لم يجدد العقد</option></select></div>
+<div class="filters"><input id="contractSearch" oninput="renderContracts()" placeholder="بحث باسم المشروع"/><select id="contractFilterStatus" onchange="renderContracts()"><option value="">كل الحالات</option><option value="active">نشط</option><option value="soon">قريب الانتهاء</option><option value="expired">منتهي</option><option value="missing">بيانات ناقصة</option></select></div>
 <div class="table-wrap"><table><thead><tr><th>المشروع</th><th>العمائر</th><th>الشقق</th><th>بداية العقد</th><th>نهاية العقد</th><th>الأيام المتبقية</th><th>حالة العقد</th><th>إجراء</th></tr></thead><tbody id="contractsBody"></tbody></table></div>
 </div>
 <div class="card" id="servicesSubTab">
@@ -718,7 +718,7 @@ body .tasneef-version-badge, body .version-badge, body .build-badge, body #versi
 </main>
 </div>
 <!-- V10807: legacy contract modal removed; one ContractsServicesEditor is created lazily by the dedicated module. -->
-<link rel="stylesheet" href="tasneef_contracts_services_editor_v10807.css?v=10815-project-sync-smart-alerts">
+<link rel="stylesheet" href="tasneef_contracts_services_editor_v10807.css?v=10814-contract-renewal-id-types">
 <link rel="stylesheet" href="tasneef_crm_unified_v10600.css?v=10607">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -742,9 +742,9 @@ window.__tasneefOrdersUnifiedOnlyV10713=true;
 window.__tasneefOrdersUnifiedOnlyV10800=true;
 window.__tasneefOrdersUnifiedOnlyV10801=true;
 window.__tasneefContractsServicesEditorExclusiveV10807=true;
-window.__TASNEEF_BUILD__="V10815-CONTRACTS-PROJECTS-DIRECT-SYNC-SMART-ALERTS";
+window.__TASNEEF_BUILD__="V10814-CONTRACT-RENEWAL-NON-RENEW-ID-TYPES";
 </script>
-<script defer="" src="app.js?v=10815-project-sync-events"></script>
+<script defer="" src="app.js?v=10814-contract-renewal-permissions"></script>
 <script defer="" src="tasneef_orders_v10801.js?v=10801-inclusive-price-status-cards"></script>
 
 
@@ -769,7 +769,7 @@ window.__TASNEEF_BUILD__="V10815-CONTRACTS-PROJECTS-DIRECT-SYNC-SMART-ALERTS";
 
 
 
-<script defer="" src="tasneef_projects_clean_v390.js?v=10815-direct-contract-sync"></script>
+<script defer="" src="tasneef_projects_clean_v390.js?v=475-fulltime-percent"></script>
 <script defer="" src="tasneef_workers_clean_v386.js?v=417-status-sync-root"></script>
 
 
@@ -780,7 +780,7 @@ window.__TASNEEF_BUILD__="V10815-CONTRACTS-PROJECTS-DIRECT-SYNC-SMART-ALERTS";
 <script defer="" src="tasneef_core_salaries_tab_v440.js?v=470"></script>
 <script defer src="tasneef_logs_tickets_canonical_v10519.js?v=10519-canonical-only"></script>
 <script defer src="tasneef_crm_unified_v10600.js?v=10612-inspection-stage-fix"></script>
-<script defer src="tasneef_contracts_services_editor_v10807.js?v=10815-project-sync-smart-alerts"></script>
+<script defer src="tasneef_contracts_services_editor_v10807.js?v=10814-actor-id-type-fix-r2"></script>
 <script defer src="tasneef_ticket_receive_visibility_v10808.js?v=10808-ticket-receive-open-visible"></script>
 <script defer src="tasneef_unified_employee_excel_v10811.js?v=10812-waddah-formulas"></script>
 </body>

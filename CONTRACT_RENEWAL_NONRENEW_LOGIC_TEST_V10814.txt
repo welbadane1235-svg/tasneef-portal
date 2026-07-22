@@ -1,0 +1,10 @@
+Tasneef V10814 logical transition tests
+Passed: 7/7
+
+PASS — renew preserves old contract
+PASS — renew creates linked active contract
+PASS — renew links historical records and resets new service
+PASS — non-renew stops project/current assignment but preserves historical assignment
+PASS — non-renew does not stop worker/supervisor and keeps completed history
+PASS — non-renew cancels only future remaining service
+PASS — decision resolves same unique alert

@@ -1,0 +1,358 @@
+-- Tasneef V10815
+-- Direct project <-> contracts/services sync by real project_id + smart contract alerts.
+-- Run once after the V10814-R2 contract migration.
+
+begin;
+
+create table if not exists public.contract_identifier_issues_v10815 (
+  id bigserial primary key,
+  table_name text not null,
+  column_name text not null,
+  raw_value text,
+  issue text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.projects add column if not exists project_code text;
+alter table public.projects add column if not exists project_type text;
+alter table public.projects add column if not exists city text;
+alter table public.projects add column if not exists district text;
+alter table public.projects add column if not exists responsible_name text;
+alter table public.projects add column if not exists contact_phone text;
+alter table public.projects add column if not exists is_active boolean default true;
+alter table public.projects add column if not exists status text default 'active';
+alter table public.projects add column if not exists stopped_reason text;
+alter table public.projects add column if not exists stopped_at timestamptz;
+alter table public.projects add column if not exists stopped_by bigint;
+alter table public.projects add column if not exists updated_at timestamptz default now();
+
+alter table public.contract_change_logs add column if not exists action text;
+alter table public.contract_change_logs add column if not exists source_section text;
+
+alter table public.contract_expiry_notifications add column if not exists notification_key text;
+alter table public.contract_expiry_notifications add column if not exists priority text default 'low';
+alter table public.contract_expiry_notifications add column if not exists contract_end_date date;
+alter table public.contract_expiry_notifications add column if not exists snoozed_until date;
+alter table public.contract_expiry_notifications add column if not exists assigned_to text;
+alter table public.contract_expiry_notifications add column if not exists last_action text;
+alter table public.contract_expiry_notifications add column if not exists last_action_at timestamptz;
+alter table public.contract_expiry_notifications add column if not exists contract_type text;
+alter table public.contract_expiry_notifications add column if not exists provider text;
+alter table public.contract_expiry_notifications add column if not exists status text default 'open';
+alter table public.contract_expiry_notifications add column if not exists resolution text;
+alter table public.contract_expiry_notifications add column if not exists resolved_at timestamptz;
+alter table public.contract_expiry_notifications add column if not exists resolved_by bigint;
+alter table public.contract_expiry_notifications add column if not exists created_at timestamptz default now();
+alter table public.contract_expiry_notifications add column if not exists updated_at timestamptz default now();
+
+create unique index if not exists uq_contract_expiry_notification_key_v10815
+  on public.contract_expiry_notifications(notification_key);
+create index if not exists idx_contract_alert_status_priority_v10815
+  on public.contract_expiry_notifications(status,priority,contract_end_date);
+
+-- Safely align project_id columns to projects.id. Non-convertible values are reported, never deleted.
+do $$
+declare
+  v_target text;
+  r record;
+  v_bad bigint;
+  v_sql text;
+begin
+  select format_type(a.atttypid,a.atttypmod)
+    into v_target
+  from pg_attribute a
+  join pg_class c on c.oid=a.attrelid
+  join pg_namespace n on n.oid=c.relnamespace
+  where n.nspname='public' and c.relname='projects' and a.attname='id'
+    and a.attnum>0 and not a.attisdropped;
+
+  if v_target is null then raise exception 'projects.id type not found'; end if;
+
+  for r in
+    select table_name,column_name,data_type,udt_name
+    from information_schema.columns
+    where table_schema='public' and column_name='project_id'
+      and table_name in (
+        'contracts','contract_services','annual_services','contract_attachments',
+        'contract_expiry_notifications','project_contract_smart',
+        'worker_project_assignments','monthly_distribution',
+        'monthly_project_distribution','project_assignments'
+      )
+  loop
+    if format_type((select atttypid from pg_attribute where attrelid=format('public.%I',r.table_name)::regclass and attname=r.column_name and attnum>0 and not attisdropped limit 1),-1)=v_target then
+      continue;
+    end if;
+
+    if v_target in ('bigint','integer','smallint') then
+      execute format('select count(*) from public.%I where %I is not null and trim(%I::text)<>'''' and trim(%I::text)!~''^[0-9]+$''',r.table_name,r.column_name,r.column_name,r.column_name) into v_bad;
+      if v_bad>0 then
+        execute format('insert into public.contract_identifier_issues_v10815(table_name,column_name,raw_value,issue) select %L,%L,%I::text,%L from public.%I where %I is not null and trim(%I::text)<>'''' and trim(%I::text)!~''^[0-9]+$'' on conflict do nothing',r.table_name,r.column_name,r.column_name,'project_id غير قابل للتحويل إلى النوع '+v_target,r.table_name,r.column_name,r.column_name,r.column_name);
+        continue;
+      end if;
+    end if;
+
+    v_sql:=format('alter table public.%I alter column %I type %s using nullif(trim(%I::text),'''')::%s',r.table_name,r.column_name,v_target,r.column_name,v_target);
+    begin
+      execute v_sql;
+    exception when others then
+      insert into public.contract_identifier_issues_v10815(table_name,column_name,raw_value,issue)
+      values(r.table_name,r.column_name,null,sqlerrm);
+    end;
+  end loop;
+end $$;
+
+create or replace function public.save_contracts_services_editor_v10815(
+  p_project_id text,
+  p_expected_project_updated_at timestamptz,
+  p_expected_smart_updated_at timestamptz,
+  p_smart_payload jsonb,
+  p_project_changes jsonb,
+  p_service_changes jsonb,
+  p_new_services jsonb,
+  p_archived_ids jsonb,
+  p_audit_rows jsonb,
+  p_user_id text,
+  p_user_name text,
+  p_reason text,
+  p_source_section text default 'contracts_services'
+) returns jsonb
+language plpgsql security definer set search_path=public as $$
+declare
+  v_now timestamptz:=now();
+  v_project_before jsonb;
+  v_project_after jsonb;
+  v_updated_at timestamptz;
+  v_result jsonb;
+begin
+  if nullif(trim(p_project_id),'') is null then raise exception 'project_id is required'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('project-contract-sync:'||p_project_id,10815));
+
+  select to_jsonb(p),p.updated_at into v_project_before,v_updated_at
+  from public.projects p where p.id::text=p_project_id for update;
+  if v_project_before is null then raise exception 'المشروع المحدد غير موجود'; end if;
+  if p_expected_project_updated_at is not null and v_updated_at is distinct from p_expected_project_updated_at then
+    raise exception 'تم تعديل البيانات من مستخدم آخر. يرجى تحديث النافذة قبل الحفظ.';
+  end if;
+
+  update public.projects set
+    name=case when p_project_changes?'name' then nullif(p_project_changes->>'name','') else name end,
+    project_code=case when p_project_changes?'project_code' then nullif(p_project_changes->>'project_code','') else project_code end,
+    project_type=case when p_project_changes?'project_type' then nullif(p_project_changes->>'project_type','') else project_type end,
+    city=case when p_project_changes?'city' then nullif(p_project_changes->>'city','') else city end,
+    district=case when p_project_changes?'district' then nullif(p_project_changes->>'district','') else district end,
+    responsible_name=case when p_project_changes?'responsible_name' then nullif(p_project_changes->>'responsible_name','') else responsible_name end,
+    contact_phone=case when p_project_changes?'contact_phone' then nullif(p_project_changes->>'contact_phone','') else contact_phone end,
+    status=case when p_project_changes?'status' then coalesce(nullif(p_project_changes->>'status',''),status) else status end,
+    is_active=case when p_project_changes?'is_active' then coalesce((p_project_changes->>'is_active')::boolean,is_active) else is_active end,
+    contract_start=case when p_project_changes?'contract_start' then nullif(p_project_changes->>'contract_start','')::date else contract_start end,
+    contract_end=case when p_project_changes?'contract_end' then nullif(p_project_changes->>'contract_end','')::date else contract_end end,
+    stopped_at=case when p_project_changes?'stopped_at' then nullif(p_project_changes->>'stopped_at','')::timestamptz else stopped_at end,
+    stopped_reason=case when p_project_changes?'stopped_reason' then nullif(p_project_changes->>'stopped_reason','') else stopped_reason end,
+    updated_at=v_now
+  where id::text=p_project_id;
+
+  select to_jsonb(p) into v_project_after from public.projects p where p.id::text=p_project_id;
+
+  v_result:=public.save_contracts_services_editor_v10814(
+    p_project_id,p_expected_smart_updated_at,p_smart_payload,'{}'::jsonb,
+    p_service_changes,p_new_services,p_archived_ids,p_audit_rows,
+    p_user_id,p_user_name,p_reason
+  );
+
+  if coalesce(p_project_changes,'{}'::jsonb)<>'{}'::jsonb then
+    perform public.write_contract_audit_v10814(
+      p_project_id,'project',p_project_id,'project_master',v_project_before,v_project_after,
+      p_user_id,p_user_name,coalesce(nullif(p_reason,''),'تعديل بيانات المشروع من قسم العقود والخدمات')
+    );
+    update public.contract_change_logs
+      set action='update',source_section=coalesce(nullif(p_source_section,''),'contracts_services')
+    where id=(select max(id) from public.contract_change_logs where entity_type='project' and entity_id=p_project_id);
+  end if;
+
+  return coalesce(v_result,'{}'::jsonb)||jsonb_build_object(
+    'project',v_project_after,'source_section',p_source_section,'saved_at',v_now
+  );
+end $$;
+
+create or replace function public.execute_annual_service_v10815(
+  p_service_id text,p_project_id text,p_execution_date date,p_executor text,p_notes text,p_user_id text,p_user_name text
+) returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_active boolean;v_result jsonb;
+begin
+  select coalesce(is_active,true) into v_active from public.projects where id::text=p_project_id for update;
+  if not found then raise exception 'المشروع المحدد غير موجود'; end if;
+  if not v_active then raise exception 'لا يمكن تنفيذ خدمة جديدة لمشروع موقوف'; end if;
+  v_result:=public.execute_annual_service_v10814(p_service_id,p_project_id,p_execution_date,p_executor,p_notes,p_user_id,p_user_name);
+  return v_result||jsonb_build_object('source_section','contracts_services');
+end $$;
+
+create or replace function public.renew_project_contract_v10815(
+  p_project_id text,p_contract_id text,p_contract_key text,p_new_start date,p_new_end date,p_new_value numeric,
+  p_provider text,p_annual_services jsonb,p_notes text,p_attachment jsonb,p_alert_date date,p_reactivate boolean,
+  p_user_id text,p_user_name text
+) returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_result jsonb;v_project jsonb;
+begin
+  perform pg_advisory_xact_lock(hashtextextended('renew:'||p_project_id||':'||coalesce(p_contract_id,p_contract_key),10815));
+  v_result:=public.renew_project_contract_v10814(p_project_id,p_contract_id,p_contract_key,p_new_start,p_new_end,p_new_value,p_provider,p_annual_services,p_notes,p_attachment,p_alert_date,p_reactivate,p_user_id,p_user_name);
+  perform public.refresh_contract_expiry_notifications_v10815();
+  select to_jsonb(p) into v_project from public.projects p where p.id::text=p_project_id;
+  return v_result||jsonb_build_object('project',v_project,'source_section','contracts_services','transaction_complete',true);
+end $$;
+
+create or replace function public.non_renew_project_contract_v10815(
+  p_project_id text,p_contract_id text,p_contract_key text,p_reason text,p_details text,p_stop_date date,p_user_id text,p_user_name text
+) returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_result jsonb;v_project jsonb;
+begin
+  perform pg_advisory_xact_lock(hashtextextended('non-renew:'||p_project_id||':'||coalesce(p_contract_id,p_contract_key),10815));
+  v_result:=public.non_renew_project_contract_v10814(p_project_id,p_contract_id,p_contract_key,p_reason,p_details,p_user_id,p_user_name);
+  update public.projects set stopped_at=coalesce(p_stop_date,current_date)::timestamptz,updated_at=now() where id::text=p_project_id;
+  perform public.refresh_contract_expiry_notifications_v10815();
+  select to_jsonb(p) into v_project from public.projects p where p.id::text=p_project_id;
+  return v_result||jsonb_build_object('project',v_project,'source_section','contracts_services','transaction_complete',true);
+end $$;
+
+create or replace function public.refresh_contract_expiry_notifications_v10815()
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_inserted integer:=0;v_updated integer:=0;v_resolved integer:=0;v_duplicates integer:=0;
+begin
+  update public.contracts set
+    status=case when end_date<current_date then 'expired' when end_date<=current_date+90 then 'expiring' else 'active' end,
+    updated_at=now()
+  where is_active=true and status not in('renewed','not_renewed','cancelled','archived') and end_date is not null;
+
+  insert into public.contract_expiry_notifications(
+    project_id,contract_id,notification_key,status,priority,contract_end_date,contract_type,provider,created_at,updated_at
+  )
+  select c.project_id,c.id,concat('contract_expiry:',c.id,':',c.end_date),'open',
+    case when c.end_date<current_date then 'urgent' when c.end_date<=current_date+7 then 'high' when c.end_date<=current_date+30 then 'medium' else 'low' end,
+    c.end_date,c.contract_type,c.provider,now(),now()
+  from public.contracts c
+  where c.is_active=true and c.status in('expiring','expired') and c.end_date is not null and c.end_date<=current_date+90
+  on conflict(notification_key) do update set
+    project_id=excluded.project_id,contract_id=excluded.contract_id,
+    priority=excluded.priority,contract_end_date=excluded.contract_end_date,
+    contract_type=excluded.contract_type,provider=excluded.provider,updated_at=now()
+  where public.contract_expiry_notifications.status<>'resolved';
+  get diagnostics v_inserted=row_count;
+
+  update public.contract_expiry_notifications n set
+    status='resolved',resolution=case when c.status='renewed' then 'renewed' when c.status='not_renewed' then 'not_renewed' else 'contract_inactive' end,
+    resolved_at=coalesce(n.resolved_at,now()),last_action=coalesce(n.last_action,c.status),last_action_at=now(),updated_at=now()
+  from public.contracts c
+  where n.contract_id=c.id and n.status<>'resolved' and (c.is_active=false or c.status in('renewed','not_renewed','cancelled','archived'));
+  get diagnostics v_resolved=row_count;
+
+  with ranked as (
+    select id,row_number() over(partition by contract_id,contract_end_date order by case when status='open' then 0 else 1 end,created_at,id) rn
+    from public.contract_expiry_notifications
+    where contract_id is not null and contract_end_date is not null
+  )
+  update public.contract_expiry_notifications n set status='resolved',resolution='duplicate_merged',resolved_at=coalesce(resolved_at,now()),last_action='duplicate_merged',last_action_at=now(),updated_at=now()
+  from ranked r where n.id=r.id and r.rn>1 and n.status<>'resolved';
+  get diagnostics v_duplicates=row_count;
+
+  return jsonb_build_object('ok',true,'upserted',v_inserted,'resolved',v_resolved,'duplicates_resolved',v_duplicates);
+end $$;
+
+create or replace function public.get_contract_dashboard_alerts_v10815(
+  p_scope text default 'active',p_priority text default null,p_status text default null,p_project_id text default null,
+  p_contract_type text default null,p_responsible text default null,p_search text default null,p_limit integer default 500
+) returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_rows jsonb;v_summary jsonb;
+begin
+  perform public.refresh_contract_expiry_notifications_v10815();
+
+  select coalesce(jsonb_agg(to_jsonb(x) order by x.sort_order,x.contract_end_date,x.project_name),'[]'::jsonb)
+  into v_rows
+  from (
+    select n.id notification_id,n.notification_key,n.status notification_status,n.priority,n.resolution,n.snoozed_until,n.assigned_to,n.last_action,n.last_action_at,
+      c.id contract_id,c.contract_key,c.contract_type,c.contract_number,c.provider,c.start_date,c.end_date,c.status,c.is_active,c.previous_contract_id,
+      p.id project_id,p.name project_name,p.project_code,p.status project_status,p.is_active project_is_active,p.responsible_name responsible,p.stopped_reason,
+      (c.end_date-current_date) days_remaining,
+      case n.priority when 'urgent' then 1 when 'high' then 2 when 'medium' then 3 when 'low' then 4 else 5 end sort_order
+    from public.contract_expiry_notifications n
+    join public.contracts c on c.id=n.contract_id
+    join public.projects p on p.id::text=n.project_id::text
+    where ((coalesce(p_scope,'active')='resolved' and n.status='resolved') or (coalesce(p_scope,'active')<>'resolved' and n.status<>'resolved'))
+      and (coalesce(p_scope,'active')='resolved' or n.snoozed_until is null or n.snoozed_until<=current_date)
+      and (nullif(p_priority,'') is null or n.priority=p_priority)
+      and (nullif(p_status,'') is null or c.status=p_status or n.resolution=p_status)
+      and (nullif(p_project_id,'') is null or p.id::text=p_project_id)
+      and (nullif(p_contract_type,'') is null or lower(coalesce(c.contract_type,'')) like '%'||lower(p_contract_type)||'%')
+      and (nullif(p_responsible,'') is null or lower(coalesce(p.responsible_name,'')) like '%'||lower(p_responsible)||'%')
+      and (nullif(p_search,'') is null or lower(concat_ws(' ',p.name,c.contract_number,c.provider,c.contract_type)) like '%'||lower(p_search)||'%')
+    limit greatest(1,least(coalesce(p_limit,500),1000))
+  ) x;
+
+  select jsonb_build_object(
+    'expired',(select count(*) from public.contracts where is_active=true and end_date<current_date),
+    'due_7',(select count(*) from public.contracts where is_active=true and end_date between current_date and current_date+7),
+    'due_30',(select count(*) from public.contracts where is_active=true and end_date between current_date+8 and current_date+30),
+    'due_60',(select count(*) from public.contracts where is_active=true and end_date between current_date+31 and current_date+60),
+    'overdue_services',(select count(*) from public.contract_services where coalesce(is_archived,false)=false and status<>'cancelled_due_to_non_renewal' and next_due_date<current_date and greatest(coalesce(visit_count,0)-coalesce(executed_count,0),0)>0),
+    'needs_decision',(select count(*) from public.contract_expiry_notifications where status='open' and priority='urgent'),
+    'renewed_recently',(select count(*) from public.contracts where status='renewed' and renewed_at>=now()-interval '30 days'),
+    'stopped_nonrenew',(select count(*) from public.projects where is_active=false and stopped_reason='contract_not_renewed'),
+    'active',(select count(*) from public.contract_expiry_notifications where status<>'resolved'),
+    'resolved',(select count(*) from public.contract_expiry_notifications where status='resolved'),
+    'duplicates_fixed',(select count(*) from public.contract_expiry_notifications where resolution='duplicate_merged')
+  ) into v_summary;
+
+  return jsonb_build_object('ok',true,'rows',v_rows,'summary',v_summary,'generated_at',now());
+end $$;
+
+create or replace function public.snooze_contract_alert_v10815(p_notification_key text,p_days integer,p_user_id text,p_user_name text)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_row public.contract_expiry_notifications%rowtype;
+begin
+  update public.contract_expiry_notifications set snoozed_until=current_date+greatest(1,least(coalesce(p_days,7),90)),last_action='snoozed',last_action_at=now(),updated_at=now()
+  where notification_key=p_notification_key and status<>'resolved' returning * into v_row;
+  if not found then raise exception 'التنبيه غير موجود أو محسوم'; end if;
+  perform public.write_contract_audit_v10814(v_row.project_id::text,'notification',p_notification_key,'snoozed_until',null,to_jsonb(v_row.snoozed_until),p_user_id,p_user_name,'تأجيل متابعة التنبيه');
+  return jsonb_build_object('ok',true,'notification_key',p_notification_key,'snoozed_until',v_row.snoozed_until);
+end $$;
+
+create or replace function public.get_contract_alert_detail_v10815(p_notification_key text)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_notification jsonb;v_contract jsonb;v_services jsonb;v_attachments jsonb;v_audit jsonb;v_project_id text;v_contract_id bigint;
+begin
+  select to_jsonb(n),n.project_id::text,n.contract_id into v_notification,v_project_id,v_contract_id
+  from public.contract_expiry_notifications n where n.notification_key=p_notification_key limit 1;
+  if v_notification is null then raise exception 'التنبيه غير موجود'; end if;
+  select to_jsonb(c) into v_contract from public.contracts c where c.id=v_contract_id;
+  select coalesce(jsonb_agg(to_jsonb(s) order by s.id),'[]'::jsonb) into v_services from public.contract_services s where s.project_id::text=v_project_id and (s.contract_id is null or s.contract_id=v_contract_id);
+  select coalesce(jsonb_agg(to_jsonb(a) order by a.created_at desc),'[]'::jsonb) into v_attachments from public.contract_attachments a where a.project_id::text=v_project_id and (a.contract_id is null or a.contract_id=v_contract_id);
+  select coalesce(jsonb_agg(to_jsonb(l) order by l.changed_at desc),'[]'::jsonb) into v_audit from public.contract_change_logs l where l.project_id::text=v_project_id limit 200;
+  return jsonb_build_object('notification',v_notification,'contract',v_contract,'services',v_services,'attachments',v_attachments,'audit',v_audit);
+end $$;
+
+grant select,insert,update on public.contract_expiry_notifications to anon,authenticated;
+grant select on public.contract_identifier_issues_v10815 to anon,authenticated;
+grant execute on function public.save_contracts_services_editor_v10815(text,timestamptz,timestamptz,jsonb,jsonb,jsonb,jsonb,jsonb,jsonb,text,text,text,text) to anon,authenticated;
+grant execute on function public.execute_annual_service_v10815(text,text,date,text,text,text,text) to anon,authenticated;
+grant execute on function public.renew_project_contract_v10815(text,text,text,date,date,numeric,text,jsonb,text,jsonb,date,boolean,text,text) to anon,authenticated;
+grant execute on function public.non_renew_project_contract_v10815(text,text,text,text,text,date,text,text) to anon,authenticated;
+grant execute on function public.refresh_contract_expiry_notifications_v10815() to anon,authenticated;
+grant execute on function public.get_contract_dashboard_alerts_v10815(text,text,text,text,text,text,text,integer) to anon,authenticated;
+grant execute on function public.snooze_contract_alert_v10815(text,integer,text,text) to anon,authenticated;
+grant execute on function public.get_contract_alert_detail_v10815(text) to anon,authenticated;
+
+select public.refresh_contract_expiry_notifications_v10815();
+
+commit;
+
+select jsonb_build_object(
+  'ok',true,
+  'build','V10815',
+  'projects_id_type',(select data_type from information_schema.columns where table_schema='public' and table_name='projects' and column_name='id'),
+  'contracts_project_id_type',(select data_type from information_schema.columns where table_schema='public' and table_name='contracts' and column_name='project_id'),
+  'services_project_id_type',(select data_type from information_schema.columns where table_schema='public' and table_name='contract_services' and column_name='project_id'),
+  'notifications_project_id_type',(select data_type from information_schema.columns where table_schema='public' and table_name='contract_expiry_notifications' and column_name='project_id'),
+  'identifier_issues',(select count(*) from public.contract_identifier_issues_v10815),
+  'active_alerts',(select count(*) from public.contract_expiry_notifications where status<>'resolved'),
+  'resolved_alerts',(select count(*) from public.contract_expiry_notifications where status='resolved'),
+  'duplicate_alerts_resolved',(select count(*) from public.contract_expiry_notifications where resolution='duplicate_merged'),
+  'stopped_projects_visible_in_contracts',(select count(*) from public.projects where is_active=false)
+) as result;

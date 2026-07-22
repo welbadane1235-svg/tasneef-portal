@@ -1,0 +1,40 @@
+Tasneef V10814 static acceptance tests
+Passed: 37/37
+
+PASS — build V10814 in editor
+PASS — same single editor modal retained
+PASS — renew button and flow
+PASS — non-renew button and flow
+PASS — annual execution RPC
+PASS — friendly type mismatch message
+PASS — project id stays canonical string once
+PASS — no Number(rawProjectId) in editor
+PASS — renew permission
+PASS — non-renew permission
+PASS — stop permission
+PASS — operations manager not auto stop
+PASS — same green scoped CSS
+PASS — cache build updated
+PASS — SQL begins transaction
+PASS — SQL dollar quotes balanced
+PASS — type inspection/migration audit
+PASS — manual link issue report
+PASS — explicit project id comparisons
+PASS — transaction save RPC
+PASS — renew creates new linked contract
+PASS — old services and attachments linked before renewal
+PASS — non-renew stops project
+PASS — non-renew ends active/current assignments
+PASS — non-renew cancels only future remaining services
+PASS — notification dedupe/resolution
+PASS — no SQL DELETE statements
+PASS — audit on service execution
+PASS — audit on project and assignments
+PASS — single v_new_id dynamic return clause
+PASS — contract file upload and cleanup
+PASS — private contract storage migration
+PASS — stored contract attachment linked to new contract
+PASS — verification SQL exists
+PASS — preflight SQL exists
+PASS — node syntax tasneef_contracts_services_editor_v10807.js
+PASS — node syntax app.js
