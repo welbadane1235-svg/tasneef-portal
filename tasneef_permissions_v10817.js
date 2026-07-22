@@ -7,7 +7,7 @@
   'use strict';
   if(window.__tasneefPermissionsV10817) return;
   window.__tasneefPermissionsV10817=true;
-  const BUILD='V10820_UNIFIED_PERMISSIONS_BRIDGE';
+  const BUILD='V10821_SESSION_SAFE_PERMISSIONS';
   const S=v=>String(v??'').trim();
   const A=v=>Array.isArray(v)?v:[];
   const $=id=>document.getElementById(id);
@@ -77,7 +77,9 @@
     supervisor:['dashboard.view','projects.view','workers.view','attendance.view','attendance.create','attendance.edit','daily_preparation.view','daily_preparation.create','daily_preparation.edit','checkin_checkout.view','checkin_checkout.checkin','checkin_checkout.checkout','tickets.view','tickets.create','tickets.edit','tickets.assign','orders.view','orders.create','orders.edit','supervisor_reports.view','supervisor_reports.edit','supervisor_reports.print','inventory.view','inventory.issue'],
     technician:['tickets.view','tickets.edit','tickets.assign','tickets.close','attendance.view','attendance.create','checkin_checkout.view','checkin_checkout.checkin','checkin_checkout.checkout','inventory.view','inventory.issue'],
     sales_employee:['dashboard.view','crm.view','crm.create','crm.edit','crm.assign','clients.view','clients.create','clients.edit','quotes.view','quotes.create','quotes.edit','quotes.print'],
-    read_only:[...CATALOG.filter(x=>x.action==='view').map(x=>x.permission_key)]
+    read_only:[...CATALOG.filter(x=>x.action==='view').map(x=>x.permission_key)],
+    warehouse_manager:['dashboard.view','inventory.view','inventory.create','inventory.edit','inventory.issue','inventory.receive','inventory.approve','reports.view','reports.print','reports.export','workers.view','projects.view'],
+    custom:['dashboard.view']
   };
   const PAGE_PERMISSIONS={dashboard:'dashboard.view',users:'users.view',projects:'projects.view',workers:'workers.view',distribution:'distribution.view',attendance:'attendance.view',daily:'checkin_checkout.view',monthly:'monthly_times.view',salaries:'payroll.view',contracts:'contracts.view',crm:'crm.view',tickets:'tickets.view',orders:'orders.view',inventoryAudit:'inventory.view',alerts:'notifications.view',export:'export_center.view',assistant:'assistant.view',adminTasks:'notifications.manage'};
   const SUP_PAGE_PERMISSIONS={supSummary:'dashboard.view',supAttendance:'attendance.view',supLogs:'checkin_checkout.view',supTickets:'tickets.view',supOrders:'orders.view',supClientDailyReport:'supervisor_reports.view',supAdminTasks:'notifications.view'};
@@ -120,8 +122,13 @@
   let broadcast=null;
   try{broadcast=new BroadcastChannel('tasneef-permissions-v10817');broadcast.onmessage=e=>{if(e.data?.type==='permissions-updated')checkVersion(true);};}catch(_){}
 
-  function roleKey(u=currentUser()){return S(u.role_key||u.role||'custom').toLowerCase();}
-  function isSuper(u=currentUser()){return SUPER_ROLES.has(roleKey(u));}
+  const ROLE_KEY_ALIASES={admin:'super_admin',system_admin:'super_admin',super_admin:'super_admin',general_manager:'operations_manager',operations_manager:'operations_manager',financial_manager:'accountant',finance_manager:'accountant',accountant:'accountant',warehouse_manager:'warehouse_manager',warehouse_officer:'warehouse_manager',maintenance_manager:'maintenance_manager',sales_manager:'sales_manager',sales_employee:'sales_employee',supervisor:'supervisor',technician:'technician',read_only:'read_only',custom:'custom'};
+  function roleKey(u=currentUser()){
+    const explicit=S(u?.role_key).toLowerCase(),legacy=S(u?.role).toLowerCase();
+    const chosen=(explicit&&explicit!=='custom')?explicit:(legacy||explicit||'custom');
+    return ROLE_KEY_ALIASES[chosen]||chosen||'custom';
+  }
+  function isSuper(u=currentUser()){return roleKey(u)==='super_admin'||SUPER_ROLES.has(S(u?.role_key).toLowerCase())||SUPER_ROLES.has(S(u?.role).toLowerCase());}
   function token(){
     return S(
       currentUser().permission_session_token||
@@ -141,8 +148,12 @@
     return true;
   }
   function fallbackEffective(u){
-    const result={},sources={};const custom=safeJson(u.permissions),denials=safeJson(u.permission_denials||u.denials),rk=roleKey(u);const preset=ROLE_TEMPLATES[rk]||[];
-    CATALOG.forEach(p=>{let v=preset.includes('*')||preset.includes(p.permission_key),src=v?'role':'none';const aliases=[p.permission_key,...Object.entries(ALIASES).filter(([,to])=>to===p.permission_key).map(([from])=>from)];for(const k of aliases){if(denials[k]===true||denials[k]==='deny'||custom[k]===false||custom[k]==='deny'){v=false;src='user_deny';break;}if(custom[k]===true||custom[k]==='allow'||custom[k]===1){v=true;src='user_allow';}}
+    const result={},sources={};
+    const serverEffective=safeJson(u.effective_permissions||u.permissions_effective);
+    const custom=safeJson(u.permissions),denials=safeJson(u.permission_denials||u.denials),rk=roleKey(u);const preset=ROLE_TEMPLATES[rk]||[];
+    CATALOG.forEach(p=>{let v=preset.includes('*')||preset.includes(p.permission_key),src=v?'role':'none';const aliases=[p.permission_key,...Object.entries(ALIASES).filter(([,to])=>to===p.permission_key).map(([from])=>from)];
+      if(Object.prototype.hasOwnProperty.call(serverEffective,p.permission_key)){v=serverEffective[p.permission_key]===true;src='server';}
+      for(const k of aliases){if(denials[k]===true||denials[k]==='deny'||custom[k]===false||custom[k]==='deny'){v=false;src='user_deny';break;}if(custom[k]===true||custom[k]==='allow'||custom[k]===1){v=true;src='user_allow';}}
       result[p.permission_key]=isSuper(u)?true:!!v;sources[p.permission_key]=isSuper(u)?'super_admin':src;
     });return {permissions:result,sources,role_key:rk,permissions_version:Number(u.permissions_version||0),scope_type:u.scope_type||'all',project_ids:A(u.allowed_project_ids)};
   }
@@ -154,7 +165,16 @@
     state.loading=(async()=>{setSessionHeader();let bundle=null;try{bundle=await callRpc('get_effective_permissions_v10817',{p_session_token:token()||null,p_target_user_id:Number(uid)});if(Array.isArray(bundle))bundle=bundle[0];}catch(e){if(!isMissingRpc(e))console.warn(BUILD,'server permissions fallback:',e.message||e);bundle=fallbackEffective(u);}
       bundle=bundle||fallbackEffective(u);state.userId=uid;state.version=Number(bundle.permissions_version||u.permissions_version||0);state.roleKey=S(bundle.role_key||roleKey(u));state.effective=safeJson(bundle.permissions||bundle.effective_permissions);state.sources=safeJson(bundle.sources);state.scopeType=S(bundle.scope_type||u.scope_type||'all');state.projectIds=A(bundle.project_ids||bundle.allowed_project_ids).map(S);if(isSuper(u))CATALOG.forEach(p=>{state.effective[p.permission_key]=true;state.sources[p.permission_key]='super_admin';});state.loaded=true;state.lastLoadAt=Date.now();localStorage.setItem(cacheKey(uid,state.version),JSON.stringify({effective:state.effective,sources:state.sources,scopeType:state.scopeType,projectIds:state.projectIds,at:now()}));const nu={...u,permissions_version:state.version,effective_permissions:state.effective,permission_sources:state.sources};putUser(nu);applyUI();return state;})().finally(()=>state.loading=null);return state.loading;
   }
-  function canPermission(key,ctx={}){const k=normalizeKey(key),u=currentUser();if(!u||u.is_active===false||['suspended','locked','expired'].includes(S(u.status)))return false;if(isSuper(u))return true;let v;if(state.loaded&&S(state.userId)===S(u.id||u.user_id))v=state.effective[k];else{const fb=fallbackEffective(u);v=fb.permissions[k];state.scopeType=fb.scope_type;state.projectIds=A(fb.project_ids).map(S);}return v===true&&scopeAllowed(ctx||{});}
+  function canPermission(key,ctx={}){
+    const k=normalizeKey(key),u=currentUser();
+    if(!u||!S(u.id||u.user_id))return false;
+    if(u.is_active===false||['suspended','locked','expired','disabled'].includes(S(u.status).toLowerCase()))return false;
+    if(isSuper(u))return true;
+    let v;
+    if(state.loaded&&S(state.userId)===S(u.id||u.user_id))v=state.effective[k];
+    else{const fb=fallbackEffective(u);v=fb.permissions[k];state.scopeType=fb.scope_type;state.projectIds=A(fb.project_ids).map(S);}
+    return v===true&&scopeAllowed(ctx||{});
+  }
   function requirePermission(key,ctx={}){if(canPermission(key,ctx))return true;toast('ليس لديك صلاحية لتنفيذ هذا الإجراء','err');return false;}
   async function checkVersion(forceReload=false){const u=currentUser();if(!u?.id||!token())return;try{const d=await callRpc('get_permissions_version_v10817',{p_session_token:token()});const v=Number(typeof d==='object'?d?.permissions_version:d);if(forceReload||v>Number(state.version||u.permissions_version||0)){clearPermissionCache(u.id);await load(true);broadcast?.postMessage({type:'permissions-reloaded',userId:u.id,version:v});}}catch(e){if(!isMissingRpc(e))console.warn(BUILD,'version check',e.message||e);}}
   window.PermissionsService={BUILD,CATALOG,ALIASES,ROLE_TEMPLATES,getCurrentUserPermissions:load,load,can:canPermission,require:requirePermission,checkVersion,clearUserCache:clearPermissionCache,isSuperAdmin:isSuper,normalizeKey,inferActionPermission:inferPermission,state};
@@ -181,11 +201,14 @@
     document.querySelectorAll('section.page').forEach(section=>{const permission=FINANCIAL_PERMISSION_BY_SECTION[section.id];if(!permission||canPermission(permission))return;section.querySelectorAll('label,.ov8-finance-row,[data-financial],.financial,.money-value').forEach(el=>{const t=S(el.textContent);if(el.matches('.ov8-finance-row,[data-financial],.financial,.money-value')||/قيمة|تكلفة|ربح|راتب|خصم|سلف|إجمالي المبالغ|قبل الضريبة|الضريبة/.test(t))el.classList.add('perm17-financial-redacted');});section.querySelectorAll('table').forEach(table=>{const heads=[...table.querySelectorAll('thead th')];heads.forEach((th,i)=>{if(/قيمة|تكلفة|ربح|راتب|خصم|سلف|إجمالي|ضريبة|مالي/.test(S(th.textContent))){[th,...table.querySelectorAll('tbody tr')].map((node,idx)=>idx===0?node:node.children[i]).filter(Boolean).forEach(cell=>{if(!cell.dataset.perm17FinancialHidden){cell.dataset.perm17PreviousDisplay=cell.style.display||'';cell.dataset.perm17FinancialHidden='true';}cell.style.display='none';});}});});});
   }
   function enforceVisiblePagePermission(){
+    if(!state.loaded)return;
     const visible=[...document.querySelectorAll('section.page')].find(el=>getComputedStyle(el).display!=='none'&&!el.classList.contains('hidden'));
     if(!visible)return;const p=PAGE_PERMISSIONS[visible.id];if(!p||canPermission(p))return;
     visible.style.display='none';const fallback=canPermission('dashboard.view')?$('dashboard'):null;if(fallback)fallback.style.display='block';toast('تم تحديث صلاحياتك ولم يعد هذا القسم متاحًا','err');
   }
   function applyUI(){
+    const u=currentUser();
+    if(S(u?.id||u?.user_id) && !state.loaded) return;
     wrapRoutes();installGuards();
     document.querySelectorAll('[onclick*="showPage("]').forEach(el=>{const m=S(el.getAttribute('onclick')).match(/showPage\(['"]([^'"]+)/);const p=m&&PAGE_PERMISSIONS[m[1]];if(p){const allowed=canPermission(p);el.dataset.permissionHidden=allowed?'false':'true';if(allowed&&el.style.display==='none')el.style.removeProperty('display');}});
     document.querySelectorAll('[onclick*="showSupervisorWindow("]').forEach(el=>{const m=S(el.getAttribute('onclick')).match(/showSupervisorWindow\(['"]([^'"]+)/);const p=m&&SUP_PAGE_PERMISSIONS[m[1]];if(p){const allowed=canPermission(p);el.dataset.permissionHidden=allowed?'false':'true';if(allowed&&el.style.display==='none')el.style.removeProperty('display');}});
@@ -202,11 +225,12 @@
   async function permissionLogin(){
     const username=S($('loginUsername')?.value),password=S($('loginPassword')?.value);if(!username||!password)return toast('أدخل اسم المستخدم وكلمة المرور','err');
     const deviceKey='tasneef_permission_device_v10817';let deviceId=localStorage.getItem(deviceKey);if(!deviceId){deviceId=uuid();localStorage.setItem(deviceKey,deviceId);}
-    try{const out=await callRpc('tasneef_login_v10817',{p_username:username,p_password:password,p_device_id:deviceId});const d=Array.isArray(out)?out[0]:out;if(!d?.ok||!d?.user)throw new Error(d?.message||'بيانات الدخول غير صحيحة');const u={...d.user,permission_session_token:d.session_token,permissions_version:d.permissions_version,effective_permissions:d.permissions||{}};localStorage.setItem('tasneef_permission_session_v10817',d.session_token);putUser(u);setSessionHeader();await load(true);if(typeof window.tasneefGo==='function')window.tasneefGo(homeForUser(u));else location.href=homeForUser(u);}
+    try{const out=await callRpc('tasneef_login_v10817',{p_username:username,p_password:password,p_device_id:deviceId});const d=Array.isArray(out)?out[0]:out;if(!d?.ok||!d?.user)throw new Error(d?.message||'بيانات الدخول غير صحيحة');let u={...d.user,permission_session_token:d.session_token,session_token:d.session_token,permissions_version:d.permissions_version,permissions:d.permissions||{},effective_permissions:d.permissions||{}};if(typeof window.tasneefNormalizeSessionUserV10821==='function')u=window.tasneefNormalizeSessionUserV10821(u);localStorage.setItem('tasneef_session_token_v10817',d.session_token);localStorage.setItem('tasneef_permission_session_v10817',d.session_token);putUser(u);setSessionHeader();await load(true);if(typeof window.tasneefGo==='function')window.tasneefGo(homeForUser(u));else location.href=homeForUser(u);}
     catch(e){if(isMissingRpc(e)&&typeof permissionLogin.__old==='function')return permissionLogin.__old();toast(S(e.message||e),'err');}
   }
   function hookLoginLogout(){
-    if(document.getElementById('loginUsername')&&typeof window.login==='function'&&!window.login.__permissionsV10817){permissionLogin.__old=window.login;permissionLogin.__permissionsV10817=true;window.login=permissionLogin;}
+    /* app.js owns the secure login flow. Replacing it caused role/session fields to be lost and every account to be routed as unauthorized. */
+    if(document.getElementById('loginUsername')&&typeof window.login!=='function'){permissionLogin.__permissionsV10817=true;window.login=permissionLogin;}
     if(typeof window.logout==='function'&&!window.logout.__permissionsV10817){const old=window.logout;const w=async function(){try{if(token())await callRpc('tasneef_logout_v10817',{p_session_token:token()});}catch(_){}const u=currentUser();clearPermissionCache(u.id);localStorage.removeItem('tasneef_permission_session_v10817');broadcast?.postMessage({type:'logout',userId:u.id});return old.apply(this,arguments);};w.__permissionsV10817=true;window.logout=w;}
   }
 
@@ -271,7 +295,19 @@
   const oldRenderUsers=window.renderUsers;
   window.renderUsers=function(){if(typeof oldRenderUsers==='function')oldRenderUsers();document.querySelectorAll('#usersBody tr').forEach(tr=>{const edit=tr.querySelector('button[onclick^="openAdvancedUserForm"]');if(edit&&(!canPermission('users.edit')||!canPermission('users.manage_permissions')))edit.style.display='none';});};
 
-  function boot(){attachTokenFromSession();ensureRoleOptions();hookLoginLogout();load(false).finally(()=>{applyUI();ensureAdminToolbar();renderPermissionMatrix();});wrapRoutes();installGuards();[0,250,750,1500,3000,7000].forEach(ms=>setTimeout(()=>{hookLoginLogout();wrapRoutes();installGuards();applyUI();},ms));const mo=new MutationObserver(()=>{clearTimeout(mo._t);mo._t=setTimeout(applyUI,120);});if(document.body)mo.observe(document.body,{childList:true,subtree:true});setInterval(()=>{hookLoginLogout();wrapRoutes();installGuards();checkVersion(false);},45000);window.addEventListener('focus',()=>checkVersion(false));window.addEventListener('storage',e=>{if(e.key==='tasneef_user'||e.key?.startsWith('tasneef:user-permissions:'))load(true);});console.log('Tasneef '+BUILD+' loaded; '+CATALOG.length+' permission keys');}
+  function boot(){
+    attachTokenFromSession();ensureRoleOptions();hookLoginLogout();
+    const authenticated=!!S(currentUser()?.id||currentUser()?.user_id);
+    const ready=authenticated?load(false):Promise.resolve(state);
+    ready.catch(e=>console.warn(BUILD,'permission boot fallback',e)).finally(()=>{
+      if(authenticated&&!state.loaded){const fb=fallbackEffective(currentUser());state.userId=S(currentUser().id||currentUser().user_id);state.effective=fb.permissions;state.sources=fb.sources;state.scopeType=fb.scope_type;state.projectIds=A(fb.project_ids).map(S);state.loaded=true;}
+      wrapRoutes();installGuards();applyUI();ensureAdminToolbar();renderPermissionMatrix();
+    });
+    [750,1500,3000,7000].forEach(ms=>setTimeout(()=>{hookLoginLogout();if(!authenticated||state.loaded){wrapRoutes();installGuards();applyUI();}},ms));
+    const mo=new MutationObserver(()=>{clearTimeout(mo._t);mo._t=setTimeout(()=>{if(!authenticated||state.loaded)applyUI();},120);});if(document.body)mo.observe(document.body,{childList:true,subtree:true});
+    setInterval(()=>{hookLoginLogout();if(!authenticated||state.loaded){wrapRoutes();installGuards();}checkVersion(false);},45000);
+    window.addEventListener('focus',()=>checkVersion(false));window.addEventListener('storage',e=>{if(e.key==='tasneef_user'||e.key?.startsWith('tasneef:user-permissions:'))load(true);});console.log('Tasneef '+BUILD+' loaded; '+CATALOG.length+' permission keys');
+  }
   setSessionHeader();
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();

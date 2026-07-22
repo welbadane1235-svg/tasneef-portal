@@ -95,6 +95,7 @@ const clearSession = () => {
   localStorage.removeItem(TASNEEF_PERMISSION_SESSION_KEY);
   localStorage.removeItem(TASNEEF_PERMISSION_CACHE_KEY);
   localStorage.removeItem(TASNEEF_PERMISSION_VERSION_KEY);
+  localStorage.removeItem('tasneef_permission_session_v10817');
 };
 const fmt = d => d ? new Date(d).toLocaleString('ar-SA') : '-';
 const timeOnly = d => d ? new Date(d).toLocaleTimeString('ar-SA-u-nu-latn',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Riyadh'}) : '-';
@@ -113,9 +114,59 @@ function activeWorkers(){ return (data.workers||[]).filter(tasneefIsActiveRecord
 window.tasneefIsActiveRecord=tasneefIsActiveRecord; window.activeProjects=activeProjects; window.activeWorkers=activeWorkers;
 function msg(text, type='ok'){ const el=$('globalMsg')||$('loginMsg'); if(!el) return; el.className='msg '+(type==='err'?'err':''); el.textContent=text; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'),4000); }
 function playAppSound(type){ try{ const files={checkin:'sounds/checkin.wav', checkout:'sounds/checkout.wav', ticket:'sounds/ticket.wav'}; const src=files[type]; if(!src) return; const a=new Audio(src); a.volume=0.75; a.play().catch(()=>{}); }catch(e){} }
-function roleHomeUrl(role){ return ['admin','general_manager','financial_manager','operations_manager','warehouse_manager'].includes(role) ? 'admin.html' : (role==='technician' ? 'technician.html' : 'supervisor.html'); }
-function isAdminAreaRole(role){ return ['admin','general_manager','financial_manager','operations_manager','warehouse_manager'].includes(role); }
-function requireRole(role){ const u=session(); if(!u){ tasneefGo('index.html'); return null; } if(role==='admin' && isAdminAreaRole(u.role)) return u; if(role && u.role!==role){ tasneefGo(roleHomeUrl(u.role)); return null; } return u; }
+/* V10821: normalize RBAC roles before routing. Never log out a valid session merely because permissions are still loading. */
+function tasneefCanonicalRoleKeyV10821(userOrRole){
+  const u=(userOrRole&&typeof userOrRole==='object')?userOrRole:{};
+  const raw=String((u.role_key||u.role||userOrRole||'')).trim().toLowerCase();
+  const aliases={
+    admin:'super_admin',system_admin:'super_admin',super_admin:'super_admin',
+    general_manager:'operations_manager',operations_manager:'operations_manager',
+    financial_manager:'accountant',finance_manager:'accountant',accountant:'accountant',
+    warehouse_manager:'warehouse_manager',warehouse_officer:'warehouse_manager',
+    maintenance_manager:'maintenance_manager',sales_manager:'sales_manager',sales_employee:'sales_employee',
+    supervisor:'supervisor',technician:'technician',read_only:'read_only',custom:'custom'
+  };
+  return aliases[raw]||raw||'custom';
+}
+function tasneefRouteRoleV10821(userOrRole){
+  const key=tasneefCanonicalRoleKeyV10821(userOrRole);
+  if(key==='super_admin') return 'admin';
+  if(['operations_manager','accountant','warehouse_manager','maintenance_manager','sales_manager','sales_employee','read_only','custom'].includes(key)) return 'general_manager';
+  if(key==='technician') return 'technician';
+  return 'supervisor';
+}
+function tasneefNormalizeSessionUserV10821(raw){
+  const user=Object.assign({},raw||{});
+  const key=tasneefCanonicalRoleKeyV10821(user);
+  user.role_key=key;
+  user.role=tasneefRouteRoleV10821(user);
+  if(user.is_active===undefined||user.is_active===null) user.is_active=!['suspended','locked','expired','disabled'].includes(String(user.status||'active').toLowerCase());
+  if(!user.status) user.status=user.is_active===false?'suspended':'active';
+  const effective=(user.effective_permissions&&typeof user.effective_permissions==='object')?user.effective_permissions:null;
+  if(effective && (!user.permissions||!Object.keys(user.permissions).length)) user.permissions=effective;
+  return user;
+}
+window.tasneefCanonicalRoleKeyV10821=tasneefCanonicalRoleKeyV10821;
+window.tasneefNormalizeSessionUserV10821=tasneefNormalizeSessionUserV10821;
+function roleHomeUrl(role){ const r=tasneefRouteRoleV10821(role); return r==='admin'?'admin.html':(r==='technician'?'technician.html':'supervisor.html'); }
+function isAdminAreaRole(role){ return ['admin','general_manager'].includes(tasneefRouteRoleV10821(role)); }
+function requireRole(role){
+  let u=session();
+  if(!u){ tasneefGo('index.html'); return null; }
+  u=tasneefNormalizeSessionUserV10821(u);
+  setSession(u);
+  const route=tasneefRouteRoleV10821(u);
+  if(role==='admin' && route==='admin') return u;
+  if(role==='supervisor' && route==='supervisor') return u;
+  if(role==='technician' && route==='technician') return u;
+  if(role && route!==role){
+    const target=roleHomeUrl(u);
+    const here=(location.pathname.split('/').pop()||'index.html').toLowerCase();
+    if(here!==target.toLowerCase()) tasneefGo(target);
+    return null;
+  }
+  return u;
+}
 async function login(){
   const username=$('loginUsername').value.trim(), password=$('loginPassword').value.trim();
   if(!username||!password) return msg('أدخل اسم المستخدم وكلمة المرور','err');
@@ -137,15 +188,16 @@ async function login(){
   if(!secureLogin?.error && secureLogin?.data?.ok){
     const payload=secureLogin.data||{};
     const token=String(payload.session_token||'').trim();
-    const user=Object.assign({},payload.user||{});
-    if(!user.role){
-      const rk=String(user.role_key||'').toLowerCase();
-      user.role=({super_admin:'admin',system_admin:'admin',general_manager:'general_manager',operations_manager:'operations_manager',finance_manager:'financial_manager',financial_manager:'financial_manager',warehouse_officer:'warehouse_manager',maintenance_manager:'technician',supervisor:'supervisor'}[rk]||rk||'supervisor');
-    }
+    const user=tasneefNormalizeSessionUserV10821(payload.user||{});
     user.permissions=payload.permissions||user.permissions||{};
     user.permission_sources=payload.sources||{};
     user.permissions_version=Number(payload.permissions_version||user.permissions_version||1);
-    if(token) localStorage.setItem(TASNEEF_PERMISSION_SESSION_KEY,token);
+    if(token){
+      user.session_token=token;
+      user.permission_session_token=token;
+      localStorage.setItem(TASNEEF_PERMISSION_SESSION_KEY,token);
+      localStorage.setItem('tasneef_permission_session_v10817',token);
+    }
     localStorage.setItem(TASNEEF_PERMISSION_CACHE_KEY,JSON.stringify(user.permissions||{}));
     localStorage.setItem(TASNEEF_PERMISSION_VERSION_KEY,String(user.permissions_version||1));
     setSession(user);
@@ -166,7 +218,7 @@ async function login(){
   }
   const {data:u,error}=await sb.from('app_users').select('*').eq('username',username).eq('password',password).eq('is_active',true).maybeSingle();
   if(error||!u) return msg(error?.message || 'بيانات الدخول غير صحيحة','err');
-  setSession(u); tasneefGo(roleHomeUrl(u.role));
+  const normalizedUser=tasneefNormalizeSessionUserV10821(u); setSession(normalizedUser); tasneefGo(roleHomeUrl(normalizedUser));
 }
 async function logout(){
   const token=localStorage.getItem(TASNEEF_PERMISSION_SESSION_KEY);
@@ -26048,8 +26100,14 @@ ${finalUrl}
   const byId=id=>document.getElementById(id), val=id=>byId(id)?.value||'';
   const safeJson=v=>{try{return typeof v==='string'?JSON.parse(v||'{}'):(v||{});}catch(_){return {};}};
   function currentUser(){try{return typeof session==='function'?session():safeJson(localStorage.getItem('tasneef_user'));}catch(_){return {};}}
-  function legacyRoleMap(role){return ({admin:'system_admin',general_manager:'general_manager',financial_manager:'finance_manager',operations_manager:'operations_manager',warehouse_manager:'warehouse_officer',technician:'maintenance_manager',supervisor:'supervisor'}[role]||role||'custom');}
+  function legacyRoleMap(role){
+    const r=String(role||'').trim().toLowerCase();
+    return ({super_admin:'system_admin',system_admin:'system_admin',admin:'system_admin',general_manager:'general_manager',financial_manager:'finance_manager',operations_manager:'operations_manager',warehouse_manager:'warehouse_officer',technician:'maintenance_manager',supervisor:'supervisor'}[r]||r||'custom');
+  }
   window.can=function(user,permissionKey,scopeCtx={},resource=null){
+    if(window.PermissionsService&&typeof window.PermissionsService.can==='function'){
+      return window.PermissionsService.can(permissionKey,{...(scopeCtx||{}),resource});
+    }
     user=user||currentUser(); if(!user||user.is_active===false||['suspended','locked','expired'].includes(user.status)) return false;
     const role=legacyRoleMap(user.role_key||user.role);
     if(role==='system_admin'||role==='general_manager') return true;
@@ -26070,7 +26128,16 @@ ${finalUrl}
     return allowed&&scopeAllowedV10700(user,scopeCtx,resource);
   };
   function scopeAllowedV10700(user,ctx,res){const t=user.scope_type||safeJson(user.access_scope).type||'all';if(t==='all')return true;if(!res&&!ctx)return true;if(t==='own')return String(res?.created_by||ctx?.created_by||'')===String(user.id);if(t==='assigned_projects'){const ids=(user.allowed_project_ids||safeJson(user.access_scope).project_ids||[]).map(String);return !ctx?.project_id&&!res?.project_id?true:ids.includes(String(ctx?.project_id||res?.project_id));}if(t==='department')return !ctx?.department_id||String(ctx.department_id)===String(user.department_id);return true;}
-  window.requirePermissionV10700=function(key,ctx,res){if(can(currentUser(),key,ctx,res))return true;const labels={'view':'العرض','create':'الإضافة','update':'التعديل','delete':'الحذف','approve':'الاعتماد','print':'الطباعة','export':'التصدير','manage':'الإدارة'};const action=labels[key.split('.').pop()]||'هذا الإجراء'; if(typeof msg==='function')msg('ليس لديك صلاحية '+action+' في هذا القسم','err');return false;};
+  window.requirePermissionV10700=function(key,ctx,res){
+    if(window.PermissionsService&&typeof window.PermissionsService.require==='function'){
+      return window.PermissionsService.require(key,{...(ctx||{}),resource:res});
+    }
+    if(window.can(currentUser(),key,ctx,res))return true;
+    const labels={'view':'العرض','create':'الإضافة','update':'التعديل','edit':'التعديل','delete':'الحذف','approve':'الاعتماد','print':'الطباعة','export':'التصدير','manage':'الإدارة','manage_permissions':'إدارة الصلاحيات'};
+    const action=labels[String(key||'').split('.').pop()]||'هذا الإجراء';
+    if(typeof msg==='function')msg('ليس لديك صلاحية '+action+' في هذا القسم','err');
+    return false;
+  };
   async function optionalSelect(table){try{const r=await sb.from(table).select('*');return r.error?[]:(r.data||[]);}catch(_){return [];}}
   window.loadSecurityCenterV10700=async function(force){
     const sd=window.securityDataV10700;
@@ -26746,3 +26813,5 @@ ${finalUrl}
   console.log(BUILD+' loaded');
 })();
 
+
+/* V10820: restored unified permissions runtime bridge on top of V10819. */
