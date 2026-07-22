@@ -114,7 +114,7 @@ function tasneefIsActiveRecord(row){ return !!row && row.is_active === true; }
 function activeProjects(){ return (data.projects||[]).filter(tasneefIsActiveRecord); }
 function activeWorkers(){ return (data.workers||[]).filter(tasneefIsActiveRecord); }
 window.tasneefIsActiveRecord=tasneefIsActiveRecord; window.activeProjects=activeProjects; window.activeWorkers=activeWorkers;
-function msg(text, type='ok'){ const el=$('globalMsg')||$('loginMsg'); if(!el) return; el.className='msg '+(type==='err'?'err':''); el.textContent=text; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'),4000); }
+function msg(text, type='ok'){ if(window.__tasneefPermissionBootingV10824 && type==='err' && /ليس لديك صلاحية|صلاحياتك|غير مصرح/.test(String(text||''))) return; const el=$('globalMsg')||$('loginMsg'); if(!el) return; el.className='msg '+(type==='err'?'err':''); el.textContent=text; el.classList.remove('hidden'); setTimeout(()=>el.classList.add('hidden'),4000); }
 function playAppSound(type){ try{ const files={checkin:'sounds/checkin.wav', checkout:'sounds/checkout.wav', ticket:'sounds/ticket.wav'}; const src=files[type]; if(!src) return; const a=new Audio(src); a.volume=0.75; a.play().catch(()=>{}); }catch(e){} }
 /* V10821: normalize RBAC roles before routing. Never log out a valid session merely because permissions are still loading. */
 function tasneefCanonicalRoleKeyV10821(userOrRole){
@@ -20082,8 +20082,8 @@ function financePrintReport(kind){
   };
   try{ initAdmin = window.initAdmin; }catch(_){}
   if(document.getElementById('dashboard')){
-    if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ window.initAdmin(); }, {once:true});
-    else setTimeout(function(){ window.initAdmin(); }, 0);
+    if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ (window.tasneefStartAdminV10824||window.initAdmin)?.(); }, {once:true});
+    else setTimeout(function(){ (window.tasneefStartAdminV10824||window.initAdmin)?.(); }, 0);
   }
 })();
 
@@ -26844,4 +26844,75 @@ ${finalUrl}
     return 'supervisor.html';
   };
   console.log('Tasneef V10822 role routing compatibility loaded');
+})();
+
+
+/* ===== V10824: no-permission-flash boot + current user welcome ===== */
+(function(){
+  'use strict';
+  if(window.__tasneefNoFlickerWelcomeV10824) return;
+  window.__tasneefNoFlickerWelcomeV10824=true;
+
+  function currentUserV10824(){
+    try{return (typeof session==='function'?(session()||{}):JSON.parse(localStorage.getItem('tasneef_user')||'{}'))||{};}catch(_){return {};}
+  }
+  function displayNameV10824(u){
+    return String(u.full_name||u.name||u.display_name||u.username||u.email||'المستخدم').trim()||'المستخدم';
+  }
+  function updateWelcomeV10824(){
+    const el=document.getElementById('currentUserWelcomeV10824');
+    if(!el) return;
+    el.textContent='مرحبًا بك، '+displayNameV10824(currentUserV10824());
+  }
+  function clearBootPermissionMessageV10824(){
+    const el=document.getElementById('globalMsg');
+    if(!el) return;
+    const text=String(el.textContent||'');
+    if(/ليس لديك صلاحية|تم تحديث صلاحياتك|غير مصرح/.test(text)){
+      el.textContent='';
+      el.className='msg hidden';
+    }
+  }
+  function revealV10824(){
+    clearBootPermissionMessageV10824();
+    updateWelcomeV10824();
+    window.__tasneefPermissionBootingV10824=false;
+    document.documentElement.classList.remove('tasneef-permissions-booting-v10824');
+    document.documentElement.dataset.tasneefAppReadyV10824='true';
+  }
+  window.tasneefUpdateWelcomeV10824=updateWelcomeV10824;
+  window.tasneefRevealAppV10824=revealV10824;
+
+  window.tasneefStartAdminV10824=function(){
+    if(window.__tasneefStartAdminPromiseV10824) return window.__tasneefStartAdminPromiseV10824;
+    window.__tasneefStartAdminPromiseV10824=(async function(){
+      window.__tasneefPermissionBootingV10824=true;
+      document.documentElement.classList.add('tasneef-permissions-booting-v10824');
+      try{
+        if(window.PermissionsService&&typeof window.PermissionsService.load==='function'){
+          await Promise.race([
+            window.PermissionsService.load(false),
+            new Promise(resolve=>setTimeout(resolve,9000))
+          ]);
+        }
+        clearBootPermissionMessageV10824();
+        updateWelcomeV10824();
+        if(typeof window.initAdmin==='function') await window.initAdmin();
+      }catch(e){
+        console.error('V10824 admin start',e);
+        try{if(typeof window.initAdmin==='function') await window.initAdmin();}catch(_){ }
+      }finally{
+        revealV10824();
+      }
+    })();
+    return window.__tasneefStartAdminPromiseV10824;
+  };
+
+  const oldSetSessionV10824=window.setSession;
+  if(typeof oldSetSessionV10824==='function'&&!oldSetSessionV10824.__welcomeV10824){
+    const wrapped=function(){const out=oldSetSessionV10824.apply(this,arguments);setTimeout(updateWelcomeV10824,0);return out;};
+    wrapped.__welcomeV10824=true;
+    try{window.setSession=wrapped;}catch(_){ }
+  }
+  document.addEventListener('DOMContentLoaded',updateWelcomeV10824,{once:true});
 })();

@@ -8,7 +8,7 @@
   if(window.__tasneefPermissionsV10817) return;
   window.__tasneefPermissionsV10817=true;
   window.__tasneefUnifiedPermissionsOnly=true;
-  const BUILD='V10823_ATOMIC_PERMISSIONS_UI';
+  const BUILD='V10824_NO_FLICKER_WELCOME';
   const S=v=>String(v??'').trim();
   const A=v=>Array.isArray(v)?v:[];
   const $=id=>document.getElementById(id);
@@ -18,7 +18,7 @@
   const currentUser=()=>{try{return typeof window.session==='function'?(window.session()||{}):JSON.parse(localStorage.getItem('tasneef_user')||'{}')||{};}catch(_){return {};}};
   const putUser=u=>localStorage.setItem('tasneef_user',JSON.stringify(u||{}));
   const client=()=>window.sb||(typeof sb!=='undefined'?sb:null);
-  const toast=(text,type='ok')=>{if(typeof window.msg==='function')return window.msg(text,type==='err'?'err':'ok');console[type==='err'?'error':'log'](text);};
+  const toast=(text,type='ok')=>{if(window.__tasneefPermissionBootingV10824&&type==='err'&&/ليس لديك صلاحية|صلاحياتك|غير مصرح/.test(S(text)))return; if(typeof window.msg==='function')return window.msg(text,type==='err'?'err':'ok');console[type==='err'?'error':'log'](text);};
   const uuid=()=>{try{return crypto.randomUUID();}catch(_){return 'device-'+Date.now()+'-'+Math.random().toString(36).slice(2);}};
 
   const GROUPS={
@@ -164,7 +164,7 @@
     const u=currentUser(),uid=S(u.id||u.user_id);if(!uid)return fallbackEffective(u);
     if(state.loading&&!force)return state.loading;if(state.loaded&&!force&&Date.now()-state.lastLoadAt<30000)return state;
     state.loading=(async()=>{setSessionHeader();let bundle=null;try{bundle=await callRpc('get_effective_permissions_v10817',{p_session_token:token()||null,p_target_user_id:Number(uid)});if(Array.isArray(bundle))bundle=bundle[0];}catch(e){if(!isMissingRpc(e))console.warn(BUILD,'server permissions fallback:',e.message||e);bundle=fallbackEffective(u);}
-      bundle=bundle||fallbackEffective(u);state.userId=uid;state.version=Number(bundle.permissions_version||u.permissions_version||0);state.roleKey=S(bundle.role_key||roleKey(u));state.effective=safeJson(bundle.permissions||bundle.effective_permissions);state.sources=safeJson(bundle.sources);state.scopeType=S(bundle.scope_type||u.scope_type||'all');state.projectIds=A(bundle.project_ids||bundle.allowed_project_ids).map(S);if(isSuper(u))CATALOG.forEach(p=>{state.effective[p.permission_key]=true;state.sources[p.permission_key]='super_admin';});state.loaded=true;state.lastLoadAt=Date.now();localStorage.setItem(cacheKey(uid,state.version),JSON.stringify({effective:state.effective,sources:state.sources,scopeType:state.scopeType,projectIds:state.projectIds,at:now()}));const nu={...u,permissions_version:state.version,effective_permissions:state.effective,permission_sources:state.sources};putUser(nu);applyUI(true);return state;})().finally(()=>state.loading=null);return state.loading;
+      bundle=bundle||fallbackEffective(u);state.userId=uid;state.version=Number(bundle.permissions_version||u.permissions_version||0);state.roleKey=S(bundle.role_key||roleKey(u));state.effective=safeJson(bundle.permissions||bundle.effective_permissions);state.sources=safeJson(bundle.sources);state.scopeType=S(bundle.scope_type||u.scope_type||'all');state.projectIds=A(bundle.project_ids||bundle.allowed_project_ids).map(S);if(isSuper(u))CATALOG.forEach(p=>{state.effective[p.permission_key]=true;state.sources[p.permission_key]='super_admin';});state.loaded=true;state.lastLoadAt=Date.now();localStorage.setItem(cacheKey(uid,state.version),JSON.stringify({effective:state.effective,sources:state.sources,scopeType:state.scopeType,projectIds:state.projectIds,at:now()}));const nu={...u,permissions_version:state.version,effective_permissions:state.effective,permission_sources:state.sources};putUser(nu);try{window.tasneefUpdateWelcomeV10824?.();const gm=document.getElementById('globalMsg');if(gm&&/ليس لديك صلاحية|تم تحديث صلاحياتك|غير مصرح/.test(S(gm.textContent))){gm.textContent='';gm.className='msg hidden';}}catch(_){ }applyUI(true);return state;})().finally(()=>state.loading=null);return state.loading;
   }
   function canPermission(key,ctx={}){
     const k=normalizeKey(key),u=currentUser();
@@ -205,7 +205,7 @@
     if(!state.loaded)return;
     const visible=[...document.querySelectorAll('section.page')].find(el=>getComputedStyle(el).display!=='none'&&!el.classList.contains('hidden'));
     if(!visible)return;const p=PAGE_PERMISSIONS[visible.id];if(!p||canPermission(p))return;
-    visible.style.display='none';const fallback=canPermission('dashboard.view')?$('dashboard'):null;if(fallback)fallback.style.display='block';toast('تم تحديث صلاحياتك ولم يعد هذا القسم متاحًا','err');
+    visible.style.display='none';const fallback=canPermission('dashboard.view')?$('dashboard'):null;if(fallback)fallback.style.display='block';if(!window.__tasneefPermissionBootingV10824)toast('تم تحديث صلاحياتك ولم يعد هذا القسم متاحًا','err');
   }
   function applyUINow(){
     const u=currentUser();
@@ -223,7 +223,7 @@
       applyFinancialRedaction();
       enforceVisiblePagePermission();
       state.uiRevision++;
-      document.documentElement.dataset.tasneefPermissionsReady='true';
+      document.documentElement.dataset.tasneefPermissionsReady='true';try{window.tasneefUpdateWelcomeV10824?.();}catch(_){ }
     }finally{
       state.applying=false;
       requestAnimationFrame(()=>document.documentElement.classList.remove('tasneef-permissions-applying-v10823'));
