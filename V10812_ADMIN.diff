@@ -1,0 +1,31 @@
+--- BACKUP_BEFORE_V10812_ADMIN.html	2026-07-22 07:44:14.690352627 +0000
++++ admin.html	2026-07-22 07:49:03.518342508 +0000
+@@ -742,9 +742,9 @@
+ window.__tasneefOrdersUnifiedOnlyV10800=true;
+ window.__tasneefOrdersUnifiedOnlyV10801=true;
+ window.__tasneefContractsServicesEditorExclusiveV10807=true;
+-window.__TASNEEF_BUILD__="V10811-UNIFIED-EXCEL-EXACT-FILTER-STYLED";
++window.__TASNEEF_BUILD__="V10812-WADDAH-FORMULA-ATTENDANCE-RANGE";
+ </script>
+-<script defer="" src="app.js?v=10811-unified-excel-exact-filter-styled"></script>
++<script defer="" src="app.js?v=10812-waddah-formula-attendance-range"></script>
+ <script defer="" src="tasneef_orders_v10801.js?v=10801-inclusive-price-status-cards"></script>
+ 
+ 
+@@ -775,13 +775,13 @@
+ 
+ <script defer="" src="tasneef_monthly_clean_v403.js?v=10801-professional-print"></script>
+ <script defer="" src="tasneef_core_unified_v413.js?v=10809-iqama-name-ui"></script>
+-<script defer="" src="tasneef_core_attendance_unified_source_v430.js?v=444"></script>
++<script defer="" src="tasneef_core_attendance_unified_source_v430.js?v=10812-date-range"></script>
+ <script defer="" src="tasneef_salaries_unified_source_v440.js?v=482-performance"></script>
+ <script defer="" src="tasneef_core_salaries_tab_v440.js?v=470"></script>
+ <script defer src="tasneef_logs_tickets_canonical_v10519.js?v=10519-canonical-only"></script>
+ <script defer src="tasneef_crm_unified_v10600.js?v=10612-inspection-stage-fix"></script>
+ <script defer src="tasneef_contracts_services_editor_v10807.js?v=10807-contracts-services-editor-restore"></script>
+ <script defer src="tasneef_ticket_receive_visibility_v10808.js?v=10808-ticket-receive-open-visible"></script>
+-<script defer src="tasneef_unified_employee_excel_v10811.js?v=10811-exact-filter-styled"></script>
++<script defer src="tasneef_unified_employee_excel_v10811.js?v=10812-waddah-formulas"></script>
+ </body>
+ </html>
+\ No newline at end of file
