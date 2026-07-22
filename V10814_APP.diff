@@ -1,0 +1,15 @@
+--- BACKUP_BEFORE_V10814_APP.js	2026-07-22 09:08:12.170176139 +0000
++++ app.js	2026-07-22 09:06:45.522179175 +0000
+@@ -25976,6 +25976,12 @@
+     Object.assign(sd,{roles,permissions,rolePermissions:rp,userPermissions:up,denials,scopes,sessions,departments:depts,projects:(window.data?.projects||[])});
+     if(!sd.roles.length)sd.roles=DEFAULT_ROLES.map((r,i)=>({id:r[0],role_key:r[0],name:r[1]}));
+     if(!sd.permissions.length)sd.permissions=MODULES.flatMap(([m,ml])=>ACTIONS.map(([a,al])=>({id:m+'.'+a,permission_key:m+'.'+a,module:m,module_name:ml,action:a,action_name:al,is_sensitive:SENSITIVE.has(a)})));
++    const contractDecisionPermissionsV10814=[
++      {id:'contracts.renew',permission_key:'contracts.renew',module:'contracts',module_name:'العقود',action:'renew',action_name:'تجديد عقد',is_sensitive:true},
++      {id:'contracts.non_renew',permission_key:'contracts.non_renew',module:'contracts',module_name:'العقود',action:'non_renew',action_name:'عدم تجديد عقد',is_sensitive:true},
++      {id:'projects.stop_from_contract',permission_key:'projects.stop_from_contract',module:'projects',module_name:'المشاريع',action:'stop_from_contract',action_name:'إيقاف من قرار العقد',is_sensitive:true}
++    ];
++    contractDecisionPermissionsV10814.forEach(p=>{if(!sd.permissions.some(x=>String(x.permission_key||x.id)===p.permission_key))sd.permissions.push(p);});
+     fillSecuritySelectsV10700();renderUsers();renderPermissionMatrixV10700();
+   };
+   function fillOptions(el,rows,value,label,blank){if(!el)return;const old=el.value;el.innerHTML=(blank?`<option value="">${blank}</option>`:'')+rows.map(r=>`<option value="${r[value]??r.id}">${esc(r[label]||r.name||r.full_name||r.username||r.id)}</option>`).join('');el.value=old;}

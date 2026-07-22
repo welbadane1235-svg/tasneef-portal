@@ -1,0 +1,58 @@
+from pathlib import Path
+import re, subprocess, json, sys
+ROOT=Path(__file__).resolve().parent
+js=(ROOT/'tasneef_contracts_services_editor_v10807.js').read_text()
+css=(ROOT/'tasneef_contracts_services_editor_v10807.css').read_text()
+html=(ROOT/'admin.html').read_text()
+app=(ROOT/'app.js').read_text()
+sql=(ROOT/'supabase_contract_renewal_nonrenew_v10814.sql').read_text()
+checks=[]
+def ck(name, cond): checks.append((name,bool(cond)))
+
+ck('build V10814 in editor', 'V10814_CONTRACT_RENEWAL_NON_RENEW_ID_TYPES' in js)
+ck('same single editor modal retained', "const MODAL_ID='contractsServicesEditorV10807'" in js and 'contractSmartModal' in js)
+ck('renew button and flow', 'تجديد' in js and 'renew_project_contract_v10814' in js)
+ck('non-renew button and flow', 'لم يجدد' in js and 'non_renew_project_contract_v10814' in js)
+ck('annual execution RPC', 'execute_annual_service_v10814' in js)
+ck('friendly type mismatch message', 'عدم تطابق معرف السجل' in js and 'operator does not exist' in js)
+ck('project id stays canonical string once', 'const ID=v=>' in js and 'p_project_id:ID(' in js)
+ck('no Number(rawProjectId) in editor', 'Number(rawProjectId)' not in js)
+ck('renew permission', "'contracts.renew'" in js and "'contracts.renew'" in app)
+ck('non-renew permission', "'contracts.non_renew'" in js and "'contracts.non_renew'" in app)
+ck('stop permission', "'projects.stop_from_contract'" in js and "'projects.stop_from_contract'" in app)
+ck('operations manager not auto stop', "const canStopFromContract=()=>isFullManager()||hasExplicit('projects.stop_from_contract')" in js)
+ck('same green scoped CSS', '.cs-expiry-alert' in css and '.cs-renewal-panel' in css and '.cs-editor-head' in css and '#0a5a49' in css)
+ck('cache build updated', '10814-contract-renewal-id-types' in html and '10814-contract-renewal-permissions' in html)
+ck('SQL begins transaction', re.search(r'^begin;',sql,re.M|re.I) is not None and re.search(r'^commit;',sql,re.M|re.I) is not None)
+ck('SQL dollar quotes balanced', sql.count('$$')%2==0 and sql.count('$q$')%2==0)
+ck('type inspection/migration audit', 'contract_identifier_migration_audit_v10814' in sql and 'format_type(a.atttypid' in sql)
+ck('manual link issue report', 'contract_identifier_issues_v10814' in sql and 'needs_manual_link' in sql)
+ck('explicit project id comparisons', sql.count('project_id::text')>=15)
+ck('transaction save RPC', 'save_contracts_services_editor_v10814' in sql and 'for update' in sql and 'pg_advisory_xact_lock' in sql)
+ck('renew creates new linked contract', 'previous_contract_id' in sql and "status='renewed'" in sql and "'active',true,$10" in sql)
+ck('old services and attachments linked before renewal', 'set contract_id=v_old.id' in sql and sql.count('contract_id is null')>=2)
+ck('non-renew stops project', "stopped_reason=''contract_not_renewed''" in sql and "status='not_renewed'" in sql)
+ck('non-renew ends active/current assignments', "end_reason=''project_contract_not_renewed''" in sql and "month_key::text>=to_char(current_date,''YYYY-MM'')" in sql)
+ck('non-renew cancels only future remaining services', "status='cancelled_due_to_non_renewal'" in sql and 'greatest(coalesce(visit_count,0)-coalesce(executed_count,0),0)>0' in sql and 'next_due_date>=current_date' in sql)
+ck('notification dedupe/resolution', 'uq_contract_expiry_notification_key_v10814' in sql and "resolution='renewed'" in sql and "resolution='not_renewed'" in sql)
+ck('no SQL DELETE statements', re.search(r'\bdelete\s+from\b',sql,re.I) is None)
+ck('audit on service execution', "'annual_service'" in sql and 'تنفيذ خدمة سنوية' in sql)
+ck('audit on project and assignments', "'assignment','project_assignments'" in sql and "'project',p_project_id" in sql)
+ck('single v_new_id dynamic return clause', len(re.findall(r'into\s+v_new_id\s+using',sql,re.I))==1)
+ck('contract file upload and cleanup', "CONTRACT_FILES_BUCKET='contract-files'" in js and 'uploadRenewalFile' in js and ".remove([uploaded.storage_path])" in js)
+ck('private contract storage migration', "values('contract-files','contract-files',false" in sql and 'storage_path text' in sql and 'contract_files_insert_v10814' in sql)
+ck('stored contract attachment linked to new contract', 'storage_bucket,storage_path,mime_type,size_bytes' in sql and 'contract_id,contract_key' in sql)
+ck('verification SQL exists', (ROOT/'supabase_contract_renewal_nonrenew_verify_v10814.sql').exists())
+ck('preflight SQL exists', (ROOT/'supabase_contract_renewal_nonrenew_preflight_v10814.sql').exists())
+
+# Node syntax tests
+for file in ['tasneef_contracts_services_editor_v10807.js','app.js']:
+    r=subprocess.run(['node','--check',str(ROOT/file)],capture_output=True,text=True)
+    ck(f'node syntax {file}', r.returncode==0)
+
+passed=sum(v for _,v in checks)
+out=['Tasneef V10814 static acceptance tests',f'Passed: {passed}/{len(checks)}','']
+for name,ok in checks: out.append(('PASS' if ok else 'FAIL')+' — '+name)
+(ROOT/'CONTRACT_RENEWAL_NONRENEW_STATIC_TEST_V10814.txt').write_text('\n'.join(out),encoding='utf-8')
+print('\n'.join(out))
+if passed!=len(checks): sys.exit(1)
