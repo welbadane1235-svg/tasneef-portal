@@ -1,4 +1,6 @@
 /* TASNEEF BUILD V230 - inventory schema safe + hide warehouse cost info - 2026-05-20 */
+window.__tasneefUnifiedPermissionsOnly = true;
+window.__tasneefLegacyPermissionsDisabledV10823 = true;
 /* V305: Loading screen removed + fast mode */
 (function(){
   window.__tasneefLoadingV154 = true;
@@ -51,7 +53,7 @@
 /* V482: one-time safe build-cache cleanup. Operational/user data is never deleted. */
 (function(){
   try{
-    const build='V482';
+    const build='V10823';
     if(localStorage.getItem('tasneef_asset_cache_version')===build) return;
     localStorage.setItem('tasneef_asset_cache_version',build);
     if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(regs=>Promise.all(regs.map(r=>r.unregister()))).catch(()=>{});
@@ -12132,6 +12134,7 @@ function financePrintReport(kind){
   const CORE_TABS = ['overview','expenses','inventory','catalog','movements','requests','reports','costCenters','suppliers','users','workers','tickets','attendance','time_logs','monthly'];
 
   function ensurePermissionsMatrix(){
+    if(window.__tasneefUnifiedPermissionsOnly) return;
     const box = $('userPermissionsBoxV72');
     if(!box || $('v201PermMatrix')) return;
     const html = `<div id="v201PermMatrix" class="v201-perm-card">
@@ -12146,6 +12149,7 @@ function financePrintReport(kind){
   }
 
   function hydratePermissionChecks(){
+    if(window.__tasneefUnifiedPermissionsOnly) return;
     ensurePermissionsMatrix();
     const id = $('userId')?.value;
     let user = null;
@@ -12183,6 +12187,7 @@ function financePrintReport(kind){
     return byText[text] || '';
   }
   function applyTabPermissions(){
+    if(window.__tasneefUnifiedPermissionsOnly) return;
     if(isAdmin()) return;
     document.querySelectorAll('#financeDashboard .finance-tabs button, #financeDashboard .finance-tabs .finance-tab').forEach(btn=>{
       const key = tabKeyFromButton(btn);
@@ -12206,6 +12211,7 @@ function financePrintReport(kind){
     return tabKeyFromButton(active) || S(window.financeCurrentTab || 'overview');
   }
   function applyActionPermissions(){
+    if(window.__tasneefUnifiedPermissionsOnly) return;
     if(isAdmin()) return;
     const tab = currentFinanceTab();
     document.querySelectorAll('#financeDashboard button').forEach(btn=>{
@@ -12218,6 +12224,7 @@ function financePrintReport(kind){
   const oldFinanceShowTab = window.financeShowTab;
   if(typeof oldFinanceShowTab === 'function' && !oldFinanceShowTab.__v201Wrapped){
     window.financeShowTab = function(tab, btn){
+      if(window.__tasneefUnifiedPermissionsOnly) return oldFinanceShowTab.apply(this, arguments);
       const key = tab === 'items' ? 'catalog' : tab;
       if(!isAdmin() && !hasPerm(`tab_${key}_view`)){ say('لا تملك صلاحية مشاهدة هذا التبويب','err'); return; }
       const r = oldFinanceShowTab.apply(this, arguments);
@@ -12229,6 +12236,7 @@ function financePrintReport(kind){
 
   function guard(action, tab, fnName){
     return function(oldFn){
+      if(window.__tasneefUnifiedPermissionsOnly) return oldFn;
       if(typeof oldFn !== 'function' || oldFn.__v201Guarded) return oldFn;
       const wrapped = function(){
         if(!hasPerm(`tab_${tab}_${action}`)){ say('لا تملك صلاحية '+({'add':'الإضافة','edit':'التعديل','delete':'الحذف','print':'الطباعة'}[action]||action),'err'); return; }
@@ -12446,6 +12454,7 @@ function financePrintReport(kind){
 ============================================================================= */
 (function(){
   'use strict';
+  if(window.__tasneefUnifiedPermissionsOnly){ console.log('V204 legacy role/permissions engine disabled by V10823'); return; }
   window.TASNEEF_BUILD = 'V204_ROLE_PERMISSIONS_HARD_FIX_2026_05_20';
   const $ = (id)=>document.getElementById(id);
   const S = (v)=>String(v ?? '').trim();
