@@ -1,0 +1,18 @@
+--- BACKUP_BEFORE_V10817_INDEX.html	2026-07-22 11:46:39.269843060 +0000
++++ index.html	2026-07-22 11:15:24.545908740 +0000
+@@ -23,12 +23,13 @@
+ <div class="logo">ت</div><h1>نظام تصنيف للتشغيل</h1><p>تسجيل دخول الإدارة والمشرفين والفنيين</p>
+ <label for="loginUsername">اسم المستخدم</label><input id="loginUsername" autocomplete="username" placeholder="مثال: admin أو fahad">
+ <label for="loginPassword">كلمة المرور</label><input id="loginPassword" type="password" autocomplete="current-password" placeholder="كلمة المرور">
+-<button onclick="login()">دخول</button><div id="loginMsg" class="msg hidden"></div><div class="small">V370 - تسجيل دخول بدون أي دومين خارجي</div>
++<button onclick="login()">دخول</button><div id="loginMsg" class="msg hidden"></div><div class="small">V10817 - تسجيل دخول بصلاحيات موحدة</div>
+ </main>
+ <script>
+ (async function(){try{localStorage.removeItem('tasneef_force_domain');sessionStorage.removeItem('tasneef_force_domain');if('serviceWorker' in navigator){const regs=await navigator.serviceWorker.getRegistrations();for(const r of regs) await r.unregister();}if(window.caches && location.protocol !== 'file:'){const keys=await caches.keys();for(const k of keys) await caches.delete(k);}}catch(e){}})();
+ document.addEventListener('keydown', function(e){ if(e.key === 'Enter') login(); });
+ </script>
+-<script src="app.js?v=10801-ticket-date-receive-scope"></script>
++<script src="app.js?v=10817-unified-permissions"></script>
++<script src="tasneef_permissions_v10817.js?v=10817"></script>
+ </body>
+ </html>

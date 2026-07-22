@@ -1,0 +1,19 @@
+Tasneef Unified Permissions V10817 - Logic Test
+Passed: 16/16
+
+PASS | super_admin always allowed
+PASS | explicit user deny overrides role
+PASS | explicit user allow adds permission
+PASS | role permission inherited
+PASS | missing permission denied
+PASS | inactive user denied
+PASS | specific project allowed
+PASS | other project denied
+PASS | all project scope allowed
+PASS | permission denial precedes project scope
+PASS | cache isolated by user
+PASS | cache isolated by version
+PASS | disabled account invalidates old session
+PASS | ended session rejected
+PASS | failed permission transaction rolls back
+PASS | successful permission transaction commits

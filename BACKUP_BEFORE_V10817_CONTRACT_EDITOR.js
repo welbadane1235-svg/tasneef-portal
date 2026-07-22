@@ -1,5 +1,5 @@
 /*
- * Tasneef ContractsServicesEditor V10817 permissions integration
+ * Tasneef ContractsServicesEditor V10815
  * Restores the contracts/services editor only inside #contracts.
  * Lazy-loads a single project's smart contracts, annual services, attachments and audit trail.
  */
@@ -7,9 +7,9 @@
   'use strict';
   if(window.__tasneefContractsServicesEditorV10807) return;
   window.__tasneefContractsServicesEditorV10807=true;
-  window.TASNEEF_BUILD='V10817_UNIFIED_PERMISSIONS';
+  window.TASNEEF_BUILD='V10815_CONTRACTS_PROJECTS_DIRECT_SYNC_ALERTS';
 
-  const VERSION='V10817';
+  const VERSION='V10815';
   const MODAL_ID='contractsServicesEditorV10807';
   const LS_KEY='tasneef_contract_smart_v299';
   const CONTRACT_FILES_BUCKET='contract-files';
@@ -27,19 +27,20 @@
   const globalData=()=>window.data||(typeof data!=='undefined'?data:{});
   const client=()=>window.sb||(typeof sb!=='undefined'?sb:null);
   const getUser=()=>{try{return typeof session==='function'?(session()||{}):JSON.parse(localStorage.getItem('tasneef_user')||'{}')||{};}catch(_){return {};}};
-  const role=()=>S(getUser().role_key||getUser().role);
+  const role=()=>S(getUser().role||getUser().role_key);
   const parsePerms=()=>{let p=getUser().permissions||{};if(typeof p==='string'){try{p=JSON.parse(p||'{}')}catch(_){p={}}}return p||{};};
-  const legacyExplicit=(...keys)=>{const p=parsePerms();return keys.some(k=>p[k]===true||p[k]==='allow'||p[k]===1);};
-  const permissionCan=(key,ctx={})=>window.PermissionsService?.can?window.PermissionsService.can(key,ctx):legacyExplicit(key);
-  const isFullManager=()=>window.PermissionsService?.isSuperAdmin?window.PermissionsService.isSuperAdmin():['admin','system_admin','general_manager','super_admin'].includes(role());
-  const canEditAll=()=>permissionCan('contracts.edit',{project_id:state?.projectId})||permissionCan('contracts.manage_services',{project_id:state?.projectId});
-  const canEditFinance=()=>permissionCan('contracts.edit_financial',{project_id:state?.projectId});
-  const canArchive=()=>permissionCan('contracts.archive',{project_id:state?.projectId});
-  const canManageAttachments=()=>permissionCan('contracts.manage_attachments',{project_id:state?.projectId});
-  const canAdminExecuted=()=>permissionCan('contracts.manage_services',{project_id:state?.projectId});
-  const canRenew=()=>permissionCan('contracts.renew',{project_id:state?.projectId});
-  const canNonRenew=()=>permissionCan('contracts.non_renew',{project_id:state?.projectId});
-  const canStopFromContract=()=>permissionCan('projects.stop_from_contract',{project_id:state?.projectId});
+  const hasExplicit=(...keys)=>{const p=parsePerms();return keys.some(k=>p[k]===true||p[k]==='allow'||p[k]===1);};
+  const isFullManager=()=>['admin','system_admin','general_manager'].includes(role());
+  const isOperations=()=>role()==='operations_manager';
+  const isFinancial=()=>role()==='financial_manager';
+  const canEditAll=()=>isFullManager()||isOperations()||hasExplicit('contracts.manage','contracts.update','contracts_services.update','contracts.edit');
+  const canEditFinance=()=>isFullManager()||isFinancial()||hasExplicit('contracts.financial.update','contracts_finance.update','contracts.value.update');
+  const canArchive=()=>isFullManager()||hasExplicit('contracts.archive','contracts_services.archive');
+  const canManageAttachments=()=>isFullManager()||isOperations()||hasExplicit('contracts.attachments.manage','contracts_attachments.manage');
+  const canAdminExecuted=()=>isFullManager()||hasExplicit('contracts.executed.override');
+  const canRenew=()=>isFullManager()||hasExplicit('contracts.renew');
+  const canNonRenew=()=>isFullManager()||hasExplicit('contracts.non_renew');
+  const canStopFromContract=()=>isFullManager()||hasExplicit('projects.stop_from_contract');
 
   const CONTRACT_DEFS=[
     {key:'operation',title:'عقد التشغيل الأساسي',provider:'الجهة المتعاقدة',asset:'عدد المباني/الوحدات',scope:'نطاق التشغيل'},
@@ -96,10 +97,13 @@
   }
   function supervisorOwns(project){const u=getUser();return role()==='supervisor'&&S(project?.supervisor_id)===S(u.id);}
   function canViewProject(project){
-    return permissionCan('contracts.view',{project_id:project?.id,resource:project});
+    if(['admin','general_manager','financial_manager','operations_manager','warehouse_manager'].includes(role())) return true;
+    if(role()==='supervisor') return supervisorOwns(project)||hasExplicit('contracts.view_all','contracts.view');
+    return hasExplicit('contracts.view','contracts.manage');
   }
   function canEditProject(project){
-    return permissionCan('contracts.edit',{project_id:project?.id,resource:project})||permissionCan('contracts.manage_services',{project_id:project?.id,resource:project});
+    if(canEditAll()) return true;
+    return role()==='supervisor'&&supervisorOwns(project)&&hasExplicit('contracts.update','contracts_services.update','contracts.edit');
   }
   function isEditable(){return state.mode==='edit'&&canEditProject(state.project);}
 

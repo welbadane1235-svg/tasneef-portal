@@ -1,0 +1,15 @@
+/* Tasneef unified permissions V10817 */
+.permission-matrix-v10817{display:grid;gap:12px;max-height:58vh;overflow:auto;padding:2px}
+.perm17-module{border:1px solid #dbe5e1;border-radius:16px;overflow:hidden;background:#fff}
+.perm17-module-head{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#f4faf7;padding:10px 12px;position:sticky;top:0;z-index:2}
+.perm17-module-actions{display:flex;gap:6px;flex-wrap:wrap}.perm17-module-actions button{padding:6px 9px;font-size:11px}
+.perm17-grid{display:grid;grid-template-columns:repeat(2,minmax(260px,1fr));gap:8px;padding:10px}
+.perm17-row{display:grid;grid-template-columns:minmax(130px,1fr) 170px 115px;align-items:center;gap:8px;border:1px solid #e6efeb;border-radius:11px;padding:8px;background:#fff}
+.perm17-row.sensitive{border-color:#efd09a;background:#fffaf1}.perm17-key{font-size:10px;color:#718079;direction:ltr;text-align:left;display:block;margin-top:3px}
+.perm17-source{font-size:10px;border-radius:999px;padding:4px 7px;text-align:center;background:#eef5f2;color:#315d51}.perm17-source.allow{background:#dcfce7;color:#166534}.perm17-source.deny{background:#fee2e2;color:#991b1b}.perm17-source.role{background:#e0f2fe;color:#075985}
+.perm17-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0}.perm17-toolbar select,.perm17-toolbar input{width:auto;min-width:180px;flex:1}.perm17-toolbar button{white-space:nowrap}
+.perm17-legend{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;margin:8px 0}.perm17-legend span{padding:5px 8px;border-radius:999px;background:#f1f5f9}.perm17-warning{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:12px;padding:10px;margin:8px 0}
+.perm17-modal{position:fixed;inset:0;background:#0f172a80;z-index:100300;display:grid;place-items:center;padding:16px}.perm17-modal.hidden{display:none}.perm17-dialog{width:min(980px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:18px;padding:18px;box-shadow:0 25px 70px #0004}.perm17-dialog h3{margin-top:0;color:#075846}.perm17-dialog table{width:100%;border-collapse:collapse}.perm17-dialog th,.perm17-dialog td{padding:8px;border-bottom:1px solid #e5ece9;text-align:right}.perm17-dialog .actions{position:sticky;bottom:0;background:#fff;padding-top:10px}
+[data-permission-hidden="true"]{display:none!important}.permission-denied-page-v10817{padding:30px;text-align:center;border:1px solid #f0caca;background:#fff1f1;color:#991b1b;border-radius:18px;margin:20px}
+.perm17-financial-redacted{filter:blur(5px);pointer-events:none;user-select:none;position:relative}.perm17-financial-redacted:after{content:'غير مصرح';filter:none;position:absolute;inset:0;display:grid;place-items:center;background:#f8fafccc;color:#64748b;font-size:11px}
+@media(max-width:850px){.perm17-grid{grid-template-columns:1fr}.perm17-row{grid-template-columns:1fr}.perm17-source{text-align:right}.perm17-toolbar>*{width:100%!important}}

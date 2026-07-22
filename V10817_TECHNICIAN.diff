@@ -1,0 +1,12 @@
+--- BACKUP_BEFORE_V10817_TECHNICIAN.html	2026-07-22 11:46:39.269843060 +0000
++++ technician.html	2026-07-22 11:15:24.545908740 +0000
+@@ -148,7 +148,8 @@
+     </div>
+   </section>
+ </div>
+-<script src="app.js?v=10808-ticket-receive-open-visible"></script>
++<script src="app.js?v=10817-unified-permissions"></script>
++<script src="tasneef_permissions_v10817.js?v=10817"></script>
+ <script>
+ (function(){
+   const ATT_KEY='tasneef_technician_attendance_v310';
