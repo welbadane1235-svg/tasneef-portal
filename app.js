@@ -120,20 +120,26 @@ function tasneefCanonicalRoleKeyV10821(userOrRole){
   const raw=String((u.role_key||u.role||userOrRole||'')).trim().toLowerCase();
   const aliases={
     admin:'super_admin',system_admin:'super_admin',super_admin:'super_admin',
-    general_manager:'operations_manager',operations_manager:'operations_manager',
+    general_manager:'operations_manager',operations_manager:'operations_manager',operations:'operations_manager',
     financial_manager:'accountant',finance_manager:'accountant',accountant:'accountant',
     warehouse_manager:'warehouse_manager',warehouse_officer:'warehouse_manager',
-    maintenance_manager:'maintenance_manager',sales_manager:'sales_manager',sales_employee:'sales_employee',
-    supervisor:'supervisor',technician:'technician',read_only:'read_only',custom:'custom'
+    maintenance_manager:'maintenance_manager',quality_manager:'quality_manager',hr_manager:'hr_manager',
+    sales_manager:'sales_manager',sales_employee:'sales_employee',contracts_officer:'contracts_officer',
+    hr_officer:'hr_officer',tickets_officer:'tickets_officer',orders_officer:'orders_officer',
+    data_entry:'data_entry',client:'client',supervisor:'supervisor',technician:'technician',
+    read_only:'read_only',custom:'custom'
   };
   return aliases[raw]||raw||'custom';
 }
 function tasneefRouteRoleV10821(userOrRole){
   const key=tasneefCanonicalRoleKeyV10821(userOrRole);
   if(key==='super_admin') return 'admin';
-  if(['operations_manager','accountant','warehouse_manager','maintenance_manager','sales_manager','sales_employee','read_only','custom'].includes(key)) return 'general_manager';
+  if(key==='supervisor') return 'supervisor';
   if(key==='technician') return 'technician';
-  return 'supervisor';
+  if(key==='client') return 'client';
+  // All managers, officers, accountants, sales users, data entry and custom users open the admin shell.
+  // The unified permissions service then limits the visible sections and actions.
+  return 'general_manager';
 }
 function tasneefNormalizeSessionUserV10821(raw){
   const user=Object.assign({},raw||{});
@@ -148,7 +154,7 @@ function tasneefNormalizeSessionUserV10821(raw){
 }
 window.tasneefCanonicalRoleKeyV10821=tasneefCanonicalRoleKeyV10821;
 window.tasneefNormalizeSessionUserV10821=tasneefNormalizeSessionUserV10821;
-function roleHomeUrl(role){ const r=tasneefRouteRoleV10821(role); return r==='admin'?'admin.html':(r==='technician'?'technician.html':'supervisor.html'); }
+function roleHomeUrl(role){ const r=tasneefRouteRoleV10821(role); return (r==='admin'||r==='general_manager')?'admin.html':(r==='technician'?'technician.html':(r==='client'?'index.html':'supervisor.html')); }
 function isAdminAreaRole(role){ return ['admin','general_manager'].includes(tasneefRouteRoleV10821(role)); }
 function requireRole(role){
   let u=session();
@@ -156,7 +162,7 @@ function requireRole(role){
   u=tasneefNormalizeSessionUserV10821(u);
   setSession(u);
   const route=tasneefRouteRoleV10821(u);
-  if(role==='admin' && route==='admin') return u;
+  if(role==='admin' && (route==='admin'||route==='general_manager')) return u;
   if(role==='supervisor' && route==='supervisor') return u;
   if(role==='technician' && route==='technician') return u;
   if(role && route!==role){
@@ -26815,3 +26821,18 @@ ${finalUrl}
 
 
 /* V10820: restored unified permissions runtime bridge on top of V10819. */
+
+
+/* ===================== V10822 ROLE ROUTING + ROLE CHECK COMPATIBILITY ===================== */
+(function(){
+  'use strict';
+  window.TASNEEF_BUILD='V10822_ROLE_ROUTING_AND_ROLE_CHECK';
+  window.tasneefRoleHomeV10822=function(userOrRole){
+    const r=typeof window.tasneefRouteRoleV10821==='function'?window.tasneefRouteRoleV10821(userOrRole):String(userOrRole||'');
+    if(r==='admin'||r==='general_manager') return 'admin.html';
+    if(r==='technician') return 'technician.html';
+    if(r==='client') return 'index.html';
+    return 'supervisor.html';
+  };
+  console.log('Tasneef V10822 role routing compatibility loaded');
+})();
