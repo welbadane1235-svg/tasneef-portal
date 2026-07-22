@@ -1,0 +1,12 @@
+Tasneef V10816_SUPERVISOR_PROJECTS_COMPLETE loaded
+V10816_SUPERVISOR_PROJECTS_COMPLETE projects: 3 workers: 1 month: 2026-07
+TASNEEF V10816 DYNAMIC TEST
+
+PASS: direct project assigned through projects.supervisor_id
+PASS: project assigned through monthly_distribution.supervisor_id
+PASS: project assigned through worker_project_assignments
+PASS: unrelated supervisor project excluded
+PASS: inactive project excluded
+PASS: all supervisor project selects refilled
+
+Result: 6/6 passed
