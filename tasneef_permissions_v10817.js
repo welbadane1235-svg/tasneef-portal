@@ -8,7 +8,7 @@
   if(window.__tasneefPermissionsV10817) return;
   window.__tasneefPermissionsV10817=true;
   window.__tasneefUnifiedPermissionsOnly=true;
-  const BUILD='V10824_NO_FLICKER_WELCOME';
+  const BUILD='V10825_STRICT_SECTION_PERMISSIONS';
   const S=v=>String(v??'').trim();
   const A=v=>Array.isArray(v)?v:[];
   const $=id=>document.getElementById(id);
@@ -129,7 +129,7 @@
     const chosen=(explicit&&explicit!=='custom')?explicit:(legacy||explicit||'custom');
     return ROLE_KEY_ALIASES[chosen]||chosen||'custom';
   }
-  function isSuper(u=currentUser()){return roleKey(u)==='super_admin'||SUPER_ROLES.has(S(u?.role_key).toLowerCase())||SUPER_ROLES.has(S(u?.role).toLowerCase());}
+  function isSuper(u=currentUser()){return roleKey(u)==='super_admin';}
   function token(){
     return S(
       currentUser().permission_session_token||
@@ -178,7 +178,7 @@
   }
   function requirePermission(key,ctx={}){if(canPermission(key,ctx))return true;toast('ليس لديك صلاحية لتنفيذ هذا الإجراء','err');return false;}
   async function checkVersion(forceReload=false){const u=currentUser();if(!u?.id||!token())return;try{const d=await callRpc('get_permissions_version_v10817',{p_session_token:token()});const v=Number(typeof d==='object'?d?.permissions_version:d);if(forceReload||v>Number(state.version||u.permissions_version||0)){clearPermissionCache(u.id);await load(true);broadcast?.postMessage({type:'permissions-reloaded',userId:u.id,version:v});}}catch(e){if(!isMissingRpc(e))console.warn(BUILD,'version check',e.message||e);}}
-  window.PermissionsService={BUILD,CATALOG,ALIASES,ROLE_TEMPLATES,getCurrentUserPermissions:load,load,can:canPermission,require:requirePermission,checkVersion,clearUserCache:clearPermissionCache,isSuperAdmin:isSuper,normalizeKey,inferActionPermission:inferPermission,state};
+  window.PermissionsService={BUILD,CATALOG,ALIASES,ROLE_TEMPLATES,getCurrentUserPermissions:load,load,can:canPermission,require:requirePermission,checkVersion,clearUserCache:clearPermissionCache,isSuperAdmin:isSuper,normalizeKey,inferActionPermission:inferPermission,applyUI:()=>applyUI(true),state};
   window.can=function(a,b,c,d){return typeof a==='string'?canPermission(a,b||{}):canPermission(b,c||{});};
   window.requirePermissionV10700=function(k,ctx,res){return requirePermission(k,{...(ctx||{}),resource:res});};
   window.requirePermission=function(k,ctx){return requirePermission(k,ctx);};
@@ -207,6 +207,41 @@
     if(!visible)return;const p=PAGE_PERMISSIONS[visible.id];if(!p||canPermission(p))return;
     visible.style.display='none';const fallback=canPermission('dashboard.view')?$('dashboard'):null;if(fallback)fallback.style.display='block';if(!window.__tasneefPermissionBootingV10824)toast('تم تحديث صلاحياتك ولم يعد هذا القسم متاحًا','err');
   }
+  function applyStrictSectionVisibilityV10825(){
+    if(!state.loaded) return;
+    const routeSelector='[onclick*="showPage("]';
+    document.querySelectorAll(routeSelector).forEach(el=>{
+      const m=S(el.getAttribute('onclick')).match(/showPage\(['"]([^'"]+)/);
+      const pageId=m&&m[1];
+      const permission=pageId&&PAGE_PERMISSIONS[pageId];
+      if(!permission) return;
+      const allowed=canPermission(permission);
+      el.dataset.permission=permission;
+      el.dataset.permissionHidden=allowed?'false':'true';
+      el.setAttribute('aria-hidden',allowed?'false':'true');
+      el.tabIndex=allowed?0:-1;
+      const page=$(pageId);
+      if(page){
+        page.dataset.permission=permission;
+        page.dataset.permissionHidden=allowed?'false':'true';
+        page.setAttribute('aria-hidden',allowed?'false':'true');
+      }
+    });
+    const active=document.querySelector('.side .nav.active[data-permission-hidden="true"]');
+    const visiblePage=[...document.querySelectorAll('section.page')].find(el=>getComputedStyle(el).display!=='none'&&!el.classList.contains('hidden'));
+    const visibleDenied=visiblePage&&visiblePage.dataset.permissionHidden==='true';
+    if(active||visibleDenied){
+      const first=[...document.querySelectorAll('.side .nav:not(.danger)')].find(el=>el.dataset.permissionHidden!=='true');
+      if(first){
+        const m=S(first.getAttribute('onclick')).match(/showPage\(['"]([^'"]+)/);
+        const pageId=m&&m[1];
+        document.querySelectorAll('.side .nav.active').forEach(el=>el.classList.remove('active'));
+        first.classList.add('active');
+        document.querySelectorAll('section.page').forEach(el=>{el.classList.add('hidden');el.style.display='none';});
+        const page=pageId&&$(pageId);if(page){page.classList.remove('hidden');page.style.display='block';}
+      }
+    }
+  }
   function applyUINow(){
     const u=currentUser();
     if(S(u?.id||u?.user_id) && !state.loaded) return;
@@ -220,6 +255,7 @@
       document.querySelectorAll('[onclick],[onchange],[onsubmit]').forEach(el=>{const txt=handlerText(el),p=permissionForHandler(txt);if(p){const allowed=canPermission(p);el.dataset.permission=p;el.dataset.permissionHidden=allowed?'false':'true';if(allowed&&el.style.display==='none'&&!el.classList.contains('hidden'))el.style.removeProperty('display');}});
       document.querySelectorAll('[onclick^="openAdvancedUserForm"]').forEach(el=>{const hasId=!/openAdvancedUserForm\(\s*\)/.test(S(el.getAttribute('onclick')));el.dataset.permission=hasId?'users.edit':'users.create';el.dataset.permissionSecondary='users.manage_permissions';});
       document.querySelectorAll('[data-permission]').forEach(el=>{const p=el.dataset.permission,p2=el.dataset.permissionSecondary,allowed=canPermission(p)&&(!p2||canPermission(p2));el.dataset.permissionHidden=allowed?'false':'true';el.disabled=!allowed;if(allowed&&el.style.display==='none'&&!el.classList.contains('hidden'))el.style.removeProperty('display');});
+      applyStrictSectionVisibilityV10825();
       applyFinancialRedaction();
       enforceVisiblePagePermission();
       state.uiRevision++;

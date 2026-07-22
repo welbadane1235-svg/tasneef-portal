@@ -2023,6 +2023,7 @@ function monthlyReportRowsV58(){return monthlyRowsV60()}
   };
 
   function applyCurrentPermissions(){
+    if(window.__tasneefUnifiedPermissionsOnly) return;
     const u = (typeof session === 'function') ? session() : null;
     if(!u) return;
     const p = getPerms(u);
@@ -3592,6 +3593,7 @@ function financeResetFilters(){ ['financeSearch','financeProjectFilter','finance
 /* ===== V113: strict sidebar permissions for all admin-area roles ===== */
 (function(){
   'use strict';
+  if(window.__tasneefUnifiedPermissionsOnly){ console.log('V113 legacy sidebar permissions disabled by V10825'); return; }
 
   const PERMISSIONS_V113 = [
     ['can_dashboard','لوحة التحكم'],
@@ -3860,6 +3862,7 @@ function financeResetFilters(){ ['financeSearch','financeProjectFilter','finance
 /* ===== V114: hard sidebar permissions fix + live session refresh ===== */
 (function(){
   'use strict';
+  if(window.__tasneefUnifiedPermissionsOnly){ console.log('V114 legacy sidebar permissions disabled by V10825'); return; }
 
   const PERMISSIONS_V114 = [
     ['can_dashboard','لوحة التحكم'],
@@ -26835,7 +26838,7 @@ ${finalUrl}
 /* ===================== V10822 ROLE ROUTING + ROLE CHECK COMPATIBILITY ===================== */
 (function(){
   'use strict';
-  window.TASNEEF_BUILD='V10822_ROLE_ROUTING_AND_ROLE_CHECK';
+  window.TASNEEF_BUILD='V10825_STRICT_SECTION_PERMISSIONS';
   window.tasneefRoleHomeV10822=function(userOrRole){
     const r=typeof window.tasneefRouteRoleV10821==='function'?window.tasneefRouteRoleV10821(userOrRole):String(userOrRole||'');
     if(r==='admin'||r==='general_manager') return 'admin.html';
@@ -26916,3 +26919,5 @@ ${finalUrl}
   }
   document.addEventListener('DOMContentLoaded',updateWelcomeV10824,{once:true});
 })();
+
+/* V10825: strict final section visibility based only on PermissionsService effective server permissions. */

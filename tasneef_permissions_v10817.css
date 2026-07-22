@@ -18,3 +18,14 @@
 html.tasneef-permissions-applying-v10823 [data-permission],html.tasneef-permissions-applying-v10823 [data-permission-hidden]{transition:none!important;animation:none!important}
 .perm17-row[data-permission-dirty="true"]{outline:2px solid #f59e0b;outline-offset:-2px;background:#fffdf5}
 .permission-matrix-v10817{overflow-anchor:none}
+
+
+/* V10824: hide the application until the real permission snapshot is ready. */
+html.tasneef-permissions-booting-v10824 body{overflow:hidden}
+html.tasneef-permissions-booting-v10824 .app-shell{visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+html.tasneef-permissions-booting-v10824 body::before{content:'جارٍ تجهيز حسابك وصلاحياتك…';position:fixed;inset:0;z-index:100500;display:grid;place-items:center;background:#f3f6f5;color:#0a4033;font:700 16px Tahoma,Arial,sans-serif}
+html.tasneef-permissions-booting-v10824 body::after{content:'';position:fixed;z-index:100501;top:calc(50% - 48px);left:calc(50% - 18px);width:36px;height:36px;border-radius:50%;border:4px solid #dce6e2;border-top-color:#0a4033;animation:tasneefBootSpinV10824 .75s linear infinite}
+@keyframes tasneefBootSpinV10824{to{transform:rotate(360deg)}}
+.user-welcome-v10824{display:inline-flex;align-items:center;min-height:38px;padding:8px 13px;border-radius:999px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);color:#fff;font-size:13px;font-weight:800;white-space:nowrap}
+.hero-action-v155{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+@media(max-width:700px){.user-welcome-v10824{width:100%;justify-content:center}.hero-action-v155{justify-content:center}}
