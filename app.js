@@ -27374,3 +27374,178 @@ ${finalUrl}
   console.info(BUILD,'loaded');
 })();
 /* ===== END V10830 ===== */
+
+/* ===== V10838: إصلاح إغلاق التذاكر في نسخة المشرف فقط ===== */
+(function(){
+  'use strict';
+  if(window.__tasneefSupervisorTicketCloseV10838) return;
+  const isSupervisorPage = !!document.getElementById('supTicketsBody') && !document.getElementById('ticketsBody');
+  if(!isSupervisorPage) return;
+  window.__tasneefSupervisorTicketCloseV10838 = true;
+  const BUILD='V10838_SUPERVISOR_TICKET_CLOSE';
+  const S=v=>String(v??'').trim();
+  const A=v=>Array.isArray(v)?v:[];
+  const E=v=>S(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const $=id=>document.getElementById(id);
+
+  function notify(text,type){
+    try{ if(typeof window.msg==='function') return window.msg(text,type); }catch(_){}
+    if(type==='err') console.error(text); else console.log(text);
+  }
+  function user(){
+    try{ if(typeof window.session==='function') return window.session()||{}; }catch(_){}
+    try{ return JSON.parse(localStorage.getItem('tasneef_user')||'{}')||{}; }catch(_){ return {}; }
+  }
+  function userName(){ const u=user(); return S(u.full_name||u.name||u.display_name||u.username||u.email)||'المشرف'; }
+  function sessionToken(){
+    const u=user();
+    return S(u.permission_session_token||u.session_token||localStorage.getItem('tasneef_session_token_v10817')||localStorage.getItem('tasneef_permission_session_v10817'));
+  }
+  function permissionAllowed(ticket){
+    try{
+      if(window.PermissionsService?.can) return window.PermissionsService.can('tickets.close',{project_id:ticket?.project_id});
+      if(typeof window.can==='function') return window.can('tickets.close',{project_id:ticket?.project_id});
+    }catch(_){}
+    return true;
+  }
+  function localTicket(id){ return A(window.data?.tickets).find(t=>S(t.id)===S(id)); }
+  async function refreshTickets(){
+    try{
+      if(typeof window.tasneefRefreshTicketsV10519==='function') await window.tasneefRefreshTicketsV10519();
+      else if(typeof window.initSupervisor==='function') await window.initSupervisor();
+    }catch(e){ console.warn(BUILD,'refresh',e); }
+    try{ if(typeof window.renderTickets==='function') window.renderTickets(); }catch(e){ console.warn(BUILD,'render',e); }
+  }
+  async function getTicket(id){
+    let t=localTicket(id); if(t) return t;
+    try{ await refreshTickets(); }catch(_){}
+    t=localTicket(id); if(t) return t;
+    try{
+      if(window.sb?.rpc){
+        const r=await window.sb.rpc('tasneef_tickets_all_v10519');
+        if(!r.error){ window.data=window.data||{}; window.data.tickets=A(r.data); t=localTicket(id); }
+      }
+    }catch(e){ console.warn(BUILD,'ticket lookup',e); }
+    return t||null;
+  }
+  function projectLabel(ticket){
+    try{ if(typeof window.projectName==='function'){ const n=window.projectName(ticket?.project_id); if(S(n)&&S(n)!=='-') return n; } }catch(_){}
+    return S(ticket?.project_name)||'-';
+  }
+  function ticketNumber(ticket){ return S(ticket?.ticket_number||ticket?.ticket_no)||('T-'+String(ticket?.id||0).padStart(4,'0')); }
+
+  function closeDialog(ticket){
+    return new Promise(resolve=>{
+      $('supervisorTicketCloseModalV10838')?.remove();
+      const modal=document.createElement('div');
+      modal.id='supervisorTicketCloseModalV10838';
+      modal.className='sup-ticket-close-modal-v10838';
+      modal.innerHTML=`<div class="sup-ticket-close-card-v10838" role="dialog" aria-modal="true" aria-labelledby="supTicketCloseTitleV10838">
+        <div class="sup-ticket-close-head-v10838"><div><h3 id="supTicketCloseTitleV10838">إغلاق التذكرة</h3><p>${E(ticketNumber(ticket))} — ${E(projectLabel(ticket))}</p></div><button type="button" class="light" data-close-modal>إلغاء</button></div>
+        <label>طريقة الإغلاق والإجراء المنفذ <span class="required-v10838">*</span></label>
+        <textarea id="supTicketCloseNoteV10838" placeholder="اكتب ماذا تم عمله لحل المشكلة وإغلاق التذكرة"></textarea>
+        <label>تم الإغلاق بواسطة</label>
+        <input id="supTicketCloserNameV10838" value="${E(userName())}" autocomplete="off">
+        <div class="sup-ticket-close-error-v10838" id="supTicketCloseErrorV10838"></div>
+        <div class="sup-ticket-close-actions-v10838"><button type="button" id="supTicketCloseSaveV10838">تأكيد الإغلاق</button><button type="button" class="light" data-close-modal>إلغاء</button></div>
+      </div>`;
+      document.body.appendChild(modal);
+      const finish=value=>{ modal.remove(); resolve(value); };
+      modal.querySelectorAll('[data-close-modal]').forEach(b=>b.addEventListener('click',()=>finish(null)));
+      modal.addEventListener('click',e=>{ if(e.target===modal) finish(null); });
+      modal.querySelector('#supTicketCloseSaveV10838').addEventListener('click',()=>{
+        const note=S(modal.querySelector('#supTicketCloseNoteV10838').value);
+        const closer=S(modal.querySelector('#supTicketCloserNameV10838').value)||userName();
+        const err=modal.querySelector('#supTicketCloseErrorV10838');
+        if(!note){ err.textContent='اكتب طريقة الإغلاق والإجراء المنفذ.'; modal.querySelector('#supTicketCloseNoteV10838').focus(); return; }
+        if(!closer){ err.textContent='اكتب اسم من أغلق التذكرة.'; return; }
+        const btn=modal.querySelector('#supTicketCloseSaveV10838'); btn.disabled=true; btn.textContent='جارٍ الإغلاق...';
+        resolve({note,closer,modal,button:btn});
+      });
+      setTimeout(()=>modal.querySelector('#supTicketCloseNoteV10838')?.focus(),50);
+    });
+  }
+  function closeDialogAfterSubmit(ctx,success,errorText){
+    if(!ctx?.modal?.isConnected) return;
+    if(success){ ctx.modal.remove(); return; }
+    const err=ctx.modal.querySelector('#supTicketCloseErrorV10838'); if(err) err.textContent=errorText||'تعذر إغلاق التذكرة.';
+    if(ctx.button){ ctx.button.disabled=false; ctx.button.textContent='إعادة المحاولة'; }
+  }
+  function isMissingRpc(error){ return /PGRST202|Could not find the function|function .* does not exist|schema cache/i.test(S(error?.message||error)); }
+  function minutesBetween(a,b){ const x=a?new Date(a):null,y=b?new Date(b):null; return (!x||!y||isNaN(x)||isNaN(y))?0:Math.max(0,Math.round((y-x)/60000)); }
+
+  async function closeOnServer(ticket,note,closer){
+    if(!window.sb) throw new Error('قاعدة البيانات غير متاحة.');
+    const token=sessionToken();
+    if(token){
+      const rpcRes=await window.sb.rpc('tasneef_close_ticket_v10838',{
+        p_session_token:token,
+        p_ticket_id:S(ticket.id),
+        p_closure_note:note,
+        p_closed_by_name:closer
+      });
+      if(!rpcRes.error){
+        const payload=Array.isArray(rpcRes.data)?rpcRes.data[0]:rpcRes.data;
+        return payload?.ticket||payload?.row||payload;
+      }
+      if(!isMissingRpc(rpcRes.error)) throw rpcRes.error;
+    }
+    // توافق مؤقت إذا لم يُشغّل ملف SQL بعد. قد تمنعه RLS؛ عندها تظهر رسالة واضحة للمستخدم.
+    const u=user(),now=new Date().toISOString();
+    const row={status:'closed',closed_at:now,closed_by:u.id,closed_by_name:closer,closure_note:note,open_duration_minutes:minutesBetween(ticket.created_at,now),processing_duration_minutes:ticket.claimed_at?minutesBetween(ticket.claimed_at,now):null,updated_at:now};
+    if(!ticket.claimed_at){ row.claimed_by=u.id; row.claimed_by_name=closer; row.claimed_at=now; }
+    const res=await window.sb.from('tickets').update(row).eq('id',ticket.id).select('*').maybeSingle();
+    if(res.error){
+      const raw=S(res.error.message||res.error);
+      if(/row-level security|permission|403|not authorized|policy/i.test(raw)) throw new Error('تعذر الإغلاق بسبب حماية قاعدة البيانات. شغّل ملف إصلاح التذاكر V10838 في Supabase ثم أعد المحاولة.');
+      throw res.error;
+    }
+    return res.data||Object.assign({},ticket,row);
+  }
+  function mergeTicket(updated){
+    if(!updated) return;
+    window.data=window.data||{};
+    const rows=A(window.data.tickets); const i=rows.findIndex(t=>S(t.id)===S(updated.id));
+    if(i>=0) rows[i]=Object.assign({},rows[i],updated); else rows.unshift(updated);
+    window.data.tickets=rows;
+    try{ if(typeof data!=='undefined') data.tickets=rows; }catch(_){}
+  }
+
+  async function supervisorCloseTicket(id){
+    const u=user(); if(!S(u.id)) return notify('سجّل الدخول أولاً','err');
+    const ticket=await getTicket(id); if(!ticket) return notify('تعذر العثور على التذكرة. اضغط تحديث ثم أعد المحاولة.','err');
+    if(S(ticket.status).toLowerCase()==='closed') return notify('التذكرة مغلقة بالفعل','err');
+    if(!permissionAllowed(ticket)) return notify('ليس لديك صلاحية إغلاق هذه التذكرة','err');
+    const form=await closeDialog(ticket); if(!form) return;
+    try{
+      const updated=await closeOnServer(ticket,form.note,form.closer);
+      mergeTicket(updated||Object.assign({},ticket,{status:'closed',closure_note:form.note,closed_by_name:form.closer,closed_at:new Date().toISOString()}));
+      closeDialogAfterSubmit(form,true);
+      try{ if(typeof window.playAppSound==='function') window.playAppSound('ticket'); }catch(_){}
+      notify('تم إغلاق التذكرة وحفظ طريقة الإغلاق');
+      await refreshTickets();
+    }catch(e){
+      console.error(BUILD,e);
+      closeDialogAfterSubmit(form,false,S(e?.message||e));
+      notify(S(e?.message||e),'err');
+    }
+  }
+
+  window.supervisorCloseTicketV10838=supervisorCloseTicket;
+  window.closeTicket=supervisorCloseTicket;
+
+  function style(){
+    if($('supervisorTicketCloseStyleV10838')) return;
+    const st=document.createElement('style'); st.id='supervisorTicketCloseStyleV10838'; st.textContent=`
+      .sup-ticket-close-modal-v10838{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:14px;direction:rtl}
+      .sup-ticket-close-card-v10838{width:min(620px,100%);background:#fff;border-radius:20px;padding:18px;box-shadow:0 28px 80px rgba(0,0,0,.35)}
+      .sup-ticket-close-head-v10838{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}.sup-ticket-close-head-v10838 h3{margin:0;color:#07533e;font-size:22px}.sup-ticket-close-head-v10838 p{margin:4px 0 0;color:#687a72}
+      .sup-ticket-close-card-v10838 label{display:block;margin:10px 0 6px;color:#07533e;font-weight:800}.sup-ticket-close-card-v10838 textarea,.sup-ticket-close-card-v10838 input{width:100%;border:1px solid #cfe0da;border-radius:12px;padding:11px;font-family:inherit;font-size:14px}.sup-ticket-close-card-v10838 textarea{min-height:130px;resize:vertical}
+      .sup-ticket-close-actions-v10838{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.sup-ticket-close-actions-v10838 button,.sup-ticket-close-head-v10838 button{border:0;border-radius:11px;padding:10px 14px;background:#07533e;color:#fff;font-family:inherit;font-weight:800;cursor:pointer}.sup-ticket-close-actions-v10838 button.light,.sup-ticket-close-head-v10838 button.light{background:#edf5f2;color:#07533e;border:1px solid #d2e2dc}.sup-ticket-close-actions-v10838 button:disabled{opacity:.6;cursor:wait}
+      .sup-ticket-close-error-v10838{min-height:22px;color:#b42318;font-weight:800;margin-top:8px}.required-v10838{color:#b42318}
+    `; document.head.appendChild(st);
+  }
+  style();
+  console.info(BUILD,'loaded');
+})();
+/* ===== END V10838 ===== */
