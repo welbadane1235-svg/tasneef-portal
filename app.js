@@ -1216,6 +1216,9 @@ window.showSupervisorWindow = function(id, btn){
       friday_minutes:Number($safe('projectFridayMinutes')?.value||90),
       operation_type:$safe('projectOperationType')?.value||'daily_visit',
       visit_type_default:$safe('projectVisitDefault')?.value||'surface',
+      allow_cross_midnight:!!$safe('projectAllowCrossMidnight')?.checked,
+      shift_end_time:$safe('projectShiftEndTime')?.value||null,
+      auto_close_grace_minutes:Number($safe('projectAutoCloseGrace')?.value||120),
       status:$safe('projectStatus')?.value||'active',
       notes:$safe('projectNotes')?.value||''
     };
@@ -1241,6 +1244,9 @@ window.showSupervisorWindow = function(id, btn){
     if($safe('projectUnitsCount')) $safe('projectUnitsCount').value=p.units_count||0;
     if($safe('projectContractStart')) $safe('projectContractStart').value=contractStartValue(p);
     if($safe('projectContractEnd')) $safe('projectContractEnd').value=contractEndValue(p);
+    if($safe('projectAllowCrossMidnight')) $safe('projectAllowCrossMidnight').checked=!!p.allow_cross_midnight;
+    if($safe('projectShiftEndTime')) $safe('projectShiftEndTime').value=String(p.shift_end_time||'').slice(0,5);
+    if($safe('projectAutoCloseGrace')) $safe('projectAutoCloseGrace').value=Number(p.auto_close_grace_minutes||120);
   };
 
   const oldClearProjectForm = window.clearProjectForm;
@@ -1250,6 +1256,9 @@ window.showSupervisorWindow = function(id, btn){
     if($safe('projectUnitsCount')) $safe('projectUnitsCount').value=0;
     if($safe('projectContractStart')) $safe('projectContractStart').value='';
     if($safe('projectContractEnd')) $safe('projectContractEnd').value='';
+    if($safe('projectAllowCrossMidnight')) $safe('projectAllowCrossMidnight').checked=false;
+    if($safe('projectShiftEndTime')) $safe('projectShiftEndTime').value='';
+    if($safe('projectAutoCloseGrace')) $safe('projectAutoCloseGrace').value=120;
   };
 
   window.renderContractAlerts = function(){
@@ -27090,3 +27099,191 @@ ${finalUrl}
   setTimeout(boot,2400);
   console.info(BUILD,'loaded');
 })();
+
+/* ===== V10830 PROJECT TIME POLICY + DELAY REVIEW ===== */
+(function(){
+  'use strict';
+  if(window.__tasneefAttendanceTimePolicyV10830)return;
+  window.__tasneefAttendanceTimePolicyV10830=true;
+  const BUILD='V10830-project-time-policy';
+  const $=id=>document.getElementById(id);
+  const S=v=>String(v??'').trim();
+  const N=v=>Number(v)||0;
+  const esc=v=>S(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const state={status:null,lastServerAt:0,timer:null,reviewTimer:null,reasonShownFor:null};
+  const delayReasons=[
+    ['emergency_fault','عطل طارئ بالمشروع'],['urgent_client_complaint','شكوى عاجلة من العميل'],
+    ['client_extra_work','أعمال إضافية بطلب العميل'],['worker_shortage','نقص في عدد العمال'],
+    ['worker_delay','تأخر العامل في إنجاز المهمة'],['waiting_technician_supplier','انتظار فني أو مورد'],
+    ['site_access_delay','تأخر فتح الموقع أو الوصول إليه'],['maintenance_ticket','تنفيذ تذكرة صيانة'],
+    ['extra_order','تنفيذ أوردر إضافي'],['emergency_cleaning','تنظيف طارئ'],
+    ['inventory_materials','جرد أو استلام مواد'],['forgot_checkout','نسيان تسجيل الخروج'],
+    ['internet_system','مشكلة في الإنترنت أو النظام'],['other','سبب آخر']
+  ];
+  function notify(text,type='ok'){
+    try{if(typeof window.msg==='function')return window.msg(text,type==='err'?'err':type==='warn'?'warn':'ok')}catch(_){}
+    console[type==='err'?'error':'log'](text);
+  }
+  function currentUser(){try{return typeof window.session==='function'?(window.session()||{}):JSON.parse(localStorage.getItem('tasneef_session')||'{}')}catch(_){return{}}}
+  function can(key){try{return window.PermissionsService?.can?window.PermissionsService.can(key):true}catch(_){return true}}
+  function projectById(id){return (window.data?.projects||[]).find(p=>S(p.id)===S(id))||null}
+  function currentProjectId(){return S($('logProject')?.value||$('supLogProject')?.value||'')}
+  function activeProject(p){return !!p && p.is_active!==false && p.active!==false && S(p.status||'active').toLowerCase()==='active'}
+  function riyadhParts(date=new Date()){
+    try{
+      const ps=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,weekday:'short'}).formatToParts(date);
+      const get=t=>ps.find(x=>x.type===t)?.value||'';
+      return {date:`${get('year')}-${get('month')}-${get('day')}`,time:`${get('hour')}:${get('minute')}:${get('second')}`,weekday:get('weekday')};
+    }catch(_){return{date:new Date().toISOString().slice(0,10),time:new Date().toTimeString().slice(0,8),weekday:''}}
+  }
+  function fridayNow(date=new Date()){const w=riyadhParts(date).weekday.toLowerCase();return w.startsWith('fri')}
+  function requiredLocal(project,date=new Date()){
+    if(!project)return 0;
+    return fridayNow(date)?N(project.friday_minutes):N(project.required_daily_minutes);
+  }
+  function minsText(n){n=Math.max(0,Math.round(N(n)));const h=Math.floor(n/60),m=n%60;return h?`${h} ساعة${m?` و${m} دقيقة`:''}`:`${m} دقيقة`}
+  function timeText(v){if(!v)return'-';try{return new Date(v).toLocaleTimeString('ar-SA',{timeZone:'Asia/Riyadh',hour:'numeric',minute:'2-digit',hour12:true})}catch(_){return S(v)}}
+  function dateTimeText(v){if(!v)return'-';try{return new Date(v).toLocaleString('ar-SA',{timeZone:'Asia/Riyadh',dateStyle:'medium',timeStyle:'short'})}catch(_){return S(v)}}
+  async function rpc(name,args={}){
+    if(!window.sb?.rpc)throw new Error('لا يوجد اتصال بقاعدة البيانات');
+    const r=await window.sb.rpc(name,args);if(r.error)throw r.error;return r.data;
+  }
+  async function context(projectId){
+    try{return await rpc('tasneef_project_time_context_v10830',{p_project_id:Number(projectId),p_at:new Date().toISOString()})}
+    catch(e){
+      const p=projectById(projectId),req=requiredLocal(p);return {ok:!!p,project:p,required_minutes:req,is_friday:fridayNow(),no_friday_shift:fridayNow()&&req<=0,source:'local-fallback',error:e.message};
+    }
+  }
+  async function openStatus(projectId=null,force=false){
+    if(!force&&state.status&&Date.now()-state.lastServerAt<45000&&(!projectId||S(state.status?.requested_project_id)===S(projectId)))return state.status;
+    try{
+      const d=await rpc('tasneef_attendance_open_status_v10830',{p_project_id:projectId?Number(projectId):null});
+      state.status=d||{};state.lastServerAt=Date.now();return state.status;
+    }catch(e){console.warn(BUILD,'status fallback',e);return null}
+  }
+  function timingPanel(){
+    let el=$('attendanceTimePanelV10830');if(el)return el;
+    const card=document.querySelector('.sup-worker-visit-card');if(!card)return null;
+    el=document.createElement('div');el.id='attendanceTimePanelV10830';el.className='attendance-time-panel-v10830';
+    const help=card.querySelector('.sup-help');(help||card.firstChild)?.after?.(el);
+    return el;
+  }
+  function statusMessage(s){
+    if(!s)return {text:'اختر مشروعًا لعرض الوقت المطلوب.',cls:'neutral'};
+    if(s.no_friday_shift)return{text:'لا يوجد دوام مطلوب لهذا المشروع يوم الجمعة. لا يمكن فتح تسجيل عادي.',cls:'danger'};
+    if(!s.open_record){return{text:`المدة المطلوبة: ${minsText(s.required_minutes||0)}${s.allow_cross_midnight?' — فترة ممتدة بعد منتصف الليل':''}`,cls:'neutral'}}
+    const extra=N(s.extra_minutes),remaining=N(s.remaining_minutes);
+    if(extra>=60)return{text:`تجاوزت الوقت المطلوب بساعة أو أكثر (${minsText(extra)}). يحتاج متابعة الإدارة.`,cls:'danger'};
+    if(extra>=30)return{text:`تجاوزت الوقت المطلوب بـ${minsText(extra)}. يجب توضيح سبب التأخير عند الخروج.`,cls:'danger'};
+    if(extra>=15)return{text:`تجاوزت الوقت المطلوب بـ${minsText(extra)}. سيطلب منك سبب التأخير.`,cls:'warn'};
+    if(extra>0)return{text:`اكتملت المدة المطلوبة وتجاوزتها بـ${minsText(extra)}.`,cls:'warn'};
+    if(remaining<=0)return{text:'اكتملت المدة المطلوبة للمشروع. يرجى تسجيل الخروج عند انتهاء العمل.',cls:'done'};
+    if(remaining<=15)return{text:`تبقى ${minsText(remaining)} على موعد تسجيل الخروج.`,cls:'warn'};
+    if(remaining<=30)return{text:`تبقى ${minsText(remaining)} على انتهاء الوقت المطلوب للمشروع.`,cls:'near'};
+    return{text:`متبقي ${minsText(remaining)} على الوقت المطلوب.`,cls:'ok'};
+  }
+  function renderTiming(s){
+    const el=timingPanel();if(!el)return;
+    const p=s?.project||projectById(currentProjectId())||{};const meta=statusMessage(s);
+    if(!p.id&&!currentProjectId()){el.innerHTML='<div class="attendance-time-empty-v10830">اختر المشروع لعرض المدة ووقت الخروج المتوقع.</div>';return}
+    const req=N(s?.required_minutes||requiredLocal(p));
+    el.innerHTML=`<div class="attendance-time-head-v10830"><b>${esc(p.name||'المشروع')}</b><span class="attendance-time-type-v10830">${S(p.operation_type)==='full_time'?'دوام كامل':S(p.operation_type)==='daily_visit'?'زيارة يومية':'حسب الحاجة'}</span></div>
+      <div class="attendance-time-grid-v10830">
+       <div><small>وقت الدخول</small><b>${s?.open_record?timeText(s.open_record.check_in):'-'}</b></div>
+       <div><small>المدة المطلوبة</small><b>${minsText(req)}</b></div>
+       <div><small>الخروج المتوقع</small><b>${s?.expected_checkout_at?timeText(s.expected_checkout_at):'-'}</b></div>
+       <div><small>${N(s?.extra_minutes)>0?'الوقت الزائد':'المتبقي'}</small><b>${minsText(N(s?.extra_minutes)>0?s.extra_minutes:s?.remaining_minutes||0)}</b></div>
+      </div><div class="attendance-time-alert-v10830 ${meta.cls}">${esc(meta.text)}</div>`;
+  }
+  async function refreshTiming(force=false){
+    const pid=currentProjectId();
+    if(!pid){renderTiming(null);return null}
+    let s=await openStatus(pid,force);
+    if(!s){const c=await context(pid);s={...c,requested_project_id:pid,open_record:null,remaining_minutes:N(c.required_minutes),extra_minutes:0};}
+    renderTiming(s);
+    try{await rpc('tasneef_attendance_emit_due_alerts_v10830',{})}catch(_){ }
+    if(s?.previous_auto_closed?.id&&!s.previous_auto_closed.delay_reason_code&&state.reasonShownFor!==S(s.previous_auto_closed.id)){
+      state.reasonShownFor=S(s.previous_auto_closed.id);
+      setTimeout(()=>requestPreviousAutoCloseReason(s.previous_auto_closed),600);
+    }
+    return s;
+  }
+  function modalShell(id,title,body,actions){
+    document.getElementById(id)?.remove();const m=document.createElement('div');m.id=id;m.className='attendance-modal-v10830';
+    m.innerHTML=`<div class="attendance-modal-card-v10830" dir="rtl"><div class="attendance-modal-head-v10830"><h3>${esc(title)}</h3></div><div class="attendance-modal-body-v10830">${body}</div><div class="attendance-modal-actions-v10830">${actions}</div></div>`;
+    document.body.appendChild(m);return m;
+  }
+  function askDelayReason(status,title='سبب تجاوز الوقت المحدد'){
+    return new Promise(resolve=>{
+      const r=status?.open_record||status||{};const options=delayReasons.map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
+      const body=`<div class="attendance-delay-summary-v10830"><div><small>المشروع</small><b>${esc(status?.project?.name||'-')}</b></div><div><small>وقت الدخول</small><b>${timeText(r.check_in)}</b></div><div><small>الوقت المطلوب</small><b>${minsText(status?.required_minutes||r.required_minutes)}</b></div><div><small>الخروج المتوقع</small><b>${timeText(status?.expected_checkout_at||r.expected_checkout_at)}</b></div><div><small>الوقت الزائد</small><b>${minsText(status?.extra_minutes)}</b></div></div><label>سبب التأخير<select id="delayReasonCodeV10830"><option value="">اختر السبب</option>${options}</select></label><label id="delayOtherLabelV10830" class="hidden">اكتب السبب<textarea id="delayReasonTextV10830"></textarea></label><div class="attendance-error-v10830" id="delayErrorV10830"></div>`;
+      const m=modalShell('delayReasonModalV10830',title,body,'<button type="button" data-save>حفظ السبب والمتابعة</button><button type="button" class="light" data-cancel>إلغاء</button>');
+      const code=m.querySelector('#delayReasonCodeV10830'),other=m.querySelector('#delayOtherLabelV10830');
+      code.onchange=()=>other.classList.toggle('hidden',code.value!=='other');
+      m.querySelector('[data-cancel]').onclick=()=>{m.remove();resolve(null)};
+      m.querySelector('[data-save]').onclick=()=>{const c=S(code.value),txt=S(m.querySelector('#delayReasonTextV10830')?.value);if(!c){m.querySelector('#delayErrorV10830').textContent='يجب اختيار سبب التأخير.';return}if(c==='other'&&!txt){m.querySelector('#delayErrorV10830').textContent='اكتب السبب الآخر.';return}m.remove();resolve({code:c,text:txt||delayReasons.find(x=>x[0]===c)?.[1]||''})};
+    });
+  }
+  async function requestPreviousAutoCloseReason(row){
+    const status={open_record:row,project:row.project||{name:row.project_name},required_minutes:row.required_minutes,expected_checkout_at:row.expected_checkout_at,extra_minutes:row.extra_minutes};
+    const reason=await askDelayReason(status,'سبب عدم تسجيل الخروج أمس');if(!reason)return;
+    try{await rpc('tasneef_attendance_submit_previous_reason_v10830',{p_attendance_id:Number(row.id),p_reason_code:reason.code,p_reason_text:reason.text});notify('تم حفظ سبب عدم تسجيل الخروج.');refreshTiming(true)}catch(e){notify(e.message||String(e),'err')}
+  }
+  const oldProjectChange=window.onLogProjectChange;
+  window.onLogProjectChange=function(){try{oldProjectChange?.apply(this,arguments)}catch(e){console.warn(e)}setTimeout(()=>refreshTiming(true),80)};
+  const oldCheckIn=window.supervisorCheckIn;
+  if(typeof oldCheckIn==='function')window.supervisorCheckIn=async function(btn){
+    const pid=currentProjectId();if(!pid)return notify('اختر المشروع','err');
+    try{
+      const c=await context(pid);if(!c?.ok)throw new Error(c?.message||'تعذر قراءة بيانات المشروع');
+      if(c.project&&!activeProject(c.project))return notify('المشروع متوقف ولا يمكن بدء تسجيل جديد.','err');
+      if(c.no_friday_shift)return notify('لا يوجد دوام مطلوب لهذا المشروع يوم الجمعة.','err');
+      const s=await openStatus(null,true);if(s?.open_record&&S(s.open_record.project_id)!==S(pid))return notify(`لديك تسجيل مفتوح في مشروع ${s.project?.name||s.open_record.project_name||''}. سجّل الخروج أولًا.`,'err');
+      const out=await oldCheckIn.apply(this,arguments);setTimeout(()=>refreshTiming(true),500);return out;
+    }catch(e){notify(e.message||String(e),'err')}
+  };
+  const oldCheckOut=window.supervisorCheckOut;
+  if(typeof oldCheckOut==='function')window.supervisorCheckOut=async function(btn){
+    const pid=currentProjectId();if(!pid)return notify('اختر المشروع','err');
+    let s=null,reason=null;
+    try{s=await openStatus(pid,true)}catch(_){ }
+    if(s?.open_record&&N(s.extra_minutes)>15){reason=await askDelayReason(s);if(!reason)return notify('تم إلغاء الخروج؛ سبب التأخير مطلوب.','warn');
+      try{await rpc('tasneef_attendance_set_pending_delay_reason_v10830',{p_attendance_id:Number(s.open_record.id),p_reason_code:reason.code,p_reason_text:reason.text,p_device_time:new Date().toISOString()})}catch(e){return notify(e.message||String(e),'err')}
+    }
+    const result=await oldCheckOut.apply(this,arguments);
+    try{if(s?.open_record?.id)await rpc('tasneef_attendance_finalize_log_v10830',{p_attendance_id:Number(s.open_record.id),p_device_time:new Date().toISOString()})}catch(e){console.warn(BUILD,'finalize',e)}
+    setTimeout(()=>refreshTiming(true),500);return result;
+  };
+  function dashboardCard(){
+    if($('attendanceReviewCardV10830'))return $('attendanceReviewCardV10830');
+    const dash=$('dashboard');if(!dash)return null;const card=document.createElement('div');card.id='attendanceReviewCardV10830';card.className='card attendance-review-card-v10830';
+    const contract=$('contractDashboardAlerts')?.closest('.card');if(contract)contract.after(card);else dash.appendChild(card);return card;
+  }
+  async function loadReviewQueue(){
+    const card=dashboardCard();if(!card||!can('attendance.view_open_records'))return;
+    card.innerHTML='<h2>مراجعة التأخير والتسجيلات المفتوحة</h2><div class="attendance-loading-v10830">جارٍ تحميل التسجيلات...</div>';
+    try{
+      const data=await rpc('tasneef_attendance_review_queue_v10830',{p_limit:100});const rows=Array.isArray(data?.rows)?data.rows:[];const k=data?.counts||{};
+      card.innerHTML=`<div class="table-head"><div><h2>مراجعة التأخير والتسجيلات المفتوحة</h2><p class="muted">الوقت الزائد لا يدخل في الوقت المعتمد إلا بعد قرار الإدارة.</p></div><button class="light" onclick="tasneefLoadAttendanceReviewV10830()">تحديث</button></div>
+      <div class="attendance-review-kpis-v10830"><div><small>مفتوحة الآن</small><b>${N(k.open)}</b></div><div><small>تجاوزات اليوم</small><b>${N(k.overtime_today)}</b></div><div><small>أغلقت تلقائيًا</small><b>${N(k.auto_closed)}</b></div><div><small>تنتظر المراجعة</small><b>${N(k.pending_review)}</b></div><div><small>وقت زائد معتمد</small><b>${N(k.approved)}</b></div><div><small>مرفوض</small><b>${N(k.rejected)}</b></div></div>
+      <div class="attendance-review-list-v10830">${rows.map(r=>`<article class="attendance-review-item-v10830 status-${esc(r.extra_time_status||'open')}"><div><b>${esc(r.supervisor_name||'-')} — ${esc(r.project_name||'-')}</b><small>${dateTimeText(r.check_in)} → ${r.check_out?dateTimeText(r.check_out):'مفتوح الآن'}</small><p>المطلوب: ${minsText(r.required_minutes)} | الخام: ${minsText(r.raw_actual_minutes||r.actual_minutes)} | الزائد: ${minsText(r.extra_minutes)}</p><p>السبب: ${esc(r.delay_reason_text||'لم يقدم بعد')}</p></div><div class="attendance-review-actions-v10830">${can('attendance.approve_extra_time')?`<button onclick="tasneefReviewAttendanceV10830(${N(r.id)},'approve',${N(r.raw_actual_minutes||r.actual_minutes)})">اعتماد</button>`:''}${can('attendance.reject_extra_time')?`<button class="danger" onclick="tasneefReviewAttendanceV10830(${N(r.id)},'reject',${N(r.required_minutes)})">رفض</button>`:''}${can('attendance.edit_approved_minutes')?`<button class="light" onclick="tasneefEditApprovedMinutesV10830(${N(r.id)},${N(r.approved_actual_minutes||r.required_minutes)})">تعديل المعتمد</button>`:''}</div></article>`).join('')||'<div class="attendance-empty-v10830">لا توجد تسجيلات تحتاج مراجعة.</div>'}</div>
+      <details class="attendance-project-audit-v10830"><summary>أوقات مشاريع تحتاج مراجعة</summary><div id="projectTimeAuditRowsV10830">اضغط لعرض التقرير.</div></details>`;
+      card.querySelector('details')?.addEventListener('toggle',e=>{if(e.target.open)loadProjectAudit()},{once:true});
+    }catch(e){card.innerHTML=`<h2>مراجعة التأخير والتسجيلات المفتوحة</h2><div class="attendance-error-v10830">${esc(e.message||e)}</div>`}
+  }
+  async function loadProjectAudit(){const el=$('projectTimeAuditRowsV10830');if(!el)return;try{const d=await rpc('tasneef_project_time_audit_v10830',{});const rows=Array.isArray(d?.rows)?d.rows:[];el.innerHTML=rows.map(r=>`<div class="project-audit-row-v10830"><b>${esc(r.project_name)}</b><span>${esc(r.issue)}</span><small>الحالي: ${N(r.required_daily_minutes)} / الجمعة ${N(r.friday_minutes)} — المتوقع: ${r.expected_daily_minutes??'-'} / ${r.expected_friday_minutes??'-'}</small></div>`).join('')||'<div class="attendance-empty-v10830">لا توجد ملاحظات على أوقات المشاريع.</div>'}catch(e){el.textContent=e.message||String(e)}}
+  window.tasneefLoadAttendanceReviewV10830=loadReviewQueue;
+  window.tasneefReviewAttendanceV10830=async function(id,action,minutes){try{const reason=prompt(action==='approve'?'سبب اعتماد الوقت الزائد':'سبب رفض الوقت الزائد')||'';if(!reason)return;await rpc('tasneef_attendance_review_extra_v10830',{p_attendance_id:Number(id),p_action:action,p_approved_minutes:Number(minutes),p_reason:reason});notify('تم حفظ قرار المراجعة.');loadReviewQueue()}catch(e){notify(e.message||String(e),'err')}};
+  window.tasneefEditApprovedMinutesV10830=async function(id,current){const v=prompt('أدخل عدد الدقائق المعتمدة',String(current));if(v===null)return;const n=Number(v);if(!Number.isFinite(n)||n<0)return notify('عدد الدقائق غير صالح','err');try{await rpc('tasneef_attendance_review_extra_v10830',{p_attendance_id:Number(id),p_action:'edit',p_approved_minutes:Math.round(n),p_reason:'تعديل إداري للوقت المعتمد'});notify('تم تعديل الوقت المعتمد.');loadReviewQueue()}catch(e){notify(e.message||String(e),'err')}};
+  function style(){if($('attendanceTimePolicyStyleV10830'))return;const st=document.createElement('style');st.id='attendanceTimePolicyStyleV10830';st.textContent=`
+    .project-shift-toggle-v10830{display:flex!important;align-items:center;gap:8px;min-height:44px}.project-shift-toggle-v10830 input{width:auto!important}
+    .attendance-time-panel-v10830{border:1px solid #cfe2dc;background:#f5faf8;border-radius:16px;padding:12px;margin:10px 0}.attendance-time-head-v10830{display:flex;justify-content:space-between;align-items:center;gap:8px}.attendance-time-type-v10830{background:#e0f1eb;color:#07533e;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:800}.attendance-time-grid-v10830{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}.attendance-time-grid-v10830>div{background:#fff;border:1px solid #dceae5;border-radius:11px;padding:8px}.attendance-time-grid-v10830 small{display:block;color:#64766e}.attendance-time-grid-v10830 b{display:block;color:#073f34;margin-top:4px}.attendance-time-alert-v10830{padding:9px 11px;border-radius:10px;font-weight:800}.attendance-time-alert-v10830.ok{background:#e5f7ec;color:#166b3b}.attendance-time-alert-v10830.near{background:#edf4ff;color:#315f9a}.attendance-time-alert-v10830.warn{background:#fff1d6;color:#885600}.attendance-time-alert-v10830.danger{background:#ffe7e7;color:#a31b1b}.attendance-time-alert-v10830.done{background:#e8f1ff;color:#24588c}.attendance-time-alert-v10830.neutral{background:#eef5f2;color:#476158}
+    .attendance-modal-v10830{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:14px}.attendance-modal-card-v10830{width:min(650px,100%);max-height:94vh;overflow:auto;background:#fff;border-radius:20px;padding:18px;box-shadow:0 30px 80px rgba(0,0,0,.35)}.attendance-modal-head-v10830 h3{margin:0 0 14px;color:#07533e}.attendance-delay-summary-v10830{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}.attendance-delay-summary-v10830>div{background:#f4f8f6;border:1px solid #dce8e3;border-radius:11px;padding:9px}.attendance-delay-summary-v10830 small{display:block;color:#6c7d75}.attendance-modal-actions-v10830{display:flex;gap:8px;justify-content:flex-start;margin-top:14px}.attendance-error-v10830{color:#a31b1b;font-weight:800;margin-top:8px}
+    .attendance-review-kpis-v10830{display:grid;grid-template-columns:repeat(6,1fr);gap:9px;margin:12px 0}.attendance-review-kpis-v10830>div{background:#f5faf8;border:1px solid #dbe8e3;border-radius:12px;padding:10px;text-align:center}.attendance-review-kpis-v10830 small{display:block}.attendance-review-kpis-v10830 b{font-size:22px;color:#07533e}.attendance-review-list-v10830{display:grid;gap:9px}.attendance-review-item-v10830{display:flex;justify-content:space-between;gap:12px;border:1px solid #dce8e3;border-right:5px solid #7b8790;border-radius:14px;padding:12px;background:#fff}.attendance-review-item-v10830.status-pending_review{border-right-color:#7b2cbf}.attendance-review-item-v10830.status-approved{border-right-color:#168a4a}.attendance-review-item-v10830.status-rejected{border-right-color:#c83232}.attendance-review-item-v10830 small{display:block;color:#64766e;margin-top:4px}.attendance-review-item-v10830 p{margin:5px 0;color:#4d6259}.attendance-review-actions-v10830{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.attendance-project-audit-v10830{margin-top:12px;border:1px solid #dce8e3;border-radius:12px;padding:10px}.project-audit-row-v10830{display:grid;grid-template-columns:1fr 2fr;gap:6px;padding:8px;border-bottom:1px solid #edf2ef}.project-audit-row-v10830 small{grid-column:1/-1;color:#687970}
+    @media(max-width:760px){.attendance-time-grid-v10830{grid-template-columns:repeat(2,1fr)}.attendance-delay-summary-v10830{grid-template-columns:1fr 1fr}.attendance-review-kpis-v10830{grid-template-columns:repeat(2,1fr)}.attendance-review-item-v10830{display:block}.attendance-review-actions-v10830{margin-top:8px}}
+  `;document.head.appendChild(st)}
+  function boot(){style();if($('logProject')){refreshTiming(true);state.timer=setInterval(()=>refreshTiming(Date.now()-state.lastServerAt>240000),60000)}if($('dashboard')){setTimeout(loadReviewQueue,1500);state.reviewTimer=setInterval(()=>{const d=$('dashboard');if(d&&getComputedStyle(d).display!=='none')loadReviewQueue()},300000)}}
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,800));window.addEventListener('load',()=>setTimeout(boot,1300));setTimeout(boot,2500);
+  console.info(BUILD,'loaded');
+})();
+/* ===== END V10830 ===== */

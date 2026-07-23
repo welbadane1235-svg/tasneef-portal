@@ -287,6 +287,14 @@ body .tasneef-version-badge, body .version-badge, body .build-badge, body #versi
 <div><label>نوع التشغيل</label><select id="projectOperationType"><option value="daily_visit">زيارة يومية</option><option value="full_time">دوام كامل</option><option value="as_needed">حسب الحاجة</option></select></div>
 <div><label>نوع الزيارة الافتراضي</label><select id="projectVisitDefault"><option value="surface">نظافة سطحية</option><option value="deep">نظافة عميقة</option></select></div>
 </div>
+<div class="split">
+<div><label class="project-shift-toggle-v10830"><input id="projectAllowCrossMidnight" type="checkbox"/> يسمح باستمرار الفترة بعد منتصف الليل</label></div>
+<div><label>وقت نهاية الفترة الممتدة</label><input id="projectShiftEndTime" type="time"/></div>
+</div>
+<div class="split">
+<div><label>مهلة الإغلاق بعد نهاية الفترة (دقيقة)</label><input id="projectAutoCloseGrace" min="0" type="number" value="120"/></div>
+<div><small class="footer-note">مثال: برج جوديا مساء يعمل دوامًا كاملًا 12 ساعة ويسمح بالعمل بعد منتصف الليل.</small></div>
+</div>
 <label>الحالة</label><select id="projectStatus"><option value="active">نشط</option><option value="inactive">متوقف</option></select>
 <label>ملاحظات</label><textarea id="projectNotes"></textarea>
 <div class="actions"><button id="projectSaveBtn" onclick="saveProject()">حفظ المشروع</button><button class="light" onclick="clearProjectForm()">إلغاء / جديد</button></div>
@@ -761,7 +769,7 @@ window.__tasneefOrdersUnifiedOnlyV10801=true;
 window.__tasneefContractsServicesEditorExclusiveV10807=true;
 window.__TASNEEF_BUILD__="V10829-TICKET-VIEW-MODES";
 </script>
-<script defer="" src="app.js?v=10829-ticket-view-modes"></script>
+<script defer="" src="app.js?v=10830-project-time-policy"></script>
 <script defer src="tasneef_permissions_v10817.js?v=10825-strict-section-permissions"></script>
 <script defer="" src="tasneef_orders_v10801.js?v=10826-order-project-options"></script>
 
