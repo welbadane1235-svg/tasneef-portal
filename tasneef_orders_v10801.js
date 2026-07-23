@@ -8,7 +8,7 @@
   window.__tasneefOrdersV10801Loaded=true;
   window.__tasneefOrdersUnifiedOnlyV10801=true;
 
-  const BUILD='V10801-PRO-PRINT-INCLUSIVE-STATUS';
+  const BUILD='V10826-ORDER-PROJECT-OPTIONS-SCOPE';
   const PAGE_SIZE=50;
   const BUCKET='order-receipts';
   const ALLOWED_MIME=new Set(['application/pdf','image/jpeg','image/png']);
@@ -27,6 +27,24 @@
   const notify=(text,type='ok')=>{if(typeof window.msg==='function')window.msg(text,type);else alert(text);};
   const uuid=()=>crypto?.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(16).slice(2));
   const sb=()=>{if(!window.sb)throw new Error('اتصال Supabase غير جاهز');return window.sb;};
+  const permissionSessionToken=()=>S(
+    currentUser().permission_session_token||
+    currentUser().session_token||
+    localStorage.getItem('tasneef_session_token_v10817')||
+    localStorage.getItem('tasneef_permission_session_v10817')
+  );
+  const effectiveRole=()=>S(currentUser().role_key||currentUser().role||'user').toLowerCase();
+  function normalizeProjectRows(rows){
+    const seen=new Set(),out=[];
+    (Array.isArray(rows)?rows:[]).forEach(p=>{
+      const id=S(p?.id??p?.project_id),name=S(p?.name||p?.project_name||p?.official_name||p?.display_name);
+      if(!id||!name||seen.has(id))return;
+      const active=p?.is_active!==false&&!['stopped','inactive','archived'].includes(S(p?.status).toLowerCase());
+      if(!active)return;
+      seen.add(id);out.push({id,name,code:S(p?.project_code||p?.code)});
+    });
+    return out.sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+  }
   const friendlyError=e=>{
     let raw=S(e?.message||e?.details||e);
     if(raw.startsWith('{')){try{const j=JSON.parse(raw);raw=S(j.message||j.error||j.details||raw);}catch(_){}}
@@ -43,17 +61,38 @@
     if(Array.isArray(state.allowedProjects)) return state.allowedProjects;
     return [];
   }
-  async function resolveAllowedProjects(){
-    if(!isSupervisor()){state.allowedProjects=null;return;}
-    try{
-      const u=currentUser();
-      if(window.ProjectsService?.getAccessibleProjects){
-        const ps=await window.ProjectsService.getAccessibleProjects(u.id,'supervisor',{period:'current'});
-        state.allowedProjects=(ps||[]).filter(p=>p&&p.is_active!==false).map(p=>S(p.name||p.project_name||p.official_name)).filter(Boolean);
-      }else{
-        state.allowedProjects=(window.data?.projects||[]).filter(p=>p&&p.is_active!==false).map(p=>S(p.name||p.project_name||p.official_name)).filter(Boolean);
+  async function loadOrderProjectOptions(force=false){
+    if(state.projectOptionsLoading&&!force)return state.projectOptionsLoading;
+    if(state.projectOptionsLoaded&&!force)return state.projectOptions;
+    state.projectOptionsLoading=(async()=>{
+      let rows=[];
+      try{
+        if(window.PermissionsService?.load)await window.PermissionsService.load(false);
+        const token=permissionSessionToken();
+        if(token){
+          const {data,error}=await sb().rpc('orders_project_options_v10826',{p_session_token:token});
+          if(error)throw error;
+          rows=normalizeProjectRows(data);
+        }
+      }catch(e){console.warn(BUILD,'orders_project_options_v10826 fallback:',e?.message||e);}
+      if(!rows.length){
+        try{
+          const u=currentUser();
+          if(window.ProjectsService?.getAccessibleProjects){
+            rows=normalizeProjectRows(await window.ProjectsService.getAccessibleProjects(u.id,effectiveRole(),{period:'current'}));
+          }
+        }catch(e){console.warn(BUILD,'ProjectsService fallback:',e?.message||e);}
       }
-    }catch(e){state.allowedProjects=[];console.warn(BUILD,'allowed projects',e);}
+      if(!rows.length)rows=normalizeProjectRows(window.data?.projects||[]);
+      state.projectOptions=rows;
+      state.projectOptionsLoaded=true;
+      return rows;
+    })().finally(()=>{state.projectOptionsLoading=null;});
+    return state.projectOptionsLoading;
+  }
+  async function resolveAllowedProjects(force=false){
+    const rows=await loadOrderProjectOptions(force);
+    state.allowedProjects=isSupervisor()?rows.map(p=>p.name):null;
   }
   function rpcArgs(filters={}){
     return {
@@ -103,7 +142,7 @@
   };
   window.OrdersService=OrdersService;
 
-  const state={rows:[],page:1,total:0,totalPages:1,filters:{archiveStatus:'active'},selected:new Set(),editingId:null,requestId:null,saving:false,loadToken:0,summaryToken:0,filtersLoaded:false,allowedProjects:undefined,loadController:null,summaryController:null,pendingUploadOrderId:null};
+  const state={rows:[],page:1,total:0,totalPages:1,filters:{archiveStatus:'active'},selected:new Set(),editingId:null,requestId:null,saving:false,loadToken:0,summaryToken:0,filtersLoaded:false,allowedProjects:undefined,projectOptions:[],projectOptionsLoaded:false,projectOptionsLoading:null,loadController:null,summaryController:null,pendingUploadOrderId:null};
 
   function injectStyle(){
     if($('ordersV10801Style'))return;const st=document.createElement('style');st.id='ordersV10801Style';st.textContent=`
@@ -149,13 +188,14 @@
     return true;
   }
 
-  function projects(){return (window.data?.projects||[]).filter(p=>p&&p.is_active!==false).map(p=>({id:S(p.id||p.project_id),name:S(p.name||p.project_name||p.official_name)})).filter(p=>p.name);}
+  function projects(){return state.projectOptions.length?state.projectOptions:normalizeProjectRows(window.data?.projects||[]);}
   function executors(){
     const src=[...(window.data?.users||[]),...(window.data?.supervisors||[]),...(window.data?.workers||[])];
     return [...new Set(src.filter(x=>x&&x.is_active!==false).map(x=>S(x.full_name||x.name||x.worker_name||x.username)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ar'));
   }
   function fillSelect(id,items,first,asObjects=false){const el=$(id);if(!el)return;const old=el.value;el.innerHTML=`<option value="">${E(first)}</option>`+items.map(x=>asObjects?`<option value="${E(x.id)}" data-name="${E(x.name)}">${E(x.name)}</option>`:`<option value="${E(x)}">${E(x)}</option>`).join('');if([...el.options].some(o=>o.value===old))el.value=old;}
-  function hydrateReferences(){fillSelect('ov8Project',projects(),'اختر المشروع',true);const dl=$('ov8ExecutorsList');if(dl)dl.innerHTML=executors().map(x=>`<option value="${E(x)}"></option>`).join('');}
+  function ensureProjectOption(projectId,projectName){const el=$('ov8Project'),id=S(projectId),name=S(projectName);if(!el||!id)return;let option=[...el.options].find(o=>S(o.value)===id);if(!option){option=document.createElement('option');option.value=id;option.dataset.name=name||('مشروع '+id);option.textContent=name||('مشروع '+id);el.appendChild(option);}else if(name){option.dataset.name=name;option.textContent=name;}el.value=id;}
+  function hydrateReferences(){fillSelect('ov8Project',projects(),'اختر المشروع',true);const dl=$('ov8ExecutorsList');if(dl)dl.innerHTML=executors().map(x=>`<option value="${E(x)}"></option>`).join('');if($('ov8Project')&&$('ov8Project').options.length<=1)setSaveStatus('لا توجد مشاريع متاحة لهذا الحساب. راجع نطاق المشاريع أو صلاحية الأوردرات.',true);}
 
   function collectFilters(){return {search:S($('ov8Search')?.value),project:S($('ov8FilterProject')?.value),executor:S($('ov8FilterExecutor')?.value),sender:S($('ov8FilterSender')?.value),orderType:S($('ov8FilterType')?.value),customerType:S($('ov8FilterCustomerType')?.value),executionStatus:S($('ov8FilterExecution')?.value),paymentStatus:S($('ov8FilterPayment')?.value),invoiceStatus:S($('ov8FilterInvoice')?.value),archiveStatus:S($('ov8FilterArchive')?.value)||'active',dateFrom:S($('ov8DateFrom')?.value),dateTo:S($('ov8DateTo')?.value)};}
   function setLoadStatus(text,err=false){const el=$('ov8LoadStatus');if(el){el.textContent=text;el.className='ov8-status'+(err?' err':'');}}
@@ -165,10 +205,24 @@
     const po=$('ov8Project')?.selectedOptions?.[0];
     return {order_type:S($('ov8OrderType')?.value),customer_type:S($('ov8CustomerType')?.value),customer_name:S($('ov8Customer')?.value),customer_phone:S($('ov8Phone')?.value),unit_number:S($('ov8Unit')?.value),project_id:S($('ov8Project')?.value),project_name:S(po?.dataset?.name||po?.textContent),executor_name:S($('ov8Executor')?.value),execution_status:S($('ov8Execution')?.value)||'لم ينفذ',payment_status:S($('ov8Payment')?.value)||'غير مسدد',invoice_status:S($('ov8InvoiceStatus')?.value)||'لم تتم',invoice_number:S($('ov8InvoiceNo')?.value),invoice_date:S($('ov8InvoiceDate')?.value),subtotal:N($('ov8Subtotal')?.value),tax_rate:N($('ov8TaxRate')?.value||15),tax_amount:N($('ov8Tax')?.value),total_amount:N($('ov8Total')?.value),cost:N($('ov8Cost')?.value),net_profit:N($('ov8Profit')?.value),details:S($('ov8Details')?.value),notes:S($('ov8Notes')?.value),order_date:S($('ov8OrderDate')?.value)||dateToday()};
   }
-  function validatePayload(p){const missing=[];if(!p.project_name)missing.push('المشروع');if(!p.customer_name)missing.push('اسم العميل');if(!p.customer_phone)missing.push('رقم العميل');if(!p.unit_number)missing.push('الوحدة / الموقع');if(!p.details)missing.push('التفاصيل');if(missing.length)throw new Error('أكمل الحقول المطلوبة: '+missing.join('، '));}
+  function validatePayload(p){const missing=[];if(!p.project_id||!/^\d+$/.test(S(p.project_id))||!p.project_name||p.project_name==='اختر المشروع')missing.push('المشروع');if(!p.customer_name)missing.push('اسم العميل');if(!p.customer_phone)missing.push('رقم العميل');if(!p.unit_number)missing.push('الوحدة / الموقع');if(!p.details)missing.push('التفاصيل');if(missing.length)throw new Error('أكمل الحقول المطلوبة: '+missing.join('، '));}
   function setSaving(on){state.saving=on;const b=$('ov8SaveBtn');if(b){b.disabled=on;b.textContent=on?'جاري الحفظ…':(state.pendingUploadOrderId?'إعادة محاولة رفع الملفات':'حفظ الأوردر');}}
 
-  async function loadFilters(){if(state.filtersLoaded)return;try{const o=await OrdersService.getFilterOptions();const projectNames=o.projects||allowedProjectNames()||[];fillSelect('ov8FilterProject',projectNames,'كل المشاريع');fillSelect('ov8FilterExecutor',o.executors||[],'كل المنفذين');fillSelect('ov8FilterSender',o.senders||[],'كل مرسلي الطلب');if($('ov8Project')&&$('ov8Project').options.length<=1)fillSelect('ov8Project',projectNames.map(x=>({id:x,name:x})),'اختر المشروع',true);const dl=$('ov8ExecutorsList');if(dl&&!dl.children.length)dl.innerHTML=(o.executors||[]).map(x=>`<option value="${E(x)}"></option>`).join('');state.filtersLoaded=true;}catch(e){console.warn(BUILD,'filter options',e);const fallback=allowedProjectNames()||projects().map(p=>p.name);fillSelect('ov8FilterProject',fallback,'كل المشاريع');if($('ov8Project')&&$('ov8Project').options.length<=1)fillSelect('ov8Project',fallback.map(x=>({id:x,name:x})),'اختر المشروع',true);}}
+  async function loadFilters(){
+    if(state.filtersLoaded)return;
+    try{
+      const o=await OrdersService.getFilterOptions();
+      const projectNames=(o.projects&&o.projects.length)?o.projects:projects().map(p=>p.name);
+      fillSelect('ov8FilterProject',projectNames,'كل المشاريع');
+      fillSelect('ov8FilterExecutor',o.executors||[],'كل المنفذين');
+      fillSelect('ov8FilterSender',o.senders||[],'كل مرسلي الطلب');
+      const dl=$('ov8ExecutorsList');if(dl&&!dl.children.length)dl.innerHTML=(o.executors||[]).map(x=>`<option value="${E(x)}"></option>`).join('');
+      state.filtersLoaded=true;
+    }catch(e){
+      console.warn(BUILD,'filter options',e);
+      fillSelect('ov8FilterProject',projects().map(p=>p.name),'كل المشاريع');
+    }
+  }
   async function load(){
     const token=++state.loadToken;state.filters=collectFilters();state.loadController?.abort();state.loadController=new AbortController();setLoadStatus('جاري تحميل الأوردرات…');
     try{const r=await OrdersService.getOrdersPage({page:state.page,pageSize:PAGE_SIZE,filters:state.filters,signal:state.loadController.signal});if(token!==state.loadToken)return;state.rows=r.rows||[];state.total=Number(r.total||0);state.totalPages=Number(r.total_pages||1);state.page=Number(r.page||1);renderCards();setLoadStatus(state.rows.length?`تم تحميل الأوردرات خلال ${OrdersService.metrics.lastPageMs}ms.`:'لا توجد أوردرات مطابقة.');}
@@ -270,7 +324,7 @@
     }catch(e){setSaveStatus('تعذر الحفظ: '+friendlyError(e),true);notify(friendlyError(e),'err');}
     finally{setSaving(false);}
   }
-  async function edit(id){try{const d=await OrdersService.getOrderDetails(id),r=d?.order;if(!r)throw new Error('ORDER_NOT_FOUND');state.editingId=id;if($('ov8EditId'))$('ov8EditId').value=id;if($('ov8FormTitle'))$('ov8FormTitle').textContent='تعديل أوردر '+(r.canonical_order_number||r.order_number);const set=(id,v)=>{if($(id))$(id).value=v??''};set('ov8Number',r.canonical_order_number||r.order_number);set('ov8OrderDate',r.order_date);set('ov8OrderType',r.order_type);set('ov8CustomerType',r.customer_type);set('ov8Project',r.project_id);if(!$('ov8Project')?.value){const hit=[...($('ov8Project')?.options||[])].find(o=>S(o.dataset.name||o.textContent)===S(r.project_name));if(hit)$('ov8Project').value=hit.value;}set('ov8Customer',r.customer_name);set('ov8Phone',r.customer_phone);set('ov8Unit',r.unit_number);set('ov8Executor',r.executor_name);set('ov8Execution',r.execution_status);set('ov8Payment',r.payment_status);set('ov8InvoiceStatus',r.invoice_status);set('ov8InvoiceNo',r.invoice_number);set('ov8InvoiceDate',r.invoice_date);set('ov8TaxRate',r.tax_rate||15);set('ov8Subtotal',r.subtotal);set('ov8Tax',r.tax_amount);set('ov8Total',N(r.total_amount)>0?r.total_amount:Math.round((N(r.subtotal)+N(r.tax_amount))*100)/100);set('ov8Cost',r.cost);set('ov8Profit',r.net_profit);set('ov8Details',r.details);set('ov8Notes',r.notes);set('ov8Reason','');recalc();if(isSupervisor())$('ov8FormCard')?.classList.add('ov8-supervisor-edit');setSaveStatus(`تم تحميل الأوردر. المرفقات الحالية: ${(d.attachments||[]).length}`);$('ov8FormCard')?.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){notify(friendlyError(e),'err');}}
+  async function edit(id){try{const d=await OrdersService.getOrderDetails(id),r=d?.order;if(!r)throw new Error('ORDER_NOT_FOUND');state.editingId=id;if($('ov8EditId'))$('ov8EditId').value=id;if($('ov8FormTitle'))$('ov8FormTitle').textContent='تعديل أوردر '+(r.canonical_order_number||r.order_number);const set=(id,v)=>{if($(id))$(id).value=v??''};set('ov8Number',r.canonical_order_number||r.order_number);set('ov8OrderDate',r.order_date);set('ov8OrderType',r.order_type);set('ov8CustomerType',r.customer_type);ensureProjectOption(r.project_id,r.project_name);if(!$('ov8Project')?.value){const hit=[...($('ov8Project')?.options||[])].find(o=>S(o.dataset.name||o.textContent)===S(r.project_name));if(hit)$('ov8Project').value=hit.value;}set('ov8Customer',r.customer_name);set('ov8Phone',r.customer_phone);set('ov8Unit',r.unit_number);set('ov8Executor',r.executor_name);set('ov8Execution',r.execution_status);set('ov8Payment',r.payment_status);set('ov8InvoiceStatus',r.invoice_status);set('ov8InvoiceNo',r.invoice_number);set('ov8InvoiceDate',r.invoice_date);set('ov8TaxRate',r.tax_rate||15);set('ov8Subtotal',r.subtotal);set('ov8Tax',r.tax_amount);set('ov8Total',N(r.total_amount)>0?r.total_amount:Math.round((N(r.subtotal)+N(r.tax_amount))*100)/100);set('ov8Cost',r.cost);set('ov8Profit',r.net_profit);set('ov8Details',r.details);set('ov8Notes',r.notes);set('ov8Reason','');recalc();if(isSupervisor())$('ov8FormCard')?.classList.add('ov8-supervisor-edit');setSaveStatus(`تم تحميل الأوردر. المرفقات الحالية: ${(d.attachments||[]).length}`);$('ov8FormCard')?.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){notify(friendlyError(e),'err');}}
   async function archive(id){const reason=prompt('اكتب سبب الأرشفة:');if(reason===null)return;try{await OrdersService.archiveOrder(id,reason);notify('تمت أرشفة الأوردر دون حذف بياناته أو إيصالاته.');await load();}catch(e){notify(friendlyError(e),'err');}}
   async function restore(id){const reason=prompt('اكتب سبب الاسترجاع:');if(reason===null)return;try{await OrdersService.restoreOrder(id,reason);notify('تم استرجاع الأوردر.');await load();}catch(e){notify(friendlyError(e),'err');}}
 
@@ -338,7 +392,7 @@
   }
 
   const OrdersUI={
-    refresh:()=>load(),newOrder:()=>resetForm(),save,page:d=>{const n=Math.min(state.totalPages,Math.max(1,state.page+Number(d||0)));if(n!==state.page){state.page=n;load();}},
+    refresh:async()=>{await resolveAllowedProjects(true);hydrateReferences();state.filtersLoaded=false;await loadFilters();return load();},newOrder:()=>resetForm(),save,page:d=>{const n=Math.min(state.totalPages,Math.max(1,state.page+Number(d||0)));if(n!==state.page){state.page=n;load();}},
     edit,view,receipts,archive,restore,whatsapp,closeReceiptPreview,archiveCurrent:()=>state.editingId?archive(state.editingId):notify('اختر أوردرًا أولًا.','err'),openAttachment,deleteAttachment,
     resetFilters(){['ov8Search','ov8FilterProject','ov8FilterExecutor','ov8FilterSender','ov8FilterType','ov8FilterCustomerType','ov8FilterExecution','ov8FilterPayment','ov8FilterInvoice','ov8DateFrom','ov8DateTo'].forEach(id=>{if($(id))$(id).value='';});if($('ov8FilterArchive'))$('ov8FilterArchive').value='active';state.page=1;load();},
     exportExcel,print:printOrders,quote
@@ -348,6 +402,6 @@
   window.saveOrderV233=save;window.clearOrderFormV233=resetForm;window.renderOrdersV233=load;window.deleteCurrentOrderV233=OrdersUI.archiveCurrent;
   window.supOrdersLoadV10061=load;window.supOrdersRenderV10061=load;window.supOrdersSaveV10061=save;window.supOrdersClearV10061=resetForm;
 
-  async function boot(){if(!mount())return;await resolveAllowedProjects();hydrateReferences();bind();resetForm();await loadFilters();await load();setTimeout(hydrateReferences,700);setTimeout(hydrateReferences,1800);console.log('Tasneef Orders',BUILD,'loaded — single OrdersService');}
+  async function boot(){if(!mount())return;bind();resetForm();await resolveAllowedProjects();hydrateReferences();await loadFilters();await load();setTimeout(async()=>{await resolveAllowedProjects(true);hydrateReferences();},900);console.log('Tasneef Orders',BUILD,'loaded — scoped project options');}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,0));else setTimeout(boot,0);
 })();

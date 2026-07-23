@@ -193,7 +193,7 @@ window.__tasneefOrdersStabilityPatchV10022=true;
 window.__tasneefOrdersFinalStabilityV10023=true;
 window.__tasneefOrdersUnifiedOnlyV10713=true;
 window.__tasneefOrdersUnifiedOnlyV10800=true;
-window.__TASNEEF_BUILD__="V10821-SESSION-SAFE-PERMISSIONS";
+window.__TASNEEF_BUILD__="V10826-ORDER-PROJECT-OPTIONS";
 </script>
 <script defer="" src="app.js?v=10825-strict-section-permissions"></script>
 <script defer src="tasneef_permissions_v10817.js?v=10825-strict-section-permissions"></script>
@@ -220,7 +220,7 @@ window.__TASNEEF_BUILD__="V10821-SESSION-SAFE-PERMISSIONS";
     if (loadingPromise) return loadingPromise;
     loadingPromise = new Promise(function(resolve,reject){
       const script=document.createElement('script');
-      script.src='tasneef_orders_v10800.js?v=10800-clean-server-first';
+      script.src='tasneef_orders_v10801.js?v=10826-order-project-options';
       script.async=true;
       script.onload=function(){
         try { if(typeof window.supOrdersLoadV10061==='function') window.supOrdersLoadV10061(); } finally { resolve(); }
