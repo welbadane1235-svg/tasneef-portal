@@ -127,6 +127,7 @@
 <input id="supTicketFilterFromV10801" type="date" onchange="renderTickets()" title="من تاريخ" aria-label="من تاريخ"/>
 <input id="supTicketFilterToV10801" type="date" onchange="renderTickets()" title="إلى تاريخ" aria-label="إلى تاريخ"/>
 <select id="supTicketSortOrder" onchange="renderTickets()"><option value="newest">الأحدث أولاً</option><option value="oldest">الأقدم أولاً</option></select>
+<select id="supTicketViewModeV10829" onchange="changeTicketViewModeV10829(this.value)" title="طريقة عرض التذاكر"><option value="table">عرض جدولي</option><option value="cards" selected>بطاقات</option><option value="kanban">Kanban</option><option value="tasks">المهام</option></select>
 <input id="supTicketSearch" oninput="renderTickets()" placeholder="بحث برقم التذكرة أو العنوان"/>
 <button type="button" class="light" onclick="resetTicketAdvancedFiltersV10801()">إعادة تعيين</button>
 </div><div class="smart-ticket-summary" id="supTicketsSmartSummary"></div><div class="smart-ticket-grid" id="supTicketsBody"></div></section>
@@ -193,9 +194,9 @@ window.__tasneefOrdersStabilityPatchV10022=true;
 window.__tasneefOrdersFinalStabilityV10023=true;
 window.__tasneefOrdersUnifiedOnlyV10713=true;
 window.__tasneefOrdersUnifiedOnlyV10800=true;
-window.__TASNEEF_BUILD__="V10826-ORDER-PROJECT-OPTIONS";
+window.__TASNEEF_BUILD__="V10829-TICKET-VIEW-MODES";
 </script>
-<script defer="" src="app.js?v=10825-strict-section-permissions"></script>
+<script defer="" src="app.js?v=10829-ticket-view-modes"></script>
 <script defer src="tasneef_permissions_v10817.js?v=10825-strict-section-permissions"></script>
 
 

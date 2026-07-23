@@ -26921,3 +26921,172 @@ ${finalUrl}
 })();
 
 /* V10825: strict final section visibility based only on PermissionsService effective server permissions. */
+
+/* ===== TASNEEF V10829 - Ticket view modes: table / cards / kanban / tasks ===== */
+(function(){
+  'use strict';
+  if(window.__tasneefTicketViewModesV10829) return;
+  window.__tasneefTicketViewModesV10829 = true;
+
+  const BUILD='V10829_TICKET_VIEW_MODES';
+  const $=id=>document.getElementById(id);
+  const S=v=>String(v??'').trim();
+  const A=v=>Array.isArray(v)?v:[];
+  const E=v=>S(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const arg=id=>/^\d+$/.test(S(id))?S(id):JSON.stringify(S(id));
+
+  function isSupervisorPage(){ return !!$('supTicketsBody') && !$('ticketsBody'); }
+  function body(){ return isSupervisorPage()?$('supTicketsBody'):$('ticketsBody'); }
+  function summary(){ return isSupervisorPage()?$('supTicketsSmartSummary'):$('ticketsSmartSummary'); }
+  function modeSelect(){ return isSupervisorPage()?$('supTicketViewModeV10829'):$('ticketViewModeV10829'); }
+  function storageKey(){ return 'tasneef:ticket-view-mode:v10829:'+(isSupervisorPage()?'supervisor':'admin'); }
+  function mode(){ const el=modeSelect(); const saved=localStorage.getItem(storageKey()); const value=S(el?.value||saved||'cards'); return ['table','cards','kanban','tasks'].includes(value)?value:'cards'; }
+  function setModeValue(value){ const el=modeSelect(); if(el) el.value=value; localStorage.setItem(storageKey(),value); }
+
+  function canPerm(key){
+    try{ if(window.PermissionsService?.can) return window.PermissionsService.can(key); }catch(_){}
+    try{ if(typeof window.can==='function') return window.can(key); }catch(_){}
+    return true;
+  }
+  function user(){ try{return typeof window.session==='function'?(window.session()||{}):{};}catch(_){return {};} }
+  function notify(text,type){ try{ if(typeof window.msg==='function') return window.msg(text,type||'err'); }catch(_){} console[type==='err'?'error':'log'](text); }
+  function ticketById(id){ return A(window.data?.tickets).find(t=>S(t.id)===S(id)); }
+  function ticketNo(t){ return S(t?.ticket_number||t?.ticket_no||t?.no)||('T-'+S(t?.id||0).padStart(4,'0')); }
+  function isReceived(t){ return !!S(t?.claimed_by||t?.claimed_by_name||t?.claimed_at||t?.received_by||t?.received_by_name||t?.received_at||t?.assigned_to||t?.assignee_id||t?.assignee_name||t?.technician_id||t?.technician_name); }
+  function statusKey(t){ const st=S(t?.status).toLowerCase(); if(st==='closed')return 'closed'; if(st==='processing'||st==='in_progress')return 'processing'; return isReceived(t)?'received':'new'; }
+  function statusText(t){ const k=statusKey(t); return ({new:'مفتوحة — جديدة',received:'مفتوحة — مستلمة',processing:'تحت المعالجة',closed:'مغلقة'})[k]; }
+  function priorityText(v){ v=S(v).toLowerCase(); return v==='urgent'?'عاجل':v==='high'?'مهم':v==='low'?'منخفض':'عادي'; }
+  function projectName(id){
+    try{ const x=window.projectName?.(id); if(S(x)) return S(x); }catch(_){}
+    const p=A(window.data?.projects).find(x=>S(x.id)===S(id)); return S(p?.name||p?.project_name||'-');
+  }
+  function supervisorName(id){
+    try{ const x=window.supervisorName?.(id); if(S(x)) return S(x); }catch(_){}
+    const u=A(window.data?.users||window.data?.app_users).find(x=>S(x.id)===S(id)); return S(u?.name||u?.full_name||u?.username||'-');
+  }
+  function dateLabel(v){ if(!v)return '-'; const d=new Date(v); if(isNaN(d))return S(v).slice(0,16); try{return d.toLocaleString('ar-SA',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});}catch(_){return S(v).slice(0,16);} }
+  function minutesOpen(t){ const start=Date.parse(S(t?.created_at||t?.opened_at||t?.updated_at)); const end=statusKey(t)==='closed'?Date.parse(S(t?.closed_at||t?.updated_at)):Date.now(); return (!isNaN(start)&&!isNaN(end))?Math.max(0,Math.round((end-start)/60000)):0; }
+  function durationText(min){ min=Math.max(0,Number(min)||0); const d=Math.floor(min/1440),h=Math.floor((min%1440)/60),m=Math.round(min%60); const out=[]; if(d)out.push(d+'ي'); if(h)out.push(h+'س'); if(m||!out.length)out.push(m+'د'); return out.join(' '); }
+  function slaDueHours(t){ let c={}; try{c=JSON.parse(localStorage.getItem('tasneef_ticket_sla_v10364')||'{}')||{};}catch(_){} const p=S(t?.priority).toLowerCase(); return p==='urgent'?Number(c.urgent||4):p==='high'?Number(c.high||24):p==='low'?Number(c.low||120):Number(c.normal||72); }
+  function slaState(t){ const due=slaDueHours(t)*60, elapsed=minutesOpen(t); if(elapsed>due)return 'late'; if(elapsed>=due*.8)return 'near'; return 'standard'; }
+  function slaText(t){ const s=slaState(t); return s==='late'?'متأخر':s==='near'?'قارب':'قياسي'; }
+  function laneOf(t){ return statusKey(t); }
+
+  function actionButtons(t,compact=false){
+    const id=arg(t.id), closed=statusKey(t)==='closed', received=isReceived(t); const out=[];
+    if(canPerm('tickets.view')&&typeof window.viewTicketSmartV147==='function') out.push(`<button type="button" class="light" onclick='viewTicketSmartV147(${id})'>عرض</button>`);
+    if(canPerm('tickets.edit')&&typeof window.editTicket==='function') out.push(`<button type="button" class="light" onclick='editTicket(${id})'>تعديل</button>`);
+    if(!closed&&!received&&canPerm('tickets.assign')&&typeof window.claimTicket==='function') out.push(`<button type="button" onclick='claimTicket(${id})'>استلام</button>`);
+    if(!closed&&canPerm('tickets.close')&&typeof window.closeTicket==='function') out.push(`<button type="button" onclick='closeTicket(${id})'>إغلاق</button>`);
+    if(closed&&canPerm('tickets.edit')&&typeof window.setTicketStatus==='function') out.push(`<button type="button" class="light" onclick='setTicketStatus(${id},"open")'>إعادة فتح</button>`);
+    if(!compact&&canPerm('tickets.delete')&&typeof window.deleteRow==='function') out.push(`<button type="button" class="danger" onclick='deleteRow("tickets",${id})'>حذف</button>`);
+    return out.join('');
+  }
+
+  function idsFromExisting(bodyEl){
+    const ids=[];
+    bodyEl.querySelectorAll('[data-ticket-id]').forEach(el=>{ const id=S(el.getAttribute('data-ticket-id')); if(id&&!ids.includes(id))ids.push(id); });
+    return ids;
+  }
+  function rowsInRenderedOrder(bodyEl){
+    const ids=idsFromExisting(bodyEl); const all=A(window.data?.tickets); if(ids.length){ const map=new Map(all.map(t=>[S(t.id),t])); return ids.map(id=>map.get(id)).filter(Boolean); }
+    return [];
+  }
+
+  function renderTable(bodyEl,rows){
+    bodyEl.className='ticket-view-table-v10829';
+    bodyEl.innerHTML=`<div class="ticket-table-wrap-v10829"><table class="ticket-table-v10829"><thead><tr><th>رقم التذكرة</th><th>المشروع</th><th>العنوان</th><th>الأولوية</th><th>الحالة</th><th>المستلم</th><th>مدة الفتح</th><th>التاريخ</th><th>الإجراءات</th></tr></thead><tbody>${rows.map(t=>`<tr data-ticket-id="${E(t.id)}" class="ticket-row-${laneOf(t)}"><td><b>${E(ticketNo(t))}</b></td><td>${E(projectName(t.project_id))}</td><td><b>${E(t.title||'-')}</b><small>${E(t.description||'')}</small></td><td><span class="ticket-pill-v10829 priority-${E(S(t.priority||'normal'))}">${E(priorityText(t.priority))}</span></td><td><span class="ticket-pill-v10829 status-${laneOf(t)}">${E(statusText(t))}</span></td><td>${E(t.claimed_by_name||'-')}</td><td><b>${E(durationText(minutesOpen(t)))}</b><small>${E(slaText(t))}</small></td><td>${E(dateLabel(t.created_at))}</td><td><div class="ticket-actions-v10829">${actionButtons(t,true)}</div></td></tr>`).join('')||'<tr><td colspan="9" class="ticket-empty-v10829">لا توجد تذاكر مطابقة للفلاتر الحالية</td></tr>'}</tbody></table></div>`;
+  }
+
+  function kanbanCard(t){ const draggable=(canPerm('tickets.edit')||canPerm('tickets.assign')||canPerm('tickets.close'))?'true':'false'; return `<article class="ticket-kanban-card-v10829 sla-${slaState(t)}" data-ticket-id="${E(t.id)}" draggable="${draggable}" ondragstart='ticketKanbanDragStartV10829(event,${arg(t.id)})'><div class="ticket-kanban-top-v10829"><b>${E(ticketNo(t))}</b><span class="ticket-pill-v10829 priority-${E(S(t.priority||'normal'))}">${E(priorityText(t.priority))}</span></div><h4>${E(t.title||'-')}</h4><p>${E(t.description||'')}</p><div class="ticket-kanban-meta-v10829"><span>${E(projectName(t.project_id))}</span><span>${E(t.claimed_by_name||'غير مستلم')}</span><span>${E(durationText(minutesOpen(t)))}</span><span>${E(slaText(t))}</span></div><div class="ticket-actions-v10829">${actionButtons(t,true)}</div></article>`; }
+  function renderKanban(bodyEl,rows){
+    const lanes=[['new','جديدة — بدون استلام'],['received','مستلمة'],['processing','تحت المعالجة'],['closed','مغلقة']];
+    bodyEl.className='ticket-kanban-v10829';
+    bodyEl.innerHTML=lanes.map(([key,label])=>{ const items=rows.filter(t=>laneOf(t)===key); return `<section class="ticket-kanban-lane-v10829 lane-${key}" ondragover="event.preventDefault()" ondrop='ticketKanbanDropV10829(event,"${key}")'><header><h3>${label}</h3><b>${items.length}</b></header><div class="ticket-kanban-list-v10829">${items.map(kanbanCard).join('')||'<div class="ticket-kanban-empty-v10829">لا توجد تذاكر</div>'}</div></section>`; }).join('');
+  }
+
+  function taskScore(t){ const k=laneOf(t); let score=0; if(slaState(t)==='late')score+=100; else if(slaState(t)==='near')score+=50; if(S(t.priority)==='urgent')score+=40; else if(S(t.priority)==='high')score+=20; if(k==='new')score+=30; if(k==='received')score+=20; if(k==='processing')score+=10; if(k==='closed')score-=100; return score; }
+  function nextAction(t){ const k=laneOf(t); if(k==='closed')return 'مكتملة — يمكن مراجعة الحل أو إعادة الفتح'; if(k==='new')return 'مطلوب استلام التذكرة وتحديد المسؤول'; if(k==='received')return 'مطلوب بدء المعالجة والمتابعة'; return 'مطلوب استكمال المعالجة وإغلاق التذكرة'; }
+  function renderTasks(bodyEl,rows){
+    const sorted=[...rows].sort((a,b)=>taskScore(b)-taskScore(a));
+    bodyEl.className='ticket-tasks-v10829';
+    bodyEl.innerHTML=sorted.map(t=>`<article class="ticket-task-v10829 task-${laneOf(t)} sla-${slaState(t)}" data-ticket-id="${E(t.id)}"><div class="ticket-task-check-v10829">${laneOf(t)==='closed'?'✓':'!'}</div><div class="ticket-task-main-v10829"><div class="ticket-task-title-v10829"><b>${E(ticketNo(t))} — ${E(t.title||'-')}</b><span class="ticket-pill-v10829 status-${laneOf(t)}">${E(statusText(t))}</span></div><p>${E(nextAction(t))}</p><div class="ticket-task-meta-v10829"><span>المشروع: <b>${E(projectName(t.project_id))}</b></span><span>الأولوية: <b>${E(priorityText(t.priority))}</b></span><span>المستلم: <b>${E(t.claimed_by_name||'-')}</b></span><span>المدة: <b>${E(durationText(minutesOpen(t)))}</b></span><span>التنبيه: <b>${E(slaText(t))}</b></span></div></div><div class="ticket-actions-v10829">${actionButtons(t,true)}</div></article>`).join('')||'<div class="ticket-empty-v10829">لا توجد مهام مطابقة للفلاتر الحالية</div>';
+  }
+
+  function restoreCardsClass(bodyEl){ bodyEl.classList.add('smart-ticket-grid'); bodyEl.classList.remove('ticket-view-table-v10829','ticket-kanban-v10829','ticket-tasks-v10829'); }
+  function applyView(bodyEl,rows,current){
+    if(current==='cards'){ restoreCardsClass(bodyEl); return; }
+    if(current==='table') return renderTable(bodyEl,rows);
+    if(current==='kanban') return renderKanban(bodyEl,rows);
+    return renderTasks(bodyEl,rows);
+  }
+
+  async function refreshTickets(){
+    try{ if(typeof window.tasneefRefreshTicketsV10519==='function') await window.tasneefRefreshTicketsV10519(); else if(typeof window.refreshAll==='function') await window.refreshAll(); else if(typeof window.loadAll==='function') await window.loadAll(); }catch(e){console.warn(BUILD,e);}
+    try{ await Promise.resolve(window.renderTickets?.()); }catch(e){console.warn(BUILD,e);}
+  }
+
+  window.changeTicketViewModeV10829=function(value){ value=['table','cards','kanban','tasks'].includes(S(value))?S(value):'cards'; setModeValue(value); window.renderTickets?.(); };
+  window.ticketKanbanDragStartV10829=function(event,id){ try{ event.dataTransfer.effectAllowed='move'; event.dataTransfer.setData('text/plain',S(id)); }catch(_){} };
+  window.ticketKanbanDropV10829=async function(event,lane){
+    event.preventDefault(); const id=S(event.dataTransfer?.getData('text/plain')); if(!id)return;
+    const t=ticketById(id); if(!t)return notify('تعذر تحديد التذكرة','err'); const old=laneOf(t); if(old===lane)return;
+    if(lane==='received'){
+      if(!canPerm('tickets.assign'))return notify('ليس لديك صلاحية استلام التذاكر','err');
+      if(statusKey(t)==='closed')return notify('أعد فتح التذكرة أولًا','err');
+      if(isReceived(t))return notify('التذكرة مستلمة بالفعل');
+      return window.claimTicket?.(id);
+    }
+    if(lane==='closed'){
+      if(!canPerm('tickets.close'))return notify('ليس لديك صلاحية إغلاق التذاكر','err');
+      return window.closeTicket?.(id);
+    }
+    if(lane==='new'){
+      if(!canPerm('tickets.edit'))return notify('ليس لديك صلاحية تعديل التذاكر','err');
+      if(isReceived(t)&&statusKey(t)!=='closed')return notify('لا يمكن إلغاء الاستلام من لوحة Kanban؛ استخدم تعديل التذكرة','err');
+      return window.setTicketStatus?.(id,'open');
+    }
+    if(lane==='processing'){
+      if(!canPerm('tickets.edit'))return notify('ليس لديك صلاحية تعديل التذاكر','err');
+      if(!window.sb?.from)return notify('تعذر الاتصال بقاعدة البيانات','err');
+      const u=user(),now=new Date().toISOString(); const payload={status:'processing',updated_at:now};
+      if(!isReceived(t)){ payload.claimed_by=u.id||null; payload.claimed_by_name=S(u.full_name||u.name||u.username||u.email||'مستخدم'); payload.claimed_at=now; }
+      const r=await window.sb.from('tickets').update(payload).eq('id',id); if(r.error)return notify(r.error.message,'err');
+      notify('تم نقل التذكرة إلى تحت المعالجة'); return refreshTickets();
+    }
+  };
+
+  function ensureSelects(){
+    const configs=[['ticketViewModeV10829','ticketSearch'],['supTicketViewModeV10829','supTicketSearch']];
+    configs.forEach(([id,anchorId])=>{ if($(id))return; const anchor=$(anchorId); const filters=anchor?.closest('.filters'); if(!filters)return; const el=document.createElement('select'); el.id=id; el.title='طريقة عرض التذاكر'; el.setAttribute('onchange','changeTicketViewModeV10829(this.value)'); el.innerHTML='<option value="table">عرض جدولي</option><option value="cards">بطاقات</option><option value="kanban">Kanban</option><option value="tasks">المهام</option>'; filters.insertBefore(el,anchor); });
+    const saved=localStorage.getItem(storageKey())||'cards'; setModeValue(saved);
+  }
+  function style(){ if($('ticketViewModesStyleV10829'))return; const st=document.createElement('style'); st.id='ticketViewModesStyleV10829'; st.textContent=`
+    #ticketViewModeV10829,#supTicketViewModeV10829{min-width:150px;font-weight:800}
+    .ticket-table-wrap-v10829{overflow:auto;border:1px solid #dce9e4;border-radius:16px;background:#fff}.ticket-table-v10829{width:100%;border-collapse:collapse;min-width:1050px}.ticket-table-v10829 th{background:#075342;color:#fff;padding:11px;text-align:right;white-space:nowrap}.ticket-table-v10829 td{padding:10px;border-bottom:1px solid #e5efeb;vertical-align:top}.ticket-table-v10829 tr:hover td{background:#f6fbf9}.ticket-table-v10829 td small{display:block;color:#6b7d75;margin-top:4px;max-width:260px;white-space:normal}.ticket-actions-v10829{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.ticket-actions-v10829 button{padding:7px 10px;border-radius:10px}
+    .ticket-pill-v10829{display:inline-flex;align-items:center;justify-content:center;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:900;white-space:nowrap}.status-new{background:#ffe9e9;color:#a51d1d}.status-received{background:#e7f2ff;color:#175d91}.status-processing{background:#fff3d5;color:#805300}.status-closed{background:#e6f7ed;color:#14713d}.priority-urgent{background:#ffe1e1;color:#a40000}.priority-high{background:#fff0d1;color:#8a5700}.priority-normal{background:#edf3f0;color:#3b5e51}.priority-low{background:#eef4ff;color:#355f99}
+    .ticket-kanban-v10829{display:grid;grid-template-columns:repeat(4,minmax(260px,1fr));gap:12px;overflow:auto;padding-bottom:8px}.ticket-kanban-lane-v10829{background:#f4f8f6;border:1px solid #dbe8e3;border-radius:18px;min-height:300px;overflow:hidden}.ticket-kanban-lane-v10829>header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#e9f2ee;color:#073f34}.ticket-kanban-lane-v10829>header h3{margin:0;font-size:15px}.ticket-kanban-lane-v10829>header b{background:#fff;border-radius:999px;padding:4px 9px}.ticket-kanban-list-v10829{padding:10px;display:grid;gap:10px}.ticket-kanban-card-v10829{background:#fff;border:1px solid #dae7e2;border-right:5px solid #0d765b;border-radius:14px;padding:12px;box-shadow:0 6px 14px rgba(13,83,67,.06);cursor:grab}.ticket-kanban-card-v10829.sla-late{border-right-color:#d92d20}.ticket-kanban-card-v10829.sla-near{border-right-color:#f0b429}.ticket-kanban-top-v10829{display:flex;justify-content:space-between;gap:8px}.ticket-kanban-card-v10829 h4{margin:10px 0 6px;color:#073f34}.ticket-kanban-card-v10829 p{margin:0 0 8px;color:#5c6e66;line-height:1.5;max-height:68px;overflow:hidden}.ticket-kanban-meta-v10829{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:9px}.ticket-kanban-meta-v10829 span{background:#f7faf8;border-radius:8px;padding:6px;font-size:11px;color:#52675e}.ticket-kanban-empty-v10829,.ticket-empty-v10829{padding:22px;text-align:center;color:#71837b;border:1px dashed #cbdcd5;border-radius:12px;background:#fff}
+    .ticket-tasks-v10829{display:grid;gap:10px}.ticket-task-v10829{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;background:#fff;border:1px solid #dce9e4;border-right:5px solid #0c765a;border-radius:16px;padding:13px}.ticket-task-v10829.sla-late{border-right-color:#d92d20}.ticket-task-v10829.sla-near{border-right-color:#f0b429}.ticket-task-check-v10829{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#edf5f2;color:#075342;font-size:18px;font-weight:900}.task-closed .ticket-task-check-v10829{background:#e5f7ec;color:#14713d}.ticket-task-title-v10829{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:#073f34}.ticket-task-main-v10829 p{margin:5px 0;color:#5d7067}.ticket-task-meta-v10829{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:#61736b}
+    @media(max-width:980px){.ticket-kanban-v10829{grid-template-columns:repeat(2,minmax(260px,1fr))}.ticket-task-v10829{grid-template-columns:auto 1fr}.ticket-task-v10829>.ticket-actions-v10829{grid-column:1/-1}}
+    @media(max-width:620px){.ticket-kanban-v10829{grid-template-columns:1fr}.ticket-task-v10829{grid-template-columns:1fr}.ticket-task-check-v10829{display:none}}
+  `; document.head.appendChild(st); }
+
+  const previousRender=window.renderTickets;
+  window.renderTickets=async function(){
+    ensureSelects(); style();
+    let result;
+    if(typeof previousRender==='function') result=await Promise.resolve(previousRender.apply(this,arguments));
+    const b=body(); if(!b)return result;
+    const current=mode(); setModeValue(current);
+    if(current==='cards'){ restoreCardsClass(b); return result; }
+    const rows=rowsInRenderedOrder(b);
+    applyView(b,rows,current);
+    return result;
+  };
+
+  function boot(){ ensureSelects(); style(); try{window.renderTickets?.();}catch(e){console.warn(BUILD,e);} }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,1000));
+  window.addEventListener('load',()=>setTimeout(boot,1500));
+  setTimeout(boot,2400);
+  console.info(BUILD,'loaded');
+})();
