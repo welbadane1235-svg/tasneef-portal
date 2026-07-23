@@ -26142,7 +26142,7 @@ ${finalUrl}
     const custom=safeJson(user.permissions); if(custom[permissionKey]===true||custom[permissionKey]==='allow') return scopeAllowedV10700(user,scopeCtx,resource); if(custom[permissionKey]===false||custom[permissionKey]==='deny') return false;
     const presets={
       operations_manager:['dashboard.view','projects.view','projects.update','workers.view','workers.update','distribution.manage','attendance.manage','daily_records.manage','daily_records.print','monthly_times.view','tickets.manage','maintenance.manage','supervisor_reports.view','reports.view'],
-      supervisor:['dashboard.view','projects.view','workers.view','attendance.create','attendance.view','daily_records.create','daily_records.view','daily_records.update','daily_records.print','tickets.view','tickets.create','supervisor_reports.view'],
+      supervisor:['dashboard.view','projects.view','workers.view','attendance.create','attendance.view','daily_records.create','daily_records.view','daily_records.update','daily_records.print','tickets.view','tickets.create','tickets.close','supervisor_reports.view'],
       finance_manager:['dashboard.view','salaries.manage','contracts.view','contracts.view_financial','invoices.manage','expenses.manage','reports.view','reports.export'],
       accountant:['salaries.view','contracts.view','contracts.view_financial','invoices.manage','expenses.manage','reports.view'],
       sales_manager:['dashboard.view','crm.manage','clients.manage','quotes.manage','contracts.view','reports.view'],
@@ -27375,14 +27375,14 @@ ${finalUrl}
 })();
 /* ===== END V10830 ===== */
 
-/* ===== V10838: إصلاح إغلاق التذاكر في نسخة المشرف فقط ===== */
+/* ===== V10839: تفعيل زر إغلاق التذاكر في نسخة المشرف وصلاحية الدور ===== */
 (function(){
   'use strict';
   if(window.__tasneefSupervisorTicketCloseV10838) return;
   const isSupervisorPage = !!document.getElementById('supTicketsBody') && !document.getElementById('ticketsBody');
   if(!isSupervisorPage) return;
   window.__tasneefSupervisorTicketCloseV10838 = true;
-  const BUILD='V10838_SUPERVISOR_TICKET_CLOSE';
+  const BUILD='V10839_SUPERVISOR_TICKET_CLOSE_PERMISSION';
   const S=v=>String(v??'').trim();
   const A=v=>Array.isArray(v)?v:[];
   const E=v=>S(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -27401,12 +27401,25 @@ ${finalUrl}
     const u=user();
     return S(u.permission_session_token||u.session_token||localStorage.getItem('tasneef_session_token_v10817')||localStorage.getItem('tasneef_permission_session_v10817'));
   }
-  function permissionAllowed(ticket){
+  async function permissionAllowed(ticket){
+    const context={project_id:ticket?.project_id};
     try{
-      if(window.PermissionsService?.can) return window.PermissionsService.can('tickets.close',{project_id:ticket?.project_id});
-      if(typeof window.can==='function') return window.can('tickets.close',{project_id:ticket?.project_id});
-    }catch(_){}
-    return true;
+      if(window.PermissionsService?.can && window.PermissionsService.can('tickets.close',context)) return true;
+      if(typeof window.can==='function' && window.can('tickets.close',context)) return true;
+      // قد تكون الصفحة ما زالت تحمل نسخة قديمة من صلاحيات الجلسة؛ أعد القراءة مرة واحدة من السيرفر.
+      if(window.PermissionsService?.load){
+        await window.PermissionsService.load(true);
+        if(window.PermissionsService.can('tickets.close',context)) return true;
+      }
+    }catch(e){ console.warn(BUILD,'permission refresh',e); }
+    return false;
+  }
+  function syncCloseButtons(){
+    let allowed=false;
+    try{ allowed=!!window.PermissionsService?.can?.('tickets.close'); }catch(_){}
+    document.querySelectorAll('#supTicketsBody button[onclick*="closeTicket("],#supTicketsBody button[data-permission="tickets.close"]').forEach(btn=>{
+      if(allowed){ btn.disabled=false; btn.dataset.permissionHidden='false'; btn.removeAttribute('aria-disabled'); }
+    });
   }
   function localTicket(id){ return A(window.data?.tickets).find(t=>S(t.id)===S(id)); }
   async function refreshTickets(){
@@ -27515,7 +27528,7 @@ ${finalUrl}
     const u=user(); if(!S(u.id)) return notify('سجّل الدخول أولاً','err');
     const ticket=await getTicket(id); if(!ticket) return notify('تعذر العثور على التذكرة. اضغط تحديث ثم أعد المحاولة.','err');
     if(S(ticket.status).toLowerCase()==='closed') return notify('التذكرة مغلقة بالفعل','err');
-    if(!permissionAllowed(ticket)) return notify('ليس لديك صلاحية إغلاق هذه التذكرة','err');
+    if(!(await permissionAllowed(ticket))) return notify('ليس لديك صلاحية إغلاق هذه التذكرة. تأكد من تشغيل إصلاح V10839 في Supabase.','err');
     const form=await closeDialog(ticket); if(!form) return;
     try{
       const updated=await closeOnServer(ticket,form.note,form.closer);
@@ -27532,7 +27545,15 @@ ${finalUrl}
   }
 
   window.supervisorCloseTicketV10838=supervisorCloseTicket;
+  window.supervisorCloseTicketV10839=supervisorCloseTicket;
   window.closeTicket=supervisorCloseTicket;
+  const previousRenderTicketsV10839=window.renderTickets;
+  if(typeof previousRenderTicketsV10839==='function'){
+    window.renderTickets=async function(){ const result=await Promise.resolve(previousRenderTicketsV10839.apply(this,arguments)); setTimeout(syncCloseButtons,0); return result; };
+  }
+  document.addEventListener('tasneef-permissions-ready',()=>setTimeout(syncCloseButtons,0));
+  window.addEventListener('focus',()=>setTimeout(syncCloseButtons,100));
+  setTimeout(syncCloseButtons,1200);
 
   function style(){
     if($('supervisorTicketCloseStyleV10838')) return;
@@ -27548,4 +27569,4 @@ ${finalUrl}
   style();
   console.info(BUILD,'loaded');
 })();
-/* ===== END V10838 ===== */
+/* ===== END V10839 ===== */
