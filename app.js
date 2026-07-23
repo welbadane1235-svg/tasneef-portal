@@ -27105,7 +27105,7 @@ ${finalUrl}
   'use strict';
   if(window.__tasneefAttendanceTimePolicyV10830)return;
   window.__tasneefAttendanceTimePolicyV10830=true;
-  const BUILD='V10837-project-switch-open-session-lock';
+  const BUILD='V10840-project-selection-independent-open-record';
   const $=id=>document.getElementById(id);
   const S=v=>String(v??'').trim();
   const N=v=>Number(v)||0;
@@ -27187,18 +27187,16 @@ ${finalUrl}
     const p=s?.project||projectById(currentProjectId())||{};const meta=statusMessage(s);
     if(!p.id&&!currentProjectId()){el.innerHTML='<div class="attendance-time-empty-v10830">اختر المشروع لعرض المدة ووقت الخروج المتوقع.</div>';return}
     const req=N(s?.required_minutes||requiredLocal(p));
-    const lockedNotice=s?.selection_locked?`<div class="attendance-project-lock-v10837"><b>يوجد تسجيل مفتوح على ${esc(p.name||'المشروع')}</b><span>يجب تسجيل الخروج من هذا المشروع قبل الانتقال إلى مشروع آخر.</span></div>`:'';
-    el.innerHTML=`${lockedNotice}<div class="attendance-time-head-v10830"><b>${esc(p.name||'المشروع')}</b><span class="attendance-time-type-v10830">${S(p.operation_type)==='full_time'?'دوام كامل':S(p.operation_type)==='daily_visit'?'زيارة يومية':'حسب الحاجة'}</span></div>
+    const otherOpen=s?.other_open_record||null;
+    const otherOpenName=S(s?.other_open_project?.name||otherOpen?.project_name||'مشروع آخر');
+    const openNotice=otherOpen?`<div class="attendance-project-lock-v10837"><b>يوجد تسجيل مفتوح على ${esc(otherOpenName)}</b><span>تم عرض بيانات المشروع الذي اخترته: ${esc(p.name||'المشروع')}. لا يمكن بدء تسجيل جديد قبل إغلاق التسجيل المفتوح، ويمكنك الرجوع إلى مشروع التسجيل المفتوح عند تسجيل الخروج.</span></div>`:'';
+    el.innerHTML=`${openNotice}<div class="attendance-time-head-v10830"><b>${esc(p.name||'المشروع')}</b><span class="attendance-time-type-v10830">${S(p.operation_type)==='full_time'?'دوام كامل':S(p.operation_type)==='daily_visit'?'زيارة يومية':'حسب الحاجة'}</span></div>
       <div class="attendance-time-grid-v10830">
        <div><small>وقت الدخول</small><b>${s?.open_record?timeText(s.open_record.check_in):'-'}</b></div>
        <div><small>المدة المطلوبة</small><b>${minsText(req)}</b></div>
        <div><small>الخروج المتوقع</small><b>${s?.expected_checkout_at?timeText(s.expected_checkout_at):'-'}</b></div>
        <div><small>${N(s?.extra_minutes)>0?'الوقت الزائد':'المتبقي'}</small><b>${minsText(N(s?.extra_minutes)>0?s.extra_minutes:s?.remaining_minutes||0)}</b></div>
       </div><div class="attendance-time-alert-v10830 ${meta.cls}">${esc(meta.text)}</div>`;
-  }
-  function selectProjectWithoutEvent(projectId){
-    const el=$('logProject')||$('supLogProject');
-    if(el&&S(projectId)&&S(el.value)!==S(projectId))el.value=S(projectId);
   }
   function renderProjectLoading(projectId){
     const el=timingPanel();if(!el)return;
@@ -27216,9 +27214,29 @@ ${finalUrl}
     const openPid=S(s?.open_record?.project_id||'');
     if(openPid&&openPid!==S(requestedPid)){
       state.lockedProjectId=openPid;
-      selectProjectWithoutEvent(openPid);
-      s={...s,selection_locked:true,attempted_project_id:requestedPid};
-      if(options.userChange)notify(`لديك تسجيل مفتوح في مشروع ${s.project?.name||s.open_record?.project_name||''}. سجّل الخروج أولًا قبل تغيير المشروع.`,'warn');
+      const originalOpenRecord=s.open_record;
+      const originalOpenProject=s.project||projectById(openPid)||{name:originalOpenRecord?.project_name};
+      let selectedContext=null;
+      try{selectedContext=await context(requestedPid)}catch(_){selectedContext=null}
+      if(seq!==state.requestSeq||S(currentProjectId())!==S(requestedPid))return null;
+      const selectedProject=selectedContext?.project||projectById(requestedPid)||{id:requestedPid,name:'المشروع المحدد'};
+      const selectedRequired=N(selectedContext?.required_minutes||requiredLocal(selectedProject));
+      s={
+        ...s,
+        project:selectedProject,
+        requested_project_id:requestedPid,
+        required_minutes:selectedRequired,
+        no_friday_shift:!!selectedContext?.no_friday_shift,
+        allow_cross_midnight:!!selectedContext?.allow_cross_midnight,
+        open_record:null,
+        expected_checkout_at:null,
+        remaining_minutes:selectedRequired,
+        extra_minutes:0,
+        other_open_record:originalOpenRecord,
+        other_open_project:originalOpenProject,
+        source:selectedContext?.source||s.source
+      };
+      if(options.userChange)notify(`تم عرض مشروع ${selectedProject.name||'المشروع المحدد'}. لديك تسجيل مفتوح في ${originalOpenProject?.name||originalOpenRecord?.project_name||'مشروع آخر'}.`,'warn');
     }else state.lockedProjectId=openPid||'';
     if(seq!==state.requestSeq)return null;
     renderTiming(s);
