@@ -27105,7 +27105,7 @@ ${finalUrl}
   'use strict';
   if(window.__tasneefAttendanceTimePolicyV10830)return;
   window.__tasneefAttendanceTimePolicyV10830=true;
-  const BUILD='V10840-project-selection-independent-open-record';
+  const BUILD='V10841-multiple-open-project-records';
   const $=id=>document.getElementById(id);
   const S=v=>String(v??'').trim();
   const N=v=>Number(v)||0;
@@ -27157,8 +27157,26 @@ ${finalUrl}
   async function openStatus(projectId=null,force=false){
     if(!force&&state.status&&Date.now()-state.lastServerAt<45000&&(!projectId||S(state.status?.requested_project_id)===S(projectId)))return state.status;
     try{
-      const d=await rpc('tasneef_attendance_open_status_v10830',{p_project_id:projectId?Number(projectId):null});
-      state.status=d||{};state.lastServerAt=Date.now();return state.status;
+      let d=await rpc('tasneef_attendance_open_status_v10830',{p_project_id:projectId?Number(projectId):null});
+      d=d||{};
+      // توافق آمن مع أي إصدار أقدم من RPC: عند طلب مشروع محدد يجب ألا نعيد سجل مشروع آخر.
+      if(projectId&&d?.open_record&&S(d.open_record.project_id)!==S(projectId)){
+        const foreignOpen=d.open_record;
+        const uid=S(currentUser()?.id);
+        let selected=(window.data?.logs||[]).filter(x=>S(x.project_id)===S(projectId)&&!x.check_out&&(!uid||S(x.supervisor_id)===uid||S(x.user_id)===uid)).sort((a,b)=>new Date(b.check_in)-new Date(a.check_in))[0]||null;
+        if(!selected&&window.sb?.from){
+          let q=window.sb.from('time_logs').select('*').eq('project_id',Number(projectId)).is('check_out',null);
+          if(uid)q=q.or(`supervisor_id.eq.${uid},user_id.eq.${uid}`);
+          const qr=await q.order('check_in',{ascending:false}).limit(1);if(!qr.error)selected=qr.data?.[0]||null;
+        }
+        const c=await context(projectId);
+        const now=Date.now();
+        const expected=selected?.expected_checkout_at?new Date(selected.expected_checkout_at).getTime():selected?.check_in?new Date(selected.check_in).getTime()+N(selected.required_minutes||c.required_minutes)*60000:0;
+        const delta=expected?Math.round((expected-now)/60000):N(c.required_minutes);
+        const opens=Array.isArray(d.open_records)?d.open_records:[foreignOpen].filter(Boolean);
+        d={...c,...d,requested_project_id:projectId,project:c.project||projectById(projectId),open_record:selected,required_minutes:N(selected?.required_minutes||c.required_minutes),expected_checkout_at:selected?.expected_checkout_at||null,remaining_minutes:selected?Math.max(0,delta):N(c.required_minutes),extra_minutes:selected?Math.max(0,-delta):0,open_records:opens};
+      }
+      state.status=d;state.lastServerAt=Date.now();return state.status;
     }catch(e){console.warn(BUILD,'status fallback',e);return null}
   }
   function timingPanel(){
@@ -27187,9 +27205,10 @@ ${finalUrl}
     const p=s?.project||projectById(currentProjectId())||{};const meta=statusMessage(s);
     if(!p.id&&!currentProjectId()){el.innerHTML='<div class="attendance-time-empty-v10830">اختر المشروع لعرض المدة ووقت الخروج المتوقع.</div>';return}
     const req=N(s?.required_minutes||requiredLocal(p));
-    const otherOpen=s?.other_open_record||null;
-    const otherOpenName=S(s?.other_open_project?.name||otherOpen?.project_name||'مشروع آخر');
-    const openNotice=otherOpen?`<div class="attendance-project-lock-v10837"><b>يوجد تسجيل مفتوح على ${esc(otherOpenName)}</b><span>تم عرض بيانات المشروع الذي اخترته: ${esc(p.name||'المشروع')}. لا يمكن بدء تسجيل جديد قبل إغلاق التسجيل المفتوح، ويمكنك الرجوع إلى مشروع التسجيل المفتوح عند تسجيل الخروج.</span></div>`:'';
+    const allOpenRecords=Array.isArray(s?.open_records)?s.open_records:[];
+    const otherOpenRecords=allOpenRecords.filter(r=>S(r?.project_id)!==S(p.id||currentProjectId()));
+    const otherOpenNames=[...new Set(otherOpenRecords.map(r=>S(r?.project_name||projectById(r?.project_id)?.name)).filter(Boolean))];
+    const openNotice=otherOpenNames.length?`<div class="attendance-project-lock-v10837 attendance-multi-open-v10841"><b>تسجيلات مفتوحة أخرى: ${esc(otherOpenNames.join('، '))}</b><span>يمكنك تسجيل الدخول للمشروع المحدد أيضًا. كل مشروع يحتفظ بتسجيل مستقل، وعند الخروج اختر المشروع المطلوب إغلاقه.</span></div>`:'';
     el.innerHTML=`${openNotice}<div class="attendance-time-head-v10830"><b>${esc(p.name||'المشروع')}</b><span class="attendance-time-type-v10830">${S(p.operation_type)==='full_time'?'دوام كامل':S(p.operation_type)==='daily_visit'?'زيارة يومية':'حسب الحاجة'}</span></div>
       <div class="attendance-time-grid-v10830">
        <div><small>وقت الدخول</small><b>${s?.open_record?timeText(s.open_record.check_in):'-'}</b></div>
@@ -27236,7 +27255,7 @@ ${finalUrl}
         other_open_project:originalOpenProject,
         source:selectedContext?.source||s.source
       };
-      if(options.userChange)notify(`تم عرض مشروع ${selectedProject.name||'المشروع المحدد'}. لديك تسجيل مفتوح في ${originalOpenProject?.name||originalOpenRecord?.project_name||'مشروع آخر'}.`,'warn');
+      if(options.userChange)notify(`تم عرض مشروع ${selectedProject.name||'المشروع المحدد'}. لديك تسجيل مفتوح أيضًا في ${originalOpenProject?.name||originalOpenRecord?.project_name||'مشروع آخر'}، ويمكنك تسجيل المشروع الحالي بشكل مستقل.`,'warn');
     }else state.lockedProjectId=openPid||'';
     if(seq!==state.requestSeq)return null;
     renderTiming(s);
@@ -27282,7 +27301,10 @@ ${finalUrl}
       const c=await context(pid);if(!c?.ok)throw new Error(c?.message||'تعذر قراءة بيانات المشروع');
       if(c.project&&!activeProject(c.project))return notify('المشروع متوقف ولا يمكن بدء تسجيل جديد.','err');
       if(c.no_friday_shift)return notify('لا يوجد دوام مطلوب لهذا المشروع يوم الجمعة.','err');
-      const s=await openStatus(null,true);if(s?.open_record&&S(s.open_record.project_id)!==S(pid))return notify(`لديك تسجيل مفتوح في مشروع ${s.project?.name||s.open_record.project_name||''}. سجّل الخروج أولًا.`,'err');
+      const s=await openStatus(pid,true);
+      if(s?.open_record&&S(s.open_record.project_id)===S(pid))notify(`يوجد تسجيل مفتوح لهذا المشروع، وسيتم استخدامه وإضافة العمال المحددين إليه دون إنشاء سجل مكرر.`,'warn');
+      const otherCount=(Array.isArray(s?.open_records)?s.open_records:[]).filter(r=>S(r?.project_id)!==S(pid)).length;
+      if(otherCount)notify(`لديك ${otherCount} تسجيل${otherCount===1?'':'ات'} مفتوح${otherCount===1?'':'ة'} في مشاريع أخرى. يُسمح بتسجيل المشروع الحالي بشكل مستقل.`,'warn');
       const out=await oldCheckIn.apply(this,arguments);setTimeout(()=>refreshTiming(true),500);return out;
     }catch(e){notify(e.message||String(e),'err')}
   };
