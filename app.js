@@ -27105,12 +27105,12 @@ ${finalUrl}
   'use strict';
   if(window.__tasneefAttendanceTimePolicyV10830)return;
   window.__tasneefAttendanceTimePolicyV10830=true;
-  const BUILD='V10831-project-time-policy-review-pages';
+  const BUILD='V10837-project-switch-open-session-lock';
   const $=id=>document.getElementById(id);
   const S=v=>String(v??'').trim();
   const N=v=>Number(v)||0;
   const esc=v=>S(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const state={status:null,lastServerAt:0,timer:null,reviewTimer:null,reasonShownFor:null,review:{page:1,pageSize:5,status:'all',projectId:'',supervisorId:'',search:'',total:0,filters:{projects:[],supervisors:[]},loading:false}};
+  const state={status:null,lastServerAt:0,timer:null,reviewTimer:null,reasonShownFor:null,requestSeq:0,lockedProjectId:'',review:{page:1,pageSize:5,status:'all',projectId:'',supervisorId:'',search:'',total:0,filters:{projects:[],supervisors:[]},loading:false}};
   const delayReasons=[
     ['emergency_fault','عطل طارئ بالمشروع'],['urgent_client_complaint','شكوى عاجلة من العميل'],
     ['client_extra_work','أعمال إضافية بطلب العميل'],['worker_shortage','نقص في عدد العمال'],
@@ -27187,7 +27187,8 @@ ${finalUrl}
     const p=s?.project||projectById(currentProjectId())||{};const meta=statusMessage(s);
     if(!p.id&&!currentProjectId()){el.innerHTML='<div class="attendance-time-empty-v10830">اختر المشروع لعرض المدة ووقت الخروج المتوقع.</div>';return}
     const req=N(s?.required_minutes||requiredLocal(p));
-    el.innerHTML=`<div class="attendance-time-head-v10830"><b>${esc(p.name||'المشروع')}</b><span class="attendance-time-type-v10830">${S(p.operation_type)==='full_time'?'دوام كامل':S(p.operation_type)==='daily_visit'?'زيارة يومية':'حسب الحاجة'}</span></div>
+    const lockedNotice=s?.selection_locked?`<div class="attendance-project-lock-v10837"><b>يوجد تسجيل مفتوح على ${esc(p.name||'المشروع')}</b><span>يجب تسجيل الخروج من هذا المشروع قبل الانتقال إلى مشروع آخر.</span></div>`:'';
+    el.innerHTML=`${lockedNotice}<div class="attendance-time-head-v10830"><b>${esc(p.name||'المشروع')}</b><span class="attendance-time-type-v10830">${S(p.operation_type)==='full_time'?'دوام كامل':S(p.operation_type)==='daily_visit'?'زيارة يومية':'حسب الحاجة'}</span></div>
       <div class="attendance-time-grid-v10830">
        <div><small>وقت الدخول</small><b>${s?.open_record?timeText(s.open_record.check_in):'-'}</b></div>
        <div><small>المدة المطلوبة</small><b>${minsText(req)}</b></div>
@@ -27195,11 +27196,31 @@ ${finalUrl}
        <div><small>${N(s?.extra_minutes)>0?'الوقت الزائد':'المتبقي'}</small><b>${minsText(N(s?.extra_minutes)>0?s.extra_minutes:s?.remaining_minutes||0)}</b></div>
       </div><div class="attendance-time-alert-v10830 ${meta.cls}">${esc(meta.text)}</div>`;
   }
-  async function refreshTiming(force=false){
-    const pid=currentProjectId();
-    if(!pid){renderTiming(null);return null}
-    let s=await openStatus(pid,force);
-    if(!s){const c=await context(pid);s={...c,requested_project_id:pid,open_record:null,remaining_minutes:N(c.required_minutes),extra_minutes:0};}
+  function selectProjectWithoutEvent(projectId){
+    const el=$('logProject')||$('supLogProject');
+    if(el&&S(projectId)&&S(el.value)!==S(projectId))el.value=S(projectId);
+  }
+  function renderProjectLoading(projectId){
+    const el=timingPanel();if(!el)return;
+    const p=projectById(projectId)||{};
+    el.innerHTML=`<div class="attendance-time-head-v10830"><b>${esc(p.name||'المشروع المحدد')}</b></div><div class="attendance-time-empty-v10830">جارٍ تحديث وقت المشروع المحدد...</div>`;
+  }
+  async function refreshTiming(force=false,options={}){
+    const requestedPid=currentProjectId();
+    const seq=++state.requestSeq;
+    if(!requestedPid){state.status=null;state.lockedProjectId='';renderTiming(null);return null}
+    if(options.immediate)renderProjectLoading(requestedPid);
+    let s=await openStatus(requestedPid,force);
+    if(seq!==state.requestSeq||S(currentProjectId())!==S(requestedPid))return null;
+    if(!s){const c=await context(requestedPid);if(seq!==state.requestSeq||S(currentProjectId())!==S(requestedPid))return null;s={...c,requested_project_id:requestedPid,open_record:null,remaining_minutes:N(c.required_minutes),extra_minutes:0};}
+    const openPid=S(s?.open_record?.project_id||'');
+    if(openPid&&openPid!==S(requestedPid)){
+      state.lockedProjectId=openPid;
+      selectProjectWithoutEvent(openPid);
+      s={...s,selection_locked:true,attempted_project_id:requestedPid};
+      if(options.userChange)notify(`لديك تسجيل مفتوح في مشروع ${s.project?.name||s.open_record?.project_name||''}. سجّل الخروج أولًا قبل تغيير المشروع.`,'warn');
+    }else state.lockedProjectId=openPid||'';
+    if(seq!==state.requestSeq)return null;
     renderTiming(s);
     try{await rpc('tasneef_attendance_emit_due_alerts_v10830',{})}catch(_){ }
     if(s?.previous_auto_closed?.id&&!s.previous_auto_closed.delay_reason_code&&state.reasonShownFor!==S(s.previous_auto_closed.id)){
@@ -27230,7 +27251,12 @@ ${finalUrl}
     try{await rpc('tasneef_attendance_submit_previous_reason_v10830',{p_attendance_id:Number(row.id),p_reason_code:reason.code,p_reason_text:reason.text});notify('تم حفظ سبب عدم تسجيل الخروج.');refreshTiming(true)}catch(e){notify(e.message||String(e),'err')}
   }
   const oldProjectChange=window.onLogProjectChange;
-  window.onLogProjectChange=function(){try{oldProjectChange?.apply(this,arguments)}catch(e){console.warn(e)}setTimeout(()=>refreshTiming(true),80)};
+  window.onLogProjectChange=function(){
+    try{oldProjectChange?.apply(this,arguments)}catch(e){console.warn(e)}
+    state.status=null;state.lastServerAt=0;
+    const pid=currentProjectId();renderProjectLoading(pid);
+    setTimeout(()=>refreshTiming(true,{userChange:true,immediate:false}),30);
+  };
   const oldCheckIn=window.supervisorCheckIn;
   if(typeof oldCheckIn==='function')window.supervisorCheckIn=async function(btn){
     const pid=currentProjectId();if(!pid)return notify('اختر المشروع','err');
@@ -27337,7 +27363,7 @@ ${finalUrl}
   window.tasneefEditApprovedMinutesV10830=async function(id,current){const v=prompt('أدخل عدد الدقائق المعتمدة',String(current));if(v===null)return;const n=Number(v);if(!Number.isFinite(n)||n<0)return notify('عدد الدقائق غير صالح','err');try{await rpc('tasneef_attendance_review_extra_v10830',{p_attendance_id:Number(id),p_action:'edit',p_approved_minutes:Math.round(n),p_reason:'تعديل إداري للوقت المعتمد'});notify('تم تعديل الوقت المعتمد.');loadReviewQueue()}catch(e){notify(e.message||String(e),'err')}};
   function style(){if($('attendanceTimePolicyStyleV10830'))return;const st=document.createElement('style');st.id='attendanceTimePolicyStyleV10830';st.textContent=`
     .project-shift-toggle-v10830{display:flex!important;align-items:center;gap:8px;min-height:44px}.project-shift-toggle-v10830 input{width:auto!important}
-    .attendance-time-panel-v10830{border:1px solid #cfe2dc;background:#f5faf8;border-radius:16px;padding:12px;margin:10px 0}.attendance-time-head-v10830{display:flex;justify-content:space-between;align-items:center;gap:8px}.attendance-time-type-v10830{background:#e0f1eb;color:#07533e;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:800}.attendance-time-grid-v10830{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}.attendance-time-grid-v10830>div{background:#fff;border:1px solid #dceae5;border-radius:11px;padding:8px}.attendance-time-grid-v10830 small{display:block;color:#64766e}.attendance-time-grid-v10830 b{display:block;color:#073f34;margin-top:4px}.attendance-time-alert-v10830{padding:9px 11px;border-radius:10px;font-weight:800}.attendance-time-alert-v10830.ok{background:#e5f7ec;color:#166b3b}.attendance-time-alert-v10830.near{background:#edf4ff;color:#315f9a}.attendance-time-alert-v10830.warn{background:#fff1d6;color:#885600}.attendance-time-alert-v10830.danger{background:#ffe7e7;color:#a31b1b}.attendance-time-alert-v10830.done{background:#e8f1ff;color:#24588c}.attendance-time-alert-v10830.neutral{background:#eef5f2;color:#476158}
+    .attendance-time-panel-v10830{border:1px solid #cfe2dc;background:#f5faf8;border-radius:16px;padding:12px;margin:10px 0}.attendance-project-lock-v10837{display:flex;flex-direction:column;gap:4px;background:#fff2d9;border:1px solid #efc774;color:#7a4c00;border-radius:11px;padding:9px 11px;margin-bottom:9px}.attendance-project-lock-v10837 b{color:#8a3800}.attendance-project-lock-v10837 span{font-size:12px}.attendance-time-head-v10830{display:flex;justify-content:space-between;align-items:center;gap:8px}.attendance-time-type-v10830{background:#e0f1eb;color:#07533e;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:800}.attendance-time-grid-v10830{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}.attendance-time-grid-v10830>div{background:#fff;border:1px solid #dceae5;border-radius:11px;padding:8px}.attendance-time-grid-v10830 small{display:block;color:#64766e}.attendance-time-grid-v10830 b{display:block;color:#073f34;margin-top:4px}.attendance-time-alert-v10830{padding:9px 11px;border-radius:10px;font-weight:800}.attendance-time-alert-v10830.ok{background:#e5f7ec;color:#166b3b}.attendance-time-alert-v10830.near{background:#edf4ff;color:#315f9a}.attendance-time-alert-v10830.warn{background:#fff1d6;color:#885600}.attendance-time-alert-v10830.danger{background:#ffe7e7;color:#a31b1b}.attendance-time-alert-v10830.done{background:#e8f1ff;color:#24588c}.attendance-time-alert-v10830.neutral{background:#eef5f2;color:#476158}
     .attendance-modal-v10830{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:14px}.attendance-modal-card-v10830{width:min(650px,100%);max-height:94vh;overflow:auto;background:#fff;border-radius:20px;padding:18px;box-shadow:0 30px 80px rgba(0,0,0,.35)}.attendance-modal-head-v10830 h3{margin:0 0 14px;color:#07533e}.attendance-delay-summary-v10830{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}.attendance-delay-summary-v10830>div{background:#f4f8f6;border:1px solid #dce8e3;border-radius:11px;padding:9px}.attendance-delay-summary-v10830 small{display:block;color:#6c7d75}.attendance-modal-actions-v10830{display:flex;gap:8px;justify-content:flex-start;margin-top:14px}.attendance-error-v10830{color:#a31b1b;font-weight:800;margin-top:8px}
     .attendance-review-kpis-v10830{display:grid;grid-template-columns:repeat(6,1fr);gap:9px;margin:12px 0}.attendance-review-kpis-v10830>button{appearance:none;background:#f5faf8;border:1px solid #dbe8e3;border-radius:12px;padding:10px;text-align:center;color:inherit;cursor:pointer}.attendance-review-kpis-v10830>button:hover,.attendance-review-kpis-v10830>button.active{border-color:#0b6b50;background:#e4f3ee;box-shadow:0 0 0 2px rgba(11,107,80,.08)}.attendance-review-kpis-v10830 small{display:block}.attendance-review-kpis-v10830 b{font-size:22px;color:#07533e}.attendance-review-filters-v10831{display:grid;grid-template-columns:minmax(220px,2fr) repeat(4,minmax(130px,1fr)) auto auto;gap:8px;align-items:center;background:#f7faf9;border:1px solid #dce8e3;border-radius:14px;padding:10px;margin:10px 0}.attendance-review-filters-v10831 input,.attendance-review-filters-v10831 select{min-height:42px;margin:0}.attendance-review-result-head-v10831{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 2px 9px;color:#53665e}.attendance-review-list-v10830{display:grid;gap:8px}.attendance-review-item-v10830{display:flex;justify-content:space-between;gap:12px;border:1px solid #dce8e3;border-right:5px solid #7b8790;border-radius:13px;padding:10px 12px;background:#fff}.attendance-review-item-v10830.status-pending_review{border-right-color:#7b2cbf}.attendance-review-item-v10830.status-approved{border-right-color:#168a4a}.attendance-review-item-v10830.status-rejected{border-right-color:#c83232}.attendance-review-item-v10830 small{display:block;color:#64766e;margin-top:3px}.attendance-review-item-v10830 p{margin:4px 0;color:#4d6259}.attendance-review-item-main-v10831{min-width:0}.attendance-review-reason-v10831{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:850px}.attendance-review-actions-v10830{display:flex;gap:6px;align-items:center;flex-wrap:wrap;flex-shrink:0}.attendance-review-pagination-v10831{display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0 4px}.attendance-review-pagination-v10831>div{display:flex;gap:4px;align-items:center}.attendance-review-pagination-v10831 button{min-width:38px}.attendance-review-pagination-v10831 button.active{background:#07533e;color:#fff}.attendance-review-pagination-v10831 button:disabled{opacity:.45;cursor:not-allowed}.attendance-review-pagination-v10831 span{color:#62746c}.attendance-review-card-v10830.is-loading-v10831{opacity:.72;pointer-events:none}.attendance-project-audit-v10830{margin-top:12px;border:1px solid #dce8e3;border-radius:12px;padding:10px}.project-audit-row-v10830{display:grid;grid-template-columns:1fr 2fr;gap:6px;padding:8px;border-bottom:1px solid #edf2ef}.project-audit-row-v10830 small{grid-column:1/-1;color:#687970}
     @media(max-width:1100px){.attendance-review-filters-v10831{grid-template-columns:repeat(3,1fr)}.attendance-review-filters-v10831 input{grid-column:1/-1}}
